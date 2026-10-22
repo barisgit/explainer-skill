@@ -10,7 +10,7 @@
 	#budget-chart { block-size: clamp(22rem, 52vw, 27rem); }
 	#algo-chart { block-size: clamp(14rem, 36vw, 18rem); }
 	.presets { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-	.verdict-note { margin-block: 0.75rem; padding-inline: var(--inset); }
+	.verdict-note { margin-block: 0.75rem; padding-inline: var(--pad); }
 	.sources li { margin-block: 0.35rem; }
 	.note-list { padding-inline-start: 1.1rem; }
 	.note-list li { margin-block: 0.4rem; }
@@ -20,7 +20,6 @@
 <main class="page">
 	<div data-overview>
 		<header class="masthead">
-			<p class="eyebrow">Password hashing · OWASP Password Storage Cheat Sheet, read 22 Oct 2026</p>
 			<h1>Use <em>Argon2id</em>, unless a FIPS-140 requirement makes it <em>PBKDF2</em>. Memory per login decides the rest.</h1>
 			<p class="lede">OWASP ranks the four: Argon2id first, scrypt when Argon2id is unavailable, PBKDF2 when FIPS-140 is required, bcrypt only for legacy systems. Set your deployment below and see which OWASP setting fits.</p>
 		</header>
@@ -57,7 +56,6 @@
 		</figure>
 
 		<section>
-			<p class="label">Side by side</p>
 			<h2>What OWASP says about each algorithm</h2>
 			<table class="compare">
 				<thead><tr><th>Algorithm</th><th>OWASP's role for it</th><th>Minimum setting</th><th>Nominal memory</th><th>Watch out for</th></tr></thead>
@@ -77,7 +75,6 @@
 		</section>
 
 		<section>
-			<p class="label">Legacy hashes</p>
 			<h2>Three ways OWASP describes to move old hashes forward</h2>
 			<p>Whatever you migrate to, store the algorithm and cost next to each hash, for example in the PHC string format, so old and new hashes can coexist during the transition.</p>
 			<div class="controls">
@@ -88,7 +85,7 @@
 				</div>
 			</div>
 
-			<div data-mig="login">
+			<div class="beside" data-mig="login">
 				<p>The user's <span data-ref="l_verify">old-hash check</span> is the only moment you hold the plaintext password, so that is when the <span data-ref="l_rehash">new hash</span> gets made. Users who never return keep their old hash until you act on them.</p>
 				<figure class="fig" data-stepper aria-label="Re-hash at login, step by step">
 					<pre class="mermaid" data-steps="l_login:1 l_e1:2 l_verify:2 l_e2:3 l_ok:3 l_e3:4 l_reject:4 l_e4:5 l_rehash:5 l_e5:6 l_store:6">
@@ -110,7 +107,7 @@ flowchart TD
 				</figure>
 			</div>
 
-			<div data-mig="wrap" hidden>
+			<div class="beside" data-mig="wrap" hidden>
 				<p>OWASP's second method feeds the <span data-ref="w_old">existing hash</span> into the new algorithm, so you can protect every row now without knowing any password. It also notes that layering can make hashes easier to crack, so the <span data-ref="w_plain">direct hash</span> should replace it at the next login.</p>
 				<figure class="fig" data-stepper aria-label="Wrap the stored hash, step by step">
 					<pre class="mermaid" data-steps="w_old:1 w_e1:2 w_wrap:2 w_e2:3 w_login:3 w_e3:4 w_plain:4">
@@ -128,7 +125,7 @@ flowchart TD
 				</figure>
 			</div>
 
-			<div data-mig="expire" hidden>
+			<div class="beside" data-mig="expire" hidden>
 				<p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p>
 				<figure class="fig" data-stepper aria-label="Expire inactive users, step by step">
 					<pre class="mermaid" data-steps="x_idle:1 x_e1:2 x_expire:2 x_e2:3 x_reset:3">
@@ -146,8 +143,7 @@ flowchart TD
 			<p class="caveat"><b>Inferred</b>OWASP gives no inactivity period, and no migration advice that depends on the target algorithm. Existing bcrypt hashes at cost 10 or more are what OWASP calls acceptable for legacy systems, so they are not urgent to move.</p>
 		</section>
 
-		<section id="decision">
-			<p class="label">The choice</p>
+		<section class="band" id="decision">
 			<h2>How many hashing algorithms will you run?</h2>
 			<p>The constraints leave one real decision: whether the FIPS-140 requirement applies to everyone or only to some deployments.</p>
 			<table class="compare">
@@ -178,8 +174,8 @@ flowchart TD
 			</fieldset>
 		</section>
 
-		<section class="sources">
-			<p class="label">Sources</p>
+		<section class="sources minor">
+			<h2>Sources</h2>
 			<ul>
 				<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Cheat Sheet Series, Password Storage Cheat Sheet</a>, fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it unless marked inferred. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Settings are reproduced and rearranged here; this page is offered under the same licence.</li>
 				<li>The cheat sheet itself cites <a href="https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver">NIST SP 800-63B-4</a> (PBKDF2 permitted), <a href="https://www.rfc-editor.org/rfc/rfc9106.html">RFC 9106</a> (Argon2) and <a href="https://www.rfc-editor.org/rfc/rfc7914.html">RFC 7914</a> (scrypt).</li>

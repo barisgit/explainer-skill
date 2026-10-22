@@ -25,7 +25,6 @@
 	.questions > li > p:first-child::before { content: counter(q) ". "; color: var(--accent); font-weight: 700; }
 	.questions textarea { inline-size: 100%; box-sizing: border-box; min-block-size: 4.5rem; margin-block: 0.4rem; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0.4rem; padding: 0.5rem 0.65rem; resize: vertical; }
 	.questions details p { margin-block: 0.5rem; }
-	.sources { color: var(--muted); font-size: 0.9rem; max-inline-size: 46rem; }
 	.sheet { border-top: 1px solid var(--rule-strong); }
 	.sheet-row { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: 0.25rem 1.5rem; padding-block: 0.6rem; border-bottom: 1px solid var(--rule); }
 	.sheet-row h3 { margin: 0; font-size: 0.95rem; line-height: 2.1; }
@@ -36,7 +35,6 @@
 <body>
 <main class="page">
 	<header class="masthead">
-		<p class="eyebrow">Fourier series · study page · first-year engineering</p>
 		<h1>A square wave is a sum of sines, and the bump at its jump never goes away</h1>
 		<p class="lede">Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.</p>
 	</header>
@@ -60,7 +58,6 @@
 	</figure>
 
 	<section id="questions">
-		<p class="label">Try first</p>
 		<h2>Six questions to answer before you read on</h2>
 		<p>Write what you think in the box, then open the answer. What you type stays in this browser, so you can come back to it.</p>
 		<ol class="questions">
@@ -69,7 +66,7 @@
 				<textarea id="a1" rows="3" data-reply="1. What a Fourier series says" placeholder="Your answer"></textarea>
 				<details><summary>Show answer</summary>
 					<p>A periodic signal can be written as a constant plus sines and cosines whose frequencies are whole multiples of the signal's own frequency. Each multiple, a harmonic, has one amplitude for its cosine and one for its sine.</p>
-					<p>No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. Section 1 shows why the amounts can be read off one at a time.</p>
+					<p>No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. The first section below shows why the amounts can be read off one at a time.</p>
 				</details>
 			</li>
 			<li>
@@ -90,7 +87,7 @@
 				<p>You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?</p>
 				<textarea id="a4" rows="3" data-reply="4. Overshoot with more terms" placeholder="Your answer"></textarea>
 				<details><summary>Show answer</summary>
-					<p>It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at <i>x</i> = π/(2k) for k terms. Section 3 lets you check.</p>
+					<p>It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at <i>x</i> = π/(2k) for k terms. The section on the bump lets you check.</p>
 				</details>
 			</li>
 			<li>
@@ -111,7 +108,6 @@
 	</section>
 
 	<section id="why">
-		<p class="label">1 · What a Fourier series is</p>
 		<h2>Why sines and cosines are enough</h2>
 		<p>Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:</p>
 		<div class="eq" id="eq-series"></div>
@@ -120,7 +116,6 @@
 	</section>
 
 	<section id="coefficients">
-		<p class="label">2 · Computing coefficients</p>
 		<h2 id="coef-head"></h2>
 		<p>Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.</p>
 		<figure class="fig" id="deriv-fig" data-stepper data-start="1" aria-label="Derivation of the Fourier coefficients, step by step">
@@ -138,7 +133,6 @@
 	</section>
 
 	<section id="gibbs">
-		<p class="label">3 · The Gibbs phenomenon</p>
 		<h2 id="gibbs-head"></h2>
 		<p>Here is the square wave from the top, close to its jump at <i>x</i> = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.</p>
 		<figure class="fig">
@@ -155,15 +149,16 @@
 			<figcaption>Dashed grey: the square wave. Dotted: the limit the peak approaches, 1.179. Horizontal axis in radians.
 				<span class="src">Computed in the page from the series. Peak position and the 9% limit: Wikipedia, “Gibbs phenomenon”.</span></figcaption>
 		</figure>
-		<p>The bump keeps its height and gets thinner. The typical error falls because the bump takes up less and less of the period, so the area under it goes to zero. The largest error does not fall: the bump stays, and just beside the jump the sum is still far from the wave. That is why the series converges at every fixed point away from the jump (convergence is not uniform) while no finite number of terms removes the bump.</p>
-		<figure class="fig">
-			<div class="chart" id="peak-chart" role="img" aria-label="Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179"></div>
-			<figcaption>Highest point of the partial sum for 1 to 200 terms (logarithmic horizontal axis). It does not head for 1; it levels off at 1.179, which is 1 + 0.179, and 0.179 is 8.95% of the jump of 2. The sawtooth behaves the same way at its jump.</figcaption>
-		</figure>
+		<div class="beside">
+			<p>The bump keeps its height and gets thinner. The typical error falls because the bump takes up less and less of the period, so the area under it goes to zero. The largest error does not fall: the bump stays, and just beside the jump the sum is still far from the wave. That is why the series converges at every fixed point away from the jump (convergence is not uniform) while no finite number of terms removes the bump.</p>
+			<figure class="fig">
+				<div class="chart" id="peak-chart" role="img" aria-label="Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179"></div>
+				<figcaption>Highest point of the partial sum for 1 to 200 terms (logarithmic horizontal axis). It does not head for 1; it levels off at 1.179, which is 1 + 0.179, and 0.179 is 8.95% of the jump of 2. The sawtooth behaves the same way at its jump.</figcaption>
+			</figure>
+		</div>
 	</section>
 
 	<section id="symmetry">
-		<p class="label">4 · Symmetry</p>
 		<h2 id="sym-head"></h2>
 		<p>An even function (<i>f</i>(−<i>x</i>) = <i>f</i>(<i>x</i>)) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.</p>
 		<figure class="fig">
@@ -189,12 +184,14 @@
 	</section>
 
 	<section id="sheet">
-		<p class="label">Formula sheet</p>
 		<h2>Everything above on one table</h2>
 		<div class="sheet" id="sheet-rows"></div>
 		<p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is <i>a</i><sub>0</sub>/2, which makes the same <i>a<sub>n</sub></i> formula work for <i>n</i> = 0. Books that write plain <i>a</i><sub>0</sub> use the average, <i>a</i><sub>0</sub> = (1/2π)∫<i>f</i> d<i>x</i>.</p>
-		<p class="label">Sources</p>
-		<ul class="sources">
+	</section>
+
+	<section class="minor">
+		<h2>Sources</h2>
+		<ul>
 			<li>H. Wilbraham, “On a certain periodic function”, <i>Cambridge and Dublin Mathematical Journal</i> 3 (1848), pp. 198–201: the first analysis of the overshoot.</li>
 			<li>J. W. Gibbs, letter in <i>Nature</i> 59 (27 April 1899), p. 606: the correction that describes the overshoot.</li>
 			<li>M. Bôcher, “Introduction to the theory of Fourier’s series”, <i>Annals of Mathematics</i> 7 (1906): the detailed analysis that gave the effect its name.</li>

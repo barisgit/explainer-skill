@@ -86,7 +86,6 @@
 <body>
 <main class="page">
 	<header class="masthead">
-		<p class="eyebrow">Algorithms · shortest paths</p>
 		<h1>Dijkstra settles the <em>nearest</em> node first, and non-negative edges are what make that safe.</h1>
 		<p class="lede">Press Next. Each round the queue gives up its smallest entry, and the caption says why that node is final.</p>
 	</header>
@@ -135,14 +134,12 @@
 	</figure>
 
 	<section>
-		<p class="label">Why it works</p>
 		<h2>The nearest queued node cannot be beaten</h2>
 		<p>A queue entry is an upper bound: a route with that length exists, though a shorter one might not have been found yet. Take the smallest entry, say <b>X</b> at <i>d</i>. Suppose a route to X shorter than <i>d</i> existed, and let <b>Y</b> be the first node on it that is not settled (possibly X itself). Y's predecessor on the route is settled, and settling it relaxed the road into Y, so Y's entry is at most the route's cost up to Y. X was the smallest entry, so Y's entry is at least <i>d</i>. The rest of the route adds roads of length zero or more, so the whole route costs at least <i>d</i>, a contradiction. X is final.</p>
 		<p>Two things follow. Each reachable node is settled exactly once, which is why the algorithm is fast. And the argument leans on one fact: <b>roads never shorten a route</b>, which is what lets the last step conclude. The next section removes that fact.</p>
 	</section>
 
 	<section>
-		<p class="label">When it goes wrong</p>
 		<h2 id="neg-head"></h2>
 		<p>Here the roads are one-way, and road B→A has a weight you can change. A negative weight means taking that road <em>reduces</em> the total, like a toll rebate. Drag it below −1 and watch which step breaks.</p>
 		<figure class="fig wide" id="neg" data-stepper data-start="1" aria-label="Dijkstra's algorithm on a graph with one negative edge, step by step">
@@ -177,8 +174,7 @@
 		<p class="caveat"><b>Inferred</b>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p>
 	</section>
 
-	<section>
-		<p class="label">Sources and notes</p>
+	<section class="minor">
 		<h2>Where the claims come from</h2>
 		<ul>
 			<li>E. W. Dijkstra, “A note on two problems in connexion with graphs”, <i>Numerische Mathematik</i> 1, 269–271 (1959): the original algorithm.</li>

@@ -27,14 +27,13 @@
 	.num { text-align: end; font-variant-numeric: tabular-nums; }
 	.compare th.num { text-align: end; }
 	.sources li { margin-block: 0.375rem; }
-	.note { min-block-size: 1.5em; margin: 0; padding: 0.625rem var(--inset); color: var(--muted); font-size: 0.875rem; }
+	.note { min-block-size: 1.5em; margin: 0; padding: 0.625rem var(--pad); color: var(--muted); font-size: 0.875rem; }
 </style>
 </head>
 <body>
 <main class="page">
 	<div data-overview>
 		<header class="masthead">
-			<p class="eyebrow">World electricity generation · 2000 to 2024 · Our World in Data</p>
 			<h1>The world generates twice the electricity it did in 2000. Wind and solar grew from 0.2% of it to 15%, but <em>coal still supplies about a third</em>.</h1>
 			<p class="lede">Explore any country or region, and see who left coal fastest.</p>
 		</header>
@@ -56,7 +55,6 @@
 		</details>
 
 		<section>
-			<p class="label">Sources</p>
 			<h2 id="change-head"></h2>
 			<p>Pick any place and stretch the end year. Bars to the right grew; bars to the left shrank. Switch the unit: a source can produce more electricity and still supply a smaller share of a growing total.</p>
 			<figure class="fig">
@@ -85,7 +83,6 @@
 		</section>
 
 		<section>
-			<p class="label">Coal</p>
 			<h2 id="coal-head"></h2>
 			<p>Every country with data for both years, ranked. Change the period or the size cut-off, flip to the countries that moved toward coal, or switch from share to terawatt-hours: the order changes, and for China the two tell opposite stories.</p>
 			<figure class="fig">
@@ -132,8 +129,7 @@
 			<p class="caveat"><b>Reading it</b>Shares in a single year move with weather and demand: a wet year can lift hydro and lower coal's share without any policy change. Over a short period that can overstate or understate the underlying trend.</p>
 		</section>
 
-		<section>
-			<p class="label">Data and method</p>
+		<section class="minor">
 			<h2>Where the numbers come from</h2>
 			<ul class="sources">
 				<li><b>Dataset.</b> Our World in Data, <a href="https://github.com/owid/energy-data">Energy dataset</a> (<code>owid-energy-data.csv</code>), downloaded 22 October 2026. Authors: Pablo Rosado, Hannah Ritchie, Edouard Mathieu and Max Roser. The dataset page marks this release as legacy and no longer updated.</li>

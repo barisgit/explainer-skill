@@ -4,21 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How the world's electricity mix changed since 2000</title>
-<style>/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views.
-   One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
-   Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
-     :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
-   To force one scheme instead of following the system: <html data-scheme="dark"> (or "light"); charts and diagrams follow it too.
-   Classes: page masthead eyebrow lede meta label cols wide | fig fig-visual stage bleed split chart mermaid scroll dg |
-   controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back.
-   Panels: children of .fig are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge
-   row of columns divided by hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
-   The inset is a default (padding-inline: var(--inset) on every direct child of .fig, specificity of one class): any padding the page
-   puts on such a child with a class of its own replaces it, so write padding: 1rem var(--inset) (or padding-block alone) to keep it.
-   Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
-   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono.
-   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
-   Mono is for code, numbers and source lines, not for labels. */
+<style>/* theme part: fonts, tokens, element defaults. Font urls resolve against kit/, where pack reads the theme from. */
 @font-face {
 	font-family: "Geist";
 	font-weight: 100 900;
@@ -64,6 +50,8 @@
 	--gutter: clamp(1rem, 4vw, 2rem);
 	--inset: clamp(1rem, 2.5vw, 1.25rem);
 	--radius: 0.625rem;
+	/* The tone under the current block: --bg on the page, --surface in a panel, --sunken in a band. Halos and split cells use it. */
+	--under: var(--bg);
 	--ease: cubic-bezier(0.25, 1, 0.5, 1);
 }
 :root[data-scheme="light"] {
@@ -150,7 +138,8 @@ strong {
 	font-weight: 600;
 }
 
-/* Page shell: masthead, then sections divided by hairlines. A section may start with <p class="label">, a plain caption. */
+/* theme part: page shell, headings, figures and panels. */
+/* Page shell: masthead, then sections divided by hairlines. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
@@ -161,11 +150,6 @@ strong {
 }
 .masthead {
 	margin-block-end: clamp(2rem, 5vw, 3rem);
-}
-.eyebrow {
-	margin: 0 0 1rem;
-	font: 500 0.8125rem / 1.5 var(--mono);
-	color: var(--muted);
 }
 h1 {
 	margin: 0 0 1.25rem;
@@ -245,18 +229,71 @@ h3 {
 .wide {
 	margin-inline: calc(50% - min(44rem, 50vw - var(--gutter)));
 }
+/* Band: the one stretch where the reader acts or decides, in the sunken tone from window edge to edge. The content keeps the column;
+   the shadow carries the tone sideways and the clip keeps it to the band's height, so nothing scrolls sideways. */
+.band {
+	--under: var(--sunken);
+	background: var(--sunken);
+	box-shadow: 0 0 0 100vmax var(--sunken);
+	clip-path: inset(0 -100vmax);
+}
+.page section.band,
+.page .band + section {
+	border-block-start: 0;
+}
+.page section.band {
+	padding-block: clamp(2rem, 5vw, 3.5rem);
+}
+/* Minor section (method, sources, assumptions): smaller type and, on wide screens, the heading in its own column, so it reads as
+   reference rather than as another finding. */
+.page section.minor {
+	margin-block: clamp(2rem, 5vw, 3rem);
+	font-size: 0.9375rem;
+}
+.minor > h2 {
+	margin-block-end: 0.75rem;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	line-height: 1.35;
+	letter-spacing: -0.01em;
+}
+@media (min-width: 56rem) {
+	.minor {
+		display: grid;
+		grid-template-columns: 13rem minmax(0, 1fr);
+		column-gap: 2.5rem;
+		align-items: start;
+	}
+	.minor > * {
+		grid-column: 2;
+	}
+	.minor > h2 {
+		grid-column: 1;
+		margin: 0;
+	}
+	.minor > h2 + * {
+		margin-block-start: 0;
+	}
+}
 
-/* Figure: one quiet panel holding a control row, readouts, the visual and a caption. */
+/* Figure: the visual and its caption, set straight on the page and aligned with the text. A figure the reader operates (an input,
+   select, tabs or a stepper inside), or one marked .panel, becomes a panel: the box says these controls act on this. --pad is the
+   inset of its children, --under the tone they sit on. */
 .fig {
+	--pad: 0px;
 	container-type: inline-size;
 	margin: 1.5rem 0;
+}
+.fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player)) {
+	--pad: var(--inset);
+	--under: var(--surface);
 	background: var(--surface);
 	border: 1px solid var(--rule);
 	border-radius: var(--radius);
 	overflow: hidden;
 }
 .fig > * {
-	padding-inline: var(--inset);
+	padding-inline: var(--pad);
 	margin: 0;
 	max-inline-size: none;
 }
@@ -295,6 +332,26 @@ h3 {
 .fig > figcaption:not(:last-child) {
 	border-block-end: 1px solid var(--rule);
 }
+/* Text beside its figure on wide screens, the figure taking two thirds; stacked on phones. Two children: the text, then the figure.
+   It follows the .fig rules so its margin reset wins over the figure's own. */
+.beside {
+	display: grid;
+	gap: 1rem 2.5rem;
+	align-items: start;
+	margin-block: 1.5rem;
+}
+.beside > * {
+	min-inline-size: 0;
+	margin-block: 0;
+}
+.beside > :first-child > :first-child {
+	margin-block-start: 0;
+}
+@media (min-width: 56rem) {
+	.beside {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+	}
+}
 .src {
 	display: block;
 	margin-top: 0.25rem;
@@ -312,9 +369,10 @@ h3 {
 	min-inline-size: 0;
 	margin: 0;
 	padding: 0.875rem var(--inset) 1rem;
-	background: var(--surface);
+	background: var(--under);
 }
 
+/* theme part: charts, plots, Mermaid blocks, svg copies per scheme, hand-built diagrams. */
 /* Charts (kit:echarts.js + kit:charts.js, or kit:plot.js): the element needs a height; the chart fills it. */
 .chart {
 	inline-size: 100%;
@@ -397,7 +455,7 @@ h3 {
 	fill: var(--ink);
 	font-weight: 600;
 	paint-order: stroke;
-	stroke: var(--surface);
+	stroke: var(--under);
 	stroke-width: 3px;
 	stroke-linejoin: round;
 }
@@ -448,6 +506,10 @@ h3 {
 }
 .fig > .mermaid {
 	margin: 0;
+}
+/* In a panel the diagram runs edge to edge; on the page it keeps its own frame. */
+.fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player))
+	> .mermaid {
 	border: 0;
 	border-radius: 0;
 }
@@ -456,20 +518,26 @@ h3 {
 	font: inherit;
 	color: inherit;
 } /* mermaid's own .label, not the section caption */
-/* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). */
-.mermaid > .dark,
-:root[data-scheme="dark"] .mermaid > .light {
-	display: none;
-}
-:root[data-scheme="dark"] .mermaid > .dark {
+/* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). Diagrams and svg files in
+   <img> (packed once per scheme) share this; only the other copy is hidden so the page's own display rule for an <img> stays. */
+.mermaid > :is(.light, .dark) {
 	display: inline-block;
 }
+:root[data-scheme="dark"] :is(.mermaid > .light, img.light),
+:root[data-scheme="light"] :is(.mermaid > .dark, img.dark) {
+	/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
+	display: none !important;
+}
 @media (prefers-color-scheme: dark) {
-	:root:not([data-scheme="light"]) .mermaid > .light {
-		display: none;
+	:root:not([data-scheme="light"]) :is(.mermaid > .light, img.light) {
+		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
+		display: none !important;
 	}
-	:root:not([data-scheme="light"]) .mermaid > .dark {
-		display: inline-block;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-scheme="dark"]) :is(.mermaid > .dark, img.dark) {
+		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
+		display: none !important;
 	}
 }
 
@@ -544,6 +612,7 @@ h3 {
 	stroke-dasharray: 3 3;
 }
 
+/* theme part: control row, fields, segmented choice, toggle, inputs, buttons, playback, tabs. */
 /* Controls: a row at the top of a panel. Field captions keep the case you write. */
 .controls {
 	display: flex;
@@ -785,6 +854,7 @@ output {
 	padding-block: 1rem;
 }
 
+/* theme part: readouts, chips, ranking rows, comparison tables. */
 /* Readouts: plain numbers in a row, no tiles. <small> is a second line under the number. */
 .stats {
 	display: grid;
@@ -796,7 +866,7 @@ output {
 /* Element-qualified so older page overrides that zeroed the panel inset (.fig > .stats { padding: 0 }) no longer apply. */
 .fig > :is(dl, div, ul).stats {
 	margin: 0;
-	padding: 1rem var(--inset) 0.5rem;
+	padding: 1rem var(--pad) 0.5rem;
 }
 /* Caption and number share rows across the line (subgrid): when one caption wraps, the numbers still line up. */
 .stat {
@@ -934,10 +1004,10 @@ output {
 	border-block-end-color: var(--rule-strong);
 }
 .fig .compare :is(th, td):first-child {
-	padding-inline-start: var(--inset);
+	padding-inline-start: var(--pad);
 }
 .fig .compare :is(th, td):last-child {
-	padding-inline-end: var(--inset);
+	padding-inline-end: var(--pad);
 }
 .compare tbody tr:last-child > * {
 	border-block-end: 0;
@@ -1046,10 +1116,10 @@ output {
 		border-inline-start: 3px solid transparent;
 	}
 	:where(.fig) :where(.compare:not(.table)) tr {
-		padding-inline: var(--inset);
+		padding-inline: var(--pad);
 	}
 	:where(.fig) :where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: calc(var(--inset) - 3px);
+		padding-inline-start: max(calc(var(--pad) - 3px), 0.75rem);
 	}
 	:where(.compare:not(.table)) tr[data-state="fit"] {
 		border-inline-start-color: var(--ok);
@@ -1093,6 +1163,7 @@ output {
 	}
 }
 
+/* theme part: caveats, details, drill-down views, reduced motion, print. */
 /* Caveat: one line beside the claim it changes; the rest goes in <details>. <b> names the kind (Inferred, Unknown). */
 .caveat {
 	max-inline-size: 66ch;
@@ -1107,7 +1178,6 @@ output {
 	color: var(--warn);
 	margin-inline-end: 0.5rem;
 }
-/* biome-ignore lint/style/noDescendingSpecificity: the rules above with higher specificity target .compare cells and set box-shadow, never margin */
 .caveat > :first-child {
 	margin-top: 0;
 }
@@ -1243,6 +1313,29 @@ details > :last-child:not(summary) {
 	}
 }
 
+/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views.
+   One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
+   Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
+     :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
+   To force one scheme instead of following the system: <html data-scheme="dark"> (or "light"); charts and diagrams follow it too.
+   The accent marks the answer: the headline phrase (h1 em), and on the page the readout or chart mark that answers a section;
+   colour the other marks neutral (var(--muted)).
+   Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
+   controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back.
+   Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
+   are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
+   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
+   The inset is a default (padding-inline: var(--pad) on every direct child of .fig, specificity of one class): any padding the page
+   puts on such a child with a class of its own replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
+   Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
+   sections (method, sources) are set smaller with the heading in its own column.
+   Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
+   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono.
+   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
+   Mono is for code, numbers and source lines, not for labels.
+   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views); pack
+   puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
+
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
    Scripts toggle the classes is-on, is-now and is-lit; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
@@ -1255,11 +1348,11 @@ details > :last-child:not(summary) {
 [data-captions] {
 	margin: 0;
 	padding-block: 0.75rem;
-	padding-inline: calc(var(--inset) + 1.5rem) var(--inset);
+	padding-inline: calc(var(--pad, var(--inset)) + 1.5rem) var(--pad, var(--inset));
 }
 [data-live] [data-captions] {
 	list-style: none;
-	padding-inline: var(--inset);
+	padding-inline: var(--pad, var(--inset));
 }
 [data-live] [data-captions] > li {
 	max-inline-size: 66ch;
@@ -1302,6 +1395,11 @@ body:has(.reply-bar) {
 .reply-bar .btn,
 .reply-hint {
 	box-shadow: 0 10px 24px -10px var(--lift);
+}
+.reply-bar .btn.is-armed {
+	color: var(--bg);
+	background: var(--bad);
+	border-color: var(--bad);
 }
 .reply-hint,
 .reply-pop {
@@ -1371,7 +1469,6 @@ dialog.reply-dialog[open] {
 .reply-body {
 	overflow: auto;
 }
-/* biome-ignore lint/style/noDescendingSpecificity: the rules above with higher specificity target .compare cells and set border, never margin or padding */
 .reply-body > * {
 	margin: 0;
 	padding: 0.75rem 1rem;
@@ -1393,7 +1490,7 @@ dialog.reply-dialog[open] {
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
-.reply-scratch {
+.reply-invisible {
 	position: absolute;
 	opacity: 0;
 	pointer-events: none;
@@ -1434,14 +1531,13 @@ dialog.reply-dialog[open] {
 	.num { text-align: end; font-variant-numeric: tabular-nums; }
 	.compare th.num { text-align: end; }
 	.sources li { margin-block: 0.375rem; }
-	.note { min-block-size: 1.5em; margin: 0; padding: 0.625rem var(--inset); color: var(--muted); font-size: 0.875rem; }
+	.note { min-block-size: 1.5em; margin: 0; padding: 0.625rem var(--pad); color: var(--muted); font-size: 0.875rem; }
 </style>
 </head>
 <body>
 <main class="page">
 	<div data-overview>
 		<header class="masthead">
-			<p class="eyebrow">World electricity generation · 2000 to 2024 · Our World in Data</p>
 			<h1>The world generates twice the electricity it did in 2000. Wind and solar grew from 0.2% of it to 15%, but <em>coal still supplies about a third</em>.</h1>
 			<p class="lede">Explore any country or region, and see who left coal fastest.</p>
 		</header>
@@ -1463,7 +1559,6 @@ dialog.reply-dialog[open] {
 		</details>
 
 		<section>
-			<p class="label">Sources</p>
 			<h2 id="change-head"></h2>
 			<p>Pick any place and stretch the end year. Bars to the right grew; bars to the left shrank. Switch the unit: a source can produce more electricity and still supply a smaller share of a growing total.</p>
 			<figure class="fig">
@@ -1492,7 +1587,6 @@ dialog.reply-dialog[open] {
 		</section>
 
 		<section>
-			<p class="label">Coal</p>
 			<h2 id="coal-head"></h2>
 			<p>Every country with data for both years, ranked. Change the period or the size cut-off, flip to the countries that moved toward coal, or switch from share to terawatt-hours: the order changes, and for China the two tell opposite stories.</p>
 			<figure class="fig">
@@ -1539,8 +1633,7 @@ dialog.reply-dialog[open] {
 			<p class="caveat"><b>Reading it</b>Shares in a single year move with weather and demand: a wet year can lift hydro and lower coal's share without any policy change. Over a short period that can overstate or understate the underlying trend.</p>
 		</section>
 
-		<section>
-			<p class="label">Data and method</p>
+		<section class="minor">
 			<h2>Where the numbers come from</h2>
 			<ul class="sources">
 				<li><b>Dataset.</b> Our World in Data, <a href="https://github.com/owid/energy-data">Energy dataset</a> (<code>owid-energy-data.csv</code>), downloaded 22 October 2026. Authors: Pablo Rosado, Hannah Ritchie, Edouard Mathieu and Max Roser. The dataset page marks this release as legacy and no longer updated.</li>
@@ -1669,263 +1762,220 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
    The page's colour scheme changing (system setting, or color-scheme / class / style on <html>) remounts the chart: zoom and legend
    state reset. Reduced motion turns animation off. */
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
-	if (!window.echarts) {
-		throw new Error('kit:charts.js needs <script src="kit:echarts.js"><\/script> before it');
-	}
-	const probe = document.createElement("i");
-	probe.hidden = true;
-	document.documentElement.append(probe);
-
-	/** Resolves `var(--name)` to the colour for the current scheme (light-dark() included). */
-	function color(name) {
-		probe.style.color = `var(--${name})`;
-		return getComputedStyle(probe).color;
-	}
-
-	// ECharts' canvas only parses rgb/hex, while computed color-mix() is color(srgb ...): such values are read back through a pixel.
-	const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-	const COLOR_KEY = /(olor|^fill|^stroke)$/;
-	const COLOR_EXPR = /^(var|color-mix|light-dark)\(/;
-
-	/** Concrete rgb(a) for a CSS colour expression in the current scheme. */
-	function resolve(expr) {
-		probe.style.color = expr;
-		const computed = getComputedStyle(probe).color;
-		if (computed.startsWith("rgb")) {
-			return computed;
-		}
-		pixel.clearRect(0, 0, 1, 1);
-		pixel.fillStyle = computed;
-		pixel.fillRect(0, 0, 1, 1);
-		const [r, g, b, a] = pixel.getImageData(0, 0, 1, 1).data;
-		return `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`;
-	}
-
-	/**
-	 * Copy of an option with every colour expression under a colour key resolved for the current scheme. Plain objects and arrays are
-	 * copied, everything else (functions, class instances, number arrays) is shared. Run at every mount so saved options stay token-based.
-	 */
-	function resolveColors(value, key = "") {
-		if (typeof value === "string") {
-			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
-		}
-		if (Array.isArray(value)) {
-			return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
-		}
-		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
-			return value;
-		}
-		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
-	}
-
-	/** ECharts theme object built from the tokens, so every component starts in the page's look. */
-	function theme() {
-		// Resolved to rgb: --accent-soft and other derived tokens are color-mix(), which ECharts cannot parse.
-		const token = (name) => resolve(`var(--${name})`);
-		const [ink, muted, rule, ruleStrong, surface, accent, accentSoft] = [
-			"ink",
-			"muted",
-			"rule",
-			"rule-strong",
-			"surface",
-			"accent",
-			"accent-soft",
-		].map(token);
-		const axis = {
-			axisLine: { lineStyle: { color: ruleStrong } },
-			axisTick: { lineStyle: { color: ruleStrong } },
-			axisLabel: { color: muted },
-			nameTextStyle: { color: muted },
-			splitLine: { lineStyle: { color: rule } },
-		};
-		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a surface halo.
-		const label = { label: { color: ink, textBorderColor: surface, textBorderWidth: 2 } };
-		const labelled = Object.fromEntries(
-			[
-				"line",
-				"bar",
-				"scatter",
-				"pie",
-				"heatmap",
-				"treemap",
-				"sankey",
-				"sunburst",
-				"radar",
-				"boxplot",
-			].map((type) => [type, label]),
-		);
-		return {
-			...labelled,
-			grid: { outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
-			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
-			backgroundColor: "transparent",
-			animation: !matchMedia("(prefers-reduced-motion: reduce)").matches,
-			animationDuration: 700,
-			animationDurationUpdate: 500,
-			animationEasing: "cubicOut",
-			textStyle: { fontFamily: getComputedStyle(document.body).fontFamily, color: ink },
-			title: { textStyle: { color: ink }, subtextStyle: { color: muted } },
-			categoryAxis: axis,
-			valueAxis: axis,
-			timeAxis: axis,
-			logAxis: axis,
-			legend: {
-				textStyle: { color: ink },
-				inactiveColor: ruleStrong,
-				pageTextStyle: { color: muted },
-				pageIconColor: accent,
-			},
-			tooltip: {
-				backgroundColor: surface,
-				borderColor: ruleStrong,
-				textStyle: { color: ink },
-				axisPointer: {
-					lineStyle: { color: muted },
-					crossStyle: { color: muted },
-					label: { backgroundColor: ink, color: surface },
-				},
-			},
-			dataZoom: {
-				// Quiet until touched: neutral track and handles, the accent only on hover and drag.
-				borderColor: rule,
-				backgroundColor: "transparent",
-				fillerColor: accentSoft,
-				textStyle: { color: muted },
-				handleStyle: { color: surface, borderColor: ruleStrong },
-				moveHandleStyle: { color: rule },
-				emphasis: { handleStyle: { borderColor: accent }, moveHandleStyle: { color: accent } },
-				dataBackground: { lineStyle: { color: ruleStrong }, areaStyle: { color: rule } },
-				selectedDataBackground: {
-					lineStyle: { color: muted },
-					areaStyle: { color: ruleStrong, opacity: 0.35 },
-				},
-			},
-			brush: { brushStyle: { color: accentSoft, borderColor: accent } },
-			toolbox: {
-				iconStyle: { borderColor: muted },
-				emphasis: { iconStyle: { borderColor: accent } },
-			},
-			visualMap: { textStyle: { color: muted } },
-			markLine: { lineStyle: { color: muted }, label: { color: muted } },
-		};
-	}
-
-	/**
-	 * Merges a patch into the saved option the way ECharts' setOption merges: objects recursively;
-	 * top-level component arrays (series, xAxis, ...) element by element, matched by id, else by
-	 * position; nested arrays such as data replaced. Remounts replay the saved option, so it must
-	 * match what the live chart shows.
-	 */
-	function merge(target, patch, topLevel = false) {
-		if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
-			patch.forEach((item, index) => {
-				const at = item?.id == null ? index : target.findIndex((t) => t?.id === item.id);
-				if (at < 0 || at >= target.length) {
-					target.push(item);
-				} else {
-					target[at] = merge(target[at], item);
-				}
-			});
-			return target;
-		}
-		if (!isObject(target) || !isObject(patch)) {
-			return patch;
-		}
-		for (const [key, value] of Object.entries(patch)) {
-			target[key] = key in target ? merge(target[key], value) : value;
-		}
-		return target;
-	}
-
-	/** Applies a top-level option patch to the saved option; see merge. Components named in `replace` are swapped for the patch's list. */
-	function mergeOption(option, patch, replace) {
-		for (const key of replace) {
-			if (!(key in patch)) {
-				delete option[key];
-			}
-		}
-		for (const [key, value] of Object.entries(patch)) {
-			option[key] =
-				key in option && !replace.includes(key)
-					? merge(option[key], value, Array.isArray(value))
-					: value;
-		}
-	}
-
-	function isObject(value) {
-		return value !== null && typeof value === "object" && !Array.isArray(value);
-	}
-
-	// Remount callbacks of the live charts. One shared check, because the scheme can change by media query or by the page itself.
-	const remounts = new Set();
-	let scheme = color("ink");
-	const checkScheme = () => {
-		const now = color("ink");
-		if (now === scheme) {
-			return;
-		}
-		scheme = now;
-		for (const remount of remounts) {
-			remount();
-		}
-	};
-	matchMedia("(prefers-color-scheme: dark)").addEventListener("change", checkScheme);
-	for (const el of [document.documentElement, document.body]) {
-		if (el) {
-			new MutationObserver(checkScheme).observe(el, { attributes: true });
-		}
-	}
-
-	const made = new WeakMap();
-
-	function make(el, option, setup) {
-		made.get(el)?.(); // a view handler that runs again replaces the chart instead of stacking observers
-		let chart = null;
-		const mount = () => {
-			chart?.dispose();
-			chart = echarts.init(el, theme());
-			chart.setOption(resolveColors(option));
-			setup?.(chart);
-		};
-		// Canvas text needs the web font loaded before the first draw.
-		const fontReady = document.fonts
-			.load(`500 12px ${getComputedStyle(document.body).fontFamily}`)
-			.catch(() => []);
-		const resizer = new ResizeObserver(() => {
-			if (!el.clientWidth) {
-				return;
-			}
-			if (chart) {
-				chart.resize();
-			} else {
-				void fontReady.then(() => !chart && el.clientWidth && mount());
-			}
-		});
-		const remount = () => chart && mount();
-		resizer.observe(el);
-		remounts.add(remount);
-		made.set(el, () => {
-			resizer.disconnect();
-			remounts.delete(remount);
-			chart?.dispose();
-		});
-		return {
-			get chart() {
-				return chart;
-			},
-			set(patch, replace = []) {
-				mergeOption(option, patch, replace);
-				chart?.setOption(
-					resolveColors(patch),
-					replace.length ? { replaceMerge: replace } : undefined,
-				);
-			},
-		};
-	}
-
-	window.Charts = { make, color: (token) => `var(--${token})` };
+  if (!window.echarts) {
+    throw new Error('kit:charts.js needs <script src="kit:echarts.js"><\/script> before it');
+  }
+  const probe = document.createElement("i");
+  probe.hidden = true;
+  document.documentElement.append(probe);
+  function color(name) {
+    probe.style.color = `var(--${name})`;
+    return getComputedStyle(probe).color;
+  }
+  const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  const COLOR_KEY = /(olor|^fill|^stroke)$/;
+  const COLOR_EXPR = /^(var|color-mix|light-dark)\(/;
+  function resolve(expr) {
+    probe.style.color = expr;
+    const computed = getComputedStyle(probe).color;
+    if (computed.startsWith("rgb") || !pixel) {
+      return computed;
+    }
+    pixel.clearRect(0, 0, 1, 1);
+    pixel.fillStyle = computed;
+    pixel.fillRect(0, 0, 1, 1);
+    const [r = 0, g = 0, b = 0, a = 0] = pixel.getImageData(0, 0, 1, 1).data;
+    return `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`;
+  }
+  function resolveColors(value, key = "") {
+    if (typeof value === "string") {
+      return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
+    }
+    if (Array.isArray(value)) {
+      return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
+    }
+    if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
+      return value;
+    }
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
+  }
+  function theme() {
+    const token = (name) => resolve(`var(--${name})`);
+    const ink = token("ink");
+    const muted = token("muted");
+    const rule = token("rule");
+    const ruleStrong = token("rule-strong");
+    const surface = token("surface");
+    const accent = token("accent");
+    const accentSoft = token("accent-soft");
+    const axis = {
+      axisLine: { lineStyle: { color: ruleStrong } },
+      axisTick: { lineStyle: { color: ruleStrong } },
+      axisLabel: { color: muted },
+      nameTextStyle: { color: muted },
+      splitLine: { lineStyle: { color: rule } }
+    };
+    const label = { label: { color: ink, textBorderColor: surface, textBorderWidth: 2 } };
+    const labelled = Object.fromEntries([
+      "line",
+      "bar",
+      "scatter",
+      "pie",
+      "heatmap",
+      "treemap",
+      "sankey",
+      "sunburst",
+      "radar",
+      "boxplot"
+    ].map((type) => [type, label]));
+    return {
+      ...labelled,
+      grid: { outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
+      color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
+      backgroundColor: "transparent",
+      animation: !matchMedia("(prefers-reduced-motion: reduce)").matches,
+      animationDuration: 700,
+      animationDurationUpdate: 500,
+      animationEasing: "cubicOut",
+      textStyle: { fontFamily: getComputedStyle(document.body).fontFamily, color: ink },
+      title: { textStyle: { color: ink }, subtextStyle: { color: muted } },
+      categoryAxis: axis,
+      valueAxis: axis,
+      timeAxis: axis,
+      logAxis: axis,
+      legend: {
+        textStyle: { color: ink },
+        inactiveColor: ruleStrong,
+        pageTextStyle: { color: muted },
+        pageIconColor: accent
+      },
+      tooltip: {
+        backgroundColor: surface,
+        borderColor: ruleStrong,
+        textStyle: { color: ink },
+        axisPointer: {
+          lineStyle: { color: muted },
+          crossStyle: { color: muted },
+          label: { backgroundColor: ink, color: surface }
+        }
+      },
+      dataZoom: {
+        borderColor: rule,
+        backgroundColor: "transparent",
+        fillerColor: accentSoft,
+        textStyle: { color: muted },
+        handleStyle: { color: surface, borderColor: ruleStrong },
+        moveHandleStyle: { color: rule },
+        emphasis: { handleStyle: { borderColor: accent }, moveHandleStyle: { color: accent } },
+        dataBackground: { lineStyle: { color: ruleStrong }, areaStyle: { color: rule } },
+        selectedDataBackground: {
+          lineStyle: { color: muted },
+          areaStyle: { color: ruleStrong, opacity: 0.35 }
+        }
+      },
+      brush: { brushStyle: { color: accentSoft, borderColor: accent } },
+      toolbox: {
+        iconStyle: { borderColor: muted },
+        emphasis: { iconStyle: { borderColor: accent } }
+      },
+      visualMap: { textStyle: { color: muted } },
+      markLine: { lineStyle: { color: muted }, label: { color: muted } }
+    };
+  }
+  function merge(target, patch, topLevel = false) {
+    if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
+      patch.forEach((item, index) => {
+        const id = idOf(item);
+        const at = id == null ? index : target.findIndex((t) => idOf(t) === id);
+        if (at < 0 || at >= target.length) {
+          target.push(item);
+        } else {
+          target[at] = merge(target[at], item);
+        }
+      });
+      return target;
+    }
+    if (!isObject(target) || !isObject(patch)) {
+      return patch;
+    }
+    for (const [key, value] of Object.entries(patch)) {
+      target[key] = key in target ? merge(target[key], value) : value;
+    }
+    return target;
+  }
+  function mergeOption(option, patch, replace) {
+    for (const key of replace) {
+      if (!(key in patch)) {
+        delete option[key];
+      }
+    }
+    for (const [key, value] of Object.entries(patch)) {
+      option[key] = key in option && !replace.includes(key) ? merge(option[key], value, Array.isArray(value)) : value;
+    }
+  }
+  function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+  const idOf = (item) => isObject(item) ? item.id : undefined;
+  const remounts = new Set;
+  let scheme = color("ink");
+  const checkScheme = () => {
+    const now = color("ink");
+    if (now === scheme) {
+      return;
+    }
+    scheme = now;
+    for (const remount of remounts) {
+      remount();
+    }
+  };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", checkScheme);
+  for (const el of [document.documentElement, document.body]) {
+    if (el) {
+      new MutationObserver(checkScheme).observe(el, { attributes: true });
+    }
+  }
+  const made = new WeakMap;
+  function make(el, option, setup) {
+    made.get(el)?.();
+    let chart = null;
+    const mount = () => {
+      chart?.dispose();
+      chart = echarts.init(el, theme());
+      chart.setOption(resolveColors(option));
+      setup?.(chart);
+    };
+    const fontReady = document.fonts.load(`500 12px ${getComputedStyle(document.body).fontFamily}`).catch(() => []);
+    const resizer = new ResizeObserver(() => {
+      if (!el.clientWidth) {
+        return;
+      }
+      if (chart) {
+        chart.resize();
+      } else {
+        fontReady.then(() => !chart && el.clientWidth && mount());
+      }
+    });
+    const remount = () => chart && mount();
+    resizer.observe(el);
+    remounts.add(remount);
+    made.set(el, () => {
+      resizer.disconnect();
+      remounts.delete(remount);
+      chart?.dispose();
+    });
+    return {
+      get chart() {
+        return chart;
+      },
+      set(patch, replace = []) {
+        mergeOption(option, patch, replace);
+        chart?.setOption(resolveColors(patch), replace.length ? { replaceMerge: replace } : undefined);
+      }
+    };
+  }
+  window.Charts = { make, color: (token) => `var(--${token})` };
 })();
 </script>
 <script>/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored).
@@ -1937,68 +1987,68 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view. */
 (() => {
-	const root = document.documentElement;
-	const views = [...document.querySelectorAll("[data-view]")];
-	const handlers = {};
-	let started = false;
-	let overviewY = 0;
-
-	/** The view claimed by the current hash: `name/param` wins over `name`; param is decoded. */
-	function route() {
-		const [name = "", ...rest] = location.hash.slice(1).split("/");
-		const view =
-			views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ??
-			views.find((v) => v.dataset.view === name);
-		return { name, view, param: decodeURIComponent(rest.join("/")) };
-	}
-
-	/** Shows the view for the hash, or the overview. Handlers run only once routing has started. */
-	function show() {
-		const { name, view, param } = route();
-		const wasInView = root.classList.contains("in-view");
-		if (view && !wasInView) {
-			overviewY = scrollY;
-		}
-		for (const v of views) {
-			v.classList.toggle("active", v === view);
-		}
-		root.classList.toggle("in-view", Boolean(view));
-		if (!view) {
-			return wasInView ? scrollTo(0, overviewY) : undefined;
-		}
-		if (started) {
-			handlers[name]?.(view, param);
-		}
-		scrollTo(0, 0);
-		const heading = view.querySelector("h1, h2");
-		heading?.setAttribute("tabindex", "-1");
-		heading?.focus({ preventScroll: true });
-	}
-
-	window.Views = {
-		on(name, fn) {
-			handlers[name] = fn;
-			if (!started) {
-				return;
-			}
-			const { name: current, view, param } = route();
-			if (view && current === name) {
-				fn(view, param);
-			}
-		},
-	};
-	root.classList.add("js-views");
-	addEventListener("hashchange", show);
-	show(); // layout only: the right view is visible before the first paint
-	const start = () => {
-		started = true;
-		show();
-	};
-	if (document.readyState === "loading") {
-		addEventListener("DOMContentLoaded", start);
-	} else {
-		start();
-	}
+  const root = document.documentElement;
+  const views = [...document.querySelectorAll("[data-view]")];
+  const handlers = {};
+  let started = false;
+  let overviewY = 0;
+  function decode(text) {
+    try {
+      return decodeURIComponent(text);
+    } catch {
+      return text;
+    }
+  }
+  function route() {
+    const [name = "", ...rest] = location.hash.slice(1).split("/");
+    const view = views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
+    return { name, view, param: decode(rest.join("/")) };
+  }
+  function show() {
+    const { name, view, param } = route();
+    const wasInView = root.classList.contains("in-view");
+    if (view && !wasInView) {
+      overviewY = scrollY;
+    }
+    for (const v of views) {
+      v.classList.toggle("active", v === view);
+    }
+    root.classList.toggle("in-view", Boolean(view));
+    if (!view) {
+      return wasInView ? scrollTo(0, overviewY) : undefined;
+    }
+    if (started) {
+      handlers[name]?.(view, param);
+    }
+    scrollTo(0, 0);
+    const heading = view.querySelector("h1, h2");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus({ preventScroll: true });
+  }
+  window.Views = {
+    on(name, fn) {
+      handlers[name] = fn;
+      if (!started) {
+        return;
+      }
+      const { name: current, view, param } = route();
+      if (view && current === name) {
+        fn(view, param);
+      }
+    }
+  };
+  root.classList.add("js-views");
+  addEventListener("hashchange", show);
+  show();
+  const start = () => {
+    started = true;
+    show();
+  };
+  if (document.readyState === "loading") {
+    addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
 })();
 </script>
 <script>
