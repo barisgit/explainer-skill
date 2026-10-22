@@ -2377,11 +2377,12 @@ window.ViewsFolds = () => {
   }
   function sync(section) {
     const button = buttons.get(section);
-    const all = foldsOf(section).every((d) => d.open);
-    button?.setAttribute("aria-expanded", String(all));
-    if (button) {
-      button.textContent = all ? "Collapse all" : "Expand all";
+    if (!button) {
+      return;
     }
+    const all = foldsOf(section).every((d) => d.open);
+    button.setAttribute("aria-expanded", String(all));
+    button.textContent = all ? "Collapse all" : "Expand all";
   }
   function create(section) {
     const button = document.createElement("button");
@@ -2438,14 +2439,13 @@ window.ViewsFolds = () => {
                listener or selector the page gave it), with previous and next on the right.
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
-               past 12). Fixed beside the column from 64rem, a closed Contents disclosure below; the current section follows
-               scrolling. */
+               past 12). The current section follows scrolling; 07-nav.css places the rail. */
 window.ViewsNav = ({ views, decode }) => {
-  const KEY = "viewTrail";
+  const STATE_KEY = "viewTrail";
   const RAIL_LIST_MAX = 12;
-  const OWN = ".trail, .toc";
+  const KIT_NAV = ".trail, .toc";
   const overview = document.querySelector("[data-overview]");
-  const home = clean(document.querySelector(".back")?.textContent) || "Overview";
+  const overviewName = clean(document.querySelector(".back")?.textContent) || "Overview";
   const nameOf = (hash) => hash.split("/")[0] ?? "";
   const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
   const drawn = new Map;
@@ -2468,15 +2468,17 @@ window.ViewsNav = ({ views, decode }) => {
   }
   function linksTo(name, scope = document) {
     const selector = `a[href^=${JSON.stringify(`#${name}/`)}]`;
-    return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(OWN));
+    return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(KIT_NAV));
   }
   const hashOf = (a) => (a.getAttribute("href") ?? "").slice(1);
   const unique = (hashes) => [...new Set(hashes)];
-  function siblings(name) {
+  const viewDrawnFor = (hash) => [...drawn].find(([, h]) => h === hash)?.[0];
+  function allSiblings(name) {
     const statics = views.map((v) => v.dataset.view ?? "").filter((claim) => claim.startsWith(`${name}/`));
     return unique([...linksTo(name).map(hashOf), ...statics]);
   }
-  function labels(name) {
+  const siblingsOf = (step) => step.list ?? allSiblings(nameOf(step.hash));
+  function linkLabels(name) {
     const texts = new Map;
     const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: clean(a.textContent) }));
     for (const { hash, text } of links) {
@@ -2490,43 +2492,43 @@ window.ViewsNav = ({ views, decode }) => {
     }
     return found;
   }
-  function label(hash, known = labels(nameOf(hash))) {
-    const view = [...drawn].find(([, h]) => h === hash)?.[0];
-    return known.get(hash) || clean(view?.querySelector("h1, h2")?.textContent) || decode(hash.split("/").slice(1).join("/"));
+  function label(hash, known = linkLabels(nameOf(hash))) {
+    return known.get(hash) || clean(viewDrawnFor(hash)?.querySelector("h1, h2")?.textContent) || decode(hash.split("/").slice(1).join("/"));
   }
-  function saved() {
+  function historyState() {
     const state = history.state;
-    const trail = state && typeof state === "object" && KEY in state ? state[KEY] : null;
+    return state && typeof state === "object" ? state : {};
+  }
+  function savedTrail() {
+    const trail = historyState()[STATE_KEY];
     return Array.isArray(trail) ? trail.filter((s) => typeof s?.hash === "string") : null;
   }
-  function listFor(hash, parent, replaced) {
+  function inheritedList(hash, parent, replaced) {
     if (replaced?.list?.includes(hash)) {
       return replaced.list;
     }
-    const view = parent && [...drawn].find(([, h]) => h === parent.hash)?.[0];
+    const view = parent && viewDrawnFor(parent.hash);
     const list = view ? unique(linksTo(nameOf(hash), view).map(hashOf)) : [];
     return list.includes(hash) ? list : undefined;
   }
   function extended(hash) {
     const cut = steps.findIndex((s) => nameOf(s.hash) === nameOf(hash));
     const before = cut < 0 ? steps : steps.slice(0, cut);
-    const list = listFor(hash, before.at(-1), steps[cut]);
+    const list = inheritedList(hash, before.at(-1), steps[cut]);
     return [...before, { hash, label: label(hash), ...list ? { list } : {} }];
   }
   function stamp(hash) {
-    const kept = saved();
+    const kept = savedTrail();
     if (kept?.at(-1)?.hash === hash) {
       steps = kept;
     } else {
       steps = hash ? extended(hash) : [];
     }
-    const state = history.state;
-    history.replaceState({ ...state && typeof state === "object" ? state : {}, [KEY]: steps }, "");
+    history.replaceState({ ...historyState(), [STATE_KEY]: steps }, "");
   }
-  const listOf = (step) => step.list ?? siblings(nameOf(step.hash));
   function crumbs(here, back) {
     const list = make("ol", { class: "crumbs" });
-    list.append(item(back ?? make("a", { href: "#" }, home)));
+    list.append(item(back ?? make("a", { href: "#" }, overviewName)));
     for (const step of steps.slice(0, -1)) {
       list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
     }
@@ -2534,12 +2536,12 @@ window.ViewsNav = ({ views, decode }) => {
     return list;
   }
   function neighbours(here) {
-    const list = listOf(here);
+    const list = siblingsOf(here);
     const at = list.indexOf(here.hash);
     if (at < 0 || list.length < 2) {
       return [];
     }
-    const known = labels(nameOf(here.hash));
+    const known = linkLabels(nameOf(here.hash));
     const link = (hash, rel) => {
       if (!hash) {
         return make("span");
@@ -2566,54 +2568,56 @@ window.ViewsNav = ({ views, decode }) => {
     }
     return bar;
   }
-  const entries = [];
-  let rail = null;
-  let homeLink = null;
-  function sectionId(section, heading) {
+  function sectionId(section, heading, n) {
     if (!section.id) {
       const slug = clean(heading.textContent).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
-      section.id = slug && !names.has(slug) && !document.getElementById(slug) ? slug : `section-${entries.length + 1}`;
+      section.id = slug && !names.has(slug) && !document.getElementById(slug) ? slug : `section-${n}`;
     }
     return section.id;
   }
-  function entry(section, heading, claimed) {
+  function entry(section, heading, n, claimed) {
     const text = clean(heading.textContent);
-    const link = make("a", { href: `#${sectionId(section, heading)}`, title: text });
+    const link = make("a", { href: `#${sectionId(section, heading, n)}`, title: text });
     link.append(make("span", {}, text));
-    const owns = [...names].filter((n) => !claimed.has(n) && linksTo(n, section).length);
-    for (const n of owns) {
-      claimed.add(n);
+    const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
+    for (const name of owns) {
+      claimed.add(name);
     }
     return { section, li: item(link), link, owns };
   }
-  function buildRail(page, sections) {
-    const list = make("ol", { id: "toc-list" });
-    homeLink = make("a", { href: "#" }, home);
-    list.append(item(homeLink));
-    const claimed = new Set;
-    for (const section of sections) {
+  function buildRail(page, overview) {
+    const sections = [...overview.querySelectorAll(":scope > section")];
+    const headed = sections.flatMap((section) => {
       const heading = section.querySelector(":scope > h2");
-      if (heading) {
-        entries.push(entry(section, heading, claimed));
-      }
-    }
-    list.append(...entries.map((e) => e.li));
+      return heading ? [{ section, heading }] : [];
+    });
+    const claimed = new Set;
+    const entries = headed.map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
+    const home = make("a", { href: "#" }, overviewName);
+    const list = make("ol", { id: "toc-list" });
+    list.append(item(home), ...entries.map((e) => e.li));
+    const nav = make("nav", { class: "toc", "aria-label": "Contents" });
     const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, "Contents");
-    toggle.addEventListener("click", () => open(toggle.getAttribute("aria-expanded") !== "true"));
-    list.addEventListener("click", (e) => e.target instanceof Element && e.target.closest("a") && open(false));
-    rail = make("nav", { class: "toc", "aria-label": "Contents" });
-    rail.append(toggle, list);
-    page.prepend(rail);
-    addEventListener("scroll", spySoon, { passive: true });
-  }
-  function open(on) {
-    rail?.classList.toggle("is-open", on);
-    rail?.querySelector(".toc-toggle")?.setAttribute("aria-expanded", String(on));
+    const setOpen = (on) => {
+      nav.classList.toggle("is-open", on);
+      toggle.setAttribute("aria-expanded", String(on));
+    };
+    toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
+    list.addEventListener("click", (e) => {
+      if (e.target instanceof Element && e.target.closest("a")) {
+        setOpen(false);
+      }
+    });
+    nav.append(toggle, list);
+    page.prepend(nav);
+    const rail = { nav, home, entries };
+    addEventListener("scroll", () => spySoon(rail), { passive: true });
+    return rail;
   }
   function stepList(step, hash) {
-    const all = listOf(step);
+    const all = siblingsOf(step);
     const shown = all.length > RAIL_LIST_MAX ? [step.hash] : all;
-    const known = labels(nameOf(step.hash));
+    const known = linkLabels(nameOf(step.hash));
     const sub = make("ol");
     for (const h of shown) {
       const text = h === step.hash ? step.label : label(h, known);
@@ -2626,59 +2630,58 @@ window.ViewsNav = ({ views, decode }) => {
     }
     return sub;
   }
-  function updateRail(hash) {
-    if (!rail) {
-      return;
-    }
-    for (const { li, owns } of entries) {
+  function updateRail(rail, hash) {
+    for (const { li, owns } of rail.entries) {
       for (const old of li.querySelectorAll("ol")) {
         old.remove();
       }
       li.append(...steps.filter((s) => owns.includes(nameOf(s.hash))).map((s) => stepList(s, hash)));
     }
-    const current = rail.querySelector('[aria-current="page"]');
-    if (current && rail.scrollHeight > rail.clientHeight) {
-      rail.scrollTop = current.offsetTop - rail.clientHeight / 3;
+    const current = rail.nav.querySelector('[aria-current="page"]');
+    if (current && rail.nav.scrollHeight > rail.nav.clientHeight) {
+      rail.nav.scrollTop = current.offsetTop - rail.nav.clientHeight / 3;
     }
-    spy();
+    spy(rail);
   }
   let spyQueued = false;
-  function spySoon() {
+  function spySoon(rail) {
     if (!spyQueued) {
       spyQueued = true;
-      requestAnimationFrame(spy);
+      requestAnimationFrame(() => spy(rail));
     }
   }
-  function spy() {
+  function spy(rail) {
     spyQueued = false;
     const inView = document.documentElement.classList.contains("in-view");
-    const passed = entries.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3).at(-1);
-    const here = inView ? null : passed?.link ?? homeLink;
-    for (const a of [homeLink, ...entries.map((e) => e.link)]) {
-      a?.removeAttribute("aria-current");
+    const passed = rail.entries.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3).at(-1);
+    const here = inView ? null : passed?.link ?? rail.home;
+    for (const a of [rail.home, ...rail.entries.map((e) => e.link)]) {
+      a.removeAttribute("aria-current");
     }
     here?.setAttribute("aria-current", "location");
   }
   const page = overview?.parentElement;
-  const hasRail = Boolean(page && overview) && names.size > 1;
-  document.documentElement.classList.toggle("has-toc", hasRail);
-  let started = false;
+  const railHost = page && overview && names.size > 1 ? { page, overview } : null;
+  document.documentElement.classList.toggle("has-toc", Boolean(railHost));
+  let toc = null;
   return {
     show(view, hash) {
-      if (!started && hasRail && page && overview) {
-        buildRail(page, [...overview.querySelectorAll(":scope > section")]);
+      if (railHost && !toc) {
+        toc = buildRail(railHost.page, railHost.overview);
       }
-      started = true;
       if (view) {
         drawn.set(view, hash);
       }
-      stamp(view ? hash : "");
+      const current = view ? hash : "";
+      stamp(current);
       const here = steps.at(-1);
       if (view && here) {
         const back = view.querySelector(".back");
         trailBar(view).replaceChildren(crumbs(here, back), ...neighbours(here));
       }
-      updateRail(view ? hash : "");
+      if (toc) {
+        updateRail(toc, current);
+      }
     }
   };
 };
@@ -2691,12 +2694,13 @@ window.ViewsNav = ({ views, decode }) => {
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
-   Navigation needs no markup of its own. Link every view from the overview (a table or list whose link text names it: "Blaž",
-   "1.6.3 Login form") and start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view
-   shows breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the
-   view it was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents
-   rail of its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more
-   <details> gets Expand all. */
+   Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it briefly
+   ("Blaž", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the view's
+   heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
+   breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
+   was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
+   its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
+   gets Expand all. */
 (() => {
   const root = document.documentElement;
   const views = [...document.querySelectorAll("[data-view]")];
