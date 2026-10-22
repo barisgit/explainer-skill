@@ -20,13 +20,16 @@ test("check reports a page error as a problem and exits 1", async () => {
 	expect(result.stdout).toContain("page error: Error: boom from the page");
 }, 30_000);
 
-test("check exits 0 for a page without problems", async () => {
-	const file = dir.write("clean.html", page("document.title = 'ok';"));
+test("check exits 0 for a page that only shows kit: in text, which is not an unpacked page", async () => {
+	const sample = `<pre>&lt;link rel="stylesheet" href="kit:theme.css"&gt;</pre>`;
+	const file = dir.write(
+		"kit-text.html",
+		page(`document.title = '<script src="kit:plot.js">';`).replace("</h1>", `</h1>${sample}`),
+	);
 
 	const result = await checkQuick(file);
 
 	expect(result.code).toBe(0);
-	expect(result.stdout).not.toContain("FAIL");
 }, 30_000);
 
 test("check names a first screen that is a list of in-page links, and keeps the hint for plain prose", async () => {

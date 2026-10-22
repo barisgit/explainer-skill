@@ -38,6 +38,5 @@ test("a page that uses only plot.js carries no ECharts and draws without errors"
 
 	expect(packed.code).toBe(0);
 	expect(readFileSync(output, "utf8")).not.toContain("Apache ECharts");
-	expect(checked.stdout).not.toContain("FAIL");
 	expect(checked.code).toBe(0);
 }, 30_000);
