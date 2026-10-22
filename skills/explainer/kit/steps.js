@@ -6,7 +6,8 @@
      <ol data-captions><li>Step 1 text</li><li>Step 2 text</li></ol>   one li per step; the current one shows
    </figure>
    Steps count from 1; the number of steps is the number of captions, else the highest step used. The stepper opens on the last
-   step (the complete picture, same as print and without JS); Play restarts from step 1 and never starts by itself.
+   step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
+   number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
    Mermaid ids are the diagram's own: `flowchart LR; api --> cache` has nodes api and cache; `api e1@--> cache` names the edge e1;
    sequence diagrams have participants by id and messages m1, m2, ... in order. pack fails when data-steps names an id the diagram lacks.
    Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
@@ -184,6 +185,7 @@
 		/** Re-reads the content and re-applies the step: `wanted`, else the current one (or the new last step if it was on the last). */
 		refresh(wanted) {
 			const wasLast = this.step === this.total;
+			const opening = this.step === 0;
 			const captionList = this.readContent();
 			this.wired = this.total >= 2;
 			this.bar.hidden = !this.wired;
@@ -196,8 +198,10 @@
 				return;
 			}
 			this.mount(captionList);
-			// The first read opens on the last step (the complete picture); later ones keep the place, and a stepper on its last step stays on it.
-			this.show(wanted ?? (wasLast ? this.total : this.step));
+			// Opening (the first read, or growing back from too few steps) shows data-start, else the last step (the complete picture);
+			// later reads keep the place, and a stepper on its last step stays on it.
+			const stay = wasLast ? this.total : this.step;
+			this.show(wanted ?? (opening ? Number(this.root.dataset.start) || this.total : stay));
 		}
 	}
 
