@@ -258,7 +258,6 @@ output { font: 500 0.8125rem var(--mono); font-variant-numeric: tabular-nums; }
 	:where(.compare:not(.table)) td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.8125rem; }
 	:where(.compare:not(.table)) tr.evidence { margin-block-start: -0.75rem; padding-block-start: 0; }
 }
-}
 
 /* Caveat: one line beside the claim it changes; the rest goes in <details>. <b> names the kind (Inferred, Unknown). */
 .caveat { max-inline-size: 66ch; margin: 1.25rem 0; padding: 0.625rem 0.875rem; background: var(--warn-soft); border-radius: 0.5rem; font-size: 0.9375rem; }
