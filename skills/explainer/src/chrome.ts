@@ -193,19 +193,30 @@ async function start(
 	return { port, stop: () => proc.kill() };
 }
 
+/**
+ * The DevTools URL of Chrome's first page. Chrome announces its port before it registers the page,
+ * by about 200 ms on a slow Linux host, so the list is polled for up to five seconds.
+ */
+async function firstPage(port: number): Promise<string> {
+	for (let tries = 0; tries < 50; tries++) {
+		const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then(
+			(r) => r.json() as Promise<Array<{ type: string; webSocketDebuggerUrl: string }>>,
+		);
+		const page = targets.find((t) => t.type === "page");
+		if (page) {
+			return page.webSocketDebuggerUrl;
+		}
+		await settle(100);
+	}
+	throw new ChromeError("Chrome opened no page to drive");
+}
+
 /** Runs `fn` against the page of a fresh headless Chrome; Chrome and its profile are always cleaned up. */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
 	const chrome = await launch(profile);
 	try {
-		const targets = await fetch(`http://127.0.0.1:${chrome.port}/json/list`).then(
-			(r) => r.json() as Promise<Array<{ type: string; webSocketDebuggerUrl: string }>>,
-		);
-		const page = targets.find((t) => t.type === "page");
-		if (!page) {
-			throw new ChromeError("Chrome opened no page to drive");
-		}
-		const cdp = await Cdp.connect(page.webSocketDebuggerUrl);
+		const cdp = await Cdp.connect(await firstPage(chrome.port));
 		try {
 			return await fn(cdp);
 		} finally {
