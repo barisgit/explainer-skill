@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      # Chrome's sandbox needs unprivileged user namespaces, which Ubuntu 24.04 restricts by default.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0"
+      # The runner's preinstalled Google Chrome (/usr/bin/google-chrome) drives check and the Mermaid render.
+      - run: bun run ci

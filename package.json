@@ -1,15 +1,26 @@
 {
-	"name": "explainer-cli",
+	"name": "explainer-skill",
 	"private": true,
 	"type": "module",
 	"scripts": {
 		"typecheck": "tsc --noEmit",
-		"vendor": "bun build/vendor.ts"
+		"lint": "biome check --error-on-warnings .",
+		"format": "biome check --write --error-on-warnings .",
+		"test": "bun test",
+		"ci": "bun run typecheck && bun run lint && bun run test",
+		"vendor": "bun build/vendor.ts",
+		"prepare": "husky"
+	},
+	"lint-staged": {
+		"*.{ts,js,css,json,jsonc}": "biome check --write --error-on-warnings --no-errors-on-unmatched"
 	},
 	"devDependencies": {
-		"@types/bun": "latest",
+		"@biomejs/biome": "2.6.2",
+		"@types/bun": "1.4.3",
 		"echarts": "6.1.0",
+		"husky": "9.1.7",
+		"lint-staged": "17.6.0",
 		"mermaid": "12.2.0",
-		"typescript": "^5.9.3"
+		"typescript": "5.9.3"
 	}
 }

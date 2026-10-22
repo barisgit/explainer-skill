@@ -1,0 +1,3 @@
+# Formats and lints the staged files (partially staged hunks are preserved), then typechecks.
+# Stays fast on purpose: the Chrome-driven tests run in `bun run ci` and in CI.
+bunx lint-staged && bun run typecheck

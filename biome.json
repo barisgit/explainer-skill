@@ -1,0 +1,67 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": {
+		"includes": [
+			"**",
+			"!**/*.html",
+			"!**/*.md",
+			"!skills/explainer/kit/echarts.js",
+			"!skills/explainer/vendor/mermaid.min.js"
+		]
+	},
+	"formatter": { "enabled": true, "indentStyle": "tab", "lineWidth": 100 },
+	"linter": {
+		"rules": {
+			"preset": "recommended",
+			"complexity": {
+				"noExcessiveCognitiveComplexity": {
+					"level": "error",
+					"options": { "maxAllowedComplexity": 15 }
+				},
+				"noExcessiveLinesPerFunction": {
+					"level": "error",
+					"options": { "maxLines": 80, "skipBlankLines": true }
+				}
+			},
+			"style": {
+				"noExcessiveLinesPerFile": {
+					"level": "error",
+					"options": { "maxLines": 600 }
+				},
+				"noNonNullAssertion": "error",
+				"useBlockStatements": "error",
+				"useImportType": "error"
+			},
+			"suspicious": {
+				"noExplicitAny": "error",
+				"noTsIgnore": "error",
+				"noEvolvingTypes": "error",
+				"noImportCycles": "error",
+				"noFocusedTests": "error"
+			},
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error"
+			}
+		}
+	},
+	"javascript": { "formatter": { "quoteStyle": "double" } },
+	"overrides": [
+		{
+			"includes": ["skills/explainer/kit/theme.css"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 1400 } }
+					}
+				}
+			}
+		},
+		{
+			"includes": ["skills/explainer/kit/*.js"],
+			"javascript": { "globals": ["echarts"] },
+			"linter": { "rules": { "correctness": { "noUndeclaredVariables": "error" } } }
+		}
+	]
+}
