@@ -16,7 +16,9 @@
 	/** The view claimed by the current hash: `name/param` wins over `name`; param is decoded. */
 	function route() {
 		const [name = "", ...rest] = location.hash.slice(1).split("/");
-		const view = views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
+		const view =
+			views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ??
+			views.find((v) => v.dataset.view === name);
 		return { name, view, param: decodeURIComponent(rest.join("/")) };
 	}
 
@@ -46,7 +48,10 @@
 	root.classList.add("js-views");
 	addEventListener("hashchange", show);
 	show(); // layout only: the right view is visible before the first paint
-	const start = () => { started = true; show(); };
+	const start = () => {
+		started = true;
+		show();
+	};
 	if (document.readyState === "loading") addEventListener("DOMContentLoaded", start);
 	else start();
 })();

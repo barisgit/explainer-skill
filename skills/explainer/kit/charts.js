@@ -16,7 +16,8 @@
    The page's colour scheme changing (system setting, or color-scheme / class / style on <html>) remounts the chart: zoom and legend
    state reset. Reduced motion turns animation off. */
 (() => {
-	if (!window.echarts) throw new Error('kit:charts.js needs <script src="kit:echarts.js"></script> before it');
+	if (!window.echarts)
+		throw new Error('kit:charts.js needs <script src="kit:echarts.js"></script> before it');
 	const probe = document.createElement("i");
 	probe.hidden = true;
 	document.documentElement.append(probe);
@@ -49,8 +50,10 @@
 	 * copied, everything else (functions, class instances, number arrays) is shared. Run at every mount so saved options stay token-based.
 	 */
 	function resolveColors(value, key = "") {
-		if (typeof value === "string") return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
-		if (Array.isArray(value)) return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
+		if (typeof value === "string")
+			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
+		if (Array.isArray(value))
+			return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
 		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) return value;
 		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
 	}
@@ -59,11 +62,38 @@
 	function theme() {
 		// Resolved to rgb: --accent-soft and other derived tokens are color-mix(), which ECharts cannot parse.
 		const token = (name) => resolve(`var(--${name})`);
-		const [ink, muted, rule, ruleStrong, surface, accent, accentSoft] = ["ink", "muted", "rule", "rule-strong", "surface", "accent", "accent-soft"].map(token);
-		const axis = { axisLine: { lineStyle: { color: ruleStrong } }, axisTick: { lineStyle: { color: ruleStrong } }, axisLabel: { color: muted }, nameTextStyle: { color: muted }, splitLine: { lineStyle: { color: rule } } };
+		const [ink, muted, rule, ruleStrong, surface, accent, accentSoft] = [
+			"ink",
+			"muted",
+			"rule",
+			"rule-strong",
+			"surface",
+			"accent",
+			"accent-soft",
+		].map(token);
+		const axis = {
+			axisLine: { lineStyle: { color: ruleStrong } },
+			axisTick: { lineStyle: { color: ruleStrong } },
+			axisLabel: { color: muted },
+			nameTextStyle: { color: muted },
+			splitLine: { lineStyle: { color: rule } },
+		};
 		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a surface halo.
 		const label = { label: { color: ink, textBorderColor: surface, textBorderWidth: 2 } };
-		const labelled = Object.fromEntries(["line", "bar", "scatter", "pie", "heatmap", "treemap", "sankey", "sunburst", "radar", "boxplot"].map((type) => [type, label]));
+		const labelled = Object.fromEntries(
+			[
+				"line",
+				"bar",
+				"scatter",
+				"pie",
+				"heatmap",
+				"treemap",
+				"sankey",
+				"sunburst",
+				"radar",
+				"boxplot",
+			].map((type) => [type, label]),
+		);
 		return {
 			...labelled,
 			grid: { outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
@@ -75,22 +105,46 @@
 			animationEasing: "cubicOut",
 			textStyle: { fontFamily: getComputedStyle(document.body).fontFamily, color: ink },
 			title: { textStyle: { color: ink }, subtextStyle: { color: muted } },
-			categoryAxis: axis, valueAxis: axis, timeAxis: axis, logAxis: axis,
-			legend: { textStyle: { color: ink }, inactiveColor: ruleStrong, pageTextStyle: { color: muted }, pageIconColor: accent },
+			categoryAxis: axis,
+			valueAxis: axis,
+			timeAxis: axis,
+			logAxis: axis,
+			legend: {
+				textStyle: { color: ink },
+				inactiveColor: ruleStrong,
+				pageTextStyle: { color: muted },
+				pageIconColor: accent,
+			},
 			tooltip: {
-				backgroundColor: surface, borderColor: ruleStrong, textStyle: { color: ink },
-				axisPointer: { lineStyle: { color: muted }, crossStyle: { color: muted }, label: { backgroundColor: ink, color: surface } },
+				backgroundColor: surface,
+				borderColor: ruleStrong,
+				textStyle: { color: ink },
+				axisPointer: {
+					lineStyle: { color: muted },
+					crossStyle: { color: muted },
+					label: { backgroundColor: ink, color: surface },
+				},
 			},
 			dataZoom: {
 				// Quiet until touched: neutral track and handles, the accent only on hover and drag.
-				borderColor: rule, backgroundColor: "transparent", fillerColor: accentSoft, textStyle: { color: muted },
-				handleStyle: { color: surface, borderColor: ruleStrong }, moveHandleStyle: { color: rule },
+				borderColor: rule,
+				backgroundColor: "transparent",
+				fillerColor: accentSoft,
+				textStyle: { color: muted },
+				handleStyle: { color: surface, borderColor: ruleStrong },
+				moveHandleStyle: { color: rule },
 				emphasis: { handleStyle: { borderColor: accent }, moveHandleStyle: { color: accent } },
 				dataBackground: { lineStyle: { color: ruleStrong }, areaStyle: { color: rule } },
-				selectedDataBackground: { lineStyle: { color: muted }, areaStyle: { color: ruleStrong, opacity: 0.35 } },
+				selectedDataBackground: {
+					lineStyle: { color: muted },
+					areaStyle: { color: ruleStrong, opacity: 0.35 },
+				},
 			},
 			brush: { brushStyle: { color: accentSoft, borderColor: accent } },
-			toolbox: { iconStyle: { borderColor: muted }, emphasis: { iconStyle: { borderColor: accent } } },
+			toolbox: {
+				iconStyle: { borderColor: muted },
+				emphasis: { iconStyle: { borderColor: accent } },
+			},
 			visualMap: { textStyle: { color: muted } },
 			markLine: { lineStyle: { color: muted }, label: { color: muted } },
 		};
@@ -112,7 +166,8 @@
 			return target;
 		}
 		if (!isObject(target) || !isObject(patch)) return patch;
-		for (const [key, value] of Object.entries(patch)) target[key] = key in target ? merge(target[key], value) : value;
+		for (const [key, value] of Object.entries(patch))
+			target[key] = key in target ? merge(target[key], value) : value;
 		return target;
 	}
 
@@ -120,7 +175,10 @@
 	function mergeOption(option, patch, replace) {
 		for (const key of replace) if (!(key in patch)) delete option[key];
 		for (const [key, value] of Object.entries(patch)) {
-			option[key] = key in option && !replace.includes(key) ? merge(option[key], value, Array.isArray(value)) : value;
+			option[key] =
+				key in option && !replace.includes(key)
+					? merge(option[key], value, Array.isArray(value))
+					: value;
 		}
 	}
 
@@ -138,7 +196,8 @@
 		for (const remount of remounts) remount();
 	};
 	matchMedia("(prefers-color-scheme: dark)").addEventListener("change", checkScheme);
-	for (const el of [document.documentElement, document.body]) if (el) new MutationObserver(checkScheme).observe(el, { attributes: true });
+	for (const el of [document.documentElement, document.body])
+		if (el) new MutationObserver(checkScheme).observe(el, { attributes: true });
 
 	const made = new WeakMap();
 
@@ -152,7 +211,9 @@
 			setup?.(chart);
 		};
 		// Canvas text needs the web font loaded before the first draw.
-		const fontReady = document.fonts.load(`500 12px ${getComputedStyle(document.body).fontFamily}`).catch(() => []);
+		const fontReady = document.fonts
+			.load(`500 12px ${getComputedStyle(document.body).fontFamily}`)
+			.catch(() => []);
 		const resizer = new ResizeObserver(() => {
 			if (!el.clientWidth) return;
 			if (chart) chart.resize();
@@ -161,12 +222,21 @@
 		const remount = () => chart && mount();
 		resizer.observe(el);
 		remounts.add(remount);
-		made.set(el, () => { resizer.disconnect(); remounts.delete(remount); chart?.dispose(); });
+		made.set(el, () => {
+			resizer.disconnect();
+			remounts.delete(remount);
+			chart?.dispose();
+		});
 		return {
-			get chart() { return chart; },
+			get chart() {
+				return chart;
+			},
 			set(patch, replace = []) {
 				mergeOption(option, patch, replace);
-				chart?.setOption(resolveColors(patch), replace.length ? { replaceMerge: replace } : undefined);
+				chart?.setOption(
+					resolveColors(patch),
+					replace.length ? { replaceMerge: replace } : undefined,
+				);
 			},
 		};
 	}

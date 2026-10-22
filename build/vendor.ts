@@ -13,7 +13,12 @@ const root = join(import.meta.dir, "..");
 const skill = join(root, "skills", "explainer");
 const nm = (...p: string[]) => join(root, "node_modules", ...p);
 
-const built = await Bun.build({ entrypoints: [join(import.meta.dir, "echarts-entry.ts")], minify: true, target: "browser", format: "iife" });
+const built = await Bun.build({
+	entrypoints: [join(import.meta.dir, "echarts-entry.ts")],
+	minify: true,
+	target: "browser",
+	format: "iife",
+});
 if (!built.success) throw new Error(built.logs.join("\n"));
 const version = (await Bun.file(nm("echarts/package.json")).json()).version;
 const header = `/* echarts: Apache ECharts ${version}, custom build, global echarts.
@@ -24,8 +29,12 @@ writeFileSync(join(skill, "kit/echarts.js"), header + (await built.outputs[0]!.t
 
 mkdirSync(join(skill, "kit/licenses"), { recursive: true });
 const echartsLicense = ["LICENSE", "NOTICE"].map((f) => Bun.file(nm("echarts", f)).text());
-writeFileSync(join(skill, "kit/licenses/echarts.txt"), (await Promise.all(echartsLicense)).join("\n\n"));
+writeFileSync(
+	join(skill, "kit/licenses/echarts.txt"),
+	(await Promise.all(echartsLicense)).join("\n\n"),
+);
 copyFileSync(nm("mermaid/LICENSE"), join(skill, "kit/licenses/mermaid.txt"));
 copyFileSync(nm("mermaid/dist/mermaid.min.js"), join(skill, "vendor/mermaid.min.js"));
 
-for (const f of ["kit/echarts.js", "vendor/mermaid.min.js"]) console.log(`${f} ${(statSync(join(skill, f)).size / 1024).toFixed(0)} KB`);
+for (const f of ["kit/echarts.js", "vendor/mermaid.min.js"])
+	console.log(`${f} ${(statSync(join(skill, f)).size / 1024).toFixed(0)} KB`);

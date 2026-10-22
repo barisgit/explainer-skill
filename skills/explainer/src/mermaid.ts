@@ -77,27 +77,46 @@ const RENDER_JS = `(async (sources, theme) => {
  * `pageCss` is the page's own inline <style> text, loaded after the kit stylesheet so per-page token overrides (a different `--accent`)
  * reach the diagram. The 5 MB Mermaid bundle stays in vendor/: only the finished SVG ships in the page.
  */
-export async function renderMermaid(sources: string[], pageCss = ""): Promise<Array<{ light: string; dark: string } | Error>> {
+export async function renderMermaid(
+	sources: string[],
+	pageCss = "",
+): Promise<Array<{ light: string; dark: string } | Error>> {
 	const dir = mkdtempSync(join(tmpdir(), "artifact-mermaid-"));
 	try {
 		const page = join(dir, "render.html");
-		writeFileSync(page, `<!doctype html><link rel="stylesheet" href="file://${join(ROOT, "kit/theme.css")}"><style>${pageCss}</style><body class="mermaid"><script src="file://${join(ROOT, "vendor/mermaid.min.js")}"></script>`);
+		writeFileSync(
+			page,
+			`<!doctype html><link rel="stylesheet" href="file://${join(ROOT, "kit/theme.css")}"><style>${pageCss}</style><body class="mermaid"><script src="file://${join(ROOT, "vendor/mermaid.min.js")}"></script>`,
+		);
 		return await withPage(async (cdp) => {
 			await cdp.send("Runtime.enable");
 			const loaded = cdp.once("Page.loadEventFired");
 			await cdp.send("Page.enable");
 			await cdp.send("Page.navigate", { url: `file://${page}` });
 			await loaded;
-			const rendered = {} as Record<(typeof THEMES)[number], Array<{ svg?: string; error?: string }>>;
+			const rendered = {} as Record<
+				(typeof THEMES)[number],
+				Array<{ svg?: string; error?: string }>
+			>;
 			for (const theme of THEMES) {
-				await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: theme }] });
-				const { result, exceptionDetails } = await cdp.send("Runtime.evaluate", { expression: `${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`, awaitPromise: true, returnByValue: true });
-				if (exceptionDetails) throw new Error(`mermaid render failed: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+				await cdp.send("Emulation.setEmulatedMedia", {
+					features: [{ name: "prefers-color-scheme", value: theme }],
+				});
+				const { result, exceptionDetails } = await cdp.send("Runtime.evaluate", {
+					expression: `${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`,
+					awaitPromise: true,
+					returnByValue: true,
+				});
+				if (exceptionDetails)
+					throw new Error(
+						`mermaid render failed: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`,
+					);
 				rendered[theme] = result.value;
 			}
 			return sources.map((_, i) => {
 				const [light, dark] = [rendered.light[i]!, rendered.dark[i]!];
-				if (light.error || dark.error || !light.svg || !dark.svg) return new Error(light.error ?? dark.error ?? "no SVG produced");
+				if (light.error || dark.error || !light.svg || !dark.svg)
+					return new Error(light.error ?? dark.error ?? "no SVG produced");
 				return { light: light.svg, dark: dark.svg };
 			});
 		});

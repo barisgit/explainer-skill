@@ -27,12 +27,14 @@
 		for (const diagram of root.querySelectorAll("[data-steps]")) {
 			for (const token of diagram.dataset.steps.split(/\s+/).filter(Boolean)) {
 				const [ref = "", steps = ""] = token.split(":");
-				for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`)) part.dataset.step = steps.replaceAll(",", " ");
+				for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`))
+					part.dataset.step = steps.replaceAll(",", " ");
 			}
 		}
 	}
 
-	const button = (label, attrs, primary = false) => `<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
+	const button = (label, attrs, primary = false) =>
+		`<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
 
 	/** Wires one stepper once and returns its refresh(step?), which re-reads the content and re-applies the step. */
 	function create(root) {
@@ -66,7 +68,9 @@
 			readout.textContent = `${step} / ${total}`;
 			if (announced !== `${step}/${total}`) {
 				announced = `${step}/${total}`;
-				root.dispatchEvent(new CustomEvent("stepchange", { bubbles: true, detail: { step, steps: total } }));
+				root.dispatchEvent(
+					new CustomEvent("stepchange", { bubbles: true, detail: { step, steps: total } }),
+				);
 			}
 		};
 		const stop = () => {
@@ -77,9 +81,15 @@
 
 		bar.addEventListener("click", (e) => {
 			const go = e.target.closest("[data-go]");
-			if (go) { stop(); show(step + Number(go.dataset.go)); }
+			if (go) {
+				stop();
+				show(step + Number(go.dataset.go));
+			}
 		});
-		range.addEventListener("input", () => { stop(); show(Number(range.value)); });
+		range.addEventListener("input", () => {
+			stop();
+			show(Number(range.value));
+		});
 		play.addEventListener("click", () => {
 			if (timer) return stop();
 			if (step === total) show(1);
@@ -87,7 +97,14 @@
 			timer = setInterval(() => (step < total ? show(step + 1) : stop()), PLAY_MS);
 		});
 		root.addEventListener("keydown", (e) => {
-			if (!wired || e.target.matches("input, textarea, select") || e.altKey || e.ctrlKey || e.metaKey) return;
+			if (
+				!wired ||
+				e.target.matches("input, textarea, select") ||
+				e.altKey ||
+				e.ctrlKey ||
+				e.metaKey
+			)
+				return;
 			const target = { ArrowLeft: step - 1, ArrowRight: step + 1, Home: 1, End: total }[e.key];
 			if (target === undefined) return;
 			e.preventDefault();
@@ -101,7 +118,10 @@
 		function refresh(wanted) {
 			const wasLast = step === total;
 			expandDiagramSteps(root);
-			parts = [...root.querySelectorAll("[data-step]")].map((el) => ({ el, steps: el.dataset.step.trim().split(/\s+/).map(Number) }));
+			parts = [...root.querySelectorAll("[data-step]")].map((el) => ({
+				el,
+				steps: el.dataset.step.trim().split(/\s+/).map(Number),
+			}));
 			const captionList = root.querySelector("[data-captions]");
 			captions = [...(captionList?.children ?? [])];
 			total = captions.length || Math.max(0, ...parts.flatMap((p) => p.steps));
@@ -125,7 +145,10 @@
 			range.max = total;
 			root.tabIndex = 0;
 			root.setAttribute("role", "group");
-			root.setAttribute("aria-label", root.getAttribute("aria-label") ?? "Step-through; use the arrow keys");
+			root.setAttribute(
+				"aria-label",
+				root.getAttribute("aria-label") ?? "Step-through; use the arrow keys",
+			);
 			root.dataset.live = "";
 			// The first read opens on the last step (the complete picture); later ones keep the place, and a stepper on its last step stays on it.
 			show(wanted ?? (wasLast ? total : step));
