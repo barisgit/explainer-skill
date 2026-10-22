@@ -25,7 +25,7 @@
 	--rule-strong: light-dark(#b8ad99, #5a534a);
 	--accent: light-dark(#b93a05, #ff8a3d);
 	--accent-ink: light-dark(#fff, #1b1208);
-	/* Derived from --accent and --warn so a page that changes only --accent stays consistent. */
+	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
 	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
 	--ok: light-dark(#18744b, #5fcf99);
 	--bad: light-dark(#b3322a, #f2776b);

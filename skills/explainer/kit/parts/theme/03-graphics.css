@@ -133,17 +133,11 @@
 .fig > .mermaid {
 	margin: 0;
 }
-/* In a panel the diagram runs edge to edge; on the page it keeps its own frame. */
-.fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player))
-	> .mermaid {
-	border: 0;
-	border-radius: 0;
-}
 .mermaid .label {
 	margin: 0;
 	font: inherit;
 	color: inherit;
-} /* mermaid's own .label, not the section caption */
+} /* mermaid's own .label, not the kit's caption */
 /* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). Diagrams and svg files in
    <img> (packed once per scheme) share this; only the other copy is hidden so the page's own display rule for an <img> stays. */
 .mermaid > :is(.light, .dark) {
