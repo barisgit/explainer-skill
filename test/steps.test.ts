@@ -6,6 +6,9 @@ afterAll(dir.cleanup);
 
 const assertLater = (name: string, body: string) => pageAssertion("steps contract", name, body);
 
+/** The class of each SVG part a, b and c, joined: "is-on" once it has appeared, "is-now" on a step it lists. */
+const PART_CLASSES = `["a", "b", "c"].map((id) => document.getElementById(id).getAttribute("class") ?? "").join()`;
+
 const PAGE = (
 	checks: string[],
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -26,16 +29,16 @@ const CHECKS = [
 		'heard.join() === "1,dcl1"',
 	),
 	assertLater(
-		"an SVG part appears at its first step and is lit on each listed one",
-		`["a", "b", "c"].map((id) => document.getElementById(id).getAttribute("class") ?? "").join() === "is-on is-now,,"`,
+		"on the opening step only the part listing step 1 is shown and lit",
+		`${PART_CLASSES} === "is-on is-now,,"`,
 	),
 	assertLater(
 		"data-labels renames the controls and keeps the defaults it leaves empty",
 		`document.querySelector("[data-go='1']").textContent === "Naprej" && document.querySelector("[data-play]").textContent === "Predvajaj" && document.querySelector(".player input").ariaLabel === "Korak" && document.querySelector(".player").ariaLabel === "Step controls"`,
 	),
 	assertLater(
-		"data-go buttons step",
-		`(document.querySelector('[data-go="1"]').click(), heard.filter(Number).at(-1) === 2)`,
+		"data-go buttons step: an earlier part stays shown, unlit, and a part listing steps 2 and 3 appears at 2",
+		`(document.querySelector('[data-go="1"]').click(), heard.filter(Number).at(-1) === 2 && ${PART_CLASSES} === "is-on,is-on is-now,")`,
 	),
 ];
 

@@ -130,7 +130,7 @@ test("an svg file in a picture stays one data-URI image", async () => {
 	expect(html).toContain("data:image/svg+xml;base64,");
 }, 30_000);
 
-test("a Mermaid diagram is one SVG in the scheme's tokens, and only a figure with controls boxes it, also outside a figure", async () => {
+test("a Mermaid diagram is one SVG in the scheme's tokens, boxed only in a figure with controls", async () => {
 	const { out } = await packAndCheck(
 		"diagram",
 		{},
