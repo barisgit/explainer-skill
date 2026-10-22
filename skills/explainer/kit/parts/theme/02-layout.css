@@ -97,9 +97,12 @@ h3 {
 	box-shadow: 0 0 0 100vmax var(--sunken);
 	clip-path: inset(0 -100vmax);
 }
+.page section.band,
+.page .band + section {
+	border-block-start: 0;
+}
 .page section.band {
 	padding-block: clamp(2rem, 5vw, 3.5rem);
-	border-block-start: 0;
 }
 /* Minor section (method, sources, assumptions): smaller type and, on wide screens, the heading in its own column, so it reads as
    reference rather than as another finding. */
