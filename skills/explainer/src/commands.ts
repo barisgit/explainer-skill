@@ -21,6 +21,7 @@ export interface Command {
 
 const MERMAID_DOC = `<pre class="mermaid"> blocks hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
 pack renders each block to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit charts.js).
+It draws a subset of each type and fails on any line it cannot read (notes, titles, cross and circle edge ends, new-style shapes), naming the line.
 Labels wrap at about 30 characters into tall boxes: keep them to a few words, or break one with <br>. Markdown strings ("\`...\`") are not supported; **bold** and *italic* work in plain labels.
 Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
   flowchart / state / class / ER   nodes and subgraphs: the node id (cache in "api --> cache[(Cache)]")

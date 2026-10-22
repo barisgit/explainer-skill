@@ -1,3 +1,84 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 6239e30019b1bc36d0722921db4ecc84f9b277a6..a12da8e660e58d3239a211d57e8412743418da97 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -309,4 +309,11 @@ declare const renderMermaidSync: typeof renderMermaidSVG;
+ /** @deprecated Use `renderMermaidSVGAsync` */
+ declare const renderMermaid: typeof renderMermaidSVGAsync;
+ 
+-export { type AsciiRenderOptions, DEFAULTS, type DiagramColors, type MermaidGraph, type PositionedGraph, type RenderOptions, THEMES, type ThemeName, fromShikiTheme, parseMermaid, renderMermaid, renderMermaidASCII, renderMermaidAscii, renderMermaidSVG, renderMermaidSVGAsync, renderMermaidSync };
++/** Thrown by every parser for input it does not consume: `unread` is the part left over, `line` the statement it is in. */
++declare class UnreadInputError extends Error {
++    readonly unread: string;
++    readonly line: string;
++    constructor(line: string, unread?: string);
++}
++
++export { type AsciiRenderOptions, DEFAULTS, type DiagramColors, type MermaidGraph, type PositionedGraph, type RenderOptions, THEMES, type ThemeName, fromShikiTheme, parseMermaid, renderMermaid, renderMermaidASCII, renderMermaidAscii, renderMermaidSVG, renderMermaidSVGAsync, renderMermaidSync, UnreadInputError };
+diff --git a/src/class/parser.ts b/src/class/parser.ts
+index 527da535f7467aeaba67a129f187f401e94fb295..b005a9df6850a88be92d55f9a8b15f1bb2316c66 100644
+--- a/src/class/parser.ts
++++ b/src/class/parser.ts
+@@ -1,5 +1,5 @@
+ import type { ClassDiagram, ClassNode, ClassRelationship, ClassMember, RelationshipType, ClassNamespace } from './types.ts'
+-import { normalizeBrTags } from '../multiline-utils.ts'
++import { normalizeBrTags, UnreadInputError } from '../multiline-utils.ts'
+ 
+ // ============================================================================
+ // Class diagram parser
+@@ -156,6 +156,8 @@ export function parseClassDiagram(lines: string[]): ClassDiagram {
+       diagram.relationships.push(rel)
+       continue
+     }
++
++    throw new UnreadInputError(line)
+   }
+ 
+   diagram.classes = [...classMap.values()]
+diff --git a/src/er/parser.ts b/src/er/parser.ts
+index a4edaa8a57dfa5835675b8ecf1c794897f225076..f5c25b6e833053cb9b0b80258fc5a449861d5793 100644
+--- a/src/er/parser.ts
++++ b/src/er/parser.ts
+@@ -1,5 +1,5 @@
+ import type { ErDiagram, ErEntity, ErAttribute, ErRelationship, Cardinality } from './types.ts'
+-import { normalizeBrTags } from '../multiline-utils.ts'
++import { normalizeBrTags, UnreadInputError } from '../multiline-utils.ts'
+ 
+ // ============================================================================
+ // ER diagram parser
+@@ -52,9 +52,8 @@ export function parseErDiagram(lines: string[]): ErDiagram {
+ 
+       // Attribute line: type name [PK|FK|UK] ["comment"]
+       const attr = parseAttribute(line)
+-      if (attr) {
+-        currentEntity.attributes.push(attr)
+-      }
++      if (!attr) throw new UnreadInputError(line)
++      currentEntity.attributes.push(attr)
+       continue
+     }
+ 
+@@ -76,6 +75,8 @@ export function parseErDiagram(lines: string[]): ErDiagram {
+       diagram.relationships.push(rel)
+       continue
+     }
++
++    throw new UnreadInputError(line)
+   }
+ 
+   diagram.entities = [...entityMap.values()]
+diff --git a/src/index.ts b/src/index.ts
+index b4a6454e1015b38924cacc674f488d3460861af2..c3f0b98d9784ebebef90507263d5666657fa6e5f 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -23,6 +23,7 @@ export type { RenderOptions, MermaidGraph, PositionedGraph } from './types.ts'
+ export type { DiagramColors, ThemeName } from './theme.ts'
+ export { fromShikiTheme, THEMES, DEFAULTS } from './theme.ts'
+ export { parseMermaid } from './parser.ts'
++export { UnreadInputError } from './multiline-utils.ts'
+ export { renderMermaidASCII, renderMermaidAscii } from './ascii/index.ts'
+ export type { AsciiRenderOptions } from './ascii/index.ts'
+ 
 diff --git a/src/layout-engine.ts b/src/layout-engine.ts
 index 8557308223e16670db3d126d9c55673b6e946598..da74af121c4e242b6e039b22b60b9f2f6ccbca8d 100644
 --- a/src/layout-engine.ts
@@ -154,11 +235,54 @@ index 8557308223e16670db3d126d9c55673b6e946598..da74af121c4e242b6e039b22b60b9f2f
  }
  
  /**
+diff --git a/src/multiline-utils.ts b/src/multiline-utils.ts
+index 980f197ea9d84a4594705a89a94b525907b5f41b..278c23966c79d74b5b6dad213c5203e3554de909 100644
+--- a/src/multiline-utils.ts
++++ b/src/multiline-utils.ts
+@@ -8,6 +8,22 @@
+ 
+ import { LINE_HEIGHT_RATIO } from './text-metrics.ts'
+ 
++/**
++ * Thrown by every parser for input it does not consume, so a diagram never renders with part of its source silently dropped.
++ * `unread` is the part left over (the whole statement when nothing of it was read), `line` the statement it is in.
++ */
++export class UnreadInputError extends Error {
++  readonly unread: string
++  readonly line: string
++
++  constructor(line: string, unread: string = line) {
++    super(`Cannot read "${unread}" in "${line}"`)
++    this.name = 'UnreadInputError'
++    this.unread = unread
++    this.line = line
++  }
++}
++
+ /**
+  * Normalize label text: strip surrounding quotes, convert <br> tags and
+  * literal \n sequences to newline characters. Strips unsupported HTML tags
 diff --git a/src/parser.ts b/src/parser.ts
-index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..fdec9ad9dd1d0c907cc7cfd1aaf6f07126ed8d79 100644
+index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bcf4de812d 100644
 --- a/src/parser.ts
 +++ b/src/parser.ts
-@@ -325,10 +325,8 @@ function registerStateNode(
+@@ -1,5 +1,5 @@
+ import type { MermaidGraph, MermaidNode, MermaidEdge, MermaidSubgraph, Direction, NodeShape, EdgeStyle } from './types.ts'
+-import { normalizeBrTags } from './multiline-utils.ts'
++import { normalizeBrTags, UnreadInputError } from './multiline-utils.ts'
+ 
+ // ============================================================================
+ // Mermaid parser — flowcharts and state diagrams
+@@ -314,6 +314,8 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
+       registerStateNode(graph, compositeStack, { id, label, shape: 'rounded' })
+       continue
+     }
++
++    throw new UnreadInputError(line)
+   }
+ 
+   return graph
+@@ -325,10 +327,8 @@ function registerStateNode(
    compositeStack: MermaidSubgraph[],
    node: MermaidNode
  ): void {
@@ -171,7 +295,112 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..fdec9ad9dd1d0c907cc7cfd1aaf6f071
    if (compositeStack.length > 0) {
      const current = compositeStack[compositeStack.length - 1]!
      if (!current.nodeIds.includes(node.id)) {
-@@ -610,10 +608,8 @@ function registerNode(
+@@ -393,10 +393,11 @@ function parseStyleProps(propsStr: string): Record<string, string> {
+  *   -.-> -.-       dotted arrow / dotted line
+  *   ==>  ===       thick arrow / thick line
+  *   <--> <-.-> <==>  bidirectional variants
++ *   --->  -..->  ===>  ----  longer links, drawn like the short ones (Mermaid lengthens them)
+  *
+  * Optional label: -->|label text|
+  */
+-const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\|([^|]*)\|)?/
++const ARROW_REGEX = /^(<)?(-{2,}>|-\.+->|={2,}>|-{3,}|-\.+-|={3,})(?:\|([^|]*)\|)?/
+ 
+ /**
+  * Text-embedded label regex — matches "-- label -->", "-. label .->", "== label ==>" syntax.
+@@ -410,32 +411,43 @@ const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|==
+  * Node shape patterns — ordered from most specific delimiters to least.
+  * Multi-char delimiters must be tried before single-char to avoid false matches.
+  */
+-const NODE_PATTERNS: Array<{ regex: RegExp; shape: NodeShape }> = [
++const NODE_SHAPES: Array<{ open: string; close: string; shape: NodeShape }> = [
+   // Triple delimiters (must be first)
+-  { regex: /^([\w-]+)\(\(\((.+?)\)\)\)/, shape: 'doublecircle' },  // A(((text)))
++  { open: '(((', close: ')))', shape: 'doublecircle' },  // A(((text)))
+ 
+   // Double delimiters with mixed brackets
+-  { regex: /^([\w-]+)\(\[(.+?)\]\)/,     shape: 'stadium' },       // A([text])
+-  { regex: /^([\w-]+)\(\((.+?)\)\)/,     shape: 'circle' },        // A((text))
+-  { regex: /^([\w-]+)\[\[(.+?)\]\]/,     shape: 'subroutine' },    // A[[text]]
+-  { regex: /^([\w-]+)\[\((.+?)\)\]/,     shape: 'cylinder' },      // A[(text)]
++  { open: '([', close: '])', shape: 'stadium' },         // A([text])
++  { open: '((', close: '))', shape: 'circle' },          // A((text))
++  { open: '[[', close: ']]', shape: 'subroutine' },      // A[[text]]
++  { open: '[(', close: ')]', shape: 'cylinder' },        // A[(text)]
+ 
+   // Trapezoid variants — must come before plain [text]
+-  { regex: /^([\w-]+)\[\/(.+?)\\\]/,     shape: 'trapezoid' },     // A[/text\]
+-  { regex: /^([\w-]+)\[\\(.+?)\/\]/,     shape: 'trapezoid-alt' }, // A[\text/]
++  { open: '[/', close: '\\]', shape: 'trapezoid' },     // A[/text\]
++  { open: '[\\', close: '/]', shape: 'trapezoid-alt' }, // A[\text/]
+ 
+   // Asymmetric flag shape
+-  { regex: /^([\w-]+)>(.+?)\]/,          shape: 'asymmetric' },    // A>text]
++  { open: '>', close: ']', shape: 'asymmetric' },        // A>text]
+ 
+   // Double curly braces (hexagon) — must come before single {text}
+-  { regex: /^([\w-]+)\{\{(.+?)\}\}/,     shape: 'hexagon' },       // A{{text}}
++  { open: '{{', close: '}}', shape: 'hexagon' },         // A{{text}}
+ 
+   // Single-char delimiters (last — most common, least specific)
+-  { regex: /^([\w-]+)\[(.+?)\]/,         shape: 'rectangle' },     // A[text]
+-  { regex: /^([\w-]+)\((.+?)\)/,         shape: 'rounded' },       // A(text)
+-  { regex: /^([\w-]+)\{(.+?)\}/,         shape: 'diamond' },       // A{text}
++  { open: '[', close: ']', shape: 'rectangle' },         // A[text]
++  { open: '(', close: ')', shape: 'rounded' },           // A(text)
++  { open: '{', close: '}', shape: 'diamond' },           // A{text}
+ ]
+ 
++const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
++
++/**
++ * Node shape patterns, in NODE_SHAPES order. Each shape tries a quoted label first, so brackets inside the quotes are text
++ * (`A["Array [i]"]`), then an unquoted one that ends at the first closing delimiter.
++ */
++const NODE_PATTERNS: Array<{ regex: RegExp; shape: NodeShape }> = NODE_SHAPES.flatMap(({ open, close, shape }) => [
++  { regex: new RegExp(`^([\\w-]+)${escapeRegex(open)}("[^"]*")${escapeRegex(close)}`), shape },
++  { regex: new RegExp(`^([\\w-]+)${escapeRegex(open)}(.+?)${escapeRegex(close)}`), shape },
++])
++
+ /** Regex for a bare node reference (just an ID, no shape brackets) */
+ const BARE_NODE_REGEX = /^([\w-]+)/
+ 
+@@ -456,13 +468,15 @@ function parseEdgeLine(
+ 
+   // Parse the first node group (possibly with & separators)
+   const firstGroup = consumeNodeGroup(remaining, graph, subgraphStack)
+-  if (!firstGroup || firstGroup.ids.length === 0) return
++  if (!firstGroup || firstGroup.ids.length === 0) throw new UnreadInputError(line)
+ 
+   remaining = firstGroup.remaining.trim()
+   let prevGroupIds = firstGroup.ids
+ 
+   // Parse arrow + node-group pairs until the line is exhausted
+   while (remaining.length > 0) {
++    // What is left before the link: reported whole when the link or the node after it cannot be read
++    const unread = remaining
+     let hasArrowStart: boolean
+     let style: EdgeStyle
+     let hasArrowEnd: boolean
+@@ -480,7 +494,7 @@ function parseEdgeLine(
+     } else {
+       // Fallback: text-embedded label syntax (-- Yes -->, -. Maybe .->, == Sure ==>)
+       const textMatch = remaining.match(TEXT_ARROW_REGEX)
+-      if (!textMatch) break
++      if (!textMatch) throw new UnreadInputError(line, unread)
+       hasArrowStart = Boolean(textMatch[1])
+       const rawLabel = textMatch[3]!.trim()
+       edgeLabel = rawLabel ? normalizeBrTags(rawLabel) : undefined
+@@ -493,7 +507,7 @@ function parseEdgeLine(
+ 
+     // Parse the next node group
+     const nextGroup = consumeNodeGroup(remaining, graph, subgraphStack)
+-    if (!nextGroup || nextGroup.ids.length === 0) break
++    if (!nextGroup || nextGroup.ids.length === 0) throw new UnreadInputError(line, unread)
+ 
+     remaining = nextGroup.remaining.trim()
+ 
+@@ -610,10 +624,8 @@ function registerNode(
    subgraphStack: MermaidSubgraph[],
    node: MermaidNode
  ): void {
@@ -184,6 +413,97 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..fdec9ad9dd1d0c907cc7cfd1aaf6f071
    trackInSubgraph(subgraphStack, node.id)
  }
  
+@@ -627,13 +639,10 @@ function trackInSubgraph(subgraphStack: MermaidSubgraph[], nodeId: string): void
+   }
+ }
+ 
+-/** Map arrow operator string to edge style (ignoring direction) */
++/** Map arrow operator string to edge style (ignoring direction and length) */
+ function arrowStyleFromOp(op: string): EdgeStyle {
+-  if (op === '-.->') return 'dotted'
+-  if (op === '-.-') return 'dotted'
+-  if (op === '==>') return 'thick'
+-  if (op === '===') return 'thick'
+-  // '-->'' and '---' are both solid
++  if (op.includes('.')) return 'dotted'
++  if (op.startsWith('=')) return 'thick'
+   return 'solid'
+ }
+ 
+diff --git a/src/sequence/parser.ts b/src/sequence/parser.ts
+index f6df0c6a84afc1c09881536fa6dae69c3d13ecf3..14e69ab23128a1a3f782d9252d39bf78acac26d3 100644
+--- a/src/sequence/parser.ts
++++ b/src/sequence/parser.ts
+@@ -1,5 +1,5 @@
+ import type { SequenceDiagram, Actor, Message, Block, Note } from './types.ts'
+-import { normalizeBrTags } from '../multiline-utils.ts'
++import { normalizeBrTags, UnreadInputError } from '../multiline-utils.ts'
+ 
+ // ============================================================================
+ // Sequence diagram parser
+@@ -22,6 +22,7 @@ import { normalizeBrTags } from '../multiline-utils.ts'
+ //   Note left of A: Text
+ //   Note right of A: Text
+ //   Note over A,B: Text
++//   activate B / deactivate B   right after a message to / from B, the same as + / - on that message
+ // ============================================================================
+ 
+ /**
+@@ -191,13 +192,52 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
+     }
+ 
+     // --- activate / deactivate explicit commands ---
+-    // These are handled implicitly via +/- on messages but can also appear standalone
+-    // For now, we skip explicit activate/deactivate lines (they affect rendering only)
++    // Right after a message to (from) that participant they are the + (-) sign on that message, which the layout draws.
++    // Anywhere else they would need activation events between messages, which the layout does not have.
++    const activationMatch = line.match(/^(activate|deactivate)\s+(\S+)$/)
++    const last = diagram.messages[diagram.messages.length - 1]
++    if (activationMatch && last) {
++      const actor = activationMatch[2]!
++      if (activationMatch[1] === 'activate' && last.to === actor && !last.activate) {
++        last.activate = true
++        continue
++      }
++      if (activationMatch[1] === 'deactivate' && last.from === actor && !last.deactivate) {
++        last.deactivate = true
++        continue
++      }
++    }
++
++    throw new UnreadInputError(line)
+   }
+ 
++  checkActivations(diagram.messages)
+   return diagram
+ }
+ 
++/**
++ * Every activation must end, and only an active participant can end one: the layout draws a bar from its start to its end,
++ * so either half alone would be dropped without a trace.
++ */
++function checkActivations(messages: Message[]): void {
++  const open = new Map<string, number>()
++  for (const msg of messages) {
++    if (msg.activate) open.set(msg.to, (open.get(msg.to) ?? 0) + 1)
++    if (msg.deactivate) {
++      const count = open.get(msg.from) ?? 0
++      if (count === 0) {
++        throw new Error(`${msg.from} is deactivated but not active; start it with "+" on an earlier message to ${msg.from}, e.g. "A->>+${msg.from}: ask"`)
++      }
++      open.set(msg.from, count - 1)
++    }
++  }
++  for (const [actor, count] of open) {
++    if (count > 0) {
++      throw new Error(`${actor} is activated but never deactivated; end it with "-" on a later message from ${actor}, e.g. "${actor}-->>-A: done"`)
++    }
++  }
++}
++
+ /** Ensure an actor exists, creating a default participant if not */
+ function ensureActor(diagram: SequenceDiagram, actorIds: Set<string>, id: string): void {
+   if (!actorIds.has(id)) {
 diff --git a/src/text-metrics.ts b/src/text-metrics.ts
 index 07766ab65303221352620180c63aa592b5842a10..48d561836bf6ed62e44b7ea5b8d9bfe96d5d8d45 100644
 --- a/src/text-metrics.ts
@@ -277,3 +597,22 @@ index 07766ab65303221352620180c63aa592b5842a10..48d561836bf6ed62e44b7ea5b8d9bfe9
  }
  
  // ============================================================================
+diff --git a/src/xychart/parser.ts b/src/xychart/parser.ts
+index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..5d366bfda541268563e157f0b0fa64a003fd2f5f 100644
+--- a/src/xychart/parser.ts
++++ b/src/xychart/parser.ts
+@@ -1,4 +1,5 @@
+ import type { XYChart, XYAxis, XYChartSeries } from './types.ts'
++import { UnreadInputError } from '../multiline-utils.ts'
+ 
+ // ============================================================================
+ // XY Chart parser
+@@ -86,6 +87,8 @@ export function parseXYChart(lines: string[]): XYChart {
+       series.push({ type: 'line', data: parseNumericArray(lineMatch[1]!) })
+       continue
+     }
++
++    throw new UnreadInputError(line)
+   }
+ 
+   // Auto-derive y-axis range from data if not specified

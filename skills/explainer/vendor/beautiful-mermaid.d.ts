@@ -12,6 +12,12 @@ export interface RenderOptions {
 	transparent?: boolean;
 }
 
+/** Thrown by every parser for input it does not consume: `unread` is the part left over, `line` the statement it is in. */
+export class UnreadInputError extends Error {
+	readonly unread: string;
+	readonly line: string;
+}
+
 /** One parsed edge of a flowchart or state diagram. */
 export interface MermaidEdge {
 	source: string;
@@ -27,6 +33,6 @@ export function parseMermaid(text: string): { edges: MermaidEdge[] };
 
 /**
  * Renders Mermaid source (flowchart/graph, stateDiagram, sequenceDiagram, classDiagram, erDiagram, xychart-beta) to SVG markup,
- * synchronously. Any other header is read as a flowchart; a parse error throws.
+ * synchronously. Any other header is read as a flowchart; a parse error throws, an UnreadInputError for input no parser rule reads.
  */
 export function renderMermaidSVG(text: string, options?: RenderOptions): string;

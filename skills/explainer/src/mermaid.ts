@@ -1,4 +1,4 @@
-import { parseMermaid, renderMermaidSVG } from "../vendor/beautiful-mermaid.js";
+import { parseMermaid, renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.js";
 
 /** A rendered diagram: one SVG that follows light and dark through the kit's tokens, and the data-ref ids of its parts. */
 export interface Diagram {
@@ -114,6 +114,26 @@ const MISRENDERS: Array<(family: Family, line: string) => string | undefined> = 
 			: undefined;
 	},
 ];
+
+/** What to write instead of input the renderer does not read, by what the unread part starts with; else UNREAD_DEFAULT. */
+const UNREAD_HINTS: Array<[RegExp, string]> = [
+	[
+		/^<?[-=.]+[xo]\b|^[xo][-=.]/,
+		'cross and circle ends (--x, --o) are not drawn; write "-->" and say what the end means in the label: a -->|stops| b',
+	],
+	[
+		/^(?:de)?activate\s/,
+		'activate and deactivate lines work right after a message to (or from) that participant, or mark the message: "A->>+B" starts B\'s bar, "B-->>-A" ends it',
+	],
+];
+const UNREAD_DEFAULT =
+	"pack draws a subset of Mermaid: leave it out, or say it with the nodes, edges and labels it reads";
+
+/** The author's message for input the renderer's parser left unread: what it is, and what to write instead. */
+function unreadMessage({ unread, line }: UnreadInputError): string {
+	const hint = UNREAD_HINTS.find(([pattern]) => pattern.test(unread))?.[1] ?? UNREAD_DEFAULT;
+	return `pack cannot read "${unread}"${unread === line ? "" : ` in "${line}"`}; ${hint}`;
+}
 
 /** The first misrender among the statements after the header, as its message. */
 function firstMisrender(family: Family, statements: string[]): string | undefined {
@@ -240,6 +260,9 @@ export function renderMermaid(sources: string[]): Array<Diagram | Error> {
 		try {
 			return renderOne(source, n);
 		} catch (e) {
+			if (e instanceof UnreadInputError) {
+				return new Error(unreadMessage(e));
+			}
 			return e instanceof Error ? e : new Error(String(e));
 		}
 	});
