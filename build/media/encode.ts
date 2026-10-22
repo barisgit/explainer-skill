@@ -1,4 +1,5 @@
-import { rmSync, statSync, writeFileSync } from "node:fs";
+import { statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { SCALE } from "./page.ts";
 import type { Frame, Rect } from "./types.ts";
 
@@ -17,7 +18,8 @@ export const sizeOf = (file: string) => statSync(file).size;
 
 /**
  * Encodes frames as a looping animated WebP, each frame lasting until the next was captured (the last for `lastMs`). The
- * frames are already the size they are shown at. The `text` preset keeps edges of small type clean.
+ * frames are already the size they are shown at. The `text` preset keeps edges of small type clean. The ffmpeg frame list
+ * is written next to the frames, in the temporary work directory, so a failed encode leaves nothing in `examples/media/`.
  */
 export async function encodeClip(frames: Frame[], lastMs: number, quality: number, out: string) {
 	const list = frames
@@ -26,7 +28,7 @@ export async function encodeClip(frames: Frame[], lastMs: number, quality: numbe
 				`file '${f.file}'\nduration ${((frames[i + 1]?.at ?? f.at + lastMs) - f.at) / 1000}`,
 		)
 		.join("\n");
-	const listFile = `${out}.txt`;
+	const listFile = join(dirname(frames[0]?.file ?? out), "frames.txt");
 	writeFileSync(listFile, `${list}\nfile '${frames.at(-1)?.file}'\n`);
 	await ffmpeg([
 		"-f",
@@ -49,7 +51,6 @@ export async function encodeClip(frames: Frame[], lastMs: number, quality: numbe
 		"0",
 		out,
 	]);
-	rmSync(listFile);
 }
 
 /** Encodes one PNG as a lossy WebP with the `text` preset, which keeps small type clean, optionally through an ffmpeg filter. */
