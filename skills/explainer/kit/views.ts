@@ -6,12 +6,13 @@
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
-   Navigation needs no markup of its own. Link every view from the overview (a table or list whose link text names it: "Blaž",
-   "1.6.3 Login form") and start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view
-   shows breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the
-   view it was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents
-   rail of its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more
-   <details> gets Expand all. */
+   Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it briefly
+   ("Blaž", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the view's
+   heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
+   breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
+   was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
+   its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
+   gets Expand all. */
 (() => {
 	const root = document.documentElement;
 	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
