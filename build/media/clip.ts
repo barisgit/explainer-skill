@@ -203,11 +203,11 @@ async function perform(cdp: Cdp, rec: Recorder, action: Action) {
 		case "drag": {
 			const [first = 0, ...rest] = action.values;
 			await rec.travel(await thumbAt(cdp, action.selector, first), travel);
-			rec.press();
+			await rec.press();
 			for (const value of rest) {
 				await rec.travel(await thumbAt(cdp, action.selector, value), action.ms);
 			}
-			rec.release();
+			await rec.release();
 			await rec.hold(action.hold ?? 600);
 			return;
 		}
