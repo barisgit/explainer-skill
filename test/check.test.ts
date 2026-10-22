@@ -28,3 +28,19 @@ test("check exits 0 for a page without problems", async () => {
 	expect(result.code).toBe(0);
 	expect(result.stdout).not.toContain("FAIL");
 }, 30_000);
+
+test("check names a first screen that is a list of in-page links, and keeps the hint for plain prose", async () => {
+	const questions = `<ol>${[1, 2, 3].map((n) => `<li><a href="#q${n}">Question ${n}?</a></li>`).join("")}</ol>`;
+	const withMap = dir.write("map.html", page("").replace("</h1>", `</h1>${questions}`));
+	const prose = dir.write("prose.html", page("").replace("</h1>", "</h1><p>Only words here.</p>"));
+
+	const [map, plain] = await Promise.all(
+		[withMap, prose].map((file) =>
+			runCli(["check", file, "--view", "none", "--out", dir.path("first")]),
+		),
+	);
+
+	expect(map?.stdout).toContain("text map: 3 in-page links");
+	expect(map?.stdout).not.toContain("no figure in view");
+	expect(plain?.stdout).toContain("no figure in view");
+}, 60_000);

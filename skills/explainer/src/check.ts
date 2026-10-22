@@ -9,11 +9,15 @@ const VIEWPORTS = {
 	narrow: { width: 390, height: 844 },
 } as const;
 const THEMES = ["light", "dark"] as const;
-/** The first viewport before any `--do` step: its PNG, the headline and the figures a reader sees without scrolling. */
+/**
+ * The first viewport before any `--do` step: its PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
+ * in-page links (href="#...") that one list shows in the viewport, i.e. a text map of the page's questions or sections.
+ */
 export interface FirstScreen {
 	png: string;
 	headline: string;
 	figures: string[];
+	links: number;
 }
 /**
  * `view` is the hash of a drill-down view ("" for the overview); `first` describes the first viewport, taken before any step (overview only).
@@ -90,13 +94,19 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	};
 })()`;
 
-/** Runs in the page before any step: the headline and the figures at least partly in the first viewport (outermost only). */
+/** Runs in the page before any step: the headline, the figures at least partly in the first viewport (outermost only) and the largest list of in-page links in view. */
 const FIRST_SCREEN_JS = `(() => {
 	const seen = (el) => { const r = el.getBoundingClientRect(); return r.width >= 120 && r.height >= 80 && Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) >= Math.min(200, r.height * 0.4); };
 	const found = [...document.querySelectorAll("figure, .fig, .chart, .mermaid, .dg, svg, canvas, img")].filter(seen);
 	const outer = found.filter((el) => !found.some((o) => o !== el && o.contains(el)));
 	const headline = document.querySelector("h1")?.textContent.replace(/\\s+/g, " ").trim() ?? "";
-	return { headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map((el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")) };
+	const lists = new Map();
+	for (const a of document.querySelectorAll('a[href^="#"]')) {
+		const r = a.getBoundingClientRect();
+		const list = a.closest("ol, ul, nav");
+		if (list && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight) lists.set(list, (lists.get(list) ?? 0) + 1);
+	}
+	return { links: Math.max(0, ...lists.values()), headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map((el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")) };
 })()`;
 
 /** Runs in the page: every drill-down hash the page links to ("#repo/mobile") or declares (static views, data-view="a/b"), in document order; view templates nothing links to. */
@@ -266,7 +276,7 @@ async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScre
 	writeFileSync(png, Buffer.from(data, "base64"));
 	return {
 		png,
-		...(await run.cdp.evaluate<{ headline: string; figures: string[] }>(FIRST_SCREEN_JS)),
+		...(await run.cdp.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)),
 	};
 }
 

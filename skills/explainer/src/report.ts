@@ -1,7 +1,18 @@
 import type { Shot, ViewReport } from "./check.ts";
 
+/** A list of this many in-page links in the first viewport counts as a deliberate text map. */
+const TEXT_MAP_LINKS = 3;
+
 /** Shot location for the warnings list: "dark narrow #repo/mobile". */
 const where = (s: Shot) => `${s.theme} ${s.viewport.split(" ")[0]}${s.view ? ` ${s.view}` : ""}`;
+
+/** What the first viewport holds: figures, else a text map (a list of in-page links) reported as such, else the plain "no figure" hint. */
+function firstContent(figures: string[], links: number): string {
+	if (figures.length) {
+		return `${figures.length} figure(s): ${figures.join(", ")}`;
+	}
+	return links >= TEXT_MAP_LINKS ? `text map: ${links} in-page links in view` : "no figure in view";
+}
 
 function firstScreens(shots: Shot[]): string[] {
 	const out: string[] = [];
@@ -9,10 +20,8 @@ function firstScreens(shots: Shot[]): string[] {
 		if (!s.first) {
 			continue;
 		}
-		const { png, headline, figures } = s.first;
-		const seen = figures.length
-			? `${figures.length} figure(s): ${figures.join(", ")}`
-			: "no figure in view";
+		const { png, headline, figures, links } = s.first;
+		const seen = firstContent(figures, links);
 		out.push(
 			`  ${s.theme.padEnd(5)} ${s.viewport.padEnd(17)} ${png}\n${" ".repeat(8)}${headline ? `"${headline}"` : "no h1"} | ${seen}`,
 		);
