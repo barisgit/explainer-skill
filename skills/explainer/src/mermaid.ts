@@ -1,4 +1,4 @@
-import { parseMermaid, renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.js";
+import { renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.js";
 
 /** A rendered diagram: one SVG that follows light and dark through the kit's tokens, and the data-ref ids of its parts. */
 export interface Diagram {
@@ -9,7 +9,7 @@ export interface Diagram {
 /** The renderer sets node labels at 13 px; drawn 1.2 times larger they read like the page's 16 px text and Mermaid's labels. */
 const SCALE = 1.2;
 
-/** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, edge ids for flowcharts and states. */
+/** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, `;` as a line break for flowcharts and states. */
 type Family = "flowchart" | "state" | "sequence" | "other";
 
 /** The header keywords pack draws, with their family. */
@@ -149,55 +149,15 @@ function firstMisrender(family: Family, statements: string[]): string | undefine
 	return undefined;
 }
 
-const EDGE_ID = /\b([A-Za-z_][\w-]*)@(?=[-=.~<])/g;
-const pairKey = (from: string, to: string) => `${from}\u0000${to}`;
-
 /**
- * Removes Mermaid's edge ids (`a e1@--> b`), which the renderer does not parse, and returns every edge's ref grouped by its
- * endpoints, in source order: the author's id, else Mermaid's `L_<from>_<to>_<n>`. The rendered SVG lists edges per subgraph,
- * not in source order, so its edges are matched by endpoints (annotateEdges). An id's edge is the one the parser reaches next
- * after the text before it.
+ * data-ref on nodes, groups, classes, entities and participants (their id), edges and their labels (the edge id the parser
+ * gives both: the author's `e1@`, else `L_<from>_<to>_<n>`), lifelines (their participant) and messages (m1, m2, ...).
  */
-function takeEdgeIds(source: string): { text: string; refs: Map<string, string[]> } {
-	const named = new Map<number, string>();
-	let text = "";
-	let last = 0;
-	for (const m of source.matchAll(EDGE_ID)) {
-		text += source.slice(last, m.index);
-		named.set(parseMermaid(text).edges.length, m[1] ?? "");
-		last = m.index + m[0].length;
-	}
-	text += source.slice(last);
-	const refs = new Map<string, string[]>();
-	parseMermaid(text).edges.forEach((edge, i) => {
-		const queue = refs.get(pairKey(edge.source, edge.target)) ?? [];
-		queue.push(named.get(i) ?? `L_${edge.source}_${edge.target}_${queue.length}`);
-		refs.set(pairKey(edge.source, edge.target), queue);
-	});
-	return { text, refs };
-}
-
-/** Gives every edge and edge label the data-ref takeEdgeIds found for its endpoints, in order among edges with the same endpoints. */
-function annotateEdges(svg: string, refs: Map<string, string[]>): string {
-	const tagged = (pattern: RegExp, markup: string) => {
-		const queues = new Map([...refs].map(([key, list]) => [key, [...list]]));
-		return markup.replace(pattern, (tag, from: string, to: string) => {
-			const ref = queues.get(pairKey(from, to))?.shift();
-			return ref ? `${tag} data-ref="${ref}"` : tag;
-		});
-	};
-	return tagged(
-		/<g class="edge-label" data-from="([^"]*)" data-to="([^"]*)"/g,
-		tagged(/<polyline class="edge" data-from="([^"]*)" data-to="([^"]*)"/g, svg),
-	);
-}
-
-/** data-ref on nodes, groups, classes, entities and participants (their id), lifelines (their participant) and messages (m1, m2, ...). */
 function annotateParts(svg: string): string {
 	let message = 0;
 	return svg
 		.replace(
-			/<g class="(?:node|subgraph|class-node|entity|actor)" data-id="([^"]*)"/g,
+			/<(?:g|polyline) class="(?:node|subgraph|class-node|entity|actor|edge|edge-label)" data-id="([^"]*)"/g,
 			(tag, id: string) => `${tag} data-ref="${id}"`,
 		)
 		.replace(
@@ -322,13 +282,10 @@ function renderOne(source: string, n: number): Diagram {
 		throw new Error(problem);
 	}
 
-	// Only flowcharts and state diagrams have edges with ids; the other types keep their own syntax.
-	const { text, refs } =
-		family === "flowchart" || family === "state"
-			? takeEdgeIds(statements)
-			: { text: body, refs: new Map<string, string[]>() };
+	// Mermaid reads ";" as a line break in flowcharts and state diagrams; elsewhere it can be message or label text.
+	const text = family === "flowchart" || family === "state" ? statements : body;
 	const raw = renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist" });
-	const svg = annotateParts(annotateEdges(inline(raw, `mm${n}`), refs));
+	const svg = annotateParts(inline(raw, `mm${n}`));
 	const remote = externalReferences(svg);
 	if (remote.length) {
 		throw new Error(
@@ -341,7 +298,7 @@ function renderOne(source: string, n: number): Diagram {
 /**
  * Renders each Mermaid source to one inline SVG, with no browser: beautiful-mermaid parses and lays it out (ELK) in this process,
  * estimating text widths. Returns one entry per source; a source that fails, or whose type is not supported, is an Error in its slot.
- * Every part carries the data-ref of its Mermaid id (see annotateParts, annotateEdges), and colours come from the kit's tokens (theme.css).
+ * Every part carries the data-ref of its Mermaid id (see annotateParts), and colours come from the kit's tokens (theme.css).
  */
 export function renderMermaid(sources: string[]): Array<Diagram | Error> {
 	return sources.map((source, n) => {

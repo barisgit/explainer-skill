@@ -18,21 +18,9 @@ export class UnreadInputError extends Error {
 	readonly line: string;
 }
 
-/** One parsed edge of a flowchart or state diagram. */
-export interface MermaidEdge {
-	source: string;
-	target: string;
-	label?: string;
-}
-
-/**
- * Parses flowchart and state diagram source (no layout); edges are in source order. The renderer's SVG tags each edge with
- * data-from and data-to, the source and target here. A header that is not a flowchart or state diagram throws.
- */
-export function parseMermaid(text: string): { edges: MermaidEdge[] };
-
 /**
  * Renders Mermaid source (flowchart/graph, stateDiagram, sequenceDiagram, classDiagram, erDiagram, xychart-beta) to SVG markup,
  * synchronously. Any other header is read as a flowchart; a parse error throws, an UnreadInputError for input no parser rule reads.
+ * Each flowchart and state edge, and its label, carries data-id: the author's id (`a e1@--> b`), else `L_<from>_<to>_<n>`.
  */
 export function renderMermaidSVG(text: string, options?: RenderOptions): string;

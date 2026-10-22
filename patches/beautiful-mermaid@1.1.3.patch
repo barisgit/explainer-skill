@@ -80,7 +80,7 @@ index b4a6454e1015b38924cacc674f488d3460861af2..c3f0b98d9784ebebef90507263d56666
  export type { AsciiRenderOptions } from './ascii/index.ts'
  
 diff --git a/src/layout-engine.ts b/src/layout-engine.ts
-index 8557308223e16670db3d126d9c55673b6e946598..da74af121c4e242b6e039b22b60b9f2f6ccbca8d 100644
+index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78f2f748f5 100644
 --- a/src/layout-engine.ts
 +++ b/src/layout-engine.ts
 @@ -30,7 +30,7 @@ import type {
@@ -207,7 +207,15 @@ index 8557308223e16670db3d126d9c55673b6e946598..da74af121c4e242b6e039b22b60b9f2f
  
    // Add internal edges (edges where both endpoints are in this subgraph)
    const internalEdges = edgesBySubgraph.get(sg.id) ?? []
-@@ -1404,9 +1433,25 @@ export function layoutGraphSync(
+@@ -776,6 +805,7 @@ function extractEdgesRecursively(
+     }
+ 
+     edges.push({
++      id: originalEdge.id,
+       source: originalEdge.source,
+       target: originalEdge.target,
+       label: originalEdge.label,
+@@ -1404,9 +1434,25 @@ export function layoutGraphSync(
    options: RenderOptions = {}
  ): PositionedGraph {
    const opts = { ...DEFAULTS, ...options }
@@ -263,7 +271,7 @@ index 980f197ea9d84a4594705a89a94b525907b5f41b..278c23966c79d74b5b6dad213c5203e3
   * Normalize label text: strip surrounding quotes, convert <br> tags and
   * literal \n sequences to newline characters. Strips unsupported HTML tags
 diff --git a/src/parser.ts b/src/parser.ts
-index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bcf4de812d 100644
+index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7eefc8fb968 100644
 --- a/src/parser.ts
 +++ b/src/parser.ts
 @@ -1,5 +1,5 @@
@@ -273,7 +281,40 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
  
  // ============================================================================
  // Mermaid parser — flowcharts and state diagrams
-@@ -314,6 +314,8 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
+@@ -161,7 +161,7 @@ function parseFlowchart(lines: string[]): MermaidGraph {
+     parseEdgeLine(line, graph, subgraphStack)
+   }
+ 
+-  return graph
++  return withEdgeIds(graph)
+ }
+ 
+ // ============================================================================
+@@ -269,11 +269,12 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
+     }
+ 
+     // --- transition: `s1 --> s2` or `s1 --> s2 : label` or `[*] --> s1` ---
+-    const transitionMatch = line.match(/^(\[\*\]|[\w\p{L}-]+)\s*(-->)\s*(\[\*\]|[\w\p{L}-]+)(?:\s*:\s*(.+))?$/u)
++    const transitionMatch = line.match(/^(\[\*\]|[\w\p{L}-]+)(?:\s+([A-Za-z_][\w-]*)@)?\s*(-->)\s*(\[\*\]|[\w\p{L}-]+)(?:\s*:\s*(.+))?$/u)
+     if (transitionMatch) {
+       let sourceId = transitionMatch[1]!
+-      let targetId = transitionMatch[3]!
+-      const rawTransitionLabel = transitionMatch[4]?.trim()
++      const edgeId = transitionMatch[2]
++      let targetId = transitionMatch[4]!
++      const rawTransitionLabel = transitionMatch[5]?.trim()
+       const edgeLabel = rawTransitionLabel ? normalizeBrTags(rawTransitionLabel) : undefined
+ 
+       // Handle [*] pseudostates — each occurrence gets a unique ID
+@@ -296,6 +297,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
+       }
+ 
+       graph.edges.push({
++        id: edgeId ?? '',
+         source: sourceId,
+         target: targetId,
+         label: edgeLabel,
+@@ -314,8 +316,25 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
        registerStateNode(graph, compositeStack, { id, label, shape: 'rounded' })
        continue
      }
@@ -281,8 +322,25 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
 +    throw new UnreadInputError(line)
    }
  
++  return withEdgeIds(graph)
++}
++
++/**
++ * Gives each edge without an author id Mermaid's `L_<source>_<target>_<n>`, n counting every edge between that pair in source
++ * order, so every edge has an id its line and its label share.
++ */
++function withEdgeIds(graph: MermaidGraph): MermaidGraph {
++  const counts = new Map<string, number>()
++  for (const edge of graph.edges) {
++    const pair = `${edge.source}\u0000${edge.target}`
++    const n = counts.get(pair) ?? 0
++    counts.set(pair, n + 1)
++    edge.id ||= `L_${edge.source}_${edge.target}_${n}`
++  }
    return graph
-@@ -325,10 +327,8 @@ function registerStateNode(
+ }
+ 
+@@ -325,10 +344,8 @@ function registerStateNode(
    compositeStack: MermaidSubgraph[],
    node: MermaidNode
  ): void {
@@ -295,7 +353,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
    if (compositeStack.length > 0) {
      const current = compositeStack[compositeStack.length - 1]!
      if (!current.nodeIds.includes(node.id)) {
-@@ -393,10 +393,11 @@ function parseStyleProps(propsStr: string): Record<string, string> {
+@@ -393,10 +410,14 @@ function parseStyleProps(propsStr: string): Record<string, string> {
   *   -.-> -.-       dotted arrow / dotted line
   *   ==>  ===       thick arrow / thick line
   *   <--> <-.-> <==>  bidirectional variants
@@ -305,10 +363,13 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
   */
 -const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\|([^|]*)\|)?/
 +const ARROW_REGEX = /^(<)?(-{2,}>|-\.+->|={2,}>|-{3,}|-\.+-|={3,})(?:\|([^|]*)\|)?/
++
++/** An edge id before a link: `e1@` in `a e1@--> b` */
++const EDGE_ID_REGEX = /^([A-Za-z_][\w-]*)@(?=[-=.<])/
  
  /**
   * Text-embedded label regex — matches "-- label -->", "-. label .->", "== label ==>" syntax.
-@@ -410,32 +411,43 @@ const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|==
+@@ -410,32 +431,43 @@ const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|==
   * Node shape patterns — ordered from most specific delimiters to least.
   * Multi-char delimiters must be tried before single-char to avoid false matches.
   */
@@ -365,7 +426,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
  /** Regex for a bare node reference (just an ID, no shape brackets) */
  const BARE_NODE_REGEX = /^([\w-]+)/
  
-@@ -456,13 +468,15 @@ function parseEdgeLine(
+@@ -456,13 +488,19 @@ function parseEdgeLine(
  
    // Parse the first node group (possibly with & separators)
    const firstGroup = consumeNodeGroup(remaining, graph, subgraphStack)
@@ -379,10 +440,14 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
    while (remaining.length > 0) {
 +    // What is left before the link: reported whole when the link or the node after it cannot be read
 +    const unread = remaining
++    // Mermaid's edge id: `a e1@--> b`
++    const idMatch = remaining.match(EDGE_ID_REGEX)
++    const edgeId = idMatch?.[1] ?? ''
++    if (idMatch) remaining = remaining.slice(idMatch[0].length)
      let hasArrowStart: boolean
      let style: EdgeStyle
      let hasArrowEnd: boolean
-@@ -480,7 +494,7 @@ function parseEdgeLine(
+@@ -480,7 +518,7 @@ function parseEdgeLine(
      } else {
        // Fallback: text-embedded label syntax (-- Yes -->, -. Maybe .->, == Sure ==>)
        const textMatch = remaining.match(TEXT_ARROW_REGEX)
@@ -391,7 +456,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
        hasArrowStart = Boolean(textMatch[1])
        const rawLabel = textMatch[3]!.trim()
        edgeLabel = rawLabel ? normalizeBrTags(rawLabel) : undefined
-@@ -493,7 +507,7 @@ function parseEdgeLine(
+@@ -493,7 +531,7 @@ function parseEdgeLine(
  
      // Parse the next node group
      const nextGroup = consumeNodeGroup(remaining, graph, subgraphStack)
@@ -400,7 +465,15 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
  
      remaining = nextGroup.remaining.trim()
  
-@@ -610,10 +624,8 @@ function registerNode(
+@@ -501,6 +539,7 @@ function parseEdgeLine(
+     for (const sourceId of prevGroupIds) {
+       for (const targetId of nextGroup.ids) {
+         graph.edges.push({
++          id: edgeId,
+           source: sourceId,
+           target: targetId,
+           label: edgeLabel,
+@@ -610,10 +649,8 @@ function registerNode(
    subgraphStack: MermaidSubgraph[],
    node: MermaidNode
  ): void {
@@ -413,7 +486,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
    trackInSubgraph(subgraphStack, node.id)
  }
  
-@@ -627,13 +639,10 @@ function trackInSubgraph(subgraphStack: MermaidSubgraph[], nodeId: string): void
+@@ -627,13 +664,10 @@ function trackInSubgraph(subgraphStack: MermaidSubgraph[], nodeId: string): void
    }
  }
  
@@ -430,6 +503,34 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..5697228405b426cf7317a1aa02e689bc
    return 'solid'
  }
  
+diff --git a/src/renderer.ts b/src/renderer.ts
+index 1485041e9cb01e1a15045cb162fb64bc5167b25e..5bee7d6b4b43aa82221d255f6aa1ba089fcd2841 100644
+--- a/src/renderer.ts
++++ b/src/renderer.ts
+@@ -212,12 +212,14 @@ function renderEdge(edge: PositionedEdge): string {
+ 
+   // Semantic data attributes for edge identification and inspection:
+   // - class="edge": CSS targeting and type identification
++  // - data-id: the edge id, also on its label, so parallel edges stay apart
+   // - data-from/data-to: source and target node IDs
+   // - data-style: edge style (solid, dotted, thick)
+   // - data-arrow-start/end: arrow presence flags
+   // - data-label: edge label if present (for quick lookup without traversing DOM)
+   const dataAttrs = [
+     'class="edge"',
++    `data-id="${escapeAttr(edge.id)}"`,
+     `data-from="${escapeAttr(edge.source)}"`,
+     `data-to="${escapeAttr(edge.target)}"`,
+     `data-style="${edge.style}"`,
+@@ -266,7 +268,7 @@ function renderEdgeLabel(edge: PositionedEdge, font: string): string {
+ 
+   // Semantic wrapper: links label to its edge via data-from/data-to
+   return (
+-    `<g class="edge-label" data-from="${escapeAttr(edge.source)}" data-to="${escapeAttr(edge.target)}" data-label="${escapeAttr(label)}">\n` +
++    `<g class="edge-label" data-id="${escapeAttr(edge.id)}" data-from="${escapeAttr(edge.source)}" data-to="${escapeAttr(edge.target)}" data-label="${escapeAttr(label)}">\n` +
+     `  ${content.replace(/\n/g, '\n  ')}\n` +
+     `</g>`
+   )
 diff --git a/src/sequence/parser.ts b/src/sequence/parser.ts
 index f6df0c6a84afc1c09881536fa6dae69c3d13ecf3..14e69ab23128a1a3f782d9252d39bf78acac26d3 100644
 --- a/src/sequence/parser.ts
@@ -597,6 +698,28 @@ index 07766ab65303221352620180c63aa592b5842a10..48d561836bf6ed62e44b7ea5b8d9bfe9
  }
  
  // ============================================================================
+diff --git a/src/types.ts b/src/types.ts
+index 4e424621c9616f89c141a4010d40679bd5374cf9..ef20f9382ce7fdf2655809798d89369bcb60f105 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -44,6 +44,8 @@ export type NodeShape =
+   | 'state-end'      // bullseye circle (end pseudostate)
+ 
+ export interface MermaidEdge {
++  /** The author's edge id (`a e1@--> b`), else Mermaid's `L_<source>_<target>_<n>` (n counts the edges between the pair) */
++  id: string
+   source: string
+   target: string
+   label?: string
+@@ -90,6 +92,8 @@ export interface PositionedNode {
+ }
+ 
+ export interface PositionedEdge {
++  /** The parsed edge's id, on both its line and its label */
++  id: string
+   source: string
+   target: string
+   label?: string
 diff --git a/src/xychart/parser.ts b/src/xychart/parser.ts
 index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..5d366bfda541268563e157f0b0fa64a003fd2f5f 100644
 --- a/src/xychart/parser.ts
