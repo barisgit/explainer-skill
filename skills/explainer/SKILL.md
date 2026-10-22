@@ -9,7 +9,7 @@ Shape the page around what the reader does next: learn a topic, make a decision,
 
 The toolbox is the CLI next to this file, run as `bun <this-directory>/cli.ts`:
 
-- `kit` lists what a page can use: interactive ECharts in the page theme (or the light `plot.js` for a few small line, stem and bar plots), Mermaid diagrams written as `<pre class="mermaid">`, the stylesheet, drill-down views, step-through figures (Mermaid diagrams included), linked highlighting between prose, rows and diagram parts, and reader replies that send notes and answers back (the same file keeps what the reader typed and chose across reloads, for any page with inputs). Each is a few HTML attributes; `kit <file>` documents one.
+- `kit` lists what a page can use: interactive ECharts in the page theme (or the light `plot.js` for a few small line, stem and bar plots), Mermaid diagrams written as `<pre class="mermaid">`, the stylesheet, drill-down views, step-through figures (Mermaid diagrams included), linked highlighting between prose, rows and diagram parts, and reader replies that send notes and answers back (the same file keeps the reader's inputs and notes across reloads, with a button to clear them; give inputs ids). Each is a few HTML attributes; `kit <file>` documents one.
 - `pack page.html -o artifact.html` inlines everything into one offline file and renders the Mermaid diagrams.
 - `check artifact.html` screenshots light and dark at desktop and phone width into a temp directory it prints, and reports errors, console warnings, network use, and overflow; `--view all` also captures every drill-down view. Look at the screenshots and fix what you see before calling the page done.
 
