@@ -16,6 +16,6 @@ jobs:
       - run: bun install --frozen-lockfile
         env:
           HUSKY: "0"
-      # The runner's preinstalled Google Chrome (/usr/bin/google-chrome) drives check and the Mermaid render.
+      # The runner's preinstalled Google Chrome (/usr/bin/google-chrome) drives check; pack renders Mermaid without it.
       # Ubuntu 24.04 restricts the user namespaces Chrome's sandbox needs, so this also covers the no-sandbox retry.
       - run: bun run ci
