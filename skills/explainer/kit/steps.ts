@@ -12,7 +12,8 @@
    this order; leave an entry empty to keep its default (no commas inside a label).
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
-   Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
+   Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts must redraw on it;
+   check warns about one whose steps change only the captions.
    Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts. Replacing
    the children of the [data-captions] list is picked up by itself; after any other replacement call Steps.refresh(el, step?). It re-reads
    captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may

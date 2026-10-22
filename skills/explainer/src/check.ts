@@ -23,7 +23,8 @@ export interface FirstScreen {
 /**
  * `view` is the hash of a drill-down view ("" for the overview); `first` describes the first viewport, taken before any step (overview only).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
- * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports).
+ * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
+ * change only its captions).
  */
 export interface Shot {
 	theme: string;
@@ -179,6 +180,39 @@ const SWEEP_JS = `(async () => {
 	const to = async (top) => { y = top; scrollTo({ top, behavior: "instant" }); await tick(); };
 	while (y < maxTop() && performance.now() < end) await to(Math.min(y + innerHeight, maxTop()));
 	if (y > 0) await to(0);
+})()`;
+
+/**
+ * Runs in the page: walks every working stepper (kit:steps.js) through its steps and back to where it was, and warns about
+ * one whose content, captions and controls aside, looks the same on every step. A caption-only stepper is legitimate when
+ * the page redraws on stepchange (the stepper's own markup then changes), so pack cannot tell; stepping it shows it.
+ * Canvases count by their pixels, since a chart redraw leaves the markup as it was.
+ */
+const STEPPERS_JS = `(async () => {
+	if (!window.Steps) return [];
+	const name = ${ELEMENT_NAME_JS};
+	const frame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 30)));
+	const look = (root) => {
+		const copy = root.cloneNode(true);
+		copy.querySelectorAll("[data-captions], .player").forEach((el) => el.remove());
+		return copy.innerHTML + [...root.querySelectorAll("canvas")].map((c) => c.toDataURL()).join("");
+	};
+	const warnings = [];
+	for (const root of document.querySelectorAll("[data-stepper][data-live]")) {
+		const range = root.querySelector(".player input[type=range]");
+		const total = Number(range?.max) || 0;
+		const start = Number(range?.value) || total;
+		const looks = new Set();
+		for (let step = 1; step <= total; step++) {
+			Steps.refresh(root, step);
+			await frame();
+			looks.add(look(root));
+		}
+		Steps.refresh(root, start);
+		await frame();
+		if (looks.size < 2) warnings.push(name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without data-stepper, or mark its parts with data-step=\\"<n>\\" (kit steps.js)");
+	}
+	return warnings;
 })()`;
 
 /** The view a hash belongs to: "#repo/mobile" is a link into the view "repo". */
@@ -395,10 +429,13 @@ async function shootOverview(run: Run, screen: Screen) {
 	run.log.reset();
 	await open(run, "");
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
-	if (theme === THEMES[0] && name === "desktop") {
+	const firstPass = theme === THEMES[0] && name === "desktop";
+	if (firstPass) {
 		await discoverViews(run);
 	}
 	await sweep(run);
+	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
+	const stepperWarnings = firstPass ? await run.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
 	await runSteps(run);
 	const png = join(
 		run.outDir,
@@ -406,7 +443,7 @@ async function shootOverview(run: Run, screen: Screen) {
 			? `${opts.tag ? `${opts.tag}-` : ""}${name}.png`
 			: `${run.stem}-${theme}-${name}.png`,
 	);
-	const warnings = await capture(run, png, screen);
+	const warnings = [...stepperWarnings, ...(await capture(run, png, screen))];
 	run.shots.push({
 		theme,
 		viewport: `${name} ${vp.width}x${vp.height}`,
@@ -450,7 +487,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
  * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
  * Reports console/page errors, network requests, failed loads and page-level horizontal overflow (problems), and warnings
- * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts). Reduced motion is emulated so animations are finished in the shots.
+ * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts, steppers that change only their captions). Reduced motion is emulated so animations are finished in the shots.
  */
 export async function check(
 	file: string,

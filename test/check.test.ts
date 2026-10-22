@@ -187,3 +187,27 @@ if (sessionStorage.loads === "2") throw new Error("second load");`,
 	expect(reloaded.code).toBe(1);
 	expect(reloaded.stdout).toContain("page error: Error: second load");
 }, 60_000);
+
+test("check warns about a stepper whose steps change only its captions, not one that redraws or marks its parts", async () => {
+	const captions = "<ol data-captions><li>One</li><li>Two</li><li>Three</li></ol>";
+	const source = dir.write(
+		"steppers.html",
+		`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css"></head><body><h1>Steppers</h1>
+<figure class="fig" id="still" data-stepper><p>A picture that never changes.</p>${captions}</figure>
+<figure class="fig" id="redrawn" data-stepper><p id="count"></p>${captions}</figure>
+<figure class="fig" id="marked" data-stepper><p data-step="2">Appears at two.</p>${captions}</figure>
+<script>document.querySelector("#redrawn").addEventListener("stepchange", (e) => { document.querySelector("#count").textContent = "Step " + e.detail.step; });</script>
+<script src="kit:steps.js"></script></body></html>`,
+	);
+	const packed = dir.path("steppers.out.html");
+	expect((await runCli(["pack", source, "-o", packed])).code).toBe(0);
+
+	const result = await checkQuick(packed);
+
+	expect(result.code).toBe(0);
+	expect(result.stdout).toContain(
+		'figure#still.fig steps through 3 captions, but nothing else in it changes: show it whole without data-stepper, or mark its parts with data-step="<n>" (kit steps.js)',
+	);
+	expect(result.stdout).not.toContain("figure#redrawn");
+	expect(result.stdout).not.toContain("figure#marked");
+}, 30_000);
