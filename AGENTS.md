@@ -76,6 +76,10 @@ Trying an installer by hand: always give it a disposable HOME (installers write 
 
 Kit files are behaviour, not just code. After a change: `pack` then `check` `skills/explainer/example.html` and a few real pages (light and dark, 1440 and 390 wide are covered by `check`), open the screenshots, and compare with the previous output. Pages reference local files relative to themselves, so pack them from where they are with `-o` elsewhere.
 
+## Tracking
+
+Open work lives in [GitHub Issues](https://github.com/barisgit/explainer-skill/issues), not in files. File a finding as an issue with the symptom, `Path:`, `Suspected cause:` and what counts as done. Label it with one `type:`, its `area:` labels (`kit`, `cli`, `check`, `pack`, `install`, `ci`), a `priority:` or `status:deferred`, and `invariant` when it breaks a decision or promise in this file or the docs; `status:needs-decision` marks an issue waiting on a product choice. A fixing commit closes its issue. Deferred issues are not authority to build.
+
 ## Commits
 
 Conventional Commits (`feat(kit):`, `fix(check):`, `chore:`, `test:`, `docs:`), one change per commit, explicit paths when staging. Gates pass on every commit. The public remote is `github.com/barisgit/explainer-skill` (MIT); releases are tags such as `v0.1.0`, which Caplet installs pin.
