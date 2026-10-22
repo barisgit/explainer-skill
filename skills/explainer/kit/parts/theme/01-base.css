@@ -40,7 +40,7 @@
 	--c5: light-dark(#8a6d00, #e6b422);
 	--c6: light-dark(#3394cc, #7cc6f0);
 	--grid: color-mix(in srgb, var(--rule-strong) 45%, transparent);
-	/* Blueprint surface for diagrams (.stage, a Mermaid block): a faint dot grid on the page tone. */
+	/* Blueprint surface for diagrams (.stage, a Mermaid block in a panel): a faint dot grid on the page tone. */
 	--blueprint:
 		radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 1.5px) 0 0 / 20px 20px,
 		var(--bg);

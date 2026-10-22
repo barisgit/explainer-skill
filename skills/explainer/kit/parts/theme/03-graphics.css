@@ -118,26 +118,18 @@
 }
 
 /* Mermaid blocks: pack renders each to one SVG drawn with the renderer's private variables (--_line, --_node-fill, ...), set here
-   from the kit's tokens, so a diagram follows light, dark and a page's own tokens. On the page it sits on the blueprint surface. */
+   from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no frame or surface of its own:
+   bare or in a plain figure it sits on the tone around it like a chart; a box means controls, so only a panel frames it and gives
+   it the blueprint surface (the panel rule in 02-layout.css). */
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
 	padding: 1.25rem 1rem;
 	text-align: center;
 	overflow-x: auto;
-	border-radius: var(--radius);
-	--under: var(--bg);
-	background: var(--blueprint);
-	border: 1px solid var(--rule);
 }
-/* In a figure the diagram has no frame or surface of its own: a plain figure sets it on the tone around it like a chart, and a
-   panel frames it and gives it the blueprint surface (the panel rule in 02-layout.css). */
 .fig > .mermaid {
 	margin: 0;
-	border: 0;
-	border-radius: 0;
-	--under: inherit;
-	background: none;
 }
 /* The renderer fills edge-label boxes, hollow markers and end states with --bg: here the tone under the diagram, so a diagram in a
    band or panel has no page-coloured boxes. */
