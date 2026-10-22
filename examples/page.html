@@ -14,6 +14,14 @@
 	.card h2 { margin: 0.4rem 0 0; font-size: 1.15rem; }
 	.card:hover h2 { color: var(--accent); }
 	.card p { margin: 0; color: var(--muted); }
+	/* One thumbnail per theme, shown the way the kit shows Mermaid's two renders: by the system scheme unless
+	   <html data-scheme> forces one. */
+	.card .dark, :root[data-scheme="dark"] .card .light { display: none; }
+	:root[data-scheme="dark"] .card .dark { display: block; }
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-scheme="light"]) .card .light { display: none; }
+		:root:not([data-scheme="light"]) .card .dark { display: block; }
+	}
 	@media (max-width: 40rem) { .gallery { grid-template-columns: 1fr; } }
 	.links { display: flex; gap: 1.25rem; }
 </style>
@@ -29,22 +37,26 @@
 
 	<section class="gallery" aria-label="Examples">
 		<a class="card" href="fourier-series/">
-			<img src="media/fourier-series-thumb.webp" alt="Fourier series study page: a square wave built from three sines, with a terms slider">
+			<img class="light" src="media/fourier-series-thumb-light.webp" alt="Fourier series study page: a square wave built from three sines, with a terms slider">
+			<img class="dark" src="media/fourier-series-thumb-dark.webp" alt="Fourier series study page: a square wave built from three sines, with a terms slider">
 			<h2>Fourier series</h2>
 			<p>Study page. Drag the terms slider to build a square wave, try each question before opening its answer, and find your own answers still there after a reload.</p>
 		</a>
 		<a class="card" href="dijkstra/">
-			<img src="media/dijkstra-thumb.webp" alt="Dijkstra step-through: a weighted graph, the priority queue and the distance table">
+			<img class="light" src="media/dijkstra-thumb-light.webp" alt="Dijkstra step-through: a weighted graph, the priority queue and the distance table">
+			<img class="dark" src="media/dijkstra-thumb-dark.webp" alt="Dijkstra step-through: a weighted graph, the priority queue and the distance table">
 			<h2>Dijkstra's algorithm</h2>
 			<p>Step-through. Four maps and any start node, with the queue and distance table at each step, and what one negative edge breaks.</p>
 		</a>
 		<a class="card" href="electricity-mix/">
-			<img src="media/electricity-mix-thumb.webp" alt="Electricity mix explorer: world generation by source from 2000 to 2024">
+			<img class="light" src="media/electricity-mix-thumb-light.webp" alt="Electricity mix explorer: world generation by source from 2000 to 2024">
+			<img class="dark" src="media/electricity-mix-thumb-dark.webp" alt="Electricity mix explorer: world generation by source from 2000 to 2024">
 			<h2>World electricity mix</h2>
 			<p>Data explorer. 223 places from Our World in Data: see how each source changed since 2000, rank who left coal fastest over a period you choose, and click a bar to open that country.</p>
 		</a>
 		<a class="card" href="password-hashing/">
-			<img src="media/password-hashing-thumb.webp" alt="Password hashing decision page: deployment presets, memory sliders and the OWASP setting that fits">
+			<img class="light" src="media/password-hashing-thumb-light.webp" alt="Password hashing decision page: deployment presets, memory sliders and the OWASP setting that fits">
+			<img class="dark" src="media/password-hashing-thumb-dark.webp" alt="Password hashing decision page: deployment presets, memory sliders and the OWASP setting that fits">
 			<h2>Choosing a password hash</h2>
 			<p>Decision page. Set memory, concurrent logins and FIPS needs, and see which OWASP setting fits, or that none does.</p>
 		</a>
