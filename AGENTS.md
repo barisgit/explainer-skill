@@ -5,7 +5,7 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 ## Requirements
 
 - Bun 1.4.3 (`curl -fsSL https://bun.sh/install | bash`). The CLI uses Bun's built-in `HTMLRewriter` and `import.meta.dir`; there is no npm install step for users. `node skills/explainer/cli.ts` prints an install hint and exits 2.
-- Google Chrome or Chromium for `check` and for rendering Mermaid in `pack` (`CHROME=/path` overrides the search; CI uses the runner's Chrome).
+- Google Chrome or Chromium for `check` and for rendering Mermaid in `pack` (`CHROME=/path` overrides the search, which also finds agent-browser and Playwright downloads; CI uses the runner's Chrome). `src/chrome.ts` retries without the sandbox when Chrome reports none is usable.
 
 ## Layout
 
@@ -38,7 +38,7 @@ Root files: `package.json` (devDependencies only), `bun.lock`, `tsconfig.json`, 
 
 The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged files, then the typecheck; about 2 s, no Chrome. It keeps partially staged hunks. lint-staged backs up through `git stash`, which worktrees share, so run commits of different worktrees one at a time. Never use `--no-verify`.
 
-`.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. Its first run is on the initial push; the Chrome sandbox on Ubuntu is the likeliest thing to need adjusting.
+`.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. The runner restricts user namespaces, so CI exercises the no-sandbox retry.
 
 ## Decisions
 

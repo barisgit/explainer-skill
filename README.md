@@ -56,7 +56,7 @@ Caplet leaves empty `kit`, `src` and `vendor` folders under `skills/explainer/`;
 ## Requirements
 
 - [Bun](https://bun.sh), verified with 1.4.3. Nothing else is installed: no `npm install`, the installed skill runs as copied. The CLI does not run under node; `node cli.ts` prints how to get Bun and exits 2.
-- Google Chrome or Chromium, for `check` and for rendering Mermaid diagrams during `pack` (`CHROME=/path/to/chrome` if it is not found).
+- Google Chrome or Chromium, for `check` and for rendering Mermaid diagrams during `pack` (`CHROME=/path/to/chrome` if it is not found). Without a system Chrome, a build downloaded by agent-browser or Playwright is used. Where the host blocks Chrome's sandbox (Ubuntu 23.10+, most containers), Chrome runs without it.
 
 ## Commands
 

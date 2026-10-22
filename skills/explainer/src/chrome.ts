@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const { CHROME } = process.env;
@@ -11,13 +11,30 @@ const CHROME_PATHS = [
 	"/usr/bin/google-chrome",
 	"/usr/bin/chromium",
 	"/usr/bin/chromium-browser",
+	// Servers often have no system Chrome but do have the build a browser tool downloaded.
+	...downloaded(join(homedir(), ".agent-browser/browsers"), "chrome-", "chrome"),
+	...downloaded(join(homedir(), ".cache/ms-playwright"), "chromium-", "chrome-linux64/chrome"),
 ];
+
+/** Chrome binaries under `dir` in folders named `<prefix><version>`, newest version first. */
+function downloaded(dir: string, prefix: string, binary: string): string[] {
+	if (!existsSync(dir)) {
+		return [];
+	}
+	return readdirSync(dir)
+		.filter((name) => name.startsWith(prefix))
+		.sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+		.map((name) => join(dir, name, binary));
+}
 
 /** Waits `ms` milliseconds, for page scripts, transitions and rebuilt DOM to settle after a load or an action. */
 export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 /** Chrome could not be started or driven: an environment problem the CLI reports without a stack trace. */
 export class ChromeError extends Error {}
+
+/** Chrome cannot create its sandbox on this host; `launch` retries without it. */
+class SandboxUnavailable extends ChromeError {}
 
 /** One call-stack entry of an exception; line and column numbers are 0-based. */
 interface CallFrame {
@@ -113,12 +130,34 @@ export class Cdp {
 	}
 }
 
-/** Starts headless Chrome and resolves with its DevTools HTTP port. */
+/**
+ * Starts headless Chrome and resolves with its DevTools HTTP port.
+ *
+ * Where Chrome cannot build its sandbox (Ubuntu 23.10+ restricts the user namespaces it needs,
+ * and so do most containers), Chrome exits with "No usable sandbox"; the launch is then retried
+ * once without it. The tradeoff is acceptable because Chrome only ever opens the local page
+ * being packed or checked.
+ */
 export async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
 		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
 	}
+	try {
+		return await start(bin, profile, []);
+	} catch (error) {
+		if (error instanceof SandboxUnavailable) {
+			return await start(bin, profile, ["--no-sandbox"]);
+		}
+		throw error;
+	}
+}
+
+async function start(
+	bin: string,
+	profile: string,
+	extra: string[],
+): Promise<{ port: number; stop: () => void }> {
 	const proc = spawn(
 		bin,
 		[
@@ -128,6 +167,7 @@ export async function launch(profile: string): Promise<{ port: number; stop: () 
 			"--hide-scrollbars",
 			"--no-first-run",
 			"--disable-gpu",
+			...extra,
 			"about:blank",
 		],
 		{ stdio: ["ignore", "ignore", "pipe"] },
@@ -141,7 +181,14 @@ export async function launch(profile: string): Promise<{ port: number; stop: () 
 				ok(Number(m[1]));
 			}
 		});
-		proc.on("exit", () => fail(new ChromeError(`Chrome exited early:\n${log.slice(-400)}`)));
+		// The full log is searched: Chrome's stack trace pushes the sandbox line out of the tail.
+		proc.on("exit", () =>
+			fail(
+				log.includes("No usable sandbox")
+					? new SandboxUnavailable("Chrome has no usable sandbox")
+					: new ChromeError(`Chrome exited early:\n${log.slice(-400)}`),
+			),
+		);
 	});
 	return { port, stop: () => proc.kill() };
 }
