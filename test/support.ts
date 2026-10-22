@@ -39,3 +39,10 @@ export function scratch() {
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
+
+/**
+ * Page script that throws "<contract>: <name>" when `body` is false 300 ms after load. Each contract gets its own throw, so one
+ * failure does not hide the others; check reports them as page errors.
+ */
+export const pageAssertion = (contract: string, name: string, body: string) =>
+	`setTimeout(() => { if (!(${body})) throw new Error("${contract}: ${name}"); }, 300);`;

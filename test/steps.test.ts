@@ -1,12 +1,10 @@
 import { afterAll, expect, test } from "bun:test";
-import { runCli, scratch } from "./support.ts";
+import { pageAssertion, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
 
-/** Each contract is checked by its own delayed throw, so one failure does not hide the others; check reports them as page errors. */
-const assertLater = (name: string, body: string) =>
-	`setTimeout(() => { if (!(${body})) throw new Error("steps contract: ${name}"); }, 300);`;
+const assertLater = (name: string, body: string) => pageAssertion("steps contract", name, body);
 
 const PAGE = (
 	checks: string[],
