@@ -2,9 +2,9 @@
 
 An agent skill that turns "show me" into one interactive HTML page: charts to explore, diagrams to step through, drill-down views, and questions the reader answers on the page. The page is a single file that works offline from `file://`, in light and dark, on desktop and phone.
 
-[![First screens of four example pages: a Fourier series study page, a Dijkstra step-through, a world electricity explorer and a password hashing decision page](examples/media/hero.webp)](https://aristovnik.me/explainer-skill/)
+[![First screens of four example pages: a Fourier series study page, a Dijkstra step-through, a world electricity explorer and a password hashing decision page](examples/media/hero.webp)](https://barisgit.github.io/explainer-skill/)
 
-**Live examples**, each written by an agent following the skill: [Fourier series](https://aristovnik.me/explainer-skill/fourier-series/) (study page), [Dijkstra's algorithm](https://aristovnik.me/explainer-skill/dijkstra/) (step-through), [World electricity mix](https://aristovnik.me/explainer-skill/electricity-mix/) (data explorer), [Choosing a password hash](https://aristovnik.me/explainer-skill/password-hashing/) (decision page). Sources are in [`examples/`](examples/).
+**Live examples**, each written by an agent following the skill: [Fourier series](https://barisgit.github.io/explainer-skill/fourier-series/) (study page), [Dijkstra's algorithm](https://barisgit.github.io/explainer-skill/dijkstra/) (step-through), [World electricity mix](https://barisgit.github.io/explainer-skill/electricity-mix/) (data explorer), [Choosing a password hash](https://barisgit.github.io/explainer-skill/password-hashing/) (decision page). Sources are in [`examples/`](examples/).
 
 ## Install
 
