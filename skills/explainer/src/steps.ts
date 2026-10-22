@@ -35,6 +35,9 @@ export function stepError(step: string): string {
 	if (!parsed) {
 		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, key:<Key>, focus:<css> or hover:<css | x,y>`;
 	}
+	if (parsed.kind === "focus" && POINT.test(parsed.arg)) {
+		return `step "${step}": focus takes a CSS selector, not a point; click:<x,y> presses at a point and focuses what it hits`;
+	}
 	if (parsed.kind === "key" && parsed.arg.length > 1 && !KEYS[parsed.arg]) {
 		return `unknown key "${parsed.arg}" (use ${Object.keys(KEYS).join(", ")} or one character)`;
 	}

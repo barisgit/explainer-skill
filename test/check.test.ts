@@ -57,3 +57,13 @@ test("check on a page that still has kit: references says to run pack first (exi
 	expect(result.stderr).toContain("kit:theme.css");
 	expect(result.stderr).toContain("pack");
 }, 30_000);
+
+test("check --do focus:<x,y> is a usage error, not a silent no-op", async () => {
+	const file = dir.write("clean-focus.html", page(""));
+
+	const result = await runCli(["check", file, "--quick", "--do", "focus:100,200"]);
+
+	expect(result.code).toBe(2);
+	expect(result.stderr).toContain("focus");
+	expect(result.stderr).toContain("click:<x,y>");
+}, 30_000);
