@@ -15,8 +15,7 @@ import { join, resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "..");
 const sandbox = resolve(process.argv[2] ?? join(tmpdir(), `explainer-install-${Date.now()}`));
-const { CAPLET } = process.env;
-const caplet = CAPLET ?? "caplet";
+const { CAPLET: caplet = "caplet" } = process.env;
 const source = join(sandbox, "source");
 const elsewhere = join(sandbox, "elsewhere");
 const problems: string[] = [];
@@ -39,7 +38,8 @@ function run(command: string[], cwd: string, home: string): Run {
 	return { code: result.status ?? 1, out: `${result.stdout}${result.stderr}` };
 }
 
-function expect(ok: boolean, label: string, detail = ""): void {
+/** Prints one line per check; a failure is kept with its detail for the summary. */
+function record(ok: boolean, label: string, detail = ""): void {
 	console.log(`  ${ok ? "ok  " : "FAIL"} ${label}`);
 	if (!ok) {
 		problems.push(`${label}\n${detail}`);
@@ -58,7 +58,7 @@ function verifyFiles(installed: string, expected: string[]): void {
 	const got = listFiles(installed).filter((file) => file !== "ACF-MANAGED.md");
 	const missing = expected.filter((file) => !got.includes(file));
 	const extra = got.filter((file) => !expected.includes(file));
-	expect(
+	record(
 		missing.length === 0 && extra.length === 0,
 		`${expected.length} files arrived`,
 		`missing: ${missing}\nextra: ${extra}`,
@@ -71,7 +71,7 @@ function verifyFiles(installed: string, expected: string[]): void {
 				readFileSync(join(source, "skills/explainer", file)),
 			) !== 0,
 	);
-	expect(differing.length === 0, "contents identical", differing.join("\n"));
+	record(differing.length === 0, "contents identical", differing.join("\n"));
 }
 
 /** The CLI runs from the installed location with no npm install, and node explains what is missing. */
@@ -79,22 +79,22 @@ function verifyCli(installed: string, home: string, outDir: string): void {
 	const cli = join(installed, "cli.ts");
 	const packed = join(outDir, "artifact.html");
 	const kit = run(["bun", cli, "kit"], elsewhere, home);
-	expect(kit.code === 0 && kit.out.includes("kit:theme.css"), "bun cli.ts kit", kit.out);
+	record(kit.code === 0 && kit.out.includes("kit:theme.css"), "bun cli.ts kit", kit.out);
 	const pack = run(
 		["bun", cli, "pack", join(installed, "example.html"), "-o", packed],
 		elsewhere,
 		home,
 	);
-	expect(pack.code === 0 && existsSync(packed), "bun cli.ts pack example.html", pack.out);
+	record(pack.code === 0 && existsSync(packed), "bun cli.ts pack example.html", pack.out);
 	const check = run(["bun", cli, "check", packed, "--out", join(outDir, "shots")], elsewhere, home);
-	expect(check.code === 0, "bun cli.ts check", check.out);
+	record(check.code === 0, "bun cli.ts check", check.out);
 	const node = run(["node", cli, "kit"], elsewhere, home);
-	expect(node.code === 2 && node.out.includes("needs Bun"), "node cli.ts explains Bun", node.out);
+	record(node.code === 2 && node.out.includes("needs Bun"), "node cli.ts explains Bun", node.out);
 }
 
 type Scenario = {
 	name: string;
-	/** Installed directories to verify, relative to HOME (`home`) or the project (`proj`). */
+	/** Installed directories to verify, relative to the scenario folder: under `home/` (the sandbox HOME) or `proj/` (the project). */
 	installed: string[];
 	steps: string[][];
 };
@@ -140,7 +140,7 @@ function runScenario(scenario: Scenario, expected: string[]): void {
 	mkdirSync(proj, { recursive: true });
 	for (const step of scenario.steps) {
 		const result = run(step, proj, home);
-		expect(result.code === 0, step.slice(0, 3).join(" "), result.out);
+		record(result.code === 0, step.slice(0, 3).join(" "), result.out);
 	}
 	for (const dir of scenario.installed) {
 		console.log(` ${dir}`);
