@@ -145,12 +145,13 @@ test("check does not warn about a data table that scrolls sideways, but does abo
 	expect(result.stdout).not.toContain("div#grid");
 }, 30_000);
 
-test("check starts every load with empty page storage, so one shot's state never reaches the next", async () => {
+test("check starts every load with empty page storage, so neither one shot's state nor what the old page writes while leaving reaches the next", async () => {
 	const file = dir.write(
 		"storage.html",
 		page(
 			`localStorage.visits = Number(localStorage.visits ?? 0) + 1;
-setTimeout(() => { if (localStorage.visits !== "1") throw new Error("storage leaked: visit " + localStorage.visits); }, 300);`,
+addEventListener("pagehide", () => { localStorage.leftBehind = "1"; });
+setTimeout(() => { if (localStorage.visits !== "1" || localStorage.leftBehind) throw new Error("storage leaked: visit " + localStorage.visits + (localStorage.leftBehind ? ", written while leaving" : "")); }, 300);`,
 		),
 	);
 
