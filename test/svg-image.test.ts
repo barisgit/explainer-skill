@@ -130,14 +130,17 @@ test("an svg file in a picture stays one data-URI image", async () => {
 	expect(html).toContain("data:image/svg+xml;base64,");
 }, 30_000);
 
-test("a Mermaid diagram still shows only the copy for the scheme", async () => {
+test("a Mermaid diagram shows only the copy for the scheme, and only a figure with controls boxes it", async () => {
 	const { out } = await packAndCheck(
 		"diagram",
 		{},
-		'<pre class="mermaid">flowchart LR\n a --> b</pre>',
+		`<figure class="fig" id="static"><pre class="mermaid">flowchart LR\n a --> b</pre></figure>
+		<figure class="fig" id="controlled"><input type="range"><pre class="mermaid">flowchart LR\n a --> b</pre></figure>`,
 		"dark",
 		{
-			"the dark copy is the one shown": `[...document.querySelectorAll(".mermaid > svg")].filter((svg) => getComputedStyle(svg).display !== "none").map((svg) => svg.getAttribute("class")).join() === "dark"`,
+			"the dark copy is the one shown": `[...document.querySelectorAll(".mermaid > svg")].filter((svg) => getComputedStyle(svg).display !== "none").map((svg) => svg.getAttribute("class")).join() === "dark,dark"`,
+			"a static diagram sits on the page with no frame or surface": `(({ borderTopWidth, backgroundImage, backgroundColor }) => borderTopWidth === "0px" && backgroundImage === "none" && backgroundColor === "rgba(0, 0, 0, 0)")(getComputedStyle(document.querySelector("#static > .mermaid")))`,
+			"a diagram with controls sits on the blueprint inside the panel's frame": `getComputedStyle(document.getElementById("controlled")).borderTopWidth === "1px" && getComputedStyle(document.querySelector("#controlled > .mermaid")).backgroundImage.startsWith("radial-gradient")`,
 		},
 	);
 

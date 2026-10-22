@@ -150,10 +150,10 @@ h3,
 	border-radius: var(--radius);
 	overflow: hidden;
 
-	/* The panel frames the diagram, which runs edge to edge; on the page a diagram keeps its own frame. */
+	/* In a panel the diagram runs edge to edge on the blueprint surface; on a plain figure it sits on the page like a chart. */
 	& > .mermaid {
-		border: 0;
-		border-radius: 0;
+		--under: var(--bg);
+		background: var(--blueprint);
 	}
 }
 .fig > * {
@@ -176,12 +176,10 @@ h3,
 	padding-block: 1rem;
 	min-inline-size: 0;
 }
-/* Blueprint surface for diagrams: a faint dot grid. */
+/* Blueprint surface for diagrams. */
 .stage,
 .fig-visual.stage {
-	background:
-		radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 1.5px) 0 0 / 20px 20px,
-		var(--bg);
+	background: var(--blueprint);
 }
 .fig-visual.stage {
 	padding: 1rem 0;

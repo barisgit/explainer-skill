@@ -125,13 +125,28 @@
 	text-align: center;
 	overflow-x: auto;
 	border-radius: var(--radius);
-	background:
-		radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 1.5px) 0 0 / 20px 20px,
-		var(--bg);
+	--under: var(--bg);
+	background: var(--blueprint);
 	border: 1px solid var(--rule);
 }
+/* In a figure the diagram has no frame or surface of its own: a plain figure sets it on the tone around it like a chart, and a
+   panel frames it and gives it the blueprint surface (the panel rule in 02-layout.css). */
 .fig > .mermaid {
 	margin: 0;
+	border: 0;
+	border-radius: 0;
+	--under: inherit;
+	background: none;
+}
+/* Mermaid paints its edge-label boxes in --bg; they take the tone under the diagram instead, so a diagram in a band has no light
+   boxes. Its stylesheet is scoped by id, which outranks any class rule. */
+.mermaid :is(.edgeLabel, .edgeLabel p, .labelBkg) {
+	/* biome-ignore lint/complexity/noImportantStyles: Mermaid's id-scoped stylesheet sets this background and outranks the kit */
+	background-color: var(--under) !important;
+}
+.mermaid .edgeLabel rect {
+	/* biome-ignore lint/complexity/noImportantStyles: Mermaid's id-scoped stylesheet sets this fill and outranks the kit */
+	fill: var(--under) !important;
 }
 .mermaid .label {
 	margin: 0;
