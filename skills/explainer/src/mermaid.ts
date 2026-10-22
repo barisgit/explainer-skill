@@ -250,6 +250,20 @@ const localUrls = (value: string, id: string) =>
 	value.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`);
 
 /**
+ * A stylesheet whose every selector, in comma lists too, applies inside `#id` only: `svg` becomes the diagram's root, any
+ * other selector its descendant. The renderer's sheets are flat rule lists (no at-rules or nesting), which this relies on.
+ */
+const scopeRules = (css: string, id: string) =>
+	css.replace(/(^|[{}])([^{}]+)\{/g, (_, before: string, selectors: string) => {
+		const scoped = selectors
+			.split(",")
+			.map((selector) =>
+				selector.trim().replace(/^svg\b|^/, (root) => (root ? `#${id}` : `#${id} `)),
+			);
+		return `${before}\n  ${scoped.join(", ")} {`;
+	});
+
+/**
  * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide
  * `svg`/`text` rules; theme.css maps the renderer's variables instead), prefixes its ids so markers of two diagrams do not
  * clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the diagram shrink
@@ -259,12 +273,10 @@ function inline(svg: string, id: string): string {
 	return editMarkup(svg.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, ""), {
 		attribute: (name, value) => (name === "id" ? `${id}-${value}` : localUrls(value, id)),
 		css: (text) =>
-			localUrls(text, id)
-				.replace(/\bsvg \{/g, `#${id} {`)
-				.replace(
-					/--xychart-color-(\d+): [^;]+;/g,
-					(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
-				),
+			scopeRules(localUrls(text, id), id).replace(
+				/--xychart-color-(\d+): [^;]+;/g,
+				(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
+			),
 	}).replace(
 		/^<svg ([^>]*?)width="([\d.]+)" height="[\d.]+" style="[^"]*"/,
 		(_, attrs: string, width: string) =>

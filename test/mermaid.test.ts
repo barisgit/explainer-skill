@@ -375,3 +375,14 @@ test("each of two edges between the same nodes keeps its own id on its line and 
 	expect(svg).toMatch(/<polyline class="edge"[^>]* data-ref="e2"[^>]* data-label="second"/);
 	expect(svg).toMatch(/<g class="edge-label"[^>]* data-ref="e2"[^>]* data-label="second"/);
 });
+
+test("every rule of an xychart's stylesheet applies inside that chart only", () => {
+	const svg = svgOf("xychart-beta\n  x-axis [a, b]\n  bar [1, 2]\n  line [2, 1]");
+	const sheets = [...svg.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1] ?? "");
+	const selectors = sheets.flatMap((css) =>
+		[...css.matchAll(/([^{}]+)\{/g)].flatMap((m) => (m[1] ?? "").split(",").map((s) => s.trim())),
+	);
+
+	expect(selectors.length).toBeGreaterThan(3);
+	expect(selectors.filter((s) => !/^#mm0\b/.test(s))).toEqual([]);
+});
