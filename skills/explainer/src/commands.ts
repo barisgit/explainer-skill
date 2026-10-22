@@ -83,7 +83,7 @@ export const COMMANDS: Record<string, Command> = {
 				return 0;
 			}
 			console.log(
-				`Reference kit files from the page with the kit: prefix; pack inlines each one used:\n  <link rel="stylesheet" href="kit:theme.css">\n  <script src="kit:charts.js"></script>      scripts run in the order written; charts.js needs kit:echarts.js before it\n`,
+				`Reference kit files from the page with the kit: prefix; pack inlines each one used:\n  <link rel="stylesheet" href="kit:theme.css">\n  <script src="kit:charts.js"></script>      scripts run in the order written; charts.js needs kit:echarts.js before it\n  <script src="kit:plot.js"></script>        alone, for a few small plots without ECharts\n`,
 			);
 			for (const f of kitFiles()) {
 				const kb = `${(statSync(join(KIT_DIR, f)).size / 1024).toFixed(0)} KB`;

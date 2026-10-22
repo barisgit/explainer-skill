@@ -304,7 +304,7 @@ h3 {
 	background: var(--surface);
 }
 
-/* Charts (kit:echarts.js + kit:charts.js): the element needs a height; the chart fills it. */
+/* Charts (kit:echarts.js + kit:charts.js, or kit:plot.js): the element needs a height; the chart fills it. */
 .chart {
 	inline-size: 100%;
 	block-size: clamp(18rem, 48vw, 26rem);
@@ -312,6 +312,114 @@ h3 {
 }
 .chart.tall {
 	block-size: clamp(22rem, 60vw, 34rem);
+}
+
+/* Plots (kit:plot.js) on the same .chart element: a legend row above an SVG that fills the rest, drawn at pixel size so text stays 13 px. */
+.plot {
+	display: flex;
+	flex-direction: column;
+}
+.plot-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 1rem;
+	margin: 0;
+	padding: 0.5rem 1rem 0;
+	list-style: none;
+	font-size: 0.8125rem;
+	line-height: 1.4;
+}
+.plot-legend button {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.375rem 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	color: var(--ink);
+	cursor: pointer;
+}
+.plot-legend button[aria-pressed="false"] {
+	--on: 0.35;
+	color: var(--muted);
+	text-decoration: line-through;
+}
+.plot-legend i {
+	opacity: var(--on, 1);
+	flex: none;
+	inline-size: 1rem;
+	block-size: 0.1875rem;
+	border-radius: 1px;
+	background: var(--c);
+}
+.plot-legend i.bar,
+.plot-legend i.stem {
+	block-size: 0.75rem;
+	inline-size: 0.75rem;
+	border-radius: 2px;
+}
+.plot-legend i.dash {
+	background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 6px);
+}
+.plot-area {
+	position: relative;
+	flex: 1;
+	min-block-size: 0;
+}
+.plot svg {
+	position: absolute;
+	inset: 0;
+	inline-size: 100%;
+	block-size: 100%;
+	overflow: visible;
+}
+.plot text {
+	font: 500 13px var(--font);
+	fill: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.plot .name {
+	fill: var(--muted);
+}
+.plot .value {
+	fill: var(--ink);
+	font-weight: 600;
+	paint-order: stroke;
+	stroke: var(--surface);
+	stroke-width: 3px;
+	stroke-linejoin: round;
+}
+.plot .value.inside {
+	fill: var(--surface);
+	stroke: none;
+}
+.plot svg :is(.grid, .zero, .axis, .guide) {
+	fill: none;
+}
+.plot svg .grid {
+	stroke: var(--rule);
+}
+.plot svg :is(.zero, .axis) {
+	stroke: var(--rule-strong);
+}
+.plot svg .guide {
+	stroke: var(--accent);
+	stroke-width: 1.5;
+	stroke-dasharray: 2 4;
+}
+.plot svg :is(.line, .stem) {
+	fill: none;
+	stroke: var(--c);
+	stroke-width: var(--w);
+	stroke-linejoin: round;
+	stroke-linecap: round;
+}
+.plot svg .line.dash {
+	stroke-dasharray: 6 4;
+}
+.plot svg :is(.dot, .bar) {
+	fill: var(--c);
 }
 
 /* Mermaid blocks are rendered by pack in both themes; show the one that matches. On the page they sit on the blueprint surface. */

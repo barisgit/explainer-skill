@@ -1,4 +1,4 @@
-/* charts: ECharts themed from the page's CSS tokens, following light/dark. Load after kit:echarts.js.
+/* charts: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light/dark. Load after kit:echarts.js.
    Charts.make(el, option, setup?)  -> { chart, set(patch) }
      el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width
      option  any ECharts option; colours default to --c1..--c6, text to the page font
