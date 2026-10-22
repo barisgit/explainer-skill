@@ -17,7 +17,9 @@ export class Cdp {
 	private id = 0;
 	private pending = new Map<number, (r: { result?: unknown; error?: { message: string } }) => void>();
 	private listeners: Array<(method: string, params: any) => void> = [];
-	private constructor(private ws: WebSocket) {
+	private readonly ws: WebSocket;
+	private constructor(ws: WebSocket) {
+		this.ws = ws;
 		ws.onmessage = (m) => {
 			const msg = JSON.parse(String(m.data));
 			if (msg.id) this.pending.get(msg.id)?.(msg);
