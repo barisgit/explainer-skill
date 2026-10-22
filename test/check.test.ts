@@ -159,3 +159,30 @@ setTimeout(() => { if (localStorage.visits !== "1") throw new Error("storage lea
 	expect(result.stdout).not.toContain("storage leaked");
 	expect(result.code).toBe(0);
 }, 60_000);
+
+test("check --do reload loads the page a second time in the same tab", async () => {
+	const file = dir.write(
+		"reload.html",
+		page(
+			`sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
+if (sessionStorage.loads === "2") throw new Error("second load");`,
+		),
+	);
+
+	const plain = await checkQuick(file);
+	const reloaded = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--view",
+		"none",
+		"--do",
+		"reload",
+		"--out",
+		dir.path("reload"),
+	]);
+
+	expect(plain.code).toBe(0);
+	expect(reloaded.code).toBe(1);
+	expect(reloaded.stdout).toContain("page error: Error: second load");
+}, 60_000);

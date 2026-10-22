@@ -16,7 +16,9 @@ const KEYS: Record<string, [number, string]> = {
 const STEP = /^(click|key|hover|focus):(.+)$/;
 const POINT = /^(\d+),(\d+)$/;
 const NTH = /@(all|\d+)$/;
+const RELOAD = "reload";
 const SETTLE_MS = 150;
+const RELOAD_SETTLE_MS = 400;
 
 type StepKind = "click" | "key" | "hover" | "focus";
 interface ParsedStep {
@@ -31,9 +33,12 @@ function parseStep(step: string): ParsedStep | undefined {
 
 /** Returns why a `--do` step is malformed, or "" when it parses. */
 export function stepError(step: string): string {
+	if (step === RELOAD) {
+		return "";
+	}
 	const parsed = parseStep(step);
 	if (!parsed) {
-		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, key:<Key>, focus:<css> or hover:<css | x,y>`;
+		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, key:<Key>, focus:<css>, hover:<css | x,y> or reload`;
 	}
 	if (parsed.kind === "focus" && POINT.test(parsed.arg)) {
 		return `step "${step}": focus takes a CSS selector, not a point; click:<x,y> presses at a point and focuses what it hits`;
@@ -179,11 +184,23 @@ async function mouseStep(
 	return {};
 }
 
+/** Reloads the page as the reader would (same URL, same storage) and waits for the load and for scripts to settle. */
+async function reloadStep(cdp: Cdp): Promise<StepResult> {
+	const loaded = cdp.once("Page.loadEventFired");
+	await cdp.send("Page.reload");
+	await loaded;
+	await settle(RELOAD_SETTLE_MS);
+	return {};
+}
+
 /**
  * Runs one step in the page. Selectors may end in `@all` (every match, re-queried before each click, with a pause after each so handlers
  * that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used.
  */
 export async function runStep(cdp: Cdp, step: string): Promise<StepResult> {
+	if (step === RELOAD) {
+		return reloadStep(cdp);
+	}
 	const parsed = parseStep(step);
 	if (!parsed) {
 		return { problem: stepError(step) };
