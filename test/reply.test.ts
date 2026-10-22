@@ -293,6 +293,20 @@ ${onLoad(2, "the rebuilt city got its answer and it is still saved", `$("si").ch
 	expect(checked.code).toBe(0);
 }, 60_000);
 
+test("an input with the multiple attribute is kept like any text field", async () => {
+	const body = `<label>Emails <input type="email" id="em" multiple></label>`;
+	const script = onLoad(2, "the typed address is back", `$("em").value === "a"`);
+	const input = dir.write("multiple.html", SMALL(body, script));
+	const output = dir.path("multiple.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["focus:#em", "key:a", "reload"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.stdout).not.toContain("page error");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
 test("a saved value is judged by the control's own label, not its fieldset's", async () => {
 	const body = `<fieldset><legend>Contact</legend><label>Email <input type="text"></label></fieldset>`;
 	const script = `

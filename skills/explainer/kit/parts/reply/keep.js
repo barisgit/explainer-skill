@@ -57,17 +57,20 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 		return readControl(box.firstElementChild);
 	}
 
+	/** Only a select has options: an input can carry `multiple` too (email, file). */
+	const isMultiSelect = (c) => c.tagName === "SELECT" && c.multiple;
+
 	function readControl(c) {
 		if (c.type === "radio" || c.type === "checkbox") {
 			return c.checked;
 		}
-		return c.multiple ? [...c.selectedOptions].map((o) => o.value) : c.value;
+		return isMultiSelect(c) ? [...c.selectedOptions].map((o) => o.value) : c.value;
 	}
 
 	function writeControl(c, value) {
 		if (c.type === "radio" || c.type === "checkbox") {
 			c.checked = value;
-		} else if (c.multiple) {
+		} else if (isMultiSelect(c)) {
 			for (const o of c.options) {
 				o.selected = value.includes(o.value);
 			}
