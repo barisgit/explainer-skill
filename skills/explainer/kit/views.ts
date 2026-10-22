@@ -1,4 +1,4 @@
-/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), and Expand all for folds.
+/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail and Expand all.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
    no hash, or a hash no view claims (plain #anchors), shows the overview. A static view may claim one
    param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for its
@@ -6,13 +6,19 @@
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
-   A section (overview section or view) with two or more <details> gets Expand all, with no markup of its own. */
+   Navigation needs no markup of its own. Link every view from the overview (a table or list whose link text names it: "Blaž",
+   "1.6.3 Login form") and start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view
+   shows breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the
+   view it was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents
+   rail of its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more
+   <details> gets Expand all. */
 (() => {
 	const root = document.documentElement;
 	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
 	const handlers: Record<string, ViewHandler> = {};
 	let started = false;
 	let overviewY = 0;
+	const nav = window.ViewsNav({ views, decode });
 	const refreshFolds = window.ViewsFolds();
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
@@ -33,11 +39,12 @@
 		return { name, view, param: decode(rest.join("/")) };
 	}
 
-	/** Runs the view's handler, then Expand all, which counts the folds the handler drew. */
+	/** Runs the view's handler, then the navigation, which reads the labels and folds the handler drew. */
 	function draw(name: string, view: HTMLElement | undefined, param: string) {
 		if (view) {
 			handlers[name]?.(view, param);
 		}
+		nav.show(view ?? null, location.hash.slice(1));
 		refreshFolds();
 	}
 
