@@ -30,6 +30,44 @@ test("a Mermaid block renders to one SVG whose nodes and edges carry data-ref id
 	expect(html).not.toContain("fonts.googleapis.com");
 });
 
+const remotePaints = [
+	{
+		name: "a node style",
+		line: "style a fill:url(https://example.com/p.svg#g)",
+		url: "https://example.com/p.svg#g",
+	},
+	{
+		name: "a class",
+		line: "classDef hot stroke:url('//example.com/p.svg#g')\n  class a hot",
+		url: "//example.com/p.svg#g",
+	},
+	{
+		name: "a link style",
+		line: "linkStyle 0 stroke:url(http://example.com/p.svg#g)",
+		url: "http://example.com/p.svg#g",
+	},
+	{
+		name: "a CSS-escaped url",
+		line: "style a fill:\\75 rl(https://example.com/p.svg#g)",
+		url: "https://example.com/p.svg#g",
+	},
+];
+
+test.each(remotePaints)(
+	"a remote paint URL in $name fails the pack and names it",
+	async ({ line, url }) => {
+		const input = dir.write(
+			"paint.html",
+			page(`<pre class="mermaid">flowchart LR\n  a --> b\n  ${line}</pre>`),
+		);
+
+		const result = await runCli(["pack", input, "-o", dir.path("paint.out.html")]);
+
+		expect(result.code).not.toBe(0);
+		expect(result.stderr).toContain(`mermaid block 1: the diagram references ${url}`);
+	},
+);
+
 test("an unsupported diagram type fails the pack and says what to draw instead", async () => {
 	const input = dir.write("pie.html", page(`<pre class="mermaid">pie\n "a" : 1</pre>`));
 

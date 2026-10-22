@@ -208,6 +208,83 @@ function annotateParts(svg: string): string {
 }
 
 /**
+ * The renderer's markup as stylesheets, tags and text. Its text and attribute values are escaped, so a raw `<` only opens a tag
+ * and a `"` only ends a value: attributes and CSS can be read and edited without touching the labels.
+ */
+const MARKUP = /<style\b[^>]*>[\s\S]*?<\/style>|<[^>]*>|[^<]+/g;
+const STYLESHEET = /^(<style\b[^>]*>)([\s\S]*?)(<\/style>)$/;
+const ATTRIBUTE = /(\s)([\w:-]+)="([^"]*)"/g;
+
+/** Each attribute value and stylesheet of the markup, through `attribute` and `css`; text content stays as written. */
+function editMarkup(
+	svg: string,
+	{
+		attribute = (_name, value) => value,
+		css = (text) => text,
+	}: { attribute?: (name: string, value: string) => string; css?: (text: string) => string },
+): string {
+	const editTag = (tag: string) =>
+		tag.replace(
+			ATTRIBUTE,
+			(_, space: string, name: string, value: string) =>
+				`${space}${name}="${attribute(name, value)}"`,
+		);
+	return svg.replace(MARKUP, (part) => {
+		const [, open = "", text = "", close = ""] = STYLESHEET.exec(part) ?? [];
+		if (open) {
+			return `${editTag(open)}${css(text)}${close}`;
+		}
+		return part.startsWith("<") ? editTag(part) : part;
+	});
+}
+
+/** A value as the browser's CSS parser reads it: entities, then CSS escapes (`\\75 rl(` is `url(`), decoded. */
+const cssValue = (value: string) =>
+	value
+		.replace(/&#x([\da-f]+);?/gi, (_, hex: string) =>
+			String.fromCodePoint(Number.parseInt(hex, 16)),
+		)
+		.replace(/&#(\d+);?/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
+		.replace(/&quot;/g, '"')
+		.replace(/&apos;|&#39;/g, "'")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&amp;/g, "&")
+		.replace(/\\([\da-f]{1,6})[ \t\n]?/gi, (_, hex: string) =>
+			String.fromCodePoint(Number.parseInt(hex, 16)),
+		)
+		.replace(/\\(.)/g, "$1");
+
+/** References out of the diagram in a CSS value or stylesheet: url() and @import targets other than a `#` fragment of the page. */
+function cssReferences(text: string): string[] {
+	const value = cssValue(text);
+	return [
+		...[...value.matchAll(/url\(\s*(['"]?)([^'")\s]*)/gi)].map((m) => m[2] ?? ""),
+		...[...value.matchAll(/@import\s+(['"]?)([^'";\s]*)/gi)].map((m) => m[2] || "@import"),
+	].filter((target) => !target.startsWith("#"));
+}
+
+/**
+ * Everything in the rendered SVG that points outside the page: a style, classDef or linkStyle value lands in fill and stroke
+ * attributes as written, and a remote url() there is a network request the packed page must not make.
+ */
+function externalReferences(svg: string): string[] {
+	const found: string[] = [];
+	editMarkup(svg, {
+		attribute(name, value) {
+			const href = /^(?:xlink:)?href$|^src$/i.test(name) && !value.startsWith("#");
+			found.push(...(href ? [value] : []), ...cssReferences(value));
+			return value;
+		},
+		css(text) {
+			found.push(...cssReferences(text));
+			return text;
+		},
+	});
+	return [...new Set(found)];
+}
+
+/**
  * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide
  * `svg`/`text` rules; theme.css maps the renderer's variables instead) and fixed colours, prefixes its ids so markers of two
  * diagrams do not clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the
@@ -247,6 +324,12 @@ function renderOne(source: string, n: number): Diagram {
 			: { text: body, refs: new Map<string, string[]>() };
 	const raw = renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist" });
 	const svg = annotateParts(annotateEdges(inline(raw, `mm${n}`), refs));
+	const remote = externalReferences(svg);
+	if (remote.length) {
+		throw new Error(
+			`the diagram references ${remote.join(", ")}; a packed page loads nothing, so give style, classDef and linkStyle colours (fill:#e33) or kit tokens (fill:var(--accent))`,
+		);
+	}
 	return { svg, refs: [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? "") };
 }
 
