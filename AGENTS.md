@@ -14,7 +14,7 @@ skills/explainer/      the installable skill, copied as-is by installers: no dot
   SKILL.md guide.md example.html
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
   src/                 main.ts (dispatch, help), commands.ts (one spec per command), pack.ts, check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
-  kit/                 what pages reference as kit:<file>: theme.css, charts.js, steps.js, link.js, views.js, reply.js, echarts.js (generated), fonts/, licenses/
+  kit/                 what pages reference as kit:<file>: theme.css, charts.js, plot.js, steps.js, link.js, views.js, reply.js, echarts.js (generated), fonts/, licenses/
   vendor/mermaid.min.js  generated; used by pack to pre-render diagrams, never inlined
 build/                 vendor.ts regenerates kit/echarts.js, vendor/mermaid.min.js and the licence texts from the pinned devDependencies
 test/                  contract tests, outside the skill so installs do not ship them
