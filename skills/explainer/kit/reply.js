@@ -1,5 +1,6 @@
 /* reply: reader notes and answers sent as one Markdown reply: data-reply on form controls, select text or click a data-ref part to add a note. Also keeps what the reader entered across reloads. Needs kit:theme.css.
-   Nothing shows until the reader selects text or clicks a data-ref part (a Note button appears), or the page has data-reply controls.
+   Nothing shows until the reader selects text, clicks a data-ref part (a Note button appears), or changes an input (a Clear button
+   appears), or the page has data-reply controls (a Reply button).
    Questions and state are plain form controls inside any element marked data-reply:
      <fieldset data-reply>                        a question: the legend is its label, the checked option its answer
        <legend>Where should sessions live?</legend>
@@ -16,16 +17,18 @@
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }.
-   Keeping: including this file is all a page needs. Every text, textarea, radio, checkbox, select, range and number control, with or
-   without data-reply, and the notes are saved in localStorage under the page's own address and restored after load. Restored
-   controls get input and change events, so the page's own listeners redraw charts and outputs; a control changed by script
-   without events is saved at the next click or when the page is left. Controls are matched by id (else radio group and value,
-   else position), so give inputs ids. Defaults are what the markup says (value, checked, selected). Controls are those present at
-   load: one the page adds later is not kept, one it removes or rebuilds stops counting. If the page's controls or their labels
-   differ from when the state was saved (a regenerated page), the saved values are dropped and the notes stay.
-   A "Clear answers" button (bottom right, shown only while something differs from the defaults or a note exists) puts every control
-   back to its default, again with events, and drops the notes and the saved copy. Put data-keep="off" on a control or its
-   container to leave it out. Without usable storage the page works as before. Open <details> are not kept.
+   Keeping: including this file is all a page needs. The reader's answers and notes are saved in localStorage under the page's own
+   address and restored after the page's load handlers have run. Answers are every text, textarea, radio, checkbox, select, range and
+   number control, with or without data-reply, that the reader moved off its default (what the markup says: value, checked,
+   selected) or chose on a data-reply question, even when that equals the default. Restored controls get input and change events,
+   so the page's own listeners redraw charts and outputs; a control changed by script without events is saved at the next click or
+   when the page is left. Controls the page renders later (views, panels) are picked up as they appear and get their saved value
+   then; one the page replaces keeps counting if the new control differs from the authored default. Controls are matched by id
+   (else radio form, group and value, else position), so give inputs ids; a saved value is dropped when the control's label
+   differs from when it was saved (a regenerated page). The "Clear answers and notes" button (bottom right, shown while anything is
+   answered or a note exists) puts every control back to its default, again with events, and drops the notes and the saved copy.
+   Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
+   <details> are not kept.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
@@ -144,19 +147,20 @@
 	// ---- keeping what the reader entered ----
 	// Chrome gives every file:// page one origin, so the page's own address is what tells their saved state apart.
 	const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
-	/** The kept controls, each with `initial`: its value as the markup declares it. */
-	let units = [];
-	/** The controls' keys and labels as found at load. A saved copy applies only to the set of controls it was saved from. */
-	let layout = "";
-	/** False until the saved state is restored, so the empty page at script time cannot overwrite it. */
+	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, label }. A control the page rebuilds with its current value in the markup is still compared with the authored one. */
+	const defaults = new Map();
+	/** Saved entries { value, label } by key, for controls that have not appeared yet. */
+	let pending = {};
+	/** False until the saved state is restored, so the page at script time cannot overwrite it. */
 	let ready = false;
 
-	/** A control's identity across loads: its id, else (radio) group and value, else its type and position among the controls. */
+	const groupOf = (c) => `${[...document.forms].indexOf(c.form)}:${c.name}`;
+	/** A control's identity across loads: its id, else (radio) form, group and value, else its type and position among the kept controls. */
 	function unitKey(c, index) {
 		if (c.id) {
 			return `#${c.id}`;
 		}
-		return c.type === "radio" && c.name ? `radio:${c.name}=${c.value}` : `${c.type}@${index}`;
+		return c.type === "radio" && c.name ? `radio:${groupOf(c)}=${c.value}` : `${c.type}@${index}`;
 	}
 
 	/** The value `c` has before the reader or a script touches it: that of a copy parsed from its markup. */
@@ -188,6 +192,26 @@
 	/** Storage can hold anything: a stored value is used only when it has the shape `readControl` gives. */
 	const kind = (value) => Object.prototype.toString.call(value);
 	const fits = (unit, value) => kind(value) === kind(unit.initial);
+	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+	/** The kept controls in the page now: { el, key, initial, label, first }, `first` when the key has not been seen before. */
+	function units() {
+		const controls = [...document.querySelectorAll(CONTROL)].filter(
+			(c) => !c.closest(".reply-ui, [data-keep=off]"),
+		);
+		return controls.map((el, i) => {
+			const key = unitKey(el, i);
+			const first = !defaults.has(key);
+			if (first) {
+				defaults.set(key, { initial: initialValue(el), label: unitLabel(el) });
+			}
+			return { el, key, first, ...defaults.get(key) };
+		});
+	}
+
+	const moved = (u) => !same(readControl(u.el), u.initial);
+	/** Answered: moved off the default, or chosen by the reader even where that equals it. */
+	const answered = (u) => moved(u) || touched.has(u.el);
 
 	/** Page listeners hear a restored or cleared control the way they hear the reader: input, then change. */
 	function announce(c) {
@@ -196,26 +220,60 @@
 		}
 	}
 
-	function findUnits() {
-		const controls = [...document.querySelectorAll(CONTROL)].filter(
-			(c) => !c.closest(".reply-ui, [data-keep=off]"),
+	/** True when some radio of `c`'s group is checked; an unnamed radio is its own group. */
+	const groupChosen = (c) =>
+		Boolean(c.name) &&
+		[...document.getElementsByName(c.name)].some(
+			(r) => r.type === "radio" && r.form === c.form && r.checked,
 		);
-		return controls.map((el, i) => ({ key: unitKey(el, i), el, initial: initialValue(el) }));
+
+	/** The controls to announce after `writes`: each written control except unchecked radios, plus one radio for a group left with no choice. */
+	function speakers(writes) {
+		const spoken = new Map();
+		for (const { el } of writes) {
+			if (el.type !== "radio" || el.checked) {
+				spoken.set(el, el);
+			} else if (!groupChosen(el)) {
+				spoken.set(el.name ? groupOf(el) : el, el);
+			}
+		}
+		return [...spoken.values()];
 	}
 
-	/** Controls the reader moved off their defaults. One a page has since removed or rebuilt is gone, and so is what it held. */
-	const changed = () =>
-		units.filter(
-			(u) => u.el.isConnected && JSON.stringify(readControl(u.el)) !== JSON.stringify(u.initial),
-		);
+	/**
+	 * Sets `writes` ({ el, value }) and tells the page. Every value is written before any event, so no listener sees a radio group half
+	 * switched. Written controls count as the reader's.
+	 */
+	function apply(writes) {
+		for (const { el, value } of writes) {
+			writeControl(el, value);
+			touched.add(el);
+		}
+		for (const el of speakers(writes)) {
+			announce(el);
+		}
+	}
 
-	/** What differs from the defaults: control values by key, and the notes. Empty means nothing to keep. */
+	/** Gives controls that appeared since the last look the saved value waiting for their key, if it was saved from the same control. */
+	function adopt() {
+		const writes = [];
+		for (const u of units().filter((x) => x.first)) {
+			const entry = pending[u.key];
+			delete pending[u.key];
+			if (entry?.label === u.label && fits(u, entry.value)) {
+				writes.push({ el: u.el, value: entry.value });
+			}
+		}
+		apply(writes);
+	}
+
+	/** What to keep: the answered controls' values by key, and the notes. */
 	function snapshot() {
-		return {
-			layout,
-			controls: Object.fromEntries(changed().map((u) => [u.key, readControl(u.el)])),
-			notes: filledNotes(),
-		};
+		const controls = {};
+		for (const u of units().filter(answered)) {
+			controls[u.key] = { value: readControl(u.el), label: u.label };
+		}
+		return { controls, notes: filledNotes() };
 	}
 
 	const empty = (state) => !state.notes.length && !Object.keys(state.controls).length;
@@ -240,28 +298,6 @@
 		}
 	}
 
-	/** Writes every value before announcing any, so no listener sees a radio group half switched. Written controls count as the reader's. */
-	function apply(list, valueFor) {
-		for (const u of list) {
-			writeControl(u.el, valueFor(u));
-			touched.add(u.el);
-		}
-		for (const u of list) {
-			if (u.el.type !== "radio" || u.el.checked) {
-				announce(u.el);
-			}
-		}
-	}
-
-	function restoreControls(state) {
-		if (state.layout !== layout) {
-			return;
-		}
-		const values = state.controls ?? {};
-		const hits = units.filter((u) => Object.hasOwn(values, u.key) && fits(u, values[u.key]));
-		apply(hits, (u) => values[u.key]);
-	}
-
 	function restoreNotes(state) {
 		for (const n of Array.isArray(state.notes) ? state.notes : []) {
 			if (typeof n?.text === "string" && (n.quote || n.part)) {
@@ -271,19 +307,23 @@
 	}
 
 	function restore() {
-		units = findUnits();
-		layout = JSON.stringify(units.map((u) => [u.key, unitLabel(u.el)]));
 		const state = stored();
-		restoreControls(state);
+		const saved = state.controls;
+		pending = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
 		restoreNotes(state);
 		ready = true;
 		sync();
 	}
 
 	function clearAnswers() {
-		apply(changed(), (u) => u.initial);
+		apply(
+			units()
+				.filter(moved)
+				.map((u) => ({ el: u.el, value: u.initial })),
+		);
 		notes.length = 0;
 		touched = new WeakSet();
+		pending = {};
 		sync();
 	}
 
@@ -365,21 +405,25 @@
 	const clear = h(
 		"button",
 		{ type: "button", class: "btn", onclick: clearAnswers },
-		"Clear answers",
+		"Clear answers and notes",
 	);
 	const bar = document.body.appendChild(h("div", { class: "reply-ui reply-bar" }, clear, button));
 	const asked = Boolean(document.querySelector("[data-reply]"));
 
 	/** Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls. */
 	function sync() {
+		if (ready) {
+			adopt();
+		}
 		const count = filledNotes().length + answers().filter((a) => a.touched).length;
-		const state = snapshot();
+		const state = ready ? snapshot() : { controls: {}, notes: filledNotes() };
 		button.hidden = !count && !asked;
 		clear.hidden = empty(state);
 		bar.hidden = button.hidden && clear.hidden;
 		button.textContent = count ? `Reply (${count})` : "Reply";
 		if (ready) {
-			persist(state);
+			// Entries still waiting for their control stay saved; a control that has appeared speaks for itself.
+			persist({ ...state, controls: { ...pending, ...state.controls } });
 		}
 	}
 
@@ -472,12 +516,29 @@
 	});
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
+	const later = () => setTimeout(sync);
 	for (const type of ["input", "change", "click"]) {
-		document.addEventListener(type, () => setTimeout(sync));
+		document.addEventListener(type, later);
 	}
 	addEventListener("pagehide", sync);
+	// Controls the page renders, replaces or removes after load: only changes to the controls themselves matter, not to this UI.
+	const isControl = (n) => n.nodeType === 1 && (n.matches(CONTROL) || n.querySelector(CONTROL));
+	new MutationObserver((records) => {
+		if (
+			records.some(
+				(m) =>
+					!m.target.closest?.(".reply-ui") && [...m.addedNodes, ...m.removedNodes].some(isControl),
+			)
+		) {
+			later();
+		}
+	}).observe(document.body, { childList: true, subtree: true });
 
 	sync();
-	// After load: the page's own scripts have attached their listeners by then, so restored values reach them.
-	addEventListener("load", restore, { once: true });
+	// After the page's own load handlers have run (they attach listeners and set initial values), so restored values reach them and survive them.
+	if (document.readyState === "complete") {
+		setTimeout(restore);
+	} else {
+		addEventListener("load", () => setTimeout(restore), { once: true });
+	}
 })();
