@@ -170,11 +170,16 @@ h1 {
 	letter-spacing: -0.035em;
 	text-wrap: balance;
 }
-/* The accent phrase stays on one line: a break at "18-minute" splits the one highlighted fact. Keep it a few words. */
+/* The accent phrase stays on one line from tablet width up: a break at "18-minute" splits the one highlighted fact. Keep it a few words;
+   on a phone it wraps like the rest of the headline, since a long phrase would run off the screen. */
 h1 em {
 	font-style: normal;
 	color: var(--accent);
-	white-space: nowrap;
+}
+@media (min-width: 40rem) {
+	h1 em {
+		white-space: nowrap;
+	}
 }
 h2 {
 	margin: 0 0 1.25rem;
