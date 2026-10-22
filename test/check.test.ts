@@ -10,14 +10,20 @@ const page = (script: string) =>
 const checkQuick = (file: string) =>
 	runCli(["check", file, "--quick", "--view", "none", "--out", dir.path("shots")]);
 
-test("check reports a page error as a problem and exits 1", async () => {
-	const file = dir.write("throws.html", page('throw new Error("boom from the page");'));
+test("check reports a page error as a problem with where it was thrown, and exits 1", async () => {
+	const file = dir.write(
+		"throws.html",
+		page(
+			'function inner() { throw new Error("boom from the page"); }\nfunction outer() { inner(); }\nouter();',
+		),
+	);
 
 	const result = await checkQuick(file);
 
 	expect(result.code).toBe(1);
 	expect(result.stdout).toContain("FAIL");
-	expect(result.stdout).toContain("page error: Error: boom from the page");
+	expect(result.stdout).toContain("page error: Error: boom from the page (at inner 1:");
+	expect(result.stdout).toMatch(/, outer 2:\d+/);
 }, 30_000);
 
 test("check exits 0 for a page that only shows kit: in text, which is not an unpacked page", async () => {

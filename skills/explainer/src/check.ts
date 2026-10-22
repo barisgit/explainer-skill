@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import type { Cdp } from "./chrome.ts";
+import type { Cdp, ExceptionDetails } from "./chrome.ts";
 import { settle, withPage } from "./chrome.ts";
 import { runStep } from "./steps.ts";
 
@@ -8,6 +8,7 @@ const VIEWPORTS = {
 	desktop: { width: 1440, height: 900 },
 	narrow: { width: 390, height: 844 },
 } as const;
+const STACK_FRAMES = 3;
 const THEMES = ["light", "dark"] as const;
 /**
  * The first viewport before any `--do` step: its PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
@@ -196,7 +197,7 @@ class PageLog {
 	constructor(cdp: Cdp) {
 		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) => {
 			const message = `page error: ${d.exception?.description ?? d.text}`;
-			this.problems.push(message.split("\n")[0] ?? message);
+			this.problems.push(`${message.split("\n")[0] ?? message} (at ${errorLocation(d)})`);
 		});
 		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => this.onConsole(type, consoleText(args)));
 		cdp.on("Log.entryAdded", ({ entry }) => {
@@ -237,6 +238,17 @@ class PageLog {
 			this.warnings.push(shorten(`console.${type}: ${text}`) + hint);
 		}
 	}
+}
+
+/** Where an exception was thrown, in the page's own line:column: the top frames ("fmt 3:38, render 4:28") or, without a stack (a syntax error), the position alone. */
+function errorLocation(d: ExceptionDetails): string {
+	const frames = (d.stackTrace?.callFrames ?? []).slice(0, STACK_FRAMES);
+	if (!frames.length) {
+		return `${d.lineNumber + 1}:${d.columnNumber + 1}`;
+	}
+	return frames
+		.map((f) => `${f.functionName || "<anonymous>"} ${f.lineNumber + 1}:${f.columnNumber + 1}`)
+		.join(", ");
 }
 
 const consoleText = (args: Array<{ value?: unknown; description?: string }>) =>

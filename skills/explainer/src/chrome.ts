@@ -19,10 +19,20 @@ export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 /** Chrome could not be started or driven: an environment problem the CLI reports without a stack trace. */
 export class ChromeError extends Error {}
 
-/** Details of a script exception as the DevTools Protocol reports it. */
-interface ExceptionDetails {
+/** One call-stack entry of an exception; line and column numbers are 0-based. */
+interface CallFrame {
+	functionName: string;
+	lineNumber: number;
+	columnNumber: number;
+}
+
+/** Details of a script exception as the DevTools Protocol reports it; `lineNumber` and `columnNumber` (0-based) are where it was thrown. */
+export interface ExceptionDetails {
 	text: string;
+	lineNumber: number;
+	columnNumber: number;
 	exception?: { description?: string };
+	stackTrace?: { callFrames: CallFrame[] };
 }
 
 /** A console argument as `Runtime.consoleAPICalled` reports it. */
