@@ -33,6 +33,18 @@ describe("pack inlines what is local", () => {
 		expect(html).toContain(kitSource.slice(0, 60));
 		expect(html).not.toMatch(/(href|src)="(local\.(css|js)|kit:link\.js)"/);
 	});
+
+	test("a page's own .ts script is inlined as written, not transpiled like the kit", async () => {
+		const source = '"use strict";\nwindow.markerTs = (x: number) => x;';
+		dir.write("own.ts", source);
+		const input = dir.write("own-ts.html", page('<script src="own.ts"></script>'));
+		const output = dir.path("own-ts.out.html");
+
+		const result = await runCli(["pack", input, "-o", output]);
+
+		expect(result.code).toBe(0);
+		expect(readFileSync(output, "utf8")).toContain(source);
+	});
 });
 
 test("a kit script ships as a classic script with its documentation comment", async () => {

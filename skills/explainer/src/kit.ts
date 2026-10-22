@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join, sep } from "node:path";
 import { KIT_DIR } from "./paths.ts";
 
 /**
@@ -49,7 +49,7 @@ export function readKitText(path: string): string {
 		.map((file) => {
 			const text = readFileSync(file, "utf8");
 			// Only kit sources are TypeScript; a page's own scripts are served as written.
-			return file.startsWith(KIT_DIR) && file.endsWith(".ts") ? script(text) : text;
+			return file.startsWith(KIT_DIR + sep) && file.endsWith(".ts") ? script(text) : text;
 		})
 		.join("\n");
 }
