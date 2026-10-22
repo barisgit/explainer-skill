@@ -11,11 +11,28 @@ export type Seen =
 	| { kind: "network"; url: string };
 
 /**
+ * `query` with its prefers-color-scheme and prefers-reduced-motion features answered for `settings`: each becomes a width test that is
+ * true or false everywhere. It runs on the host for the page's inline stylesheets and in the page for `matchMedia` (it is plain
+ * JavaScript apart from the annotations, which Bun strips, so the probe embeds its source).
+ */
+function forceMedia(query: string, settings: Settings): string {
+	const answer = (yes: boolean) => (yes ? "(min-width: 0px)" : "(min-width: 100000px)");
+	return query
+		.replace(/\(prefers-color-scheme:\s*(light|dark)\)/g, (_, scheme) =>
+			answer(scheme === settings.scheme),
+		)
+		.replace(/\(prefers-reduced-motion:\s*(reduce|no-preference)\)/g, (_, motion) =>
+			answer((motion === "reduce") === settings.reduceMotion),
+		);
+}
+
+/**
  * Page-side script, injected as the first thing in `<head>` so it runs before any page code. It uses no engine-specific API,
  * so it behaves the same in WebKit and Blink:
  * - records window errors, unhandled rejections, failed resource loads and CSP violations for `window.__explainer.take()`;
  * - empties local and session storage on every load except a reload;
- * - forces the colour scheme and reduced motion for CSS (`data-scheme` on <html> unless the page set one, media rules rewritten) and for `matchMedia`;
+ * - forces the colour scheme and reduced motion for `matchMedia` and sets `data-scheme` on <html> unless the page set one (the media
+ *   rules of inline stylesheets are rewritten by `instrument`: changing them from the page makes WebKit drop the first chart mount);
  * - hides scrollbars, so layout at 1440 px is 1440 px wide.
  * Statements end in semicolons: `instrument` joins the lines, because the injection must not add a line to the page.
  */
@@ -33,16 +50,9 @@ const PROBE_JS = (settings: Settings) => `(() => {
 	addEventListener("unhandledrejection", (e) => add({ kind: "rejection", text: "Uncaught (in promise) " + String(e.reason), stack: (e.reason && e.reason.stack) || "", line: 0, col: 0 }));
 	document.addEventListener("securitypolicyviolation", (e) => add({ kind: "network", url: e.blockedURI }));
 	document.documentElement.dataset.scheme ||= S.scheme;
-	const yes = "(min-width: 0px)", no = "(min-width: 100000px)";
-	const force = (q) => q
-		.replace(/\\(prefers-color-scheme:\\s*(light|dark)\\)/g, (_, s) => (s === S.scheme ? yes : no))
-		.replace(/\\(prefers-reduced-motion:\\s*(reduce|no-preference)\\)/g, (_, m) => ((m === "reduce") === S.reduceMotion ? yes : no));
+	const force = ${forceMedia.toString()};
 	const matchMedia = window.matchMedia.bind(window);
-	window.matchMedia = (q) => matchMedia(force(q));
-	const rewrite = (rules) => { for (const r of rules) { if (r.media) r.media.mediaText = force(r.media.mediaText); if (r.cssRules) rewrite(r.cssRules); } };
-	const sheets = () => { for (const s of document.styleSheets) { try { rewrite(s.cssRules); } catch (e) {} } };
-	addEventListener("DOMContentLoaded", sheets);
-	addEventListener("load", sheets);
+	window.matchMedia = (q) => matchMedia(force(q, S));
 	const hide = document.createElement("style");
 	hide.textContent = "html { scrollbar-width: none; } ::-webkit-scrollbar { display: none; }";
 	document.head.append(hide);
@@ -64,10 +74,13 @@ export interface Instrumented {
 }
 
 /**
- * Puts the CSP and the probe on one line right after `<head>` (else after the doctype, else first), so every page line number is the
+ * Answers the media queries of inline stylesheets for `settings`, and puts the CSP and the probe on one line right after `<head>` (else after the doctype, else first), so every page line number is the
  * original's and only columns after the insertion point on that one line move.
  */
-export function instrument(html: string, settings: Settings): Instrumented {
+export function instrument(source: string, settings: Settings): Instrumented {
+	const html = source.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, (style) =>
+		forceMedia(style, settings),
+	);
 	const injected = `${CSP}<script>${PROBE_JS(settings).replace(/\n\s*/g, " ")}</script>`;
 	const anchor = /<head(\s[^>]*)?>/i.exec(html) ?? /^\s*<!doctype[^>]*>/i.exec(html);
 	const at = anchor ? anchor.index + anchor[0].length : 0;
