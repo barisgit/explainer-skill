@@ -13,13 +13,15 @@ window.ViewsFolds = () => {
 		);
 	}
 
+	/** Sets the section's button to what a click would do: Collapse all once every fold is open, else Expand all. */
 	function sync(section: HTMLElement) {
 		const button = buttons.get(section);
-		const all = foldsOf(section).every((d) => d.open);
-		button?.setAttribute("aria-expanded", String(all));
-		if (button) {
-			button.textContent = all ? "Collapse all" : "Expand all";
+		if (!button) {
+			return;
 		}
+		const all = foldsOf(section).every((d) => d.open);
+		button.setAttribute("aria-expanded", String(all));
+		button.textContent = all ? "Collapse all" : "Expand all";
 	}
 
 	function create(section: HTMLElement) {
