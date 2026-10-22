@@ -215,7 +215,10 @@ const MARKUP = /<style\b[^>]*>[\s\S]*?<\/style>|<[^>]*>|[^<]+/g;
 const STYLESHEET = /^(<style\b[^>]*>)([\s\S]*?)(<\/style>)$/;
 const ATTRIBUTE = /(\s)([\w:-]+)="([^"]*)"/g;
 
-/** Each attribute value and stylesheet of the markup, through `attribute` and `css`; text content stays as written. */
+/**
+ * Each attribute value and stylesheet of the markup, through `attribute` and `css`. Text content and data-* attributes (the
+ * renderer copies labels into data-label) stay as written: they are text, never fetched or styled.
+ */
 function editMarkup(
 	svg: string,
 	{
@@ -224,10 +227,8 @@ function editMarkup(
 	}: { attribute?: (name: string, value: string) => string; css?: (text: string) => string },
 ): string {
 	const editTag = (tag: string) =>
-		tag.replace(
-			ATTRIBUTE,
-			(_, space: string, name: string, value: string) =>
-				`${space}${name}="${attribute(name, value)}"`,
+		tag.replace(ATTRIBUTE, (whole: string, space: string, name: string, value: string) =>
+			name.startsWith("data-") ? whole : `${space}${name}="${attribute(name, value)}"`,
 		);
 	return svg.replace(MARKUP, (part) => {
 		const [, open = "", text = "", close = ""] = STYLESHEET.exec(part) ?? [];
@@ -284,27 +285,31 @@ function externalReferences(svg: string): string[] {
 	return [...new Set(found)];
 }
 
+/** `url(#x)` pointing at the diagram's own `x`, whose id inline() prefixed. */
+const localUrls = (value: string, id: string) =>
+	value.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`);
+
 /**
  * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide
- * `svg`/`text` rules; theme.css maps the renderer's variables instead) and fixed colours, prefixes its ids so markers of two
- * diagrams do not clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the
- * diagram shrink to the column (at most SCALE times its size).
+ * `svg`/`text` rules; theme.css maps the renderer's variables instead), prefixes its ids so markers of two diagrams do not
+ * clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the diagram shrink
+ * to the column (at most SCALE times its size). Only attributes and stylesheets change: a label reads as written.
  */
 function inline(svg: string, id: string): string {
-	return svg
-		.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, "")
-		.replace(/\bsvg \{/g, `#${id} {`)
-		.replace(
-			/--xychart-color-(\d+): [^;]+;/g,
-			(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
-		)
-		.replace(/ id="([^"]+)"/g, ` id="${id}-$1"`)
-		.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`)
-		.replace(
-			/^<svg ([^>]*?)width="([\d.]+)" height="[\d.]+" style="[^"]*"/,
-			(_, attrs: string, width: string) =>
-				`<svg id="${id}" ${attrs}width="100%" style="max-width: ${Math.ceil(Number(width) * SCALE)}px"`,
-		);
+	return editMarkup(svg.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, ""), {
+		attribute: (name, value) => (name === "id" ? `${id}-${value}` : localUrls(value, id)),
+		css: (text) =>
+			localUrls(text, id)
+				.replace(/\bsvg \{/g, `#${id} {`)
+				.replace(
+					/--xychart-color-(\d+): [^;]+;/g,
+					(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
+				),
+	}).replace(
+		/^<svg ([^>]*?)width="([\d.]+)" height="[\d.]+" style="[^"]*"/,
+		(_, attrs: string, width: string) =>
+			`<svg id="${id}" ${attrs}width="100%" style="max-width: ${Math.ceil(Number(width) * SCALE)}px"`,
+	);
 }
 
 /** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */

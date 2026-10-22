@@ -340,3 +340,25 @@ const activations = [
 test.each(activations)("$name fails with what to write instead", ({ input, message }) => {
 	expect(failureOf(input)).toBe(message);
 });
+
+/** Text as the renderer escapes it in content and attribute values. */
+const escaped = (text: string) =>
+	text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+test.each(["url(#cache) svg {", "--xychart-color-0: red;", "url(https://example.com/a.png)"])(
+	"the label %p renders as written",
+	(label) => {
+		const { svg, refs } = (() => {
+			const [diagram = new Error("no diagram")] = renderMermaid([
+				`flowchart LR\n  a["${label}"] --> b`,
+			]);
+			if (diagram instanceof Error) {
+				throw diagram;
+			}
+			return diagram;
+		})();
+		expect(svg).toContain(`data-label="${escaped(label)}"`);
+		expect(svg).toContain(`>${escaped(label).replace(/&quot;/g, '"')}</text>`);
+		expect(refs.sort()).toEqual(["L_a_b_0", "a", "b"]);
+	},
+);
