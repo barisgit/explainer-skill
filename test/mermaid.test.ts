@@ -404,3 +404,23 @@ test.each([
 ])("an unsupported $type says what to draw instead", ({ type, instead }) => {
 	expect(failureOf(`${type}\n  a`)).toEndWith(`; draw it as ${instead}`);
 });
+
+test.each([
+	["a literal", "<br>"],
+	["a self-closing", "<br/>"],
+	["an escaped", "&lt;br&gt;"],
+])("%s <br> in a label breaks the line, as in Mermaid", async (_, br) => {
+	const input = dir.write(
+		"br.html",
+		page(`<pre class="mermaid">flowchart LR\n  a["one${br}two"] --> b</pre>`),
+	);
+	const output = dir.path("br.out.html");
+
+	const result = await runCli(["pack", input, "-o", output]);
+
+	expect(result.code).toBe(0);
+	const html = readFileSync(output, "utf8");
+	expect(html).toMatch(/>one<\/tspan><tspan[^>]*>two</);
+	expect(html).not.toContain("onetwo");
+	expect(html).not.toMatch(/<br\s*\/?>/);
+});

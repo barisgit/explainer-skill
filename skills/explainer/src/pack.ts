@@ -76,11 +76,18 @@ const DATA_REF = /\bdata-ref="([^"]*)"/g;
 const refsIn = (markup: string) =>
 	[...markup.matchAll(DATA_REF)].flatMap((m) => (m[1] ?? "").split(/\s+/).filter(Boolean));
 
+const STEPPED = `diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`;
+
+/** A start tag as innerHTML writes it, from the parser's raw (still escaped) attribute values. */
+const startTag = (el: HTMLRewriterTypes.Element) =>
+	`<${el.tagName}${[...el.attributes].map(([name, value]) => ` ${name}="${value}"`).join("")}>`;
+
 /**
  * Replaces the source of every `pre.mermaid` (or `div.mermaid`) block with its rendered diagram in a `div`: one SVG whose
- * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy. Syntax errors, unsupported
- * types and data-steps or data-step on a block (diagrams do not step) are returned as problems. Blocks and attributes are
- * found by the HTML parser, so any spelling the browser accepts counts. `diagramRefs` collects every part id.
+ * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy. The source is the block's
+ * inner HTML, decoded, as Mermaid reads it in a browser, so a literal `<br>` in a label breaks the line like `&lt;br&gt;`.
+ * Blocks and attributes are found by the HTML parser, so any spelling the browser accepts counts. Syntax errors, unsupported
+ * types and data-steps or data-step on a block (diagrams do not step) are returned as problems. `diagramRefs` collects every part id.
  */
 function renderMermaidBlocks(
 	html: string,
@@ -88,24 +95,24 @@ function renderMermaidBlocks(
 	diagramRefs: Set<string>,
 ): Promise<string> {
 	let blocks = 0;
+	let open = false;
 	let source: string[] = [];
 	return new HTMLRewriter()
 		.on("pre.mermaid, div.mermaid", {
 			element(el) {
 				const n = ++blocks;
-				const stepped = el.hasAttribute("data-steps") || el.hasAttribute("data-step");
-				const text: string[] = [];
-				source = text;
+				if (el.hasAttribute("data-steps") || el.hasAttribute("data-step")) {
+					problems.push(`mermaid block ${n}: ${STEPPED}`);
+				}
+				const parts: string[] = [];
+				source = parts;
+				open = true;
 				el.tagName = "div";
 				el.onEndTag((end) => {
-					const diagram = renderMermaid(unescapeHtml(text.join("")), n - 1);
+					open = false;
+					const diagram = renderMermaid(unescapeHtml(parts.join("")), n - 1);
 					if (diagram instanceof Error) {
 						return void problems.push(`mermaid block ${n}: ${diagram.message}`);
-					}
-					if (stepped) {
-						problems.push(
-							`mermaid block ${n}: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`,
-						);
 					}
 					for (const id of diagram.refs) {
 						diagramRefs.add(id);
@@ -113,9 +120,24 @@ function renderMermaidBlocks(
 					end.before(diagram.svg, { html: true });
 				});
 			},
+			// Text inside the block's child elements arrives here too, in document order with their tags.
 			text(chunk) {
 				source.push(chunk.text);
 				chunk.remove();
+			},
+		})
+		.on(".mermaid *", {
+			element(el) {
+				if (!open) {
+					return;
+				}
+				const parts = source;
+				const tag = el.tagName;
+				parts.push(startTag(el));
+				if (el.canHaveContent) {
+					el.onEndTag(() => void parts.push(`</${tag}>`));
+				}
+				el.removeAndKeepContent();
 			},
 		})
 		.transform(new Response(html))
