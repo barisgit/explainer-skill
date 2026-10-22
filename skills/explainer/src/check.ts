@@ -182,35 +182,55 @@ const SWEEP_JS = `(async () => {
 	if (y > 0) await to(0);
 })()`;
 
+const STEPPER_BUDGET_MS = 3000;
+const STEPPER_MAX_STEPS = 40;
 /**
- * Runs in the page: walks every working stepper (kit:steps.js) through its steps and back to where it was, and warns about
- * one whose content, captions and controls aside, looks the same on every step. A caption-only stepper is legitimate when
- * the page redraws on stepchange (the stepper's own markup then changes), so pack cannot tell; stepping it shows it.
- * Canvases count by their pixels, since a chart redraw leaves the markup as it was.
+ * Runs in the page: steps every working stepper (kit:steps.js) until its content, captions and controls aside, looks different
+ * from the step it opened on, then returns it there, also when stepping throws. A caption-only stepper is legitimate when the
+ * page redraws on stepchange (the stepper's own markup then changes), so pack cannot tell; stepping it shows it. Canvases
+ * count by their pixels, since a chart redraw leaves the markup as it was. One stepper takes at most 40 steps and the page 3 s;
+ * a stepper still unchanged when either runs out is reported as not fully checked rather than as caption-only.
  */
 const STEPPERS_JS = `(async () => {
 	if (!window.Steps) return [];
 	const name = ${ELEMENT_NAME_JS};
+	const end = performance.now() + ${STEPPER_BUDGET_MS};
 	const frame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 30)));
 	const look = (root) => {
 		const copy = root.cloneNode(true);
 		copy.querySelectorAll("[data-captions], .player").forEach((el) => el.remove());
 		return copy.innerHTML + [...root.querySelectorAll("canvas")].map((c) => c.toDataURL()).join("");
 	};
+	/** The steps taken before the stepper looked different, or -1 when it did. */
+	const unchangedSteps = async (root, start, total) => {
+		const baseline = look(root);
+		let taken = 0;
+		for (let step = 1; step <= total; step++) {
+			if (step === start) continue;
+			if (taken === ${STEPPER_MAX_STEPS} || performance.now() > end) return taken;
+			Steps.refresh(root, step);
+			taken++;
+			await frame();
+			if (look(root) !== baseline) return -1;
+		}
+		return taken;
+	};
 	const warnings = [];
 	for (const root of document.querySelectorAll("[data-stepper][data-live]")) {
 		const range = root.querySelector(".player input[type=range]");
 		const total = Number(range?.max) || 0;
 		const start = Number(range?.value) || total;
-		const looks = new Set();
-		for (let step = 1; step <= total; step++) {
-			Steps.refresh(root, step);
+		let taken;
+		try {
+			taken = await unchangedSteps(root, start, total);
+		} finally {
+			Steps.refresh(root, start);
 			await frame();
-			looks.add(look(root));
 		}
-		Steps.refresh(root, start);
-		await frame();
-		if (looks.size < 2) warnings.push(name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without data-stepper, or mark its parts with data-step=\\"<n>\\" (kit steps.js)");
+		if (taken < 0 || total < 2) continue;
+		warnings.push(taken + 1 < total
+			? name(root) + " was not fully checked: its first " + (taken + 1) + " of " + total + " steps change only the captions, and check stops after ${STEPPER_MAX_STEPS} steps or ${STEPPER_BUDGET_MS / 1000} s: step through the rest by hand"
+			: name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without data-stepper, or mark its parts with data-step=\\"<n>\\" (kit steps.js)");
 	}
 	return warnings;
 })()`;

@@ -211,3 +211,28 @@ test("check warns about a stepper whose steps change only its captions, not one 
 	expect(result.stdout).not.toContain("figure#redrawn");
 	expect(result.stdout).not.toContain("figure#marked");
 }, 30_000);
+
+test("check stops stepping a stepper once it changes, and says so when its time runs out before that", async () => {
+	const captions = `<ol data-captions>${"<li>Step</li>".repeat(300)}</ol>`;
+	const source = dir.write(
+		"long-steppers.html",
+		`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css"></head><body><h1>Steppers</h1>
+<figure class="fig" id="still" data-stepper><p>Never changes.</p>${captions}</figure>
+<figure class="fig" id="redrawn" data-stepper><p id="count"></p>${captions}</figure>
+<script>document.querySelector("#redrawn").addEventListener("stepchange", (e) => { document.querySelector("#count").textContent = "Step " + e.detail.step; });</script>
+<script src="kit:steps.js"></script></body></html>`,
+	);
+	const packed = dir.path("long-steppers.out.html");
+	expect((await runCli(["pack", source, "-o", packed])).code).toBe(0);
+	const started = performance.now();
+
+	const result = await checkQuick(packed);
+
+	expect(performance.now() - started).toBeLessThan(15_000);
+	expect(result.code).toBe(0);
+	expect(result.stdout).toMatch(
+		/figure#still\.fig was not fully checked: its first \d+ of 300 steps change only the captions, and check stops after 40 steps or 3 s: step through the rest by hand/,
+	);
+	expect(result.stdout).not.toContain("steps through 300 captions");
+	expect(result.stdout).not.toContain("figure#redrawn");
+}, 60_000);
