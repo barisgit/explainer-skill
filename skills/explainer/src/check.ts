@@ -72,6 +72,8 @@ export async function kitReferences(html: string): Promise<string[]> {
 	return [...refs];
 }
 
+/** Page-side function naming an element in reports: `div#panel.card` (tag, id, first class). */
+const ELEMENT_NAME_JS = `(el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")`;
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
 
@@ -85,7 +87,7 @@ const TALL_FIGURE = 1.5;
  */
 const PAGE_JS = (narrow: boolean) => `(() => {
 	const vw = document.documentElement.clientWidth;
-	const name = (el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "");
+	const name = ${ELEMENT_NAME_JS};
 	const scrolls = (el) => { const o = getComputedStyle(el).overflowX; return o === "auto" || o === "scroll"; };
 	const clipped = (el) => { for (let p = el.parentElement; p; p = p.parentElement) if (scrolls(p)) return true; return false; };
 	const shown = (el) => el.getClientRects().length > 0;
@@ -118,6 +120,7 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 
 /** Runs in the page before any step: the headline, the figures at least partly in the first viewport (outermost only) and the largest list of in-page links in view. */
 const FIRST_SCREEN_JS = `(() => {
+	const name = ${ELEMENT_NAME_JS};
 	const seen = (el) => { const r = el.getBoundingClientRect(); return r.width >= 120 && r.height >= 80 && Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) >= Math.min(200, r.height * 0.4); };
 	const found = [...document.querySelectorAll("figure, .fig, .chart, .mermaid, .dg, svg, canvas, img")].filter(seen);
 	const outer = found.filter((el) => !found.some((o) => o !== el && o.contains(el)));
@@ -128,7 +131,7 @@ const FIRST_SCREEN_JS = `(() => {
 		const list = a.closest("ol, ul, nav");
 		if (list && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight) lists.set(list, (lists.get(list) ?? 0) + 1);
 	}
-	return { links: Math.max(0, ...lists.values()), headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map((el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")) };
+	return { links: Math.max(0, ...lists.values()), headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map(name) };
 })()`;
 
 /** Runs in the page: every drill-down hash the page links to ("#repo/mobile") or declares (static views, data-view="a/b"), in document order; view templates nothing links to. */
@@ -239,6 +242,8 @@ interface Run {
 	opts: CheckOptions;
 	shots: Shot[];
 	views: ViewReport;
+	/** The drill-down hashes to capture, set once by the first overview pass (light, desktop) and reused for every other screen. */
+	viewHashes: string[];
 	stepNotes: Set<string>;
 }
 
@@ -302,14 +307,14 @@ async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScre
 	};
 }
 
-/** Finds the drill-down hashes on the freshly loaded overview, records them in the report and returns those to capture. */
-async function discoverViews(run: Run): Promise<string[]> {
+/** Finds the drill-down hashes on the freshly loaded overview and records them in the report and in `run.viewHashes`. */
+async function discoverViews(run: Run) {
 	const found = await run.cdp.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
 	const chosen = chooseViews(run.opts.views, found.hashes);
 	run.views.found = found.hashes;
 	run.views.uncaptured = chosen.skipped;
 	run.views.templates = found.templates;
-	return chosen.capture;
+	run.viewHashes = chosen.capture;
 }
 
 /** Runs the `--do` steps in order, recording their problems and notes. */
@@ -326,14 +331,16 @@ async function runSteps(run: Run) {
 	}
 }
 
-/** The overview page for one theme and viewport: first screen, view discovery, `--do` steps, full-page shot. */
-async function shootOverview(run: Run, screen: Screen): Promise<string[]> {
+/** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, full-page shot. */
+async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name, vp } = screen;
 	const { opts } = run;
 	run.log.reset();
 	await open(run, "");
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
-	const hashes = theme === THEMES[0] && name === "desktop" ? await discoverViews(run) : [];
+	if (theme === THEMES[0] && name === "desktop") {
+		await discoverViews(run);
+	}
 	await runSteps(run);
 	const png = join(
 		run.outDir,
@@ -351,7 +358,6 @@ async function shootOverview(run: Run, screen: Screen): Promise<string[]> {
 		problems: [...new Set(run.log.problems)],
 		warnings,
 	});
-	return hashes;
 }
 
 /** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
@@ -408,10 +414,10 @@ export async function check(
 			opts,
 			shots,
 			views,
+			viewHashes: [],
 			stepNotes,
 		};
 		await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
-		let hashes: string[] = [];
 		for (const theme of themes) {
 			for (const [name, vp] of Object.entries(VIEWPORTS)) {
 				const narrow = name === "narrow";
@@ -427,9 +433,8 @@ export async function check(
 					],
 				});
 				const screen = { theme, name, vp };
-				const discovered = await shootOverview(run, screen);
-				hashes = theme === THEMES[0] && name === "desktop" ? discovered : hashes;
-				for (const hash of hashes) {
+				await shootOverview(run, screen);
+				for (const hash of run.viewHashes) {
 					await shootView(run, screen, hash);
 				}
 			}
