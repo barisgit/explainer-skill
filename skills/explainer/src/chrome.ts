@@ -167,6 +167,9 @@ async function start(
 			"--hide-scrollbars",
 			"--no-first-run",
 			"--disable-gpu",
+			// macOS: never touch the login keychain. Without this, Chrome asks for one on every
+			// launch and shows a modal dialog when HOME has none (e.g. the sandboxed verify:install).
+			"--use-mock-keychain",
 			...extra,
 			"about:blank",
 		],
