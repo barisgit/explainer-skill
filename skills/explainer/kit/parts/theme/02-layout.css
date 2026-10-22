@@ -1,5 +1,5 @@
 /* theme part: page shell, headings, figures and panels. */
-/* Page shell: masthead, then sections divided by hairlines. A section may start with <p class="label">, a plain caption. */
+/* Page shell: masthead, then sections divided by hairlines. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
@@ -89,18 +89,68 @@ h3 {
 .wide {
 	margin-inline: calc(50% - min(44rem, 50vw - var(--gutter)));
 }
+/* Band: the one stretch where the reader acts or decides, in the sunken tone from window edge to edge. The content keeps the column;
+   the shadow carries the tone sideways and the clip keeps it to the band's height, so nothing scrolls sideways. */
+.band {
+	--under: var(--sunken);
+	background: var(--sunken);
+	box-shadow: 0 0 0 100vmax var(--sunken);
+	clip-path: inset(0 -100vmax);
+}
+.page section.band {
+	padding-block: clamp(2rem, 5vw, 3.5rem);
+	border-block-start: 0;
+}
+/* Minor section (method, sources, assumptions): smaller type and, on wide screens, the heading in its own column, so it reads as
+   reference rather than as another finding. */
+.page section.minor {
+	margin-block: clamp(2rem, 5vw, 3rem);
+	font-size: 0.9375rem;
+}
+.minor > h2 {
+	margin-block-end: 0.75rem;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	line-height: 1.35;
+	letter-spacing: -0.01em;
+}
+@media (min-width: 56rem) {
+	.minor {
+		display: grid;
+		grid-template-columns: 13rem minmax(0, 1fr);
+		column-gap: 2.5rem;
+		align-items: start;
+	}
+	.minor > * {
+		grid-column: 2;
+	}
+	.minor > h2 {
+		grid-column: 1;
+		margin: 0;
+	}
+	.minor > h2 + * {
+		margin-block-start: 0;
+	}
+}
 
-/* Figure: one quiet panel holding a control row, readouts, the visual and a caption. */
+/* Figure: the visual and its caption, set straight on the page and aligned with the text. A figure the reader operates (an input,
+   select, tabs or a stepper inside), or one marked .panel, becomes a panel: the box says these controls act on this. --pad is the
+   inset of its children, --under the tone they sit on. */
 .fig {
+	--pad: 0px;
 	container-type: inline-size;
 	margin: 1.5rem 0;
+}
+.fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player)) {
+	--pad: var(--inset);
+	--under: var(--surface);
 	background: var(--surface);
 	border: 1px solid var(--rule);
 	border-radius: var(--radius);
 	overflow: hidden;
 }
 .fig > * {
-	padding-inline: var(--inset);
+	padding-inline: var(--pad);
 	margin: 0;
 	max-inline-size: none;
 }
@@ -139,6 +189,26 @@ h3 {
 .fig > figcaption:not(:last-child) {
 	border-block-end: 1px solid var(--rule);
 }
+/* Text beside its figure on wide screens, the figure taking two thirds; stacked on phones. Two children: the text, then the figure.
+   It follows the .fig rules so its margin reset wins over the figure's own. */
+.beside {
+	display: grid;
+	gap: 1rem 2.5rem;
+	align-items: start;
+	margin-block: 1.5rem;
+}
+.beside > * {
+	min-inline-size: 0;
+	margin-block: 0;
+}
+.beside > :first-child > :first-child {
+	margin-block-start: 0;
+}
+@media (min-width: 56rem) {
+	.beside {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+	}
+}
 .src {
 	display: block;
 	margin-top: 0.25rem;
@@ -156,5 +226,5 @@ h3 {
 	min-inline-size: 0;
 	margin: 0;
 	padding: 0.875rem var(--inset) 1rem;
-	background: var(--surface);
+	background: var(--under);
 }

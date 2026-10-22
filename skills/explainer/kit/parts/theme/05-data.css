@@ -10,7 +10,7 @@
 /* Element-qualified so older page overrides that zeroed the panel inset (.fig > .stats { padding: 0 }) no longer apply. */
 .fig > :is(dl, div, ul).stats {
 	margin: 0;
-	padding: 1rem var(--inset) 0.5rem;
+	padding: 1rem var(--pad) 0.5rem;
 }
 /* Caption and number share rows across the line (subgrid): when one caption wraps, the numbers still line up. */
 .stat {
@@ -148,10 +148,10 @@
 	border-block-end-color: var(--rule-strong);
 }
 .fig .compare :is(th, td):first-child {
-	padding-inline-start: var(--inset);
+	padding-inline-start: var(--pad);
 }
 .fig .compare :is(th, td):last-child {
-	padding-inline-end: var(--inset);
+	padding-inline-end: var(--pad);
 }
 .compare tbody tr:last-child > * {
 	border-block-end: 0;
@@ -260,10 +260,10 @@
 		border-inline-start: 3px solid transparent;
 	}
 	:where(.fig) :where(.compare:not(.table)) tr {
-		padding-inline: var(--inset);
+		padding-inline: var(--pad);
 	}
 	:where(.fig) :where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: calc(var(--inset) - 3px);
+		padding-inline-start: max(calc(var(--pad) - 3px), 0.75rem);
 	}
 	:where(.compare:not(.table)) tr[data-state="fit"] {
 		border-inline-start-color: var(--ok);

@@ -81,7 +81,7 @@
 	fill: var(--ink);
 	font-weight: 600;
 	paint-order: stroke;
-	stroke: var(--surface);
+	stroke: var(--under);
 	stroke-width: 3px;
 	stroke-linejoin: round;
 }
@@ -132,6 +132,10 @@
 }
 .fig > .mermaid {
 	margin: 0;
+}
+/* In a panel the diagram runs edge to edge; on the page it keeps its own frame. */
+.fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player))
+	> .mermaid {
 	border: 0;
 	border-radius: 0;
 }

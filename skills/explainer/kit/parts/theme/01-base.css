@@ -44,6 +44,8 @@
 	--gutter: clamp(1rem, 4vw, 2rem);
 	--inset: clamp(1rem, 2.5vw, 1.25rem);
 	--radius: 0.625rem;
+	/* The tone under the current block: --bg on the page, --surface in a panel, --sunken in a band. Halos and split cells use it. */
+	--under: var(--bg);
 	--ease: cubic-bezier(0.25, 1, 0.5, 1);
 }
 :root[data-scheme="light"] {

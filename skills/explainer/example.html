@@ -36,7 +36,6 @@
 		</figure>
 
 		<section>
-			<p class="label">A simulated week</p>
 			<h2 id="week-head"></h2>
 			<p>Same café, same average load every day. Customers arrive at random, and random arrivals clump: some days the clumps land on top of each other and never clear.</p>
 			<!-- kit:steps.js adds Back/Play/Next before the captions and fires stepchange; the chart redraws for the step's day. -->
@@ -62,7 +61,6 @@
 		</section>
 
 		<section>
-			<p class="label">The mechanism</p>
 			<h2>Why one clump of customers costs an hour</h2>
 			<!-- data-ref terms light the diagram node with the same Mermaid id (kit:link.js). -->
 			<p>A <span data-ref="clump">clump</span> leaves a <span data-ref="backlog">backlog</span>, and the barista works it off only in <span data-ref="spare">spare time</span>. At 90% busy that is one minute in ten, so the <span data-ref="stack">next clump</span> usually lands first.</p>
@@ -87,8 +85,8 @@ flowchart TD
 			</figure>
 		</section>
 
-		<section id="fixes-section">
-			<p class="label">Fixes</p>
+		<!-- The one band: the section where the reader compares fixes and answers. -->
+		<section class="band" id="fixes-section">
 			<h2>Which fix buys back the most time at 90% busy?</h2>
 			<figure class="fig">
 				<div class="controls">
