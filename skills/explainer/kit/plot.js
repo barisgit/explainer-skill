@@ -16,7 +16,9 @@
               Range and step are automatic and round; format(v) => text writes the tick labels and values (decimal comma, units).
        legend false hides the legend (by default it shows when two or more series have a name)
      set(patch)  shallow-merges the patch into the option (x and y one level deeper) and redraws at once; series is replaced whole.
-   Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar also has a title.
+   Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
+   A bar label sits past the bar's end, or inside the end when the panel has no room past it. A label on a stacked segment is left out
+   when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
    Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
@@ -103,6 +105,9 @@
 
 	function lineMark(s, i, { X, Y }) {
 		const pts = s.data.filter(finite).map(([x, y]) => `${px(X(x))},${px(Y(y))}`);
+		if (!pts.length) {
+			return "";
+		}
 		const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2}`;
 		return `<path class="line${s.dash ? " dash" : ""}" style="${style}" d="M${pts.join("L")}"/>`;
 	}
@@ -127,7 +132,7 @@
 	}
 
 	/** Layout shared by the bars of a plot: which axis holds the categories, the bar thickness, running stack ends. */
-	function barLayout(series, option, { xa, ya }) {
+	function barLayout(series, option, { xa, ya, W, L, B }) {
 		const horizontal = Boolean(option.horizontal);
 		const cat = horizontal ? ya : xa;
 		const thick = Math.min(cat.band * 0.62, 56);
@@ -139,6 +144,9 @@
 			thick,
 			each,
 			stacked: cat.names.map(() => 0),
+			// Where a label past a bar's end may still go: the panel's right edge, the plot's left edge, the top edge, the axis.
+			bounds: horizontal ? [L, W - 4] : [B, 0], // [for a negative value, for a positive one]
+			grow: horizontal ? 1 : -1, // screen direction of a positive value
 		};
 	}
 
@@ -154,21 +162,25 @@
 			: "";
 	}
 
-	/** A value label: past the end of a side-by-side bar, inside a stacked segment. */
-	function barLabel(t, bar, stack, textWidth) {
-		if (stack) {
-			return segmentLabel(t, bar, textWidth);
-		}
-		const { horizontal, end, mid, positive } = bar;
-		const away = positive ? 1 : -1;
+	/** Label of a side-by-side bar: past its end (`dir` is the screen direction it grows), or inside the end when the panel has no room past it. */
+	function endLabel(t, { horizontal, length, end, mid, dir, bound }, textWidth) {
+		const reach = horizontal ? textWidth(t) + 6 : FONT + 4;
+		const fitsInside = length >= reach + 6;
+		const inside = dir * (bound - end) < reach && fitsInside;
+		const at = inside ? -dir : dir;
+		const cls = inside ? "value inside" : "value";
 		return horizontal
-			? svgText("value", end + away * 6, mid, positive ? "start" : "end", t)
-			: svgText("value", mid, end - away * (FONT / 2 + 4), "middle", t);
+			? svgText(cls, end + at * 6, mid, at > 0 ? "start" : "end", t)
+			: svgText(cls, mid, end + at * (FONT / 2 + 4), "middle", t);
 	}
 
-	/** One bar (series j, category i) with its title and value label. */
-	function barMark(s, j, i, v, layout, option, textWidth) {
-		const { horizontal, cat, val, thick, each, stacked } = layout;
+	/** A value label: inside a stacked segment when it fits, else at the end of a side-by-side bar. */
+	const barLabel = (t, bar, stack, textWidth) =>
+		stack ? segmentLabel(t, bar, textWidth) : endLabel(t, bar, textWidth);
+
+	/** The rect (with its title) of bar series j, category i, and the geometry its label needs. */
+	function barRect(s, j, i, v, layout, option) {
+		const { horizontal, cat, val, thick, each, stacked, bounds, grow } = layout;
 		const from = option.stack ? stacked[i] : 0;
 		stacked[i] = from + v;
 		const a = val.at(from);
@@ -177,20 +189,27 @@
 		const length = Math.abs(b - a);
 		const offset = cat.at(i) - thick / 2 + (option.stack ? 0 : j * each);
 		const [x, y, w, h] = horizontal ? [start, offset, length, each] : [offset, start, each, length];
-		const name = s.name ? ` · ${s.name}` : "";
-		const title = `<title>${esc(`${cat.names[i]}${name}: ${val.format(v)}`)}</title>`;
-		const rect = `<rect class="bar" style="--c:${seriesColor(s, j)}" x="${px(x)}" y="${px(y)}" width="${px(w)}" height="${px(h)}">${title}</rect>`;
-		const format = s.label === true ? val.format : s.label;
-		const t = format?.(v);
-		const bar = {
-			horizontal,
-			start,
-			length,
-			end: b,
-			mid: offset + each / 2,
-			each,
-			positive: v > 0,
+		const title = `<title>${esc(`${cat.names[i]}${s.name ? ` · ${s.name}` : ""}: ${val.format(v)}`)}</title>`;
+		return {
+			rect: `<rect class="bar" style="--c:${seriesColor(s, j)}" x="${px(x)}" y="${px(y)}" width="${px(w)}" height="${px(h)}">${title}</rect>`,
+			bar: {
+				horizontal,
+				start,
+				length,
+				end: b,
+				mid: offset + each / 2,
+				each,
+				dir: v >= 0 ? grow : -grow,
+				bound: bounds[+(v >= 0)],
+			},
+			format: s.label === true ? val.format : s.label,
 		};
+	}
+
+	/** One bar with its title and, when the series asks for labels, its value label. */
+	function barMark(s, j, i, v, layout, option, textWidth) {
+		const { rect, bar, format } = barRect(s, j, i, v, layout, option);
+		const t = format?.(v);
 		return t ? rect + barLabel(t, bar, option.stack, textWidth) : rect;
 	}
 
@@ -202,9 +221,7 @@
 				ctx.shown[j]
 					? s.data
 							.map((v, i) =>
-								Number.isFinite(v) && v !== 0
-									? barMark(s, j, i, v, layout, option, ctx.textWidth)
-									: "",
+								Number.isFinite(v) ? barMark(s, j, i, v, layout, option, ctx.textWidth) : "",
 							)
 							.join("")
 					: "",
