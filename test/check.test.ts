@@ -67,3 +67,14 @@ test("check --do focus:<x,y> is a usage error, not a silent no-op", async () => 
 	expect(result.stderr).toContain("focus");
 	expect(result.stderr).toContain("click:<x,y>");
 }, 30_000);
+
+test("check warns about content cut off inside an overflow:hidden panel, but not about ellipsis truncation", async () => {
+	const body = `<div id="panel" style="width:100px;overflow:hidden"><div style="width:300px">wide content</div></div><p id="title" style="width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">a long title that is truncated on purpose</p>`;
+	const file = dir.write("clipped.html", page("").replace("</h1>", `</h1>${body}`));
+
+	const result = await checkQuick(file);
+
+	expect(result.code).toBe(0);
+	expect(result.stdout).toContain("div#panel has content cut off: 300px of content in 100px");
+	expect(result.stdout).not.toContain("p#title");
+}, 30_000);

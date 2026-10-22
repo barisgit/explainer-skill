@@ -22,7 +22,7 @@ export interface FirstScreen {
 /**
  * `view` is the hash of a drill-down view ("" for the overview); `first` describes the first viewport, taken before any step (overview only).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
- * a missing viewport meta, a diagram or chart taller than 1.5 viewports).
+ * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports).
  */
 export interface Shot {
 	theme: string;
@@ -78,7 +78,8 @@ const TALL_FIGURE = 1.5;
 /**
  * Runs in the page for the current viewport (`narrow`: the phone width). `culprits`: elements sticking out of the viewport that no scrolling
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
- * than their box and scrolls sideways. `warnings`: a missing viewport meta and SVG text rendered under 9 px (narrow only), diagrams and charts
+ * than their box and scrolls sideways. `warnings`: content cut off inside an overflow hidden/clip box (ellipsis truncation excepted),
+ * a missing viewport meta and SVG text rendered under 9 px (narrow only), diagrams and charts
  * (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players with a log) are tall by design and
  * are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to the screen.
  */
@@ -91,7 +92,9 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	const all = [...document.body.querySelectorAll("*")];
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
 	const inner = all.filter((el) => scrolls(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
-	const warnings = [];
+	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
+	const cut = all.filter((el) => hides(el) && shown(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
+	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
 	if (${narrow}) for (const svg of document.querySelectorAll("svg")) {
 		if (!shown(svg)) continue;
@@ -382,7 +385,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
  * the first viewport before any step, the full page after the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
  * Reports console/page errors, network requests, failed loads and page-level horizontal overflow (problems), and warnings
- * (console warnings, sideways-scrolling containers, tiny diagram text, a missing viewport meta, tall diagrams and charts). Reduced motion is emulated so animations are finished in the shots.
+ * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts). Reduced motion is emulated so animations are finished in the shots.
  */
 export async function check(
 	file: string,

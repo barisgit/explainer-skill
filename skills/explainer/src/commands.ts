@@ -130,7 +130,7 @@ export const COMMANDS: Record<string, Command> = {
 	},
 	check: {
 		summary:
-			"Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view, into a fresh temp directory (printed) unless --out says where. Reports first-screen info, errors, network requests and overflow as problems (exit 1), and console warnings, tiny diagram text, a missing viewport meta, over-tall diagrams and charts and sideways-scrolling containers as warnings.",
+			"Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view, into a fresh temp directory (printed) unless --out says where. Reports first-screen info, errors, network requests and overflow as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts and sideways-scrolling containers as warnings.",
 		usage:
 			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--quick] [--tag <name>] [--out dir] [--json]",
 		flags: [
