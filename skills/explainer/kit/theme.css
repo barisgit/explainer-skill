@@ -3,7 +3,7 @@
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
    To force one scheme instead of following the system: <html data-scheme="dark"> (or "light"); charts and diagrams follow it too.
-   Classes: page masthead eyebrow lede meta label cols wide | fig fig-visual stage bleed split chart mermaid scroll dg |
+   Classes: page masthead lede meta label cols wide | fig fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back.
    Panels: children of .fig are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge
    row of columns divided by hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
@@ -155,11 +155,6 @@ strong {
 }
 .masthead {
 	margin-block-end: clamp(2rem, 5vw, 3rem);
-}
-.eyebrow {
-	margin: 0 0 1rem;
-	font: 500 0.8125rem / 1.5 var(--mono);
-	color: var(--muted);
 }
 h1 {
 	margin: 0 0 1.25rem;
