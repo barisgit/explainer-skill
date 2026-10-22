@@ -386,3 +386,16 @@ test("every rule of an xychart's stylesheet applies inside that chart only", () 
 	expect(selectors.length).toBeGreaterThan(3);
 	expect(selectors.filter((s) => !/^#mm0\b/.test(s))).toEqual([]);
 });
+
+test.each([
+	{
+		type: "block-beta",
+		instead: "a flowchart with a subgraph per block group, or a CSS grid of boxes",
+	},
+	{
+		type: "radar-beta",
+		instead: "a flowchart for parts and links, or a chart with kit:charts.js for numbers",
+	},
+])("an unsupported $type says what to draw instead", ({ type, instead }) => {
+	expect(failureOf(`${type}\n  a`)).toEndWith(`; draw it as ${instead}`);
+});

@@ -46,16 +46,20 @@ const INSTEAD = new Map([
 	["packet-beta", "an HTML table with one column per bit range"],
 	["packet", "an HTML table with one column per bit range"],
 	["mindmap", "a flowchart LR or a nested list"],
+	["block-beta", "a flowchart with a subgraph per block group, or a CSS grid of boxes"],
+	["block", "a flowchart with a subgraph per block group, or a CSS grid of boxes"],
 ]);
+/** What to draw instead of a type INSTEAD does not name. */
+const INSTEAD_OTHERWISE =
+	"a flowchart for parts and links, or a chart with kit:charts.js for numbers";
 
 /** The family of the source's header keyword; throws, saying what to draw instead, for a type pack cannot draw. */
 function familyOf(body: string): Family {
 	const type = /^\S+/.exec(body)?.[0] ?? "";
 	const family = SUPPORTED.get(type);
 	if (!family) {
-		const instead = INSTEAD.get(type);
 		throw new Error(
-			`"${type}" diagrams are not supported (pack draws ${SUPPORTED_LIST})${instead ? `; draw it as ${instead}` : ""}`,
+			`"${type}" diagrams are not supported (pack draws ${SUPPORTED_LIST}); draw it as ${INSTEAD.get(type) ?? INSTEAD_OTHERWISE}`,
 		);
 	}
 	return family;
