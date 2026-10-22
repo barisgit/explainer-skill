@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
+import { findLoads, type Load } from "./loads.ts";
 import { renderMermaid } from "./mermaid.ts";
 import { themeSvgImages } from "./svg-theme.ts";
 
@@ -231,10 +232,37 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 		});
 }
 
+const DIAGRAM_COLOURS =
+	"a packed page loads nothing, so give style, classDef and linkStyle colours (fill:#e33) or kit tokens (fill:var(--accent))";
+
+/** A problem findLoads reports, as the author fixes it; one in a diagram points to the Mermaid style syntax. */
+function loadMessage({ origin, kind, target }: Load): string {
+	if (origin.block && kind !== "unreadable" && kind !== "entity") {
+		return `mermaid block ${origin.block}: the diagram references ${target}; ${DIAGRAM_COLOURS}`;
+	}
+	const remote = isRemote(target);
+	switch (kind) {
+		case "url":
+			return `remote url(${target}) in ${origin.label}`;
+		case "local":
+			return `url(${target}) in ${origin.label} is not inlined: write url() without CSS escapes so pack can inline it`;
+		case "import":
+			return `@import in ${origin.label}: put the CSS in a <link> or <style> instead`;
+		case "href":
+			return remote
+				? `remote ${origin.label}: ${target}`
+				: `${origin.label} loads ${target}: put what it points to in the page and point at its #id`;
+		case "entity":
+			return `${origin.label} uses the HTML entity ${target}, which pack does not read: write the character itself`;
+		case "unreadable":
+			return `pack cannot read the CSS in ${origin.label} (${target}), so it cannot tell what that CSS loads: fix the CSS`;
+	}
+}
+
 /**
  * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
  * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
- * (remote src/href/url(), srcset) and every diagram that fails to render. `warnings` lists links that go nowhere.
+ * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render. `warnings` lists links that go nowhere.
  */
 export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
 	const baseDir = dirname(resolve(inputPath));
@@ -244,10 +272,12 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	const source = await renderMermaidBlocks(original, problems, diagramRefs);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);
-	if (problems.length) {
-		const remote = problems.some((p) => !p.startsWith("mermaid block"));
+	// The inliner names the loads it sees as written; findLoads also finds the escaped ones, so the same load can come twice.
+	const all = [...new Set([...problems, ...(await findLoads(html)).map(loadMessage)])];
+	if (all.length) {
+		const remote = all.some((p) => !p.startsWith("mermaid block"));
 		throw new PackError(
-			`${problems.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and reference them relatively, or use kit: files." : ""}`,
+			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and reference them relatively, or use kit: files." : ""}`,
 		);
 	}
 	const warnings = loneRefs(original, diagramRefs).map(

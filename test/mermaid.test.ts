@@ -51,6 +51,11 @@ const remotePaints = [
 		line: "style a fill:\\75 rl(https://example.com/p.svg#g)",
 		url: "https://example.com/p.svg#g",
 	},
+	{
+		name: "a url escaped with a form feed",
+		line: "style a fill:\\75\frl(https://example.com/p.svg#g)",
+		url: "https://example.com/p.svg#g",
+	},
 ];
 
 test.each(remotePaints)(

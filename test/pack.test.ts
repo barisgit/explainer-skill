@@ -112,6 +112,33 @@ test("pack inlines a local url() in a style attribute", async () => {
 	expect(html).not.toContain("attr.gif");
 });
 
+test.each([
+	{
+		name: "a local url() written with CSS escapes",
+		markup: '<div style="background:\\75 rl(local.png)"></div>',
+		message:
+			"url(local.png) in a style attribute is not inlined: write url() without CSS escapes so pack can inline it",
+	},
+	{
+		name: "an HTML entity pack does not decode in an SVG paint",
+		markup: '<svg><rect fill="url&lpar;#p&rpar;"/></svg>',
+		message:
+			"<rect fill> uses the HTML entity &lpar;, which pack does not read: write the character itself",
+	},
+	{
+		name: "a stylesheet the CSS parser cannot read",
+		markup: "<style>}}} b { color: red; }</style>",
+		message: "pack cannot read the CSS in <style>",
+	},
+])("$name fails the pack, since it may load something", async ({ markup, message }) => {
+	const input = dir.write("hidden-load.html", page(markup));
+
+	const result = await runCli(["pack", input, "-o", dir.path("hidden-load.out.html")]);
+
+	expect(result.code).toBe(1);
+	expect(result.stderr).toContain(message);
+});
+
 describe("pack rejects network dependencies", () => {
 	const remote = {
 		script: [
@@ -129,6 +156,30 @@ describe("pack rejects network dependencies", () => {
 		"url() in a style attribute": [
 			'<div style="background:url(https://cdn.example.com/a.png)"></div>',
 			"remote url(https://cdn.example.com/a.png) in a style attribute",
+		],
+		"url() written with CSS escapes in a style": [
+			"<style>body { background: \\75\frl(https://cdn.example.com/e.png); }</style>",
+			"remote url(https://cdn.example.com/e.png) in <style>",
+		],
+		"url() written with CSS escapes in a style attribute": [
+			'<div style="background:\\75 rl(https://cdn.example.com/f.png)"></div>',
+			"remote url(https://cdn.example.com/f.png) in a style attribute",
+		],
+		"image-set() string in a style": [
+			'<style>b { background: image-set("https://cdn.example.com/h.png" 1x); }</style>',
+			"remote url(https://cdn.example.com/h.png) in <style>",
+		],
+		"@import written with CSS escapes": [
+			'<style>@\\69mport "https://cdn.example.com/x.css";</style>',
+			"@import in <style>: put the CSS in a <link> or <style> instead",
+		],
+		"paint attribute of an inline SVG, written with an HTML entity": [
+			'<svg><rect fill="u&#x72;l(https://cdn.example.com/g.svg#p)"/></svg>',
+			"remote url(https://cdn.example.com/g.svg#p) in <rect fill>",
+		],
+		"href of an inline SVG <use>": [
+			'<svg><use href="https://cdn.example.com/s.svg#i"/></svg>',
+			"remote <use href>: https://cdn.example.com/s.svg#i",
 		],
 		"srcset on an img": [
 			'<img srcset="https://cdn.example.com/a.png 1x, b.png 2x">',

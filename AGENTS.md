@@ -13,7 +13,7 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 skills/explainer/      the installable skill, copied as-is by installers: no dotfiles, tests or node_modules inside
   SKILL.md guide.md example.html
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
-  src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, kit.ts (kit file names, TypeScript to script), pack.ts, svg-theme.ts (svg files per colour scheme), check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
+  src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, kit.ts (kit file names, TypeScript to script), pack.ts, loads.ts (what a packed page would still load, read through Bun's CSS parser), svg-theme.ts (svg files per colour scheme), check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
   kit/                 what pages reference as kit:<file>: theme.css, charts, plot, steps, link, views and reply as .ts sources that pages name .js, echarts.js (generated), fonts/, licenses/
     parts/<name>/      pieces of a kit file too long for one file (a script, or theme.css by concern); pack puts them in front of kit/<name> in file name order, so a page still includes one file
   vendor/beautiful-mermaid.js  generated (beautiful-mermaid, patched, with ELK); used by pack to render diagrams in-process, never inlined; its .d.ts beside it

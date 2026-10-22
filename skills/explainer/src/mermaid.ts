@@ -203,52 +203,6 @@ function editMarkup(
 	});
 }
 
-/** A value as the browser's CSS parser reads it: entities, then CSS escapes (`\\75 rl(` is `url(`), decoded. */
-const cssValue = (value: string) =>
-	value
-		.replace(/&#x([\da-f]+);?/gi, (_, hex: string) =>
-			String.fromCodePoint(Number.parseInt(hex, 16)),
-		)
-		.replace(/&#(\d+);?/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
-		.replace(/&quot;/g, '"')
-		.replace(/&apos;|&#39;/g, "'")
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&amp;/g, "&")
-		.replace(/\\([\da-f]{1,6})[ \t\n]?/gi, (_, hex: string) =>
-			String.fromCodePoint(Number.parseInt(hex, 16)),
-		)
-		.replace(/\\(.)/g, "$1");
-
-/** References out of the diagram in a CSS value or stylesheet: url() and @import targets other than a `#` fragment of the page. */
-function cssReferences(text: string): string[] {
-	const value = cssValue(text);
-	return [
-		...[...value.matchAll(/url\(\s*(['"]?)([^'")\s]*)/gi)].map((m) => m[2] ?? ""),
-		...[...value.matchAll(/@import\s+(['"]?)([^'";\s]*)/gi)].map((m) => m[2] || "@import"),
-	].filter((target) => !target.startsWith("#"));
-}
-
-/**
- * Everything in the rendered SVG that points outside the page: a style, classDef or linkStyle value lands in fill and stroke
- * attributes as written, and a remote url() there is a network request the packed page must not make.
- */
-function externalReferences(svg: string): string[] {
-	const found: string[] = [];
-	editMarkup(svg, {
-		attribute(name, value) {
-			const href = /^(?:xlink:)?href$|^src$/i.test(name) && !value.startsWith("#");
-			found.push(...(href ? [value] : []), ...cssReferences(value));
-			return value;
-		},
-		css(text) {
-			found.push(...cssReferences(text));
-			return text;
-		},
-	});
-	return [...new Set(found)];
-}
-
 /** `url(#x)` pointing at the diagram's own `x`, whose id inline() prefixed. */
 const localUrls = (value: string, id: string) =>
 	value.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`);
@@ -302,12 +256,6 @@ function renderOne(source: string, n: number): Diagram {
 	const text = family === "flowchart" || family === "state" ? statements : body;
 	const raw = renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist" });
 	const svg = annotateParts(inline(raw, `mm${n}`));
-	const remote = externalReferences(svg);
-	if (remote.length) {
-		throw new Error(
-			`the diagram references ${remote.join(", ")}; a packed page loads nothing, so give style, classDef and linkStyle colours (fill:#e33) or kit tokens (fill:var(--accent))`,
-		);
-	}
 	return { svg, refs: [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? "") };
 }
 
