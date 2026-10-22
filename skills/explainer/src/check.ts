@@ -53,6 +53,25 @@ export interface CheckResult {
 	stepNotes: string[];
 }
 
+/**
+ * The distinct `kit:` references in page source: they only resolve after `pack`, so a page that has them is not ready to check.
+ * Parsed as HTML, so a `"kit:..."` inside a script's text or an escaped code sample is not mistaken for an unpacked page.
+ */
+export async function kitReferences(html: string): Promise<string[]> {
+	const refs = new Set<string>();
+	const collect = (attr: string) => ({
+		element(el: { getAttribute(name: string): string | null }) {
+			refs.add(el.getAttribute(attr) ?? "");
+		},
+	});
+	await new HTMLRewriter()
+		.on('[href^="kit:"]', collect("href"))
+		.on('[src^="kit:"]', collect("src"))
+		.transform(new Response(html))
+		.text();
+	return [...refs];
+}
+
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
 

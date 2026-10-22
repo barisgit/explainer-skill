@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { check } from "./check.ts";
+import { check, kitReferences } from "./check.ts";
 import { PackError, pack } from "./pack.ts";
 import { report } from "./report.ts";
 import { stepError } from "./steps.ts";
@@ -154,6 +154,12 @@ export const COMMANDS: Record<string, Command> = {
 		run: async ([file], flags) => {
 			if (!file || !existsSync(file)) {
 				return usage(`check needs an existing file. Example: check artifact.html`);
+			}
+			const unpacked = await kitReferences(readFileSync(file, "utf8"));
+			if (unpacked.length) {
+				return usage(
+					`${file} still references ${unpacked.join(", ")}: check opens packed files. Run: pack ${file} -o artifact.html, then check artifact.html`,
+				);
 			}
 			const steps = flags.get("--do") ?? [];
 			const bad = steps.map(stepError).find(Boolean);

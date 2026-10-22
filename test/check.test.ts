@@ -44,3 +44,16 @@ test("check names a first screen that is a list of in-page links, and keeps the 
 	expect(map?.stdout).not.toContain("no figure in view");
 	expect(plain?.stdout).toContain("no figure in view");
 }, 60_000);
+
+test("check on a page that still has kit: references says to run pack first (exit 2)", async () => {
+	const file = dir.write(
+		"unpacked.html",
+		`<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><h1>Unpacked</h1></body></html>`,
+	);
+
+	const result = await runCli(["check", file, "--quick", "--out", dir.path("unpacked")]);
+
+	expect(result.code).toBe(2);
+	expect(result.stderr).toContain("kit:theme.css");
+	expect(result.stderr).toContain("pack");
+}, 30_000);
