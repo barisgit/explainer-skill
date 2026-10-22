@@ -1,6 +1,6 @@
 # Explainer
 
-An agent skill that turns "show me" into one interactive HTML page: charts to explore, diagrams to step through, drill-down views, and questions the reader answers on the page. The page is a single file that works offline from `file://`, in light and dark, on desktop and phone.
+An agent skill that turns "show me" into one interactive HTML page: charts to explore, step-through explanations, diagrams that light up from the text, drill-down views, and questions the reader answers on the page. The page is a single file that works offline from `file://`, in light and dark, on desktop and phone.
 
 <a href="https://barisgit.github.io/explainer-skill/">
 <picture>
@@ -35,7 +35,7 @@ Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/
 
 Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name. `bun ~/.claude/skills/explainer/cli.ts kit` checks an installed copy.
 
-**Requirements:** [Bun](https://bun.sh) (verified with 1.4.3), and Google Chrome or Chromium for `check` and for rendering Mermaid during `pack` (`CHROME=/path/to/chrome` if it is not found; a build downloaded by agent-browser or Playwright also works). Nothing else is installed: the skill runs as copied.
+**Requirements:** [Bun](https://bun.sh) (verified with 1.4.3), and Google Chrome or Chromium for `check` (`CHROME=/path/to/chrome` if it is not found; a build downloaded by agent-browser or Playwright also works). Nothing else is installed: the skill runs as copied.
 
 <details>
 <summary>Update and uninstall</summary>
@@ -58,7 +58,7 @@ caplet remove explainer --scope user && caplet apply --scope user
 The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, run as `bun <skill directory>/cli.ts`:
 
 1. **Write** `page.html`: plain HTML that references kit files with a `kit:` prefix and adds behaviour through attributes. `kit` lists what is available and `kit <file>` documents one file.
-2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams in light and dark, so the result is one offline file.
+2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams to SVG in-process (one per diagram, following light and dark), so the result is one offline file.
 3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
 
 A diagram whose parts light up from the text, for illustration:
@@ -87,7 +87,7 @@ A diagram whose parts light up from the text, for illustration:
   <img alt="Fourier series page: dragging the terms slider sharpens the partial sum of a square wave" src="examples/media/fourier-series-terms-light.webp">
 </picture>
 
-**Step-through figures.** Back, Play, Next, a scrubber and arrow keys from a few attributes; Mermaid diagrams, SVG parts and captions step together.
+**Step-through figures.** Back, Play, Next, a scrubber and arrow keys from a few attributes; HTML, hand-built SVG parts and captions step together.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/dijkstra-steps-dark.webp">
@@ -108,7 +108,7 @@ A diagram whose parts light up from the text, for illustration:
   <img alt="Password hashing page: deployment presets change the recommended OWASP setting, down to nothing fits" src="examples/media/password-hashing-presets-light.webp">
 </picture>
 
-Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time, linked highlighting between prose, table rows and diagram parts, and a stylesheet that follows the system's light or dark setting.
+Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time (flowchart, state, sequence, class, ER and xychart), linked highlighting between prose, table rows and diagram parts, and a stylesheet that follows the system's light or dark setting.
 
 [`skills/explainer/example.html`](skills/explainer/example.html) is one short page that uses each feature where it helps its subject.
 
@@ -126,7 +126,8 @@ Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are pub
 ## Credits
 
 - [visual-explainer](https://github.com/nicobailon/visual-explainer) by Nico Bailon (MIT): the look and the reply flow.
-- [Apache ECharts](https://echarts.apache.org) (Apache-2.0) and [Mermaid](https://mermaid.js.org) (MIT), bundled in the kit.
+- [Apache ECharts](https://echarts.apache.org) (Apache-2.0), bundled in the kit.
+- [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) by Craft Docs (MIT), patched, with [ELK](https://github.com/kieler/elkjs) (EPL-2.0) and [entities](https://github.com/fb55/entities) (BSD-2-Clause): the Mermaid renderer `pack` uses, not shipped in pages.
 - [Geist and Geist Mono](https://vercel.com/font) by Vercel (SIL OFL 1.1).
 
 Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data).
