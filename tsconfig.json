@@ -5,5 +5,5 @@
 		"noUncheckedIndexedAccess": true, "noImplicitOverride": true, "skipLibCheck": true,
 		"types": ["bun"]
 	},
-	"include": ["cli.ts", "src", "build"]
+	"include": ["skills/explainer/cli.ts", "skills/explainer/src", "build"]
 }
