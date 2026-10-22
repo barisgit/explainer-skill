@@ -144,3 +144,18 @@ test("check does not warn about a data table that scrolls sideways, but does abo
 	expect(result.stdout).toContain("scrolls sideways: div#strip");
 	expect(result.stdout).not.toContain("div#grid");
 }, 30_000);
+
+test("check starts every load with empty page storage, so one shot's state never reaches the next", async () => {
+	const file = dir.write(
+		"storage.html",
+		page(
+			`localStorage.visits = Number(localStorage.visits ?? 0) + 1;
+setTimeout(() => { if (localStorage.visits !== "1") throw new Error("storage leaked: visit " + localStorage.visits); }, 300);`,
+		),
+	);
+
+	const result = await runCli(["check", file, "--view", "none", "--out", dir.path("storage")]);
+
+	expect(result.stdout).not.toContain("storage leaked");
+	expect(result.code).toBe(0);
+}, 60_000);
