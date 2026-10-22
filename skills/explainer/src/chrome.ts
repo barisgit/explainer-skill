@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const { CHROME } = process.env;
 const CHROME_PATHS = [
-	process.env.CHROME,
+	CHROME,
 	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 	"/opt/homebrew/bin/chromium",
 	"/usr/bin/google-chrome",
@@ -12,21 +13,48 @@ const CHROME_PATHS = [
 	"/usr/bin/chromium-browser",
 ];
 
+/** Details of a script exception as the DevTools Protocol reports it. */
+interface ExceptionDetails {
+	text: string;
+	exception?: { description?: string };
+}
+
+/** A console argument as `Runtime.consoleAPICalled` reports it. */
+interface ConsoleArg {
+	value?: unknown;
+	description?: string;
+}
+
+/** The DevTools events the tool listens for, with the parts of their parameters it reads. */
+export interface CdpEvents {
+	"Runtime.exceptionThrown": { exceptionDetails: ExceptionDetails };
+	"Runtime.consoleAPICalled": { type: string; args: ConsoleArg[] };
+	"Log.entryAdded": { entry: { level: string; source: string; text: string; url?: string } };
+	"Network.requestWillBeSent": { request: { url: string } };
+	"Network.loadingFailed": { errorText: string; canceled?: boolean };
+	"Page.loadEventFired": object;
+}
+
+type Reply = { result?: unknown; error?: { message: string } };
+type Message = Reply & { id?: number; method?: keyof CdpEvents; params?: unknown };
+
 /** Minimal Chrome DevTools Protocol client: request/response plus event subscription. */
 export class Cdp {
 	private id = 0;
-	private pending = new Map<
-		number,
-		(r: { result?: unknown; error?: { message: string } }) => void
-	>();
-	private listeners: Array<(method: string, params: any) => void> = [];
+	private readonly pending = new Map<number, (r: Reply) => void>();
+	private readonly listeners = new Map<string, Array<(params: never) => void>>();
 	private readonly ws: WebSocket;
 	private constructor(ws: WebSocket) {
 		this.ws = ws;
 		ws.onmessage = (m) => {
-			const msg = JSON.parse(String(m.data));
-			if (msg.id) this.pending.get(msg.id)?.(msg);
-			else for (const l of this.listeners) l(msg.method, msg.params);
+			const msg = JSON.parse(String(m.data)) as Message;
+			if (msg.id) {
+				this.pending.get(msg.id)?.(msg);
+			} else if (msg.method) {
+				for (const listener of this.listeners.get(msg.method) ?? []) {
+					listener(msg.params as never);
+				}
+			}
 		};
 	}
 	static async connect(url: string): Promise<Cdp> {
@@ -37,7 +65,8 @@ export class Cdp {
 		});
 		return new Cdp(ws);
 	}
-	send<T = any>(method: string, params: object = {}): Promise<T> {
+	/** Sends a command; `T` is the caller's description of the reply, which the protocol does not let us check. */
+	send<T = unknown>(method: string, params: object = {}): Promise<T> {
 		const id = ++this.id;
 		return new Promise((ok, fail) => {
 			this.pending.set(id, (r) =>
@@ -46,11 +75,22 @@ export class Cdp {
 			this.ws.send(JSON.stringify({ id, method, params }));
 		});
 	}
-	on(fn: (method: string, params: any) => void) {
-		this.listeners.push(fn);
+	/** Evaluates `expression` in the page and returns its JSON value; throws with the page's error when the script throws. */
+	async evaluate<T>(expression: string, awaitPromise = false): Promise<T> {
+		const { result, exceptionDetails } = await this.send<{
+			result: { value: T };
+			exceptionDetails?: ExceptionDetails;
+		}>("Runtime.evaluate", { expression, returnByValue: true, awaitPromise });
+		if (exceptionDetails) {
+			throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
+		}
+		return result.value;
 	}
-	once(event: string): Promise<void> {
-		return new Promise((ok) => this.on((m) => m === event && ok()));
+	on<E extends keyof CdpEvents>(event: E, fn: (params: CdpEvents[E]) => void) {
+		this.listeners.set(event, [...(this.listeners.get(event) ?? []), fn]);
+	}
+	once(event: keyof CdpEvents): Promise<void> {
+		return new Promise((ok) => this.on(event, () => ok()));
 	}
 	close() {
 		this.ws.close();
@@ -60,7 +100,9 @@ export class Cdp {
 /** Starts headless Chrome and resolves with its DevTools HTTP port. */
 export async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
-	if (!bin) throw new Error("no Chrome found: set CHROME=/path/to/chrome");
+	if (!bin) {
+		throw new Error("no Chrome found: set CHROME=/path/to/chrome");
+	}
 	const proc = spawn(
 		bin,
 		[
@@ -79,7 +121,9 @@ export async function launch(profile: string): Promise<{ port: number; stop: () 
 		proc.stderr.on("data", (d) => {
 			log += d;
 			const m = log.match(/DevTools listening on ws:\/\/[^:]+:(\d+)/);
-			if (m) ok(Number(m[1]));
+			if (m) {
+				ok(Number(m[1]));
+			}
 		});
 		proc.on("exit", () => fail(new Error(`Chrome exited early:\n${log.slice(-400)}`)));
 	});
@@ -91,10 +135,14 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
 	const chrome = await launch(profile);
 	try {
-		const target = await fetch(`http://127.0.0.1:${chrome.port}/json/list`).then(
-			(r) => r.json() as Promise<any[]>,
+		const targets = await fetch(`http://127.0.0.1:${chrome.port}/json/list`).then(
+			(r) => r.json() as Promise<Array<{ type: string; webSocketDebuggerUrl: string }>>,
 		);
-		const cdp = await Cdp.connect(target.find((t) => t.type === "page").webSocketDebuggerUrl);
+		const page = targets.find((t) => t.type === "page");
+		if (!page) {
+			throw new Error("Chrome opened no page to drive");
+		}
+		const cdp = await Cdp.connect(page.webSocketDebuggerUrl);
 		try {
 			return await fn(cdp);
 		} finally {

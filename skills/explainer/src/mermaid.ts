@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Cdp } from "./chrome.ts";
 import { withPage } from "./chrome.ts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -71,6 +72,30 @@ const RENDER_JS = `(async (sources, theme) => {
 	return out;
 })`;
 
+interface Rendered {
+	svg?: string;
+	error?: string;
+}
+
+/** Renders every source in the page under the emulated colour scheme; one entry per source. */
+async function renderTheme(
+	cdp: Cdp,
+	sources: string[],
+	theme: (typeof THEMES)[number],
+): Promise<Rendered[]> {
+	await cdp.send("Emulation.setEmulatedMedia", {
+		features: [{ name: "prefers-color-scheme", value: theme }],
+	});
+	try {
+		return await cdp.evaluate<Rendered[]>(
+			`${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`,
+			true,
+		);
+	} catch (e) {
+		throw new Error(`mermaid render failed: ${e instanceof Error ? e.message : String(e)}`);
+	}
+}
+
 /**
  * Renders each Mermaid source to SVG once per colour scheme, in headless Chrome with the kit's fonts and tokens.
  * Returns one `{ light, dark }` pair per source; a source that fails to parse is reported as an Error in its slot.
@@ -94,30 +119,14 @@ export async function renderMermaid(
 			await cdp.send("Page.enable");
 			await cdp.send("Page.navigate", { url: `file://${page}` });
 			await loaded;
-			const rendered = {} as Record<
-				(typeof THEMES)[number],
-				Array<{ svg?: string; error?: string }>
-			>;
-			for (const theme of THEMES) {
-				await cdp.send("Emulation.setEmulatedMedia", {
-					features: [{ name: "prefers-color-scheme", value: theme }],
-				});
-				const { result, exceptionDetails } = await cdp.send("Runtime.evaluate", {
-					expression: `${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`,
-					awaitPromise: true,
-					returnByValue: true,
-				});
-				if (exceptionDetails)
-					throw new Error(
-						`mermaid render failed: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`,
-					);
-				rendered[theme] = result.value;
-			}
+			const light = await renderTheme(cdp, sources, "light");
+			const dark = await renderTheme(cdp, sources, "dark");
 			return sources.map((_, i) => {
-				const [light, dark] = [rendered.light[i]!, rendered.dark[i]!];
-				if (light.error || dark.error || !light.svg || !dark.svg)
-					return new Error(light.error ?? dark.error ?? "no SVG produced");
-				return { light: light.svg, dark: dark.svg };
+				const [l, d] = [light[i], dark[i]];
+				if (!l?.svg || !d?.svg) {
+					return new Error(l?.error ?? d?.error ?? "no SVG produced");
+				}
+				return { light: l.svg, dark: d.svg };
 			});
 		});
 	} finally {

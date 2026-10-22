@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp } from "./chrome.ts";
 import { withPage } from "./chrome.ts";
+import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
 	desktop: { width: 1440, height: 900 },
@@ -24,7 +25,7 @@ export interface Shot {
 	viewport: string;
 	view: string;
 	png: string;
-	first?: FirstScreen;
+	first?: FirstScreen | undefined;
 	problems: string[];
 	warnings: string[];
 }
@@ -98,140 +99,6 @@ const FIRST_SCREEN_JS = `(() => {
 	return { headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map((el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")) };
 })()`;
 
-/** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
-const KEYS: Record<string, [number, string]> = {
-	ArrowLeft: [37, "ArrowLeft"],
-	ArrowUp: [38, "ArrowUp"],
-	ArrowRight: [39, "ArrowRight"],
-	ArrowDown: [40, "ArrowDown"],
-	Enter: [13, "Enter"],
-	Space: [32, "Space"],
-	Escape: [27, "Escape"],
-	Tab: [9, "Tab"],
-	Home: [36, "Home"],
-	End: [35, "End"],
-};
-const STEP = /^(click|key|hover|focus):(.+)$/;
-const POINT = /^(\d+),(\d+)$/;
-const NTH = /@(all|\d+)$/;
-const SETTLE_MS = 150;
-
-/** Returns why a `--do` step is malformed, or "" when it parses. */
-export function stepError(step: string): string {
-	const m = STEP.exec(step);
-	if (!m)
-		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, key:<Key>, focus:<css> or hover:<css | x,y>`;
-	if (m[1] === "key" && m[2]!.length > 1 && !KEYS[m[2]!])
-		return `unknown key "${m[2]}" (use ${Object.keys(KEYS).join(", ")} or one character)`;
-	return "";
-}
-
-/** Unquoted attribute values are not valid CSS when they start with a digit: `[value=0]` becomes `[value="0"]`. */
-const quoteAttrValues = (css: string) =>
-	css.replace(/\[\s*([\w:-]+)\s*([~|^$*]?=)\s*([^\]"'\s][^\]"']*?)\s*\]/g, '[$1$2"$3"]');
-
-type Found = { count: number } | { error: string };
-
-/** Runs in the page: how many elements match, or why the selector is invalid. */
-async function countMatches(cdp: Cdp, selector: string): Promise<Found> {
-	const r = await cdp.send("Runtime.evaluate", {
-		expression: `(() => { try { return { count: document.querySelectorAll(${JSON.stringify(selector)}).length }; } catch (e) { return { error: String(e.message) }; } })()`,
-		returnByValue: true,
-	});
-	return r.result.value;
-}
-
-/** Page coordinates of a hover/click target: literal `x,y`, or the centre of the `index`-th matching element scrolled into view (null if none). */
-async function pointOf(cdp: Cdp, arg: string, index = 0): Promise<{ x: number; y: number } | null> {
-	const xy = POINT.exec(arg);
-	if (xy) return { x: Number(xy[1]), y: Number(xy[2]) };
-	const r = await cdp.send("Runtime.evaluate", {
-		expression: `(() => { const el = document.querySelectorAll(${JSON.stringify(arg)})[${index}]; if (!el) return null; el.scrollIntoView({ block: "center" }); const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`,
-		returnByValue: true,
-	});
-	return r.result.value;
-}
-
-/** Runs the same expression on the `index`-th match, so every click of an `@all` sequence sees the DOM the previous click left behind. */
-const onNth = (cdp: Cdp, selector: string, index: number, body: string) =>
-	cdp.send("Runtime.evaluate", {
-		expression: `(() => { const el = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; if (!el) return false; ${body}; return true; })()`,
-		returnByValue: true,
-	});
-
-/** What a step reported: a `problem` fails the check, a `note` just says what happened (how many elements an `@all` click hit). */
-interface StepResult {
-	problem?: string;
-	note?: string;
-}
-
-/**
- * Runs one step in the page. Selectors may end in `@all` (every match, re-queried before each click, with a pause after each so handlers
- * that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used.
- */
-async function runStep(
-	cdp: Cdp,
-	step: string,
-	settle: (ms: number) => Promise<unknown>,
-): Promise<StepResult> {
-	const [, kind, raw] = STEP.exec(step)!;
-	if (kind === "key") {
-		const [vk, code] = KEYS[raw!] ?? [raw!.toUpperCase().charCodeAt(0), `Key${raw!.toUpperCase()}`];
-		const key = raw === "Space" ? " " : raw!;
-		const text = key.length === 1 ? key : raw === "Enter" ? "\r" : undefined;
-		for (const type of ["keyDown", "keyUp"])
-			await cdp.send("Input.dispatchKeyEvent", {
-				type,
-				key,
-				code,
-				windowsVirtualKeyCode: vk,
-				text: type === "keyDown" ? text : undefined,
-			});
-		return {};
-	}
-	const isPoint = POINT.test(raw!);
-	const nth = isPoint ? undefined : NTH.exec(raw!)?.[1];
-	const selector = isPoint ? raw! : quoteAttrValues(raw!.replace(NTH, ""));
-	let indices = [Number(nth ?? 0)];
-	if (!isPoint) {
-		const found = await countMatches(cdp, selector);
-		if ("error" in found)
-			return {
-				problem: `${step}: invalid CSS selector (${found.error}). Quote attribute values: [value="0"]`,
-			};
-		if (nth === "all") indices = Array.from({ length: found.count }, (_, i) => i);
-		if (!found.count || indices.some((i) => i >= found.count))
-			return {
-				problem: `${step}: ${found.count ? `only ${found.count} element(s) match` : "no element matches"} ${selector}`,
-			};
-	}
-	if (kind === "focus") {
-		await onNth(cdp, selector, indices[0]!, "el.focus()");
-		return {};
-	}
-	if (kind === "click" && !isPoint) {
-		// DOM click: the handler runs whatever overlaps the element, and the element is focused first so key: steps reach it.
-		for (const i of indices) {
-			await onNth(
-				cdp,
-				selector,
-				i,
-				"el.scrollIntoView({ block: 'center' }); el.focus?.({ preventScroll: true }); el.click()",
-			);
-			if (indices.length > 1) await settle(SETTLE_MS);
-		}
-		return nth === "all" ? { note: `${step}: clicked ${indices.length}` } : {};
-	}
-	// Real mouse events, so :hover styles and pointer handlers (chart tips, marks) fire; click:x,y presses and releases there.
-	const point = await pointOf(cdp, selector, indices[0]);
-	if (!point) return { problem: `${step}: no element matches ${selector}` };
-	await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
-	if (kind === "click")
-		for (const type of ["mousePressed", "mouseReleased"])
-			await cdp.send("Input.dispatchMouseEvent", { type, ...point, button: "left", clickCount: 1 });
-	return {};
-}
-
 /** Runs in the page: every drill-down hash the page links to ("#repo/mobile") or declares (static views, data-view="a/b"), in document order; view templates nothing links to. */
 const DISCOVER_JS = `(() => {
 	const names = new Set([...document.querySelectorAll("[data-view]")].map((v) => v.dataset.view));
@@ -246,7 +113,7 @@ const DISCOVER_JS = `(() => {
 const MAX_DISCOVERED = 6;
 
 /** The view a hash belongs to: "#repo/mobile" is a link into the view "repo". */
-const viewName = (hash: string) => hash.slice(1).split("/")[0]!;
+const viewName = (hash: string) => hash.slice(1).split("/")[0] ?? "";
 
 /**
  * Which views to capture from the `--view` values: none given = the first hash of each view (at most 6 views), `all` = every hash found,
@@ -259,14 +126,226 @@ function chooseViews(
 	const hashes = requested
 		.filter((v) => v !== "all" && v !== "none")
 		.map((v) => (v.startsWith("#") ? v : `#${v}`));
-	if (requested.includes("none")) return { capture: [], skipped: found };
-	if (requested.includes("all"))
+	if (requested.includes("none")) {
+		return { capture: [], skipped: found };
+	}
+	if (requested.includes("all")) {
 		return { capture: [...new Set([...hashes, ...found])], skipped: [] };
-	if (hashes.length) return { capture: hashes, skipped: found.filter((f) => !hashes.includes(f)) };
+	}
+	if (hashes.length) {
+		return { capture: hashes, skipped: found.filter((f) => !hashes.includes(f)) };
+	}
 	const firsts = found
 		.filter((h, i) => found.findIndex((o) => viewName(o) === viewName(h)) === i)
 		.slice(0, MAX_DISCOVERED);
 	return { capture: firsts, skipped: found.filter((h) => !firsts.includes(h)) };
+}
+
+/** Collects what the page reports while it loads and runs: problems fail the check, warnings are only listed. */
+class PageLog {
+	problems: string[] = [];
+	warnings: string[] = [];
+
+	constructor(cdp: Cdp) {
+		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) => {
+			const message = `page error: ${d.exception?.description ?? d.text}`;
+			this.problems.push(message.split("\n")[0] ?? message);
+		});
+		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => this.onConsole(type, consoleText(args)));
+		cdp.on("Log.entryAdded", ({ entry }) => {
+			if (entry.level === "warning" && entry.source !== "console-api") {
+				this.warnings.push(shorten(`${entry.source} warning: ${entry.text}`));
+			}
+			if (entry.level === "error") {
+				this.problems.push(`${entry.source}: ${entry.text} ${entry.url ?? ""}`);
+			}
+		});
+		cdp.on("Network.requestWillBeSent", ({ request }) => {
+			if (/^(https?|wss?|ftp):/.test(request.url)) {
+				this.problems.push(`network request: ${request.url}`);
+			}
+		});
+		cdp.on("Network.loadingFailed", ({ canceled, errorText }) => {
+			if (!canceled) {
+				this.problems.push(`failed load: ${errorText}`);
+			}
+		});
+	}
+
+	/** Forgets everything reported so far, before the next page load. */
+	reset() {
+		this.problems = [];
+		this.warnings = [];
+	}
+
+	private onConsole(type: string, text: string) {
+		if (type === "error") {
+			this.problems.push(`console.error: ${text}`);
+		}
+		// ECharts reports its own warnings (bad option, missing component) with console.log, so its prefix counts as a warning too.
+		if (type === "warning" || /^\[ECharts\]/.test(text)) {
+			const hint = /grid\.containLabel/.test(text)
+				? " [kit: delete containLabel; charts.js already keeps axis labels inside the grid margins]"
+				: "";
+			this.warnings.push(shorten(`console.${type}: ${text}`) + hint);
+		}
+	}
+}
+
+const consoleText = (args: Array<{ value?: unknown; description?: string }>) =>
+	args.map((a) => a.value ?? a.description ?? "").join(" ");
+const shorten = (text: string) => (text.length > 220 ? `${text.slice(0, 217)}...` : text);
+const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+/** Everything one check run shares: the page, its log, where files go, and what has been collected. */
+interface Run {
+	cdp: Cdp;
+	log: PageLog;
+	url: string;
+	outDir: string;
+	stem: string;
+	opts: CheckOptions;
+	shots: Shot[];
+	views: ViewReport;
+	stepNotes: Set<string>;
+}
+
+/** Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. */
+async function open(run: Run, hash: string) {
+	const { cdp } = run;
+	await cdp.send("Page.navigate", { url: "about:blank" });
+	const loaded = cdp.once("Page.loadEventFired");
+	await cdp.send("Page.navigate", { url: run.url + hash });
+	await loaded;
+	await settle(400);
+}
+
+interface Screen {
+	theme: string;
+	name: string;
+	vp: { width: number; height: number };
+}
+
+/** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
+async function capture(run: Run, png: string, screen: Screen): Promise<string[]> {
+	const { cdp, log } = run;
+	const narrow = screen.name === "narrow";
+	const page = await cdp.evaluate<{
+		overflow: boolean;
+		culprits: string[];
+		scrolls: string[];
+		warnings: string[];
+	}>(PAGE_JS(narrow));
+	if (page.overflow) {
+		log.problems.push(
+			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
+		);
+	}
+	const { contentSize } = await cdp.send<{ contentSize: { height: number } }>(
+		"Page.getLayoutMetrics",
+	);
+	const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
+		format: "png",
+		captureBeyondViewport: true,
+		clip: { x: 0, y: 0, width: screen.vp.width, height: Math.ceil(contentSize.height), scale: 1 },
+	});
+	writeFileSync(png, Buffer.from(data, "base64"));
+	return [
+		...page.warnings,
+		...page.scrolls.map((s) => `scrolls sideways: ${s}`),
+		...new Set(log.warnings),
+	];
+}
+
+/** The first viewport before any step: PNG, headline and the figures in view. */
+async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScreen> {
+	const png = join(run.outDir, `${run.stem}-first-${theme}-${name}.png`);
+	const { data } = await run.cdp.send<{ data: string }>("Page.captureScreenshot", {
+		format: "png",
+	});
+	writeFileSync(png, Buffer.from(data, "base64"));
+	return {
+		png,
+		...(await run.cdp.evaluate<{ headline: string; figures: string[] }>(FIRST_SCREEN_JS)),
+	};
+}
+
+/** Finds the drill-down hashes on the freshly loaded overview, records them in the report and returns those to capture. */
+async function discoverViews(run: Run): Promise<string[]> {
+	const found = await run.cdp.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
+	const chosen = chooseViews(run.opts.views, found.hashes);
+	run.views.found = found.hashes;
+	run.views.uncaptured = chosen.skipped;
+	run.views.templates = found.templates;
+	return chosen.capture;
+}
+
+/** Runs the `--do` steps in order, recording their problems and notes. */
+async function runSteps(run: Run) {
+	for (const step of run.opts.steps) {
+		const result = await runStep(run.cdp, step, settle);
+		if (result.problem) {
+			run.log.problems.push(`--do ${result.problem}`);
+		}
+		if (result.note) {
+			run.stepNotes.add(result.note);
+		}
+		await settle(200);
+	}
+}
+
+/** The overview page for one theme and viewport: first screen, view discovery, `--do` steps, full-page shot. */
+async function shootOverview(run: Run, screen: Screen): Promise<string[]> {
+	const { theme, name, vp } = screen;
+	const { opts } = run;
+	run.log.reset();
+	await open(run, "");
+	const first = opts.quick ? undefined : await firstScreen(run, screen);
+	const hashes = theme === THEMES[0] && name === "desktop" ? await discoverViews(run) : [];
+	await runSteps(run);
+	const png = join(
+		run.outDir,
+		opts.quick
+			? `${opts.tag ? `${opts.tag}-` : ""}${name}.png`
+			: `${run.stem}-${theme}-${name}.png`,
+	);
+	const warnings = await capture(run, png, screen);
+	run.shots.push({
+		theme,
+		viewport: `${name} ${vp.width}x${vp.height}`,
+		view: "",
+		png,
+		first,
+		problems: [...new Set(run.log.problems)],
+		warnings,
+	});
+	return hashes;
+}
+
+/** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
+async function shootView(run: Run, screen: Screen, hash: string) {
+	const { theme, name, vp } = screen;
+	run.log.reset();
+	await open(run, hash);
+	if (
+		!(await run.cdp.evaluate<boolean>(`document.documentElement.classList.contains("in-view")`))
+	) {
+		run.log.problems.push(`${hash}: no view is shown for this hash`);
+	}
+	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
+	const png = join(run.outDir, `${run.stem}-view-${slug}-${theme}-${name}.png`);
+	const warnings = await capture(run, png, screen);
+	run.shots.push({
+		theme,
+		viewport: `${name} ${vp.width}x${vp.height}`,
+		view: hash,
+		png,
+		problems: [...new Set(run.log.problems)],
+		warnings,
+	});
+	if (!run.views.captured.includes(hash)) {
+		run.views.captured.push(hash);
+	}
 }
 
 /**
@@ -281,97 +360,28 @@ export async function check(
 	outDir: string,
 	opts: CheckOptions,
 ): Promise<CheckResult> {
-	const url = `file://${resolve(file)}`;
 	mkdirSync(outDir, { recursive: true });
+	const themes = opts.quick ? THEMES.slice(0, 1) : THEMES;
+	const stem = `${basename(file).replace(/\.html?$/, "")}${opts.tag ? `-${opts.tag}` : ""}`;
 	const shots: Shot[] = [];
 	const views: ViewReport = { found: [], captured: [], uncaptured: [], templates: [] };
 	const stepNotes = new Set<string>();
-	const stem = `${basename(file).replace(/\.html?$/, "")}${opts.tag ? `-${opts.tag}` : ""}`;
-	const themes = opts.quick ? THEMES.slice(0, 1) : THEMES;
 	await withPage(async (cdp) => {
-		let problems: string[] = [];
-		let consoleWarnings: string[] = [];
-		const shorten = (text: string) => (text.length > 220 ? `${text.slice(0, 217)}...` : text);
-		cdp.on((method, p) => {
-			if (method === "Runtime.exceptionThrown")
-				problems.push(
-					`page error: ${p.exceptionDetails.exception?.description ?? p.exceptionDetails.text}`.split(
-						"\n",
-					)[0]!,
-				);
-			if (method === "Runtime.consoleAPICalled" && p.type === "error")
-				problems.push(
-					`console.error: ${p.args.map((a: any) => a.value ?? a.description).join(" ")}`,
-				);
-			if (method === "Runtime.consoleAPICalled") {
-				const text = p.args.map((a: any) => a.value ?? a.description).join(" ");
-				// ECharts reports its own warnings (bad option, missing component) with console.log, so its prefix counts as a warning too.
-				if (p.type === "warning" || /^\[ECharts\]/.test(text))
-					consoleWarnings.push(
-						shorten(`console.${p.type}: ${text}`) +
-							(/grid\.containLabel/.test(text)
-								? " [kit: delete containLabel; charts.js already keeps axis labels inside the grid margins]"
-								: ""),
-					);
-			}
-			if (
-				method === "Log.entryAdded" &&
-				p.entry.level === "warning" &&
-				p.entry.source !== "console-api"
-			)
-				consoleWarnings.push(shorten(`${p.entry.source} warning: ${p.entry.text}`));
-			if (method === "Log.entryAdded" && p.entry.level === "error")
-				problems.push(`${p.entry.source}: ${p.entry.text} ${p.entry.url ?? ""}`);
-			if (method === "Network.requestWillBeSent" && /^(https?|wss?|ftp):/.test(p.request.url))
-				problems.push(`network request: ${p.request.url}`);
-			if (method === "Network.loadingFailed" && !p.canceled)
-				problems.push(`failed load: ${p.errorText}`);
-		});
+		const run: Run = {
+			cdp,
+			log: new PageLog(cdp),
+			url: `file://${resolve(file)}`,
+			outDir,
+			stem,
+			opts,
+			shots,
+			views,
+			stepNotes,
+		};
 		await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
-		const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
-		const evaluate = async <T>(expression: string): Promise<T> =>
-			(await cdp.send("Runtime.evaluate", { expression, returnByValue: true })).result.value;
-		/** Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. */
-		const open = async (hash: string) => {
-			await cdp.send("Page.navigate", { url: "about:blank" });
-			const loaded = cdp.once("Page.loadEventFired");
-			await cdp.send("Page.navigate", { url: url + hash });
-			await loaded;
-			await settle(400);
-		};
-		/** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
-		const capture = async (
-			png: string,
-			vp: { width: number },
-			narrow: boolean,
-		): Promise<string[]> => {
-			const page = await evaluate<{
-				overflow: boolean;
-				culprits: string[];
-				scrolls: string[];
-				warnings: string[];
-			}>(PAGE_JS(narrow));
-			if (page.overflow)
-				problems.push(
-					`horizontal page overflow at ${vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
-				);
-			const { contentSize } = await cdp.send("Page.getLayoutMetrics");
-			const { data } = await cdp.send("Page.captureScreenshot", {
-				format: "png",
-				captureBeyondViewport: true,
-				clip: { x: 0, y: 0, width: vp.width, height: Math.ceil(contentSize.height), scale: 1 },
-			});
-			writeFileSync(png, Buffer.from(data, "base64"));
-			return [
-				...page.warnings,
-				...page.scrolls.map((s) => `scrolls sideways: ${s}`),
-				...new Set(consoleWarnings),
-			];
-		};
 		let hashes: string[] = [];
-		for (const theme of themes)
+		for (const theme of themes) {
 			for (const [name, vp] of Object.entries(VIEWPORTS)) {
-				const viewport = `${name} ${vp.width}x${vp.height}`;
 				const narrow = name === "narrow";
 				await cdp.send("Emulation.setDeviceMetricsOverride", {
 					...vp,
@@ -384,71 +394,14 @@ export async function check(
 						{ name: "prefers-reduced-motion", value: "reduce" },
 					],
 				});
-				problems = [];
-				consoleWarnings = [];
-				await open("");
-				let first: FirstScreen | undefined;
-				if (!opts.quick) {
-					const png = join(outDir, `${stem}-first-${theme}-${name}.png`);
-					const { data } = await cdp.send("Page.captureScreenshot", { format: "png" });
-					writeFileSync(png, Buffer.from(data, "base64"));
-					first = {
-						png,
-						...(await evaluate<{ headline: string; figures: string[] }>(FIRST_SCREEN_JS)),
-					};
-				}
-				if (theme === THEMES[0] && name === "desktop") {
-					const found = await evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
-					const chosen = chooseViews(opts.views, found.hashes);
-					hashes = chosen.capture;
-					views.found = found.hashes;
-					views.uncaptured = chosen.skipped;
-					views.templates = found.templates;
-				}
-				for (const step of opts.steps) {
-					const result = await runStep(cdp, step, settle);
-					if (result.problem) problems.push(`--do ${result.problem}`);
-					if (result.note) stepNotes.add(result.note);
-					await settle(200);
-				}
-				const png = join(
-					outDir,
-					opts.quick
-						? `${opts.tag ? `${opts.tag}-` : ""}${name}.png`
-						: `${stem}-${theme}-${name}.png`,
-				);
-				const warnings = await capture(png, vp, narrow);
-				shots.push({
-					theme,
-					viewport,
-					view: "",
-					png,
-					first,
-					problems: [...new Set(problems)],
-					warnings,
-				});
+				const screen = { theme, name, vp };
+				const discovered = await shootOverview(run, screen);
+				hashes = theme === THEMES[0] && name === "desktop" ? discovered : hashes;
 				for (const hash of hashes) {
-					problems = [];
-					consoleWarnings = [];
-					await open(hash);
-					const active = await evaluate<boolean>(
-						`document.documentElement.classList.contains("in-view")`,
-					);
-					if (!active) problems.push(`${hash}: no view is shown for this hash`);
-					const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
-					const viewPng = join(outDir, `${stem}-view-${slug}-${theme}-${name}.png`);
-					const viewWarnings = await capture(viewPng, vp, narrow);
-					shots.push({
-						theme,
-						viewport,
-						view: hash,
-						png: viewPng,
-						problems: [...new Set(problems)],
-						warnings: viewWarnings,
-					});
-					if (!views.captured.includes(hash)) views.captured.push(hash);
+					await shootView(run, screen, hash);
 				}
 			}
+		}
 	});
 	return { shots, views, stepNotes: [...stepNotes] };
 }
