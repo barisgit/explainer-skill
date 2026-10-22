@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { renderMermaid } from "./mermaid.ts";
 import { KIT_DIR } from "./paths.ts";
+import { themeSvgImages } from "./svg-theme.ts";
 
 const MIME: Record<string, string> = {
 	".png": "image/png",
@@ -256,7 +257,8 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	const diagramRefs = new Set<string>();
 	const original = readFileSync(inputPath, "utf8");
 	const source = await renderMermaidBlocks(original, problems, diagramRefs);
-	const html = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
+	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
+	const html = await themeSvgImages(inlined);
 	if (problems.length) {
 		const remote = problems.some((p) => !p.startsWith("mermaid block"));
 		throw new PackError(

@@ -450,20 +450,26 @@ h3 {
 	font: inherit;
 	color: inherit;
 } /* mermaid's own .label, not the section caption */
-/* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). */
-.mermaid > .dark,
-:root[data-scheme="dark"] .mermaid > .light {
-	display: none;
-}
-:root[data-scheme="dark"] .mermaid > .dark {
+/* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). Diagrams and svg files in
+   <img> (packed once per scheme) share this; only the other copy is hidden so the page's own display rule for an <img> stays. */
+.mermaid > :is(.light, .dark) {
 	display: inline-block;
 }
+:root[data-scheme="dark"] :is(.mermaid > .light, img.light),
+:root[data-scheme="light"] :is(.mermaid > .dark, img.dark) {
+	/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
+	display: none !important;
+}
 @media (prefers-color-scheme: dark) {
-	:root:not([data-scheme="light"]) .mermaid > .light {
-		display: none;
+	:root:not([data-scheme="light"]) :is(.mermaid > .light, img.light) {
+		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
+		display: none !important;
 	}
-	:root:not([data-scheme="light"]) .mermaid > .dark {
-		display: inline-block;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-scheme="dark"]) :is(.mermaid > .dark, img.dark) {
+		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
+		display: none !important;
 	}
 }
 
