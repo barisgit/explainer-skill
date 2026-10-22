@@ -99,3 +99,4 @@ declare var Steps: { refresh(el: Element, step?: number): void };
 declare var Views: { on(name: string, fn: ViewHandler): void };
 declare var ReplyKeep: (options: ReplyKeepOptions) => ReplyKeepApi;
 declare var ReplyNotes: (options: ReplyNotesOptions) => void;
+declare var ViewsFolds: () => () => void;

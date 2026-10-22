@@ -1,0 +1,15 @@
+/* theme part: navigation kit:views.js builds from the page's own markup: Expand all (.fold-all). Pages write none of these classes. */
+/* Expand all: right-aligned just above the section's first fold, without .expand's +/- suffix. */
+.fold-all {
+	display: block;
+	margin: 1.25rem 0 -1rem auto;
+}
+.fold-all::after {
+	content: none;
+}
+
+@media print {
+	.fold-all {
+		display: none;
+	}
+}
