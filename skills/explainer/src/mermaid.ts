@@ -9,27 +9,57 @@ export interface Diagram {
 /** The renderer sets node labels at 13 px; drawn 1.2 times larger they read like the page's 16 px text and Mermaid's labels. */
 const SCALE = 1.2;
 
-const SUPPORTED =
-	/^(flowchart|graph|stateDiagram(-v2)?|sequenceDiagram|classDiagram|erDiagram|xychart(-beta)?)$/;
+/** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, edge ids for flowcharts and states. */
+type Family = "flowchart" | "state" | "sequence" | "other";
 
-/** What to draw instead, per Mermaid type pack cannot render. The kit names are the files `kit <file>` documents. */
-const INSTEAD: Record<string, string> = {
-	pie: "a pie or, better for comparing, a bar chart with kit:charts.js (ECharts)",
-	gantt: "a horizontal bar chart on a time axis with kit:charts.js, or a table of dates",
-	timeline: "an ordered list or a table, or a flowchart LR with one node per period",
-	journey: "a line chart of the scores per step with kit:plot.js or kit:charts.js",
-	quadrantChart: "a scatter chart with kit:charts.js, with markLine at the two midpoints",
-	gitGraph: "a flowchart LR with one node per commit and a subgraph per branch",
-	"sankey-beta": "a sankey chart with kit:charts.js",
-	sankey: "a sankey chart with kit:charts.js",
-	"architecture-beta": "a flowchart with a subgraph per group",
-	"packet-beta": "an HTML table with one column per bit range",
-	packet: "an HTML table with one column per bit range",
-	mindmap: "a flowchart LR or a nested list",
-};
+/** The header keywords pack draws, with their family. */
+const SUPPORTED = new Map<string, Family>([
+	["flowchart", "flowchart"],
+	["graph", "flowchart"],
+	["stateDiagram", "state"],
+	["stateDiagram-v2", "state"],
+	["sequenceDiagram", "sequence"],
+	["classDiagram", "other"],
+	["erDiagram", "other"],
+	["xychart", "other"],
+	["xychart-beta", "other"],
+]);
 
+/** SUPPORTED as the author is told it: the older stateDiagram and xychart headers still draw but are not advertised. */
 const SUPPORTED_LIST =
 	"flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram, xychart-beta";
+
+/**
+ * What to draw instead, per Mermaid type pack cannot render. The kit names are the files `kit <file>` documents. A Map, unlike an
+ * object literal, finds nothing for a header such as `constructor`.
+ */
+const INSTEAD = new Map([
+	["pie", "a pie or, better for comparing, a bar chart with kit:charts.js (ECharts)"],
+	["gantt", "a horizontal bar chart on a time axis with kit:charts.js, or a table of dates"],
+	["timeline", "an ordered list or a table, or a flowchart LR with one node per period"],
+	["journey", "a line chart of the scores per step with kit:plot.js or kit:charts.js"],
+	["quadrantChart", "a scatter chart with kit:charts.js, with markLine at the two midpoints"],
+	["gitGraph", "a flowchart LR with one node per commit and a subgraph per branch"],
+	["sankey-beta", "a sankey chart with kit:charts.js"],
+	["sankey", "a sankey chart with kit:charts.js"],
+	["architecture-beta", "a flowchart with a subgraph per group"],
+	["packet-beta", "an HTML table with one column per bit range"],
+	["packet", "an HTML table with one column per bit range"],
+	["mindmap", "a flowchart LR or a nested list"],
+]);
+
+/** The family of the source's header keyword; throws, saying what to draw instead, for a type pack cannot draw. */
+function familyOf(body: string): Family {
+	const type = /^\S+/.exec(body)?.[0] ?? "";
+	const family = SUPPORTED.get(type);
+	if (!family) {
+		const instead = INSTEAD.get(type);
+		throw new Error(
+			`"${type}" diagrams are not supported (pack draws ${SUPPORTED_LIST})${instead ? `; draw it as ${instead}` : ""}`,
+		);
+	}
+	return family;
+}
 
 /** The source without front matter and `%%` comment lines; the header keyword is the first word left. */
 function stripPreamble(source: string): string {
@@ -59,28 +89,26 @@ const NO_SOURCE = new RegExp(`^\\s*${LINK}`);
 /** A sequence message: sender, arrow (`->>`, `-->`, `-x`, `-)` and their dashed forms), receiver with an optional activation sign, text. */
 const MESSAGE = /^([^:]*?)\s*(--?>>|--?>|--?x|--?\))\s*([+-]?)([^:]*?)\s*(:.*)?$/;
 
-const isFlowchart = (type: string) => type === "flowchart" || type === "graph";
-
 /**
  * Statements the renderer draws wrong without an error, each with what to write instead: a markdown string (it prints the
  * backticks), a link missing an end (it drops the arrow), a message missing a participant (it invents one named after the arrow).
  */
-const MISRENDERS: Array<(type: string, line: string) => string | undefined> = [
+const MISRENDERS: Array<(family: Family, line: string) => string | undefined> = [
 	(_, line) =>
 		line.includes('"`')
 			? 'markdown strings ("`...`") are not supported; drop the backticks: a["**bold** and *italic*"] still renders'
 			: undefined,
-	(type, line) =>
-		isFlowchart(type) && NO_TARGET.test(line)
+	(family, line) =>
+		family === "flowchart" && NO_TARGET.test(line)
 			? `"${line}" has no target node; write it as "${line} next", naming the node it points to`
 			: undefined,
-	(type, line) =>
-		isFlowchart(type) && NO_SOURCE.test(line)
+	(family, line) =>
+		family === "flowchart" && NO_SOURCE.test(line)
 			? `"${line}" has no source node; write it as "prev ${line}", naming the node it starts from`
 			: undefined,
-	(type, line) => {
+	(family, line) => {
 		const [, from, arrow, sign, to, text = ""] =
-			(type === "sequenceDiagram" && MESSAGE.exec(line)) || [];
+			(family === "sequence" && MESSAGE.exec(line)) || [];
 		return arrow && !(from && to)
 			? `"${line}" is missing a participant; write it as "${from || "A"}${arrow}${sign}${to || "B"}${text}", sender before the arrow and receiver after`
 			: undefined;
@@ -88,11 +116,11 @@ const MISRENDERS: Array<(type: string, line: string) => string | undefined> = [
 ];
 
 /** The first misrender among the statements after the header, as its message. */
-function misrender(type: string, statements: string[]): string | undefined {
+function firstMisrender(family: Family, statements: string[]): string | undefined {
 	for (const statement of statements) {
 		const line = statement.trim();
 		for (const check of MISRENDERS) {
-			const problem = check(type, line);
+			const problem = check(family, line);
 			if (problem) {
 				return problem;
 			}
@@ -160,17 +188,19 @@ function annotateParts(svg: string): string {
 }
 
 /**
- * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide `svg`/`text`
- * rules; theme.css maps the renderer's variables instead) and fixed colours, prefixes its ids so markers of two diagrams do not clash, scopes the xychart
- * stylesheet to this diagram and draws its series in the kit palette, and lets the diagram shrink to the column (at most SCALE times its size).
+ * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide
+ * `svg`/`text` rules; theme.css maps the renderer's variables instead) and fixed colours, prefixes its ids so markers of two
+ * diagrams do not clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the
+ * diagram shrink to the column (at most SCALE times its size).
  */
 function inline(svg: string, id: string): string {
 	return svg
 		.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, "")
 		.replace(/\bsvg \{/g, `#${id} {`)
-		.replace(/--xychart-color-(\d+): [^;]+;/g, (_, n: string) => {
-			return `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`;
-		})
+		.replace(
+			/--xychart-color-(\d+): [^;]+;/g,
+			(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
+		)
 		.replace(/ id="([^"]+)"/g, ` id="${id}-$1"`)
 		.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`)
 		.replace(
@@ -183,22 +213,18 @@ function inline(svg: string, id: string): string {
 /** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */
 function renderOne(source: string, n: number): Diagram {
 	const body = stripPreamble(source);
-	const type = /^\S+/.exec(body)?.[0] ?? "";
-	if (!SUPPORTED.test(type)) {
-		const instead = INSTEAD[type];
-		throw new Error(
-			`"${type}" diagrams are not supported (pack draws ${SUPPORTED_LIST})${instead ? `; draw it as ${instead}` : ""}`,
-		);
-	}
-	const problem = misrender(type, splitStatements(body).split("\n").slice(1));
+	const family = familyOf(body);
+	const statements = splitStatements(body);
+	const problem = firstMisrender(family, statements.split("\n").slice(1));
 	if (problem) {
 		throw new Error(problem);
 	}
-	const graphLike = /^(flowchart|graph|stateDiagram)/.test(type);
+
 	// Only flowcharts and state diagrams have edges with ids; the other types keep their own syntax.
-	const { text, refs } = graphLike
-		? takeEdgeIds(splitStatements(body))
-		: { text: body, refs: new Map<string, string[]>() };
+	const { text, refs } =
+		family === "flowchart" || family === "state"
+			? takeEdgeIds(statements)
+			: { text: body, refs: new Map<string, string[]>() };
 	const raw = renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist" });
 	const svg = annotateParts(annotateEdges(inline(raw, `mm${n}`), refs));
 	return { svg, refs: [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? "") };
