@@ -199,6 +199,21 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 				}
 			},
 		})
+		.on("img[srcset], source[srcset]", {
+			element: (el) =>
+				void problems.push(
+					`<${el.tagName} srcset> is not inlined: use src with one local image (srcset="${el.getAttribute("srcset")}")`,
+				),
+		})
+		.on("[style]", {
+			element(el) {
+				const style = el.getAttribute("style") ?? "";
+				const inlined = attempt(() => inlineCss(style, baseDir, "a style attribute"), style);
+				if (inlined !== style) {
+					el.setAttribute("style", inlined);
+				}
+			},
+		})
 		.on("iframe[src], audio[src], embed[src], object[data]", {
 			element: (el) =>
 				void problems.push(`<${el.tagName}> loads a separate resource; embed its content instead`),
@@ -218,7 +233,7 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 /**
  * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
  * Mermaid blocks are pre-rendered (needs Chrome). Throws PackError listing every remaining network dependency
- * (remote src/href/url()) and every diagram that fails to render. `warnings` lists links that go nowhere.
+ * (remote src/href/url(), srcset) and every diagram that fails to render. `warnings` lists links that go nowhere.
  */
 export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
 	const baseDir = dirname(resolve(inputPath));

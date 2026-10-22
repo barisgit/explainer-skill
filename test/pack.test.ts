@@ -6,8 +6,8 @@ import { runCli, SKILL_DIR, scratch } from "./support.ts";
 const dir = scratch();
 afterAll(dir.cleanup);
 
-const page = (head: string) =>
-	`<!doctype html><html><head>${head}</head><body><p>hi</p></body></html>`;
+const page = (markup: string) =>
+	`<!doctype html><html><head></head><body>${markup}<p>hi</p></body></html>`;
 
 describe("pack inlines what is local", () => {
 	test("a local stylesheet (with its url() asset), a local script and a kit: file", async () => {
@@ -42,6 +42,19 @@ test("pack of a missing page is a usage error (exit 2), not a stack trace", asyn
 	expect(result.stderr).toStartWith("error: pack needs an existing page");
 });
 
+test("pack inlines a local url() in a style attribute", async () => {
+	dir.write("attr.gif", "GIF89a");
+	const input = dir.write("attr.html", page('<div style="background:url(attr.gif)"></div>'));
+	const output = dir.path("attr.out.html");
+
+	const result = await runCli(["pack", input, "-o", output]);
+
+	expect(result.code).toBe(0);
+	const html = readFileSync(output, "utf8");
+	expect(html).toContain("data:image/gif;base64,");
+	expect(html).not.toContain("attr.gif");
+});
+
 describe("pack rejects network dependencies", () => {
 	const remote = {
 		script: [
@@ -55,6 +68,14 @@ describe("pack rejects network dependencies", () => {
 		"url() in a style": [
 			"<style>body { background: url(https://cdn.example.com/bg.png); }</style>",
 			"remote url(https://cdn.example.com/bg.png)",
+		],
+		"url() in a style attribute": [
+			'<div style="background:url(https://cdn.example.com/a.png)"></div>',
+			"remote url(https://cdn.example.com/a.png) in a style attribute",
+		],
+		"srcset on an img": [
+			'<img srcset="https://cdn.example.com/a.png 1x, b.png 2x">',
+			'<img srcset> is not inlined: use src with one local image (srcset="https://cdn.example.com/a.png 1x, b.png 2x")',
 		],
 	} as const;
 
