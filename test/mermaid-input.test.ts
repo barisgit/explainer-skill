@@ -72,12 +72,217 @@ const unreadable = [
 		unread: "area [1, 2]",
 		hint: "leave it out",
 	},
+	{
+		name: "a style property without a value",
+		input: "flowchart LR\n  a --> b\n  style a fill:red,GARBAGE",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "a classDef property with an empty value",
+		input: "flowchart LR\n  a --> b\n  classDef hot fill:red,bad:",
+		unread: "bad:",
+		hint: "leave it out",
+	},
+	{
+		name: "a link style with two indexes and no comma",
+		input: "flowchart LR\n  a --> b\n  linkStyle 0 1 stroke:red",
+		unread: "1 stroke:red",
+		hint: "leave it out",
+	},
+	{
+		name: "a state link style with an empty index",
+		input: "stateDiagram-v2\n  A --> B\n  linkStyle 0,,1 stroke:red",
+		unread: "linkStyle 0,,1 stroke:red",
+		hint: "leave it out",
+	},
+	{
+		name: "a dangling &",
+		input: "flowchart LR\n  a --> b &",
+		unread: "&",
+		hint: "leave it out",
+	},
+	{
+		name: "an end outside a subgraph",
+		input: "flowchart LR\n  a --> b\n  end",
+		unread: "end",
+		hint: "leave it out",
+	},
+	{
+		name: "a } outside a composite state",
+		input: "stateDiagram-v2\n  A --> B\n  }",
+		unread: "}",
+		hint: "leave it out",
+	},
+	{
+		name: "a nested namespace",
+		input: "classDiagram\n  namespace Outer {\n  namespace Inner {\n  class A\n  }\n  }",
+		unread: "namespace Inner {",
+		hint: "leave it out",
+	},
+	{
+		name: "an entity attribute with an unknown key",
+		input: "erDiagram\n  A {\n    string id PK GARBAGE\n  }",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "an entity attribute with a second comment",
+		input: 'erDiagram\n  A {\n    string id PK "a" "b"\n  }',
+		unread: '"b"',
+		hint: "leave it out",
+	},
+	{
+		name: "a block keyword run into its label",
+		input: "sequenceDiagram\n  loopGARBAGE\n  A->>B: hi\n  end",
+		unread: "loopGARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after an xychart header",
+		input: "xychart-beta GARBAGE\n  x-axis [a, b]\n  bar [1, 2]",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after an xychart title",
+		input: 'xychart-beta\n  title "Revenue" GARBAGE\n  x-axis [a, b]\n  bar [1, 2]',
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after x-axis categories",
+		input: "xychart-beta\n  x-axis [a, b] GARBAGE\n  bar [1, 2]",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after an x-axis range",
+		input: "xychart-beta\n  x-axis 0 --> 10 GARBAGE\n  line [1, 2]",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "an exponent in an axis range",
+		input: "xychart-beta\n  x-axis 0 --> 10e3\n  line [1, 2]",
+		unread: "e3",
+		hint: "leave it out",
+	},
+	{
+		name: "text after a y-axis range",
+		input: 'xychart-beta\n  x-axis [a, b]\n  y-axis "t" 0 --> 100 GARBAGE\n  bar [1, 2]',
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after a bar series",
+		input: "xychart-beta\n  x-axis [a, b]\n  bar [1, 2] GARBAGE",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after a line series",
+		input: "xychart-beta\n  x-axis [a, b]\n  line [1, 2] GARBAGE",
+		unread: "GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "a value that is not a number",
+		input: "xychart-beta\n  x-axis [a, b]\n  bar [1junk, 2]",
+		unread: "1junk",
+		hint: "leave it out",
+	},
+	{
+		name: "an empty value",
+		input: "xychart-beta\n  x-axis [a, b, c]\n  bar [1, , 2]",
+		unread: "1, , 2",
+		hint: "leave it out",
+	},
+	{
+		name: "text after a classDiagram header",
+		input: "classDiagram ; GARBAGE\n  A <|-- B",
+		unread: "; GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after an erDiagram header",
+		input: "erDiagram ; GARBAGE\n  A ||--o{ B : has",
+		unread: "; GARBAGE",
+		hint: "leave it out",
+	},
+	{
+		name: "text after a sequenceDiagram header",
+		input: "sequenceDiagram ; GARBAGE\n  A->>B: hi",
+		unread: "; GARBAGE",
+		hint: "leave it out",
+	},
 ];
 
 test.each(unreadable)("$name fails, naming what pack cannot read", ({ input, unread, hint }) => {
 	const message = failureOf(input);
 	expect(message).toContain(`pack cannot read "${unread}"`);
 	expect(message).toContain(hint);
+});
+
+const unclosed = [
+	{
+		name: "a subgraph",
+		input: "flowchart LR\n  subgraph Lost\n  a --> b",
+		opener: "subgraph Lost",
+		closer: "end",
+	},
+	{
+		name: "a composite state",
+		input: "stateDiagram-v2\n  state Lost {\n  A --> B",
+		opener: "state Lost {",
+		closer: "}",
+	},
+	{
+		name: "a namespace",
+		input: "classDiagram\n  namespace Lost {\n  class A",
+		opener: "namespace Lost {",
+		closer: "}",
+	},
+	{
+		name: "a class body",
+		input: "classDiagram\n  class A {\n  +int id",
+		opener: "class A {",
+		closer: "}",
+	},
+	{ name: "an entity", input: "erDiagram\n  A {\n  string id", opener: "A {", closer: "}" },
+	{
+		name: "a sequence block",
+		input: "sequenceDiagram\n  loop Lost\n  A->>B: hi",
+		opener: "loop Lost",
+		closer: "end",
+	},
+];
+
+test.each(unclosed)(
+	"$name left open fails and says how to close it",
+	({ input, opener, closer }) => {
+		expect(failureOf(input)).toBe(`"${opener}" is never closed: end it with "${closer}"`);
+	},
+);
+
+test("an entity attribute keeps every key of a comma list and its comment", () => {
+	const svg = svgOf('erDiagram\n  A {\n    string id PK, FK "the id"\n  }');
+	expect(svg).toContain(">PK,FK<");
+	expect(svg).toContain(">the id<");
+});
+
+test("a quoted x-axis category keeps its comma", () => {
+	const svg = svgOf('xychart-beta\n  x-axis ["Jan, 1", Feb]\n  bar [1, 2]');
+	expect(svg).toContain(">Jan, 1<");
+	expect(svg).not.toContain('>"Jan<');
+});
+
+test("a participant declared again takes its latest name, as in Mermaid", () => {
+	const svg = svgOf(
+		"sequenceDiagram\n  participant A as First\n  participant A as Second\n  A->>B: hi",
+	);
+	expect(svg).toContain(">Second<");
+	expect(svg).not.toContain(">First<");
 });
 
 test("brackets inside a quoted label stay in the label, and its edge is kept", () => {
