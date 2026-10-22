@@ -11,10 +11,10 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
 import { PackError, pack } from "./pack.ts";
+import { KIT_DIR } from "./paths.ts";
 import { report } from "./report.ts";
 import { stepError } from "./steps.ts";
 
-const ROOT = join(import.meta.dir, "..");
 /** The command line that starts this CLI, as shown in help and hints. */
 export const CLI = `bun ${process.argv[1]}`;
 
@@ -26,8 +26,6 @@ export interface Command {
 	examples: string[];
 	run: (args: string[], flags: Map<string, string[]>) => Promise<number>;
 }
-
-const KIT_DIR = join(ROOT, "kit");
 
 const MERMAID_DOC = `<pre class="mermaid"> blocks hold Mermaid source (flowchart, sequence, state, class, ER, gantt, pie, ...). pack renders each block once in light and dark, so no script ships.
 Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:

@@ -1,4 +1,4 @@
-import type { Cdp } from "./chrome.ts";
+import { type Cdp, settle } from "./chrome.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
 const KEYS: Record<string, [number, string]> = {
@@ -144,12 +144,7 @@ async function resolveTarget(
 }
 
 /** DOM click: the handler runs whatever overlaps the element, and the element is focused first so key: steps reach it. */
-async function domClick(
-	cdp: Cdp,
-	step: string,
-	target: Target,
-	settle: (ms: number) => Promise<unknown>,
-): Promise<StepResult> {
+async function domClick(cdp: Cdp, step: string, target: Target): Promise<StepResult> {
 	for (const i of target.indices) {
 		await onNth(
 			cdp,
@@ -188,11 +183,7 @@ async function mouseStep(
  * Runs one step in the page. Selectors may end in `@all` (every match, re-queried before each click, with a pause after each so handlers
  * that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used.
  */
-export async function runStep(
-	cdp: Cdp,
-	step: string,
-	settle: (ms: number) => Promise<unknown>,
-): Promise<StepResult> {
+export async function runStep(cdp: Cdp, step: string): Promise<StepResult> {
 	const parsed = parseStep(step);
 	if (!parsed) {
 		return { problem: stepError(step) };
@@ -210,7 +201,7 @@ export async function runStep(
 		return {};
 	}
 	if (parsed.kind === "click" && !target.isPoint) {
-		return domClick(cdp, step, target, settle);
+		return domClick(cdp, step, target);
 	}
 	return mouseStep(cdp, step, parsed.kind, target);
 }

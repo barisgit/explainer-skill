@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Cdp } from "./chrome.ts";
 import { withPage } from "./chrome.ts";
+import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
 
-const ROOT = join(import.meta.dir, "..");
 const THEMES = ["light", "dark"] as const;
 
 /**
@@ -111,7 +111,7 @@ export async function renderMermaid(
 		const page = join(dir, "render.html");
 		writeFileSync(
 			page,
-			`<!doctype html><link rel="stylesheet" href="file://${join(ROOT, "kit/theme.css")}"><style>${pageCss}</style><body class="mermaid"><script src="file://${join(ROOT, "vendor/mermaid.min.js")}"></script>`,
+			`<!doctype html><link rel="stylesheet" href="file://${join(KIT_DIR, "theme.css")}"><style>${pageCss}</style><body class="mermaid"><script src="file://${join(SKILL_ROOT, "vendor/mermaid.min.js")}"></script>`,
 		);
 		return await withPage(async (cdp) => {
 			await cdp.send("Runtime.enable");

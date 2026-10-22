@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp } from "./chrome.ts";
-import { withPage } from "./chrome.ts";
+import { settle, withPage } from "./chrome.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
@@ -230,7 +230,6 @@ class PageLog {
 const consoleText = (args: Array<{ value?: unknown; description?: string }>) =>
 	args.map((a) => a.value ?? a.description ?? "").join(" ");
 const shorten = (text: string) => (text.length > 220 ? `${text.slice(0, 217)}...` : text);
-const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 /** Everything one check run shares: the page, its log, where files go, and what has been collected. */
 interface Run {
@@ -320,7 +319,7 @@ async function discoverViews(run: Run) {
 /** Runs the `--do` steps in order, recording their problems and notes. */
 async function runSteps(run: Run) {
 	for (const step of run.opts.steps) {
-		const result = await runStep(run.cdp, step, settle);
+		const result = await runStep(run.cdp, step);
 		if (result.problem) {
 			run.log.problems.push(`--do ${result.problem}`);
 		}

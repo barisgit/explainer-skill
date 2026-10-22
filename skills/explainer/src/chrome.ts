@@ -13,6 +13,9 @@ const CHROME_PATHS = [
 	"/usr/bin/chromium-browser",
 ];
 
+/** Waits `ms` milliseconds, for page scripts, transitions and rebuilt DOM to settle after a load or an action. */
+export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
 /** Chrome could not be started or driven: an environment problem the CLI reports without a stack trace. */
 export class ChromeError extends Error {}
 

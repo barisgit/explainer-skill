@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { renderMermaid } from "./mermaid.ts";
+import { KIT_DIR } from "./paths.ts";
 
-const KIT_DIR = join(import.meta.dir, "..", "kit");
 const MIME: Record<string, string> = {
 	".png": "image/png",
 	".jpg": "image/jpeg",
