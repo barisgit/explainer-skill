@@ -34,6 +34,10 @@ const CHECKS = [
 		"an unmapped edge appears with its later endpoint",
 		`${edgeSteps("L_a_b_0")} === "2,2" && ${edgeSteps("L_b_c_0")} === "3,3"`,
 	),
+	assertLater(
+		"data-go buttons step",
+		`(document.querySelector('[data-go="1"]').click(), heard.filter(Number).at(-1) === 2)`,
+	),
 ];
 
 test("a stepper in a Mermaid diagram", async () => {

@@ -11,7 +11,8 @@
    An edge data-steps does not name appears with its later endpoint, so mapping the nodes is enough; an edge listed in data-steps keeps its own steps.
    Mermaid ids are the diagram's own: `flowchart LR; api --> cache` has nodes api and cache; `api e1@--> cache` names the edge e1;
    sequence diagrams have participants by id and messages m1, m2, ... in order. pack fails when data-steps names an id the diagram lacks.
-   Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
+   Controls: <button data-go="-1"> Back, <button data-go="1"> Next (click them to step by script or in check --do click:'[data-go="1"]'), Play
+   (data-play), the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
    Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts and data-steps. Replacing
    the children of the [data-captions] list is picked up by itself; after any other replacement call Steps.refresh(el, step?). It re-reads
    captions, parts and data-steps, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
