@@ -115,3 +115,37 @@ document.addEventListener("click", (e) => {
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
 }, 60_000);
+
+test("a control the page rebuilds after load stops counting: nothing of it is kept and Clear is not offered for it", async () => {
+	const script = `
+document.querySelector("main").insertAdjacentHTML("beforeend", '<button type="button" id="rebuild">Rebuild</button>');
+$("rebuild").addEventListener("click", () => { $("name").replaceWith(Object.assign(document.createElement("input"), { id: "name", type: "text" })); });
+document.addEventListener("click", (e) => {
+	if (e.target.id === "rebuild") setTimeout(() => { if (!(clearButton().hidden && saved() === 0)) throw new Error("keep contract: a rebuilt control leaves nothing kept"); }, 150);
+});`;
+	const input = dir.write("rebuilt.html", PAGE(script));
+	const output = dir.path("rebuilt.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["focus:#name", "key:z", "click:#rebuild"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("saved values are dropped when the regenerated page has other controls, so none lands on a control that took the old one's position", async () => {
+	const script = `
+sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
+if (sessionStorage.loads === "2") document.querySelector("main").insertAdjacentHTML("afterbegin", '<input type="text" aria-label="New">');`;
+	const html = `<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Layout</h1>
+<input type="text" aria-label="Old"></main><script>${script}</script><script src="kit:reply.js"></script>
+<script>${onLoad(2, "the control that now holds the old one's position stays empty", `document.querySelector("[aria-label=New]").value === ""`)}</script></body></html>`;
+	const input = dir.write("layout.html", html);
+	const output = dir.path("layout.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["focus:[aria-label=Old]", "key:z", "reload"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);

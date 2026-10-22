@@ -146,6 +146,8 @@
 	const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
 	/** The kept controls, each with `initial`: its value as the markup declares it. */
 	let units = [];
+	/** The controls' keys and labels as found at load. A saved copy applies only to the set of controls it was saved from. */
+	let layout = "";
 	/** False until the saved state is restored, so the empty page at script time cannot overwrite it. */
 	let ready = false;
 
@@ -203,11 +205,14 @@
 
 	/** Controls the reader moved off their defaults. One a page has since removed or rebuilt is gone, and so is what it held. */
 	const changed = () =>
-		units.filter((u) => JSON.stringify(readControl(u.el)) !== JSON.stringify(u.initial));
+		units.filter(
+			(u) => u.el.isConnected && JSON.stringify(readControl(u.el)) !== JSON.stringify(u.initial),
+		);
 
 	/** What differs from the defaults: control values by key, and the notes. Empty means nothing to keep. */
 	function snapshot() {
 		return {
+			layout,
 			controls: Object.fromEntries(changed().map((u) => [u.key, readControl(u.el)])),
 			notes: filledNotes(),
 		};
@@ -249,6 +254,9 @@
 	}
 
 	function restoreControls(state) {
+		if (state.layout !== layout) {
+			return;
+		}
 		const values = state.controls ?? {};
 		const hits = units.filter((u) => Object.hasOwn(values, u.key) && fits(u, values[u.key]));
 		apply(hits, (u) => values[u.key]);
@@ -264,6 +272,7 @@
 
 	function restore() {
 		units = findUnits();
+		layout = JSON.stringify(units.map((u) => [u.key, unitLabel(u.el)]));
 		const state = stored();
 		restoreControls(state);
 		restoreNotes(state);
