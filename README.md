@@ -2,7 +2,12 @@
 
 An agent skill that turns "show me" into one interactive HTML page: charts to explore, diagrams to step through, drill-down views, and questions the reader answers on the page. The page is a single file that works offline from `file://`, in light and dark, on desktop and phone.
 
-[![First screens of four example pages: a Fourier series study page, a Dijkstra step-through, a world electricity explorer and a password hashing decision page](examples/media/hero.webp)](https://barisgit.github.io/explainer-skill/)
+<a href="https://barisgit.github.io/explainer-skill/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/hero-dark.webp">
+  <img alt="First screens of four example pages: a Fourier series study page, a Dijkstra step-through, a world electricity explorer and a password hashing decision page" src="examples/media/hero-light.webp">
+</picture>
+</a>
 
 **Live examples**, each written by an agent following the skill: [Fourier series](https://barisgit.github.io/explainer-skill/fourier-series/) (study page), [Dijkstra's algorithm](https://barisgit.github.io/explainer-skill/dijkstra/) (step-through), [World electricity mix](https://barisgit.github.io/explainer-skill/electricity-mix/) (data explorer), [Choosing a password hash](https://barisgit.github.io/explainer-skill/password-hashing/) (decision page). Sources are in [`examples/`](examples/).
 
@@ -73,19 +78,31 @@ A step-through, for illustration:
 
 **Charts that redraw as the reader moves a control.** ECharts in the page theme, with zoom, legend toggles and click-to-drill, or the light `plot.js` for a few small plots.
 
-![Fourier series page: dragging the terms slider sharpens the partial sum of a square wave](examples/media/fourier-series-terms.webp)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/fourier-series-terms-dark.webp">
+  <img alt="Fourier series page: dragging the terms slider sharpens the partial sum of a square wave" src="examples/media/fourier-series-terms-light.webp">
+</picture>
 
 **Step-through figures.** Back, Play, Next, a scrubber and arrow keys from a few attributes; Mermaid diagrams, SVG parts and captions step together.
 
-![Dijkstra page in dark: stepping the algorithm on a street grid updates the graph, the queue and the distance table](examples/media/dijkstra-steps.webp)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/dijkstra-steps-dark.webp">
+  <img alt="Dijkstra page: stepping the algorithm on a street grid updates the graph, the queue and the distance table" src="examples/media/dijkstra-steps-light.webp">
+</picture>
 
 **Drill-down views.** A hash router inside the one file: a bar, row or link opens its own view, and Back returns with the scroll position kept.
 
-![Electricity page: switching the coal ranking to TWh, then opening the United States view and going back](examples/media/electricity-mix-coal-ranking.webp)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/electricity-mix-coal-ranking-dark.webp">
+  <img alt="Electricity page: switching the coal ranking to TWh, then opening the United States view and going back" src="examples/media/electricity-mix-coal-ranking-light.webp">
+</picture>
 
 **Questions the reader answers.** Form controls marked `data-reply` become one Markdown reply the reader sends back to the agent, together with notes on selected text or diagram parts. Inputs and notes survive a reload, with a Clear button.
 
-![Password hashing page: deployment presets change the recommended OWASP setting, down to nothing fits](examples/media/password-hashing-presets.webp)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/password-hashing-presets-dark.webp">
+  <img alt="Password hashing page: deployment presets change the recommended OWASP setting, down to nothing fits" src="examples/media/password-hashing-presets-light.webp">
+</picture>
 
 Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time, linked highlighting between prose, table rows and diagram parts, and a stylesheet that follows the system's light or dark setting.
 
