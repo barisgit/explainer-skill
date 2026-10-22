@@ -19,7 +19,7 @@ Known gaps found while building and testing the skill. Each names where it lives
 - Wide left-to-right Mermaid and sequence diagrams still shrink to tiny text on phones; `check` warns under 9 px but nothing fixes it.
 - The `kit` listing's attribute list is hard-coded in `src/commands.ts` and can drift from the kit headers.
 - Machine output: only `check` has `--json`; a shared envelope (tool, version, command, ok, diagnostics) for `pack` and `kit`, a distinct exit code for a missing Chrome, and `--version` would help scripts.
-- The embedded page scripts in `src/check.ts` and `src/mermaid.ts` are template strings that neither `tsc` nor Biome sees.
+- The embedded page scripts in `src/check.ts` and `src/mermaid.ts` are template strings that neither the typecheck nor Biome sees.
 
 ## Project
 

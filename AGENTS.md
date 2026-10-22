@@ -27,7 +27,7 @@ Root files: `package.json` (devDependencies only), `bun.lock`, `tsconfig.json`, 
 | Command | What it does |
 |---|---|
 | `bun install` | Installs dev tools from the lockfile and the git hook (`prepare` runs husky) |
-| `bun run typecheck` | `tsc --noEmit`, strictest settings |
+| `bun run typecheck` | `bun check --all` (Bun's built-in checker, same errors as `tsc`), strictest settings |
 | `bun run lint` | `biome check` (format check, lint, import order), warnings are errors; no writes |
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
 | `bun run test` | Contract tests (Chrome needed, about 10 s) |
@@ -36,7 +36,7 @@ Root files: `package.json` (devDependencies only), `bun.lock`, `tsconfig.json`, 
 | `bun run vendor` | Regenerates ECharts bundle, Mermaid bundle and licence texts (dev only) |
 | `bun skills/explainer/cli.ts kit \| pack \| check` | The skill's CLI; `--help` on any command |
 
-The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged files, then `tsc`; about 2 s, no Chrome. It keeps partially staged hunks. lint-staged backs up through `git stash`, which worktrees share, so run commits of different worktrees one at a time. Never use `--no-verify`.
+The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged files, then the typecheck; about 2 s, no Chrome. It keeps partially staged hunks. lint-staged backs up through `git stash`, which worktrees share, so run commits of different worktrees one at a time. Never use `--no-verify`.
 
 `.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. Its first run is on the initial push; the Chrome sandbox on Ubuntu is the likeliest thing to need adjusting.
 
