@@ -6,23 +6,23 @@ The agent reads `skills/explainer/SKILL.md` and drives a small CLI (see Commands
 
 ## Install
 
-Both installers copy `skills/explainer/` as it is. Until the repository is published, install from the local checkout; replace the path with yours.
+Both installers copy `skills/explainer/` as it is.
 
 **npx skills** ([vercel-labs/skills](https://github.com/vercel-labs/skills))
 
 ```sh
-npx skills add ~/Programming_local/Projects/explainer-skill --global --agent claude-code --agent codex -y
+npx skills add barisgit/explainer-skill --global --agent claude-code --agent codex -y
 ```
 
-Several agents share one copy in `~/.agents/skills/explainer` and the others get symlinks; add `--copy` to give each agent its own copy. Without `--global` the skill goes into the current project. Once the repository is public: `npx skills add <owner>/<repo>`.
+Several agents share one copy in `~/.agents/skills/explainer` and the others get symlinks; add `--copy` to give each agent its own copy. Without `--global` the skill goes into the current project. A local checkout works too: pass its path instead of `barisgit/explainer-skill`.
 
 **Caplet** (verified with `caplet` v0.2.0)
 
 ```sh
-caplet add ~/Programming_local/Projects/explainer-skill --scope user
+caplet add github:barisgit/explainer-skill --pin v0.1.0 --scope user
 ```
 
-Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <path> --scope project`. Once the repository is public: `caplet add github:<owner>/<repo> --pin <tag-or-commit> --scope user`.
+Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
 An installed skill can be checked with `bun ~/.claude/skills/explainer/cli.ts kit`. Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name (see [AGENTS.md](AGENTS.md)).
 
@@ -84,7 +84,7 @@ bun run format            # apply formatting and safe lint fixes
 bun run verify:install    # before a release: installs with both installers into a temp HOME (network, Chrome)
 ```
 
-`.github/workflows/ci.yml` is prepared but has not run yet: the repository has no remote. Details and decisions are in [AGENTS.md](AGENTS.md).
+GitHub Actions runs the same gate (`.github/workflows/ci.yml`). Details and decisions are in [AGENTS.md](AGENTS.md).
 
 ## Credits
 
@@ -96,4 +96,4 @@ Licence texts are in `skills/explainer/kit/licenses/`.
 
 ## Licence
 
-Not chosen yet.
+MIT, see [LICENSE](LICENSE). A copy sits in `skills/explainer/` so installed copies carry it.

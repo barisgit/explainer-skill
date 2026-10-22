@@ -23,5 +23,4 @@ Known gaps found while building and testing the skill. Each names where it lives
 
 ## Project
 
-- `.github/workflows/ci.yml` has never run (no remote). The Chrome sandbox setting on Ubuntu is the likeliest first failure.
-- No licence chosen for this project.
+- `.github/workflows/ci.yml` runs for the first time on the initial push. The Chrome sandbox setting on Ubuntu is the likeliest first failure.

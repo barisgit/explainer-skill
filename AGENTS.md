@@ -38,7 +38,7 @@ Root files: `package.json` (devDependencies only), `bun.lock`, `tsconfig.json`, 
 
 The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged files, then `tsc`; about 2 s, no Chrome. It keeps partially staged hunks. lint-staged backs up through `git stash`, which worktrees share, so run commits of different worktrees one at a time. Never use `--no-verify`.
 
-`.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. It has never run: the repository has no remote yet, so it could not be exercised. Expect to adjust it (Bun version, Chrome sandbox) on first use.
+`.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. Its first run is on the initial push; the Chrome sandbox on Ubuntu is the likeliest thing to need adjusting.
 
 ## Decisions
 
@@ -77,8 +77,4 @@ Kit files are behaviour, not just code. After a change: `pack` then `check` `ski
 
 ## Commits
 
-Conventional Commits (`feat(kit):`, `fix(check):`, `chore:`, `test:`, `docs:`), one change per commit, explicit paths when staging. Gates pass on every commit. Local git only until a remote exists.
-
-## Open questions
-
-- Licence for this project: not chosen. Until it is, do not add a LICENSE file or licence metadata.
+Conventional Commits (`feat(kit):`, `fix(check):`, `chore:`, `test:`, `docs:`), one change per commit, explicit paths when staging. Gates pass on every commit. The public remote is `github.com/barisgit/explainer-skill` (MIT); releases are tags such as `v0.1.0`, which Caplet installs pin.
