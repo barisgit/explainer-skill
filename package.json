@@ -9,6 +9,7 @@
 		"test": "bun test",
 		"ci": "bun run typecheck && bun run lint && bun run test",
 		"vendor": "bun build/vendor.ts",
+		"verify:install": "bun build/verify-install.ts",
 		"prepare": "husky"
 	},
 	"lint-staged": {
