@@ -1058,14 +1058,21 @@ output {
 		min-inline-size: 0;
 		padding-block-end: 0.375rem;
 	}
+	/* A table, not a grid: the cell's text, <i>, <code> and other inline pieces share one anonymous column beside the label. */
 	:where(.compare:not(.table)) td[data-label] {
-		display: grid;
-		grid-template-columns: minmax(5.5rem, 36%) 1fr;
-		gap: 0.75rem;
-		align-items: baseline;
+		display: table;
+		table-layout: fixed;
+		border-collapse: separate; /* the table's collapsing model, inherited from .compare, would drop the cell's own padding */
+		border-spacing: 0;
+		inline-size: 100%;
 	}
 	:where(.compare:not(.table)) td[data-label]::before {
 		content: attr(data-label);
+		display: table-cell;
+		box-sizing: content-box;
+		inline-size: 36%;
+		min-inline-size: 5.5rem;
+		padding-inline-end: 0.75rem;
 		color: var(--muted);
 		font-size: 0.8125rem;
 	}
