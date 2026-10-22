@@ -424,3 +424,18 @@ test.each([
 	expect(html).not.toContain("onetwo");
 	expect(html).not.toMatch(/<br\s*\/?>/);
 });
+
+test("a Mermaid block left open at the end of the page fails, with its data-step", async () => {
+	const input = dir.write(
+		"open.html",
+		"<!doctype html><html><body><p>Before</p><pre class=mermaid data-step=1>flowchart LR\n  a --> b\n",
+	);
+
+	const result = await runCli(["pack", input, "-o", dir.path("open.out.html")]);
+
+	expect(result.code).not.toBe(0);
+	expect(result.stderr).toContain("mermaid block 1: diagrams do not step");
+	expect(result.stderr).toContain(
+		"mermaid block 1 has no end tag, so the rest of the page is its source: close it with </pre>",
+	);
+});

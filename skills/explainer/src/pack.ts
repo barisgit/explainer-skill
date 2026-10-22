@@ -87,7 +87,8 @@ const startTag = (el: HTMLRewriterTypes.Element) =>
  * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy. The source is the block's
  * inner HTML, decoded, as Mermaid reads it in a browser, so a literal `<br>` in a label breaks the line like `&lt;br&gt;`.
  * Blocks and attributes are found by the HTML parser, so any spelling the browser accepts counts. Syntax errors, unsupported
- * types and data-steps or data-step on a block (diagrams do not step) are returned as problems. `diagramRefs` collects every part id.
+ * types, data-steps or data-step on a block (diagrams do not step) and a block left open at the end of the page are returned
+ * as problems. `diagramRefs` collects every part id.
  */
 function renderMermaidBlocks(
 	html: string,
@@ -95,7 +96,7 @@ function renderMermaidBlocks(
 	diagramRefs: Set<string>,
 ): Promise<string> {
 	let blocks = 0;
-	let open = false;
+	let open: { n: number; tag: string } | undefined;
 	let source: string[] = [];
 	return new HTMLRewriter()
 		.on("pre.mermaid, div.mermaid", {
@@ -106,10 +107,10 @@ function renderMermaidBlocks(
 				}
 				const parts: string[] = [];
 				source = parts;
-				open = true;
+				open = { n, tag: el.tagName };
 				el.tagName = "div";
 				el.onEndTag((end) => {
-					open = false;
+					open = undefined;
 					const diagram = renderMermaid(unescapeHtml(parts.join("")), n - 1);
 					if (diagram instanceof Error) {
 						return void problems.push(`mermaid block ${n}: ${diagram.message}`);
@@ -138,6 +139,15 @@ function renderMermaidBlocks(
 					el.onEndTag(() => void parts.push(`</${tag}>`));
 				}
 				el.removeAndKeepContent();
+			},
+		})
+		.onDocument({
+			end() {
+				if (open) {
+					problems.push(
+						`mermaid block ${open.n} has no end tag, so the rest of the page is its source: close it with </${open.tag}>`,
+					);
+				}
 			},
 		})
 		.transform(new Response(html))
