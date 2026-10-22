@@ -17,6 +17,7 @@ const MIME: Record<string, string> = {
 	".otf": "font/otf",
 };
 
+/** The page cannot become an offline file; the message lists every cause (remote references, missing files, failed diagrams). */
 export class PackError extends Error {}
 
 const isRemote = (ref: string) => /^(https?:)?\/\//i.test(ref);
@@ -132,13 +133,10 @@ function loneRefs(source: string, diagramRefs: Set<string>): string[] {
 }
 
 /**
- * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
- * Mermaid blocks are pre-rendered (needs Chrome). Throws PackError listing every remaining network dependency
- * (remote src/href/url()) and every diagram that fails to render. `warnings` lists links that go nowhere.
+ * The rewriter that inlines local CSS, scripts, images and fonts; every remote or unreadable reference is added to `problems`
+ * instead of throwing, so one run reports them all.
  */
-export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
-	const baseDir = dirname(resolve(inputPath));
-	const problems: string[] = [];
+function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 	const attempt = <T>(fn: () => T, fallback: T): T => {
 		try {
 			return fn();
@@ -150,7 +148,7 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 			return fallback;
 		}
 	};
-	const rewriter = new HTMLRewriter()
+	return new HTMLRewriter()
 		.on("link[rel~=stylesheet][href]", {
 			element(el) {
 				const href = el.getAttribute("href") ?? "";
@@ -215,10 +213,20 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 				}
 			},
 		});
+}
+
+/**
+ * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
+ * Mermaid blocks are pre-rendered (needs Chrome). Throws PackError listing every remaining network dependency
+ * (remote src/href/url()) and every diagram that fails to render. `warnings` lists links that go nowhere.
+ */
+export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
+	const baseDir = dirname(resolve(inputPath));
+	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
 	const original = readFileSync(inputPath, "utf8");
 	const source = await renderMermaidBlocks(original, problems, diagramRefs);
-	const html = await rewriter.transform(new Response(source)).text();
+	const html = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	if (problems.length) {
 		const remote = problems.some((p) => !p.startsWith("mermaid block"));
 		throw new PackError(
