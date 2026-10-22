@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
 
 /** The skill directory as an installer would copy it. */
 export const SKILL_DIR = join(import.meta.dir, "..", "skills", "explainer");
@@ -46,3 +47,18 @@ export function scratch() {
  */
 export const pageAssertion = (contract: string, name: string, body: string) =>
 	`setTimeout(() => { if (!(${body})) throw new Error("${contract}: ${name}"); }, 300);`;
+
+/** The rendered diagram's SVG, failing the test when the source does not render. */
+export function svgOf(source: string): string {
+	const diagram = renderMermaid(source);
+	if (diagram instanceof Error) {
+		throw diagram;
+	}
+	return diagram.svg;
+}
+
+/** The message a source fails with, or "rendered". */
+export function failureOf(source: string): string {
+	const diagram = renderMermaid(source);
+	return diagram instanceof Error ? diagram.message : "rendered";
+}
