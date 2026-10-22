@@ -1,5 +1,6 @@
 import {
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
@@ -7,7 +8,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { check } from "./check.ts";
 import { PackError, pack } from "./pack.ts";
 import { report } from "./report.ts";
@@ -105,8 +106,14 @@ export const COMMANDS: Record<string, Command> = {
 			if (!input || !out) {
 				return usage("pack needs an input and -o. Example: pack page.html -o artifact.html");
 			}
+			if (!existsSync(input)) {
+				return usage(
+					`pack needs an existing page, not "${input}". Example: pack page.html -o artifact.html`,
+				);
+			}
 			try {
 				const { html, warnings } = await pack(input);
+				mkdirSync(dirname(out), { recursive: true });
 				writeFileSync(out, html);
 				console.log(
 					`packed ${out} (${(html.length / 1024).toFixed(0)} KB), no network dependencies${warnings.map((w) => `\nwarning: ${w}`).join("")}\nnext: ${CLI} check ${out}`,

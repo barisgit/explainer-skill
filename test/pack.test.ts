@@ -35,6 +35,13 @@ describe("pack inlines what is local", () => {
 	});
 });
 
+test("pack of a missing page is a usage error (exit 2), not a stack trace", async () => {
+	const result = await runCli(["pack", dir.path("absent.html"), "-o", dir.path("out.html")]);
+
+	expect(result.code).toBe(2);
+	expect(result.stderr).toStartWith("error: pack needs an existing page");
+});
+
 describe("pack rejects network dependencies", () => {
 	const remote = {
 		script: [

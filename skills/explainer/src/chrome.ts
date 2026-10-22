@@ -13,6 +13,9 @@ const CHROME_PATHS = [
 	"/usr/bin/chromium-browser",
 ];
 
+/** Chrome could not be started or driven: an environment problem the CLI reports without a stack trace. */
+export class ChromeError extends Error {}
+
 /** Details of a script exception as the DevTools Protocol reports it. */
 interface ExceptionDetails {
 	text: string;
@@ -61,7 +64,7 @@ export class Cdp {
 		const ws = new WebSocket(url);
 		await new Promise((ok, fail) => {
 			ws.onopen = ok;
-			ws.onerror = () => fail(new Error("cannot connect to Chrome"));
+			ws.onerror = () => fail(new ChromeError("cannot connect to Chrome"));
 		});
 		return new Cdp(ws);
 	}
@@ -101,7 +104,7 @@ export class Cdp {
 export async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
-		throw new Error("no Chrome found: set CHROME=/path/to/chrome");
+		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
 	}
 	const proc = spawn(
 		bin,
@@ -125,7 +128,7 @@ export async function launch(profile: string): Promise<{ port: number; stop: () 
 				ok(Number(m[1]));
 			}
 		});
-		proc.on("exit", () => fail(new Error(`Chrome exited early:\n${log.slice(-400)}`)));
+		proc.on("exit", () => fail(new ChromeError(`Chrome exited early:\n${log.slice(-400)}`)));
 	});
 	return { port, stop: () => proc.kill() };
 }
@@ -140,7 +143,7 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 		);
 		const page = targets.find((t) => t.type === "page");
 		if (!page) {
-			throw new Error("Chrome opened no page to drive");
+			throw new ChromeError("Chrome opened no page to drive");
 		}
 		const cdp = await Cdp.connect(page.webSocketDebuggerUrl);
 		try {

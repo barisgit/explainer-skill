@@ -1,3 +1,4 @@
+import { ChromeError } from "./chrome.ts";
 import { CLI, COMMANDS, type Command, usage } from "./commands.ts";
 
 function help(name?: string): string {
@@ -38,8 +39,12 @@ function parseArgs(
 		if (spec === undefined) {
 			return { error: `unknown flag ${a} for ${name}. Run: ${CLI} ${name} --help` };
 		}
-		const value = /^\S+\s+</.test(spec) ? [rest[++i] ?? ""] : [];
-		flags.set(a, [...(flags.get(a) ?? []), ...value]);
+		const takesValue = /^\S+\s+</.test(spec);
+		const value = takesValue ? rest[++i] : undefined;
+		if (takesValue && value === undefined) {
+			return { error: `${a} needs a value. Run: ${CLI} ${name} --help` };
+		}
+		flags.set(a, [...(flags.get(a) ?? []), ...(value === undefined ? [] : [value])]);
 	}
 	return { args, flags };
 }
@@ -61,4 +66,12 @@ const parsed = parseArgs(name, command, rest);
 if ("error" in parsed) {
 	process.exit(usage(parsed.error));
 }
-process.exit(await command.run(parsed.args, parsed.flags));
+try {
+	process.exit(await command.run(parsed.args, parsed.flags));
+} catch (e) {
+	if (!(e instanceof ChromeError)) {
+		throw e;
+	}
+	console.error(`error: ${e.message}`);
+	process.exit(1);
+}
