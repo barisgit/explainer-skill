@@ -12,7 +12,7 @@ const PAGE = (
 	checks: string[],
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><h1>Steps</h1>
-<figure class="fig" id="s" data-stepper data-start="1">
+<figure class="fig" id="s" data-stepper data-start="1" data-labels="Nazaj,Predvajaj,Premor,Naprej,,Korak">
 <pre class="mermaid" data-steps="a:1 b:2 c:3">flowchart LR; a --> b; b --> c</pre>
 <ol data-captions><li>one</li><li>two</li><li>three</li></ol></figure>
 <script src="kit:steps.js"></script>
@@ -33,6 +33,10 @@ const CHECKS = [
 	assertLater(
 		"an unmapped edge appears with its later endpoint",
 		`${edgeSteps("L_a_b_0")} === "2,2" && ${edgeSteps("L_b_c_0")} === "3,3"`,
+	),
+	assertLater(
+		"data-labels renames the controls and keeps the defaults it leaves empty",
+		`document.querySelector("[data-go='1']").textContent === "Naprej" && document.querySelector("[data-play]").textContent === "Predvajaj" && document.querySelector(".player input").ariaLabel === "Korak" && document.querySelector(".player").ariaLabel === "Step controls"`,
 	),
 	assertLater(
 		"data-go buttons step",

@@ -11,7 +11,8 @@
    An edge data-steps does not name appears with its later endpoint, so mapping the nodes is enough; an edge listed in data-steps keeps its own steps.
    Mermaid ids are the diagram's own: `flowchart LR; api --> cache` has nodes api and cache; `api e1@--> cache` names the edge e1;
    sequence diagrams have participants by id and messages m1, m2, ... in order. pack fails when data-steps names an id the diagram lacks.
-   Controls: <button data-go="-1"> Back, <button data-go="1"> Next (click them to step by script or in check --do click:'[data-go="1"]'), Play
+   Labels: data-labels="Back,Play,Pause,Next,Step controls,Step" on the stepper replaces the button texts and the two accessible names, in this
+   order; leave an entry empty to keep its default (no commas inside a label). Controls: <button data-go="-1"> Back, <button data-go="1"> Next (click them to step by script or in check --do click:'[data-go="1"]'), Play
    (data-play), the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
    Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts and data-steps. Replacing
    the children of the [data-captions] list is picked up by itself; after any other replacement call Steps.refresh(el, step?). It re-reads
@@ -82,6 +83,9 @@
 		}
 	}
 
+	// Default texts in data-labels order; the page's list may leave entries empty to keep them.
+	const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"];
+
 	const button = (label, attrs, primary = false) =>
 		`<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
 
@@ -94,16 +98,21 @@
 		timer = null;
 		announced = "";
 		wired = false;
+		labels = [];
 
 		constructor(root) {
 			this.root = root;
+			const custom = (root.dataset.labels ?? "").split(",").map((label) => label.trim());
+			this.labels = LABELS.map((label, i) => custom[i] || label);
+			const [back, play, , next, group, scrubber] = this.labels;
 			this.bar = document.createElement("div");
 			this.bar.className = "player";
 			this.bar.setAttribute("role", "group");
-			this.bar.setAttribute("aria-label", "Step controls");
-			this.bar.innerHTML = `${button("Back", 'data-go="-1"')}${button("Play", "data-play", true)}${button("Next", 'data-go="1"')}<input type="range" min="1" aria-label="Step"><output></output>`;
+			this.bar.setAttribute("aria-label", group);
+			this.bar.innerHTML = `${button(back, 'data-go="-1"')}${button(play, "data-play", true)}${button(next, 'data-go="1"')}<input type="range" min="1"><output></output>`;
 			[this.back, this.play, this.next] = this.bar.querySelectorAll("button");
 			this.range = this.bar.querySelector("input");
+			this.range.setAttribute("aria-label", scrubber);
 			this.readout = this.bar.querySelector("output");
 			this.bindControls();
 			this.bindKeys();
@@ -146,7 +155,7 @@
 		stop() {
 			clearInterval(this.timer);
 			this.timer = null;
-			this.play.textContent = "Play";
+			this.play.textContent = this.labels[1];
 		}
 
 		bindControls() {
@@ -168,7 +177,7 @@
 				if (this.step === this.total) {
 					this.show(1);
 				}
-				this.play.textContent = "Pause";
+				this.play.textContent = this.labels[2];
 				this.timer = setInterval(
 					() => (this.step < this.total ? this.show(this.step + 1) : this.stop()),
 					PLAY_MS,
