@@ -7,7 +7,7 @@
 			"!**/*.html",
 			"!**/*.md",
 			"!skills/explainer/kit/echarts.js",
-			"!skills/explainer/vendor/mermaid.min.js",
+			"!skills/explainer/vendor/beautiful-mermaid.js",
 			"!examples/*/data.js"
 		]
 	},

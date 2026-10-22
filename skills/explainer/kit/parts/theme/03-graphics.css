@@ -1,4 +1,4 @@
-/* theme part: charts, plots, Mermaid blocks, svg copies per scheme, hand-built diagrams. */
+/* theme part: charts, plots, Mermaid blocks, svg files per scheme, hand-built diagrams. */
 /* Charts (kit:echarts.js + kit:charts.js, or kit:plot.js): the element needs a height; the chart fills it. */
 .chart {
 	inline-size: 100%;
@@ -117,7 +117,8 @@
 	fill: var(--c);
 }
 
-/* Mermaid blocks are rendered by pack in both themes; show the one that matches. On the page they sit on the blueprint surface. */
+/* Mermaid blocks: pack renders each to one SVG drawn with the renderer's private variables (--_line, --_node-fill, ...), set here
+   from the kit's tokens, so a diagram follows light, dark and a page's own tokens. On the page it sits on the blueprint surface. */
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
@@ -138,39 +139,44 @@
 	--under: inherit;
 	background: none;
 }
-/* Mermaid paints its edge-label boxes in --bg; they take the tone under the diagram instead, so a diagram in a band has no light
-   boxes. Its stylesheet is scoped by id, which outranks any class rule. */
-.mermaid :is(.edgeLabel, .edgeLabel p, .labelBkg) {
-	/* biome-ignore lint/complexity/noImportantStyles: Mermaid's id-scoped stylesheet sets this background and outranks the kit */
-	background-color: var(--under) !important;
+/* The renderer fills edge-label boxes, hollow markers and end states with --bg: here the tone under the diagram, so a diagram in a
+   band or panel has no page-coloured boxes. */
+.mermaid > svg {
+	--bg: var(--under);
+	--fg: var(--ink);
+	--_text: var(--ink);
+	--_text-sec: var(--muted);
+	--_text-muted: var(--muted);
+	--_text-faint: color-mix(in srgb, var(--muted) 70%, var(--under));
+	--_line: var(--muted);
+	--_arrow: var(--muted);
+	--_node-fill: var(--surface);
+	--_node-stroke: var(--rule-strong);
+	--_group-fill: transparent;
+	--_group-hdr: var(--sunken);
+	--_inner-stroke: var(--rule);
+	--_key-badge: var(--sunken);
+	font-family: var(--font);
+	overflow: visible;
 }
-.mermaid .edgeLabel rect {
-	/* biome-ignore lint/complexity/noImportantStyles: Mermaid's id-scoped stylesheet sets this fill and outranks the kit */
-	fill: var(--under) !important;
+.mermaid > svg .mono {
+	font-family: var(--mono);
 }
-.mermaid .label {
-	margin: 0;
-	font: inherit;
-	color: inherit;
-} /* mermaid's own .label, not the kit's caption */
-/* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). Diagrams and svg files in
-   <img> (packed once per scheme) share this; only the other copy is hidden so the page's own display rule for an <img> stays. */
-.mermaid > :is(.light, .dark) {
-	display: inline-block;
-}
-:root[data-scheme="dark"] :is(.mermaid > .light, img.light),
-:root[data-scheme="light"] :is(.mermaid > .dark, img.dark) {
+/* pack inlines an svg file in <img> once per scheme; the copy shown follows the system scheme unless <html data-scheme> forces one
+   (light-dark() cannot switch display). Only the other copy is hidden, so the page's own display rule for the <img> stays. */
+:root[data-scheme="dark"] img.light,
+:root[data-scheme="light"] img.dark {
 	/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
 	display: none !important;
 }
 @media (prefers-color-scheme: dark) {
-	:root:not([data-scheme="light"]) :is(.mermaid > .light, img.light) {
+	:root:not([data-scheme="light"]) img.light {
 		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
 		display: none !important;
 	}
 }
 @media (prefers-color-scheme: light) {
-	:root:not([data-scheme="dark"]) :is(.mermaid > .dark, img.dark) {
+	:root:not([data-scheme="dark"]) img.dark {
 		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
 		display: none !important;
 	}

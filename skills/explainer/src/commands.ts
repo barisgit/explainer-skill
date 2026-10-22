@@ -19,7 +19,9 @@ export interface Command {
 	run: (args: string[], flags: Map<string, string[]>) => Promise<number>;
 }
 
-const MERMAID_DOC = `<pre class="mermaid"> blocks hold Mermaid source (flowchart, sequence, state, class, ER, gantt, pie, ...). pack renders each block once in light and dark, so no script ships.
+const MERMAID_DOC = `<pre class="mermaid"> blocks hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
+pack renders each block to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit charts.js).
+Labels stay on one line: keep them to a few words, or break one with <br>.
 Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
   flowchart / state / class / ER   nodes and subgraphs: the node id (cache in "api --> cache[(Cache)]")
   edges                            the edge id: name one with "api e1@--> cache" (otherwise Mermaid's, e.g. L_api_cache_0)
@@ -29,8 +31,8 @@ Use the ids from prose, steps and replies:
   <pre class="mermaid" data-steps="api:1 cache:2,4 e1:3"> inside a data-stepper: api appears on step 1, cache on 2 and again lit on 4 (kit:steps.js)
   clicking a node offers a note on it (kit:reply.js)
 pack fails when data-steps names an id the diagram lacks, and lists the ids it has. Keep ids short and meaningful: they are what you type here.
-Colours come from the kit tokens plus overrides in the page's own inline <style> (e.g. :root { --accent: ... }); linked stylesheets are not read.
-Phones: Mermaid scales the diagram to the column, so a wide left-to-right chart gets tiny text; prefer top-down (flowchart TD) and few nodes. check warns under 9 px.`;
+Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
+Phones: the diagram scales to the column, so a wide left-to-right chart gets tiny text; prefer top-down (flowchart TD) and few nodes. check warns under 9 px.`;
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {
@@ -74,7 +76,7 @@ export const COMMANDS: Record<string, Command> = {
 				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
 			}
 			console.log(
-				`<pre class="mermaid">...</pre>  diagram source (flowchart, sequence, state, class, ER, gantt, pie, ...); pack renders it in light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-steps, data-captions, data-ref, data-reply, data-keep.`,
+				`<pre class="mermaid">...</pre>  diagram source (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-steps, data-captions, data-ref, data-reply, data-keep.`,
 			);
 			return 0;
 		},

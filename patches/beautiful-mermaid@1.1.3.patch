@@ -1,0 +1,279 @@
+diff --git a/src/layout-engine.ts b/src/layout-engine.ts
+index 8557308223e16670db3d126d9c55673b6e946598..da74af121c4e242b6e039b22b60b9f2f6ccbca8d 100644
+--- a/src/layout-engine.ts
++++ b/src/layout-engine.ts
+@@ -30,7 +30,7 @@ import type {
+   RenderOptions,
+ } from './types.ts'
+ import { FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, ARROW_HEAD } from './styles.ts'
+-import { measureMultilineText } from './text-metrics.ts'
++import { measureMultilineText, wrapText } from './text-metrics.ts'
+ import { elkLayoutSync } from './elk-instance.ts'
+ import { clipEdgeToShape } from './shape-clipping.ts'
+ 
+@@ -209,10 +209,16 @@ function mermaidToElk(
+       'elk.layered.highDegreeNodes.threshold': '8',
+       'elk.layered.compaction.postCompaction.strategy': 'LEFT_RIGHT_CONSTRAINT_LOCKING',
+       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
++      // Back edges are the ones written last, as in Mermaid, so a cycle does not reorder a top-down flow.
++      'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
+       'elk.layered.wrapping.strategy': 'OFF',
+       // Use SEPARATE when subgraphs have direction overrides (enables proper direction handling)
+       // Use INCLUDE_CHILDREN otherwise (simpler cross-hierarchy edge routing)
+       'elk.hierarchyHandling': hasDirectionOverride ? 'SEPARATE' : 'INCLUDE_CHILDREN',
++      // Edge points relative to the node whose edges list holds the edge, which is the offset collectEdgeSegments adds.
++      // The default (CONTAINER) uses the endpoints' lowest common ancestor, so an edge between levels of one subgraph
++      // was drawn off by that subgraph's position.
++      'elk.json.edgeCoords': 'PARENT',
+     },
+     children: [],
+     edges: [],
+@@ -259,23 +265,25 @@ function mermaidToElk(
+     }
+   }
+ 
+-  // Add top-level nodes (those not in any subgraph)
++  // Top-level nodes and subgraphs, in the order they are first written (a subgraph where its first member is), so that
++  // MODEL_ORDER cycle breaking turns back exactly the edges that point to something written earlier.
++  const rank = appearanceRank(graph)
++  const topLevel: Array<{ rank: number; node: ElkGraphNode }> = []
+   for (const [id, node] of graph.nodes) {
+     if (!subgraphNodeIds.has(id) && !subgraphIds.has(id)) {
+       const size = estimateNodeSize(id, node.label, node.shape)
+-      elkGraph.children!.push({
++      topLevel.push({ rank: rank(id), node: {
+         id,
+         width: size.width,
+         height: size.height,
+         labels: [{ text: node.label }],
+-      })
++      } })
+     }
+   }
+-
+-  // Add subgraphs as compound nodes with children and their internal edges
+   for (const sg of graph.subgraphs) {
+-    elkGraph.children!.push(subgraphToElk(sg, graph, opts, edgesBySubgraph, subgraphPorts))
++    topLevel.push({ rank: rank(sg.id), node: subgraphToElk(sg, graph, opts, edgesBySubgraph, subgraphPorts) })
+   }
++  elkGraph.children!.push(...topLevel.sort((a, b) => a.rank - b.rank).map(t => t.node))
+ 
+   // Add root-level edges
+   for (const { index, edge } of edgesBySubgraph.get(null)!) {
+@@ -324,6 +332,23 @@ function mermaidToElk(
+   return elkGraph
+ }
+ 
++/**
++ * Where each node and subgraph is first written: a node's index in graph.nodes (insertion order), a subgraph's that of its
++ * earliest member, less a half so it sorts before that member's siblings.
++ */
++function appearanceRank(graph: MermaidGraph): (id: string) => number {
++  const order = new Map([...graph.nodes.keys()].map((id, i) => [id, i]))
++  const subgraphs = new Map<string, MermaidSubgraph>()
++  const walk = (list: MermaidSubgraph[]) => { for (const sg of list) { subgraphs.set(sg.id, sg); walk(sg.children) } }
++  walk(graph.subgraphs)
++  const rank = (id: string): number => {
++    const sg = subgraphs.get(id)
++    if (!sg) return order.get(id) ?? Number.MAX_SAFE_INTEGER
++    return Math.min(Number.MAX_SAFE_INTEGER, ...sg.nodeIds.map(rank), ...sg.children.map(c => rank(c.id))) - 0.5
++  }
++  return rank
++}
++
+ /**
+  * Convert a MermaidSubgraph to an ELK compound node.
+  * Includes internal edges (edges where both endpoints are in this subgraph)
+@@ -353,6 +378,9 @@ function subgraphToElk(
+     'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
+     'elk.layered.spacing.edgeNodeBetweenLayers': '12',
+     'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
++    // MODEL_ORDER throws inside a compound node in elkjs 0.11.1; a depth-first search over the children, which are in
++    // written order, turns back the same edges.
++    'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
+     'elk.layered.spacing.nodeNodeBetweenLayers': String(opts.layerSpacing),
+     'elk.spacing.nodeNode': String(opts.nodeSpacing),
+   }
+@@ -380,24 +408,25 @@ function subgraphToElk(
+     }))
+   }
+ 
+-  // Add direct child nodes
++  // Direct child nodes and nested subgraphs, in the order they are first written (see mermaidToElk)
++  const rank = appearanceRank(graph)
++  const members: Array<{ rank: number; node: ElkGraphNode }> = []
+   for (const nodeId of sg.nodeIds) {
+     const node = graph.nodes.get(nodeId)
+     if (node) {
+       const size = estimateNodeSize(nodeId, node.label, node.shape)
+-      elkNode.children!.push({
++      members.push({ rank: rank(nodeId), node: {
+         id: nodeId,
+         width: size.width,
+         height: size.height,
+         labels: [{ text: node.label }],
+-      })
++      } })
+     }
+   }
+-
+-  // Add nested subgraphs recursively
+   for (const child of sg.children) {
+-    elkNode.children!.push(subgraphToElk(child, graph, opts, edgesBySubgraph, subgraphPorts))
++    members.push({ rank: rank(child.id), node: subgraphToElk(child, graph, opts, edgesBySubgraph, subgraphPorts) })
+   }
++  elkNode.children!.push(...members.sort((a, b) => a.rank - b.rank).map(m => m.node))
+ 
+   // Add internal edges (edges where both endpoints are in this subgraph)
+   const internalEdges = edgesBySubgraph.get(sg.id) ?? []
+@@ -1404,9 +1433,25 @@ export function layoutGraphSync(
+   options: RenderOptions = {}
+ ): PositionedGraph {
+   const opts = { ...DEFAULTS, ...options }
+-  const elkGraph = mermaidToElk(graph, opts)
++  const wrapped = wrapLabels(graph)
++  const elkGraph = mermaidToElk(wrapped, opts)
+   const result = elkLayoutSync(elkGraph)
+-  return elkToPositioned(result, graph, DEFAULTS.mergeEdges)
++  return elkToPositioned(result, wrapped, DEFAULTS.mergeEdges)
++}
++
++/** Mermaid's wrapping width for node and edge labels, in px at the renderer's font sizes. */
++const LABEL_WRAP_WIDTH = 200
++
++/** The graph with node and edge labels wrapped at LABEL_WRAP_WIDTH, as Mermaid lays them out. */
++function wrapLabels(graph: MermaidGraph): MermaidGraph {
++  const nodes = new Map([...graph.nodes].map(([id, node]) => [id, {
++    ...node,
++    label: wrapText(node.label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel, LABEL_WRAP_WIDTH),
++  }]))
++  const edges = graph.edges.map(edge => edge.label
++    ? { ...edge, label: wrapText(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel, LABEL_WRAP_WIDTH) }
++    : edge)
++  return { ...graph, nodes, edges }
+ }
+ 
+ /**
+diff --git a/src/parser.ts b/src/parser.ts
+index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..fdec9ad9dd1d0c907cc7cfd1aaf6f07126ed8d79 100644
+--- a/src/parser.ts
++++ b/src/parser.ts
+@@ -325,10 +325,8 @@ function registerStateNode(
+   compositeStack: MermaidSubgraph[],
+   node: MermaidNode
+ ): void {
+-  const isNew = !graph.nodes.has(node.id)
+-  if (isNew) {
+-    graph.nodes.set(node.id, node)
+-  }
++  // The latest alias or description sets the label, as in Mermaid (see registerNode)
++  graph.nodes.set(node.id, node)
+   if (compositeStack.length > 0) {
+     const current = compositeStack[compositeStack.length - 1]!
+     if (!current.nodeIds.includes(node.id)) {
+@@ -610,10 +608,8 @@ function registerNode(
+   subgraphStack: MermaidSubgraph[],
+   node: MermaidNode
+ ): void {
+-  const isNew = !graph.nodes.has(node.id)
+-  if (isNew) {
+-    graph.nodes.set(node.id, node)
+-  }
++  // As in Mermaid, the latest shaped definition sets the label and shape; Map.set on a known id keeps its first position.
++  graph.nodes.set(node.id, node)
+   trackInSubgraph(subgraphStack, node.id)
+ }
+ 
+diff --git a/src/text-metrics.ts b/src/text-metrics.ts
+index 07766ab65303221352620180c63aa592b5842a10..48d561836bf6ed62e44b7ea5b8d9bfe96d5d8d45 100644
+--- a/src/text-metrics.ts
++++ b/src/text-metrics.ts
+@@ -161,34 +161,72 @@ export function getCharWidth(char: string): number {
+   return 1.0
+ }
+ 
++// geist-widths:start
++// Generated by build/geist-widths.ts in the explainer repository from the kit's Geist font; rerun it when the font changes.
++/** Advance widths of printable ASCII (U+0020 to U+007E) in Geist, in thousandths of an em, by font weight. */
++const GEIST_WIDTHS: Record<number, readonly number[]> = {
++  400: [250, 213, 346, 478, 629, 802, 620, 178, 274, 274, 430, 558, 201, 419, 201, 480, 663, 384, 619, 613, 615, 626, 593, 524, 604, 593, 297, 297, 544, 540, 544, 559, 906, 668, 680, 703, 694, 603, 590, 700, 713, 270, 597, 640, 580, 877, 743, 739, 650, 733, 672, 640, 552, 689, 667, 945, 606, 576, 544, 347, 455, 347, 426, 557, 248, 551, 595, 546, 595, 561, 395, 594, 581, 244, 260, 590, 267, 877, 581, 573, 595, 595, 379, 520, 392, 575, 536, 819, 585, 537, 537, 389, 264, 389, 523],
++  500: [243, 228, 361, 515, 643, 810, 649, 186, 290, 290, 427, 562, 213, 418, 213, 494, 673, 406, 630, 625, 629, 641, 604, 531, 624, 606, 302, 302, 546, 544, 546, 570, 925, 689, 688, 713, 701, 609, 595, 713, 716, 280, 607, 656, 583, 890, 745, 751, 657, 745, 680, 654, 568, 694, 688, 968, 633, 594, 561, 361, 470, 361, 438, 558, 258, 565, 608, 563, 608, 576, 412, 607, 591, 256, 284, 609, 282, 885, 591, 588, 608, 608, 394, 537, 410, 586, 560, 829, 607, 553, 552, 395, 274, 395, 523],
++  600: [236, 243, 376, 552, 656, 818, 677, 195, 306, 306, 424, 566, 225, 418, 225, 508, 683, 427, 642, 637, 643, 656, 615, 538, 644, 618, 306, 306, 548, 548, 548, 581, 944, 709, 695, 724, 708, 615, 600, 726, 719, 290, 617, 672, 586, 902, 748, 763, 664, 757, 689, 668, 584, 699, 709, 991, 660, 613, 577, 375, 485, 375, 450, 560, 268, 580, 621, 580, 621, 591, 429, 620, 601, 269, 308, 628, 297, 892, 601, 603, 621, 621, 409, 553, 427, 597, 584, 839, 628, 570, 567, 401, 284, 401, 523],
++}
++// geist-widths:end
++
++/** Letters without a canonical decomposition, measured as the ASCII letter they are drawn from. */
++const LATIN_BASES: Record<string, string> = { Đ: 'D', đ: 'd', Ł: 'L', ł: 'l', Ø: 'O', ø: 'o', ı: 'i', ħ: 'h' }
++
++/** A character's Geist advance in em, or undefined outside printable ASCII and the Latin letters built on it. */
++function geistWidth(char: string, widths: readonly number[]): number | undefined {
++  const base = LATIN_BASES[char] ?? char.normalize('NFD')[0] ?? char
++  const code = base.codePointAt(0) ?? 0
++  const advance = code >= 32 && code <= 126 ? widths[code - 32] : undefined
++  return advance === undefined ? undefined : advance / 1000
++}
++
+ /**
+- * Measure the pixel width of a text string.
++ * Measure the pixel width of a text string in Geist, the font the explainer kit draws diagrams in.
+  *
+- * Uses character class buckets for more accurate width estimation
+- * than uniform character width assumptions.
++ * Printable ASCII and accented Latin letters use Geist's measured advances (geist-widths.ts); other characters keep the
++ * character-class estimate, scaled to Geist's average lowercase letter.
+  *
+  * @param text - The text to measure
+  * @param fontSize - Font size in pixels
+- * @param fontWeight - Font weight (affects width slightly)
++ * @param fontWeight - Font weight: 400, 500 and 600 are measured, others use the nearest below
+  * @returns Estimated width in pixels
+  */
+ export function measureTextWidth(text: string, fontSize: number, fontWeight: number): number {
+-  // Base ratio calibrated for Inter font family
+-  // Heavier weights are slightly wider
+-  // Added +0.02 buffer to prevent edge truncation of characters like 's' at line ends
+-  const baseRatio = fontWeight >= 600 ? 0.60 : fontWeight >= 500 ? 0.57 : 0.54
+-
++  const widths = GEIST_WIDTHS[fontWeight >= 600 ? 600 : fontWeight >= 500 ? 500 : 400] ?? []
+   let totalWidth = 0
+-
+-  // Iterate over code points (handles surrogate pairs for emoji/CJK)
+   for (const char of text) {
+-    totalWidth += getCharWidth(char)
++    totalWidth += geistWidth(char, widths) ?? getCharWidth(char) * GEIST_LOWERCASE_EM
+   }
+-
+-  // Add minimum padding to prevent truncation at text boundaries
+-  // Increased from 0.1 to 0.15 for better label separation and collision prevention
++  // Slack for kerning and the anti-aliased edge of the last glyph
+   const minPadding = fontSize * 0.15
+-  return totalWidth * fontSize * baseRatio + minPadding
++  return totalWidth * fontSize + minPadding
++}
++
++/** Geist's average lowercase advance in em, the unit getCharWidth's classes are relative to. */
++const GEIST_LOWERCASE_EM = 0.57
++
++/**
++ * Break each line of a label at spaces so no line is wider than maxWidth, keeping a longer word whole. A line with
++ * formatting tags is left as written, since a break inside <b>...</b> would end the tag on the wrong line.
++ */
++export function wrapText(text: string, fontSize: number, fontWeight: number, maxWidth: number): string {
++  return text.split('\n').map(line => {
++    if (line.includes('<') || measureTextWidth(line, fontSize, fontWeight) <= maxWidth) return line
++    const lines: string[] = []
++    let current = ''
++    for (const word of line.split(' ')) {
++      const next = current ? `${current} ${word}` : word
++      if (current && measureTextWidth(next, fontSize, fontWeight) > maxWidth) {
++        lines.push(current)
++        current = word
++      } else {
++        current = next
++      }
++    }
++    return [...lines, current].join('\n')
++  }).join('\n')
+ }
+ 
+ // ============================================================================

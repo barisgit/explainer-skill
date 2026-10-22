@@ -32,38 +32,17 @@
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
 
-	/** The two node ids of a Mermaid edge id `L_<from>_<to>_<n>`; node ids may hold underscores, so only a split that names two nodes counts. */
-	function endpointsOf(edgeId: string, nodeIds: Set<string>) {
-		const parts = /^L_(.+)_\d+$/.exec(edgeId)?.[1]?.split("_") ?? [];
-		for (let cut = 1; cut < parts.length; cut++) {
-			const ends = [parts.slice(0, cut).join("_"), parts.slice(cut).join("_")];
-			if (ends.every((id) => nodeIds.has(id))) {
-				return ends;
-			}
-		}
-		return [];
-	}
-
-	/** An edge the author did not map appears with its later endpoint (an endpoint with no step is there from the start). */
+	/** An edge the author did not map appears with its later endpoint (an endpoint with no step is there from the start). Edges and
+	 * their labels name their endpoints in data-from and data-to. */
 	function followEndpoints(diagram: Element, firstStep: Map<string, number>) {
-		const nodeIds = new Set(
-			[...diagram.querySelectorAll<Part>(".node[data-ref], .cluster[data-ref]")].map(
-				(n) => n.dataset.ref ?? "",
-			),
-		);
 		for (const edge of diagram.querySelectorAll<Part>(
-			'[data-et="edge"][data-id]:not([data-step])',
+			":is(.edge, .edge-label)[data-from][data-to]:not([data-step])",
 		)) {
-			const id = edge.dataset.id ?? "";
-			const steps = endpointsOf(id, nodeIds).map((end) => firstStep.get(end) ?? 0);
-			const step = Math.max(0, ...steps);
+			const ends = [edge.dataset.from ?? "", edge.dataset.to ?? ""];
+			const step = Math.max(0, ...ends.map((end) => firstStep.get(end) ?? 0));
 			if (step > 0) {
-				for (const part of diagram.querySelectorAll<Part>(
-					`[data-ref~="${CSS.escape(id)}"]:not([data-step])`,
-				)) {
-					part.dataset.step = String(step);
-					part.dataset.stepAuto = "";
-				}
+				edge.dataset.step = String(step);
+				edge.dataset.stepAuto = "";
 			}
 		}
 	}

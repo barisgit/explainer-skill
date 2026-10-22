@@ -1,137 +1,220 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { Cdp } from "./chrome.ts";
-import { withPage } from "./chrome.ts";
-import { kitPath, readKitText } from "./kit.ts";
-import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
+import { parseMermaid, renderMermaidSVG } from "../vendor/beautiful-mermaid.js";
 
-const THEMES = ["light", "dark"] as const;
+/** A rendered diagram: one SVG that follows light and dark through the kit's tokens, and the data-ref ids of its parts. */
+export interface Diagram {
+	svg: string;
+	refs: string[];
+}
 
-/**
- * Runs in the render page: gives every diagram part the `data-ref` of its Mermaid id, so prose, steppers and replies can address it
- * (kit:link.js, kit:steps.js, kit:reply.js). Nodes and subgraphs carry their node id, edges their edge id (`a e1@--> b` names one `e1`),
- * sequence participants their id and messages `m1`, `m2`, ... in order. Returns the annotated SVG markup.
- */
-const ANNOTATE_JS = `(markup) => {
-	const host = document.createElement("div");
-	host.innerHTML = markup;
-	const svg = host.querySelector("svg");
-	const ref = (el, name) => el.setAttribute("data-ref", name);
-	const own = (id) => id.slice(svg.id.length + 1);
-	for (const g of svg.querySelectorAll("g.node[id]")) ref(g, own(g.id).replace(/^(flowchart|state|classId|entity)-/, "").replace(/-\\d+$/, ""));
-	for (const g of svg.querySelectorAll("g.cluster[id]")) ref(g, own(g.id));
-	for (const e of svg.querySelectorAll('[data-et="edge"][data-id], [data-et="participant"][data-id], [data-et="life-line"][data-id]')) ref(e, e.dataset.id);
-	for (const l of svg.querySelectorAll("g.edgeLabel > g.label[data-id]")) ref(l.parentElement, l.dataset.id);
-	const messages = [...svg.querySelectorAll('[data-et="message"]')], texts = [...svg.querySelectorAll("text.messageText")];
-	messages.forEach((m, i) => { ref(m, "m" + (i + 1)); if (texts[i]) ref(texts[i], "m" + (i + 1)); });
-	return svg.outerHTML;
-}`;
+/** The renderer sets node labels at 13 px; drawn 1.2 times larger they read like the page's 16 px text and Mermaid's labels. */
+const SCALE = 1.2;
 
-/** Mermaid theme variables from the kit's tokens, resolved in the render page for the emulated colour scheme. */
-const RENDER_JS = `(async (sources, theme) => {
-	const annotate = ${ANNOTATE_JS};
-	const probe = document.body.appendChild(document.createElement("i"));
-	// Mermaid's colour maths parses only hex/rgb/hsl, and derived tokens such as --accent-soft compute to color(srgb ...): read them back through a pixel.
-	const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-	const c = (name) => {
-		probe.style.color = "var(--" + name + ")";
-		pixel.clearRect(0, 0, 1, 1);
-		pixel.fillStyle = getComputedStyle(probe).color;
-		pixel.fillRect(0, 0, 1, 1);
-		const [r, g, b] = pixel.getImageData(0, 0, 1, 1).data;
-		return "rgb(" + r + ", " + g + ", " + b + ")";
-	};
-	const font = getComputedStyle(document.body).fontFamily;
-	probe.style.fontFamily = "var(--mono)";
-	const mono = getComputedStyle(probe).fontFamily;
-	await Promise.all([document.fonts.load("500 14px " + font), document.fonts.load("400 12px " + mono)]);
-	mermaid.initialize({
-		startOnLoad: false, securityLevel: "strict", theme: "base", fontFamily: font,
-		// Blueprint touches: edge annotations in mono, groups drawn as dashed outlines, sequence actors flat like every other box.
-		themeCSS: ".edgeLabel, .edgeLabel p, .edgeLabel span { font-family: " + mono + "; font-size: 12px; } .cluster rect { stroke-dasharray: 5 4; } rect.actor { filter: none; }",
-		themeVariables: {
-			// Flat drawings: the default neo-look shadow is a light grey halo in dark mode.
-			darkMode: theme === "dark", fontFamily: font, background: c("bg"), dropShadow: "none", useGradient: false,
-			primaryColor: c("surface"), primaryTextColor: c("ink"), primaryBorderColor: c("rule-strong"),
-			secondaryColor: c("sunken"), tertiaryColor: c("bg"), lineColor: c("muted"), textColor: c("ink"),
-			mainBkg: c("surface"), nodeBorder: c("rule-strong"), clusterBkg: c("sunken"), clusterBorder: c("rule-strong"),
-			edgeLabelBackground: c("bg"), titleColor: c("ink"),
-			noteBkgColor: c("warn-soft"), noteBorderColor: c("warn"), noteTextColor: c("ink"),
-			actorBkg: c("surface"), actorBorder: c("rule-strong"), actorTextColor: c("ink"), actorLineColor: c("rule-strong"),
-			signalColor: c("ink"), signalTextColor: c("ink"), labelBoxBkgColor: c("sunken"), labelBoxBorderColor: c("rule-strong"),
-			labelTextColor: c("ink"), loopTextColor: c("ink"), activationBkgColor: c("accent-soft"), activationBorderColor: c("accent"),
-			sequenceNumberColor: c("accent-ink"),
-			pie1: c("c1"), pie2: c("c2"), pie3: c("c3"), pie4: c("c4"), pie5: c("c5"), pie6: c("c6"),
-		},
-	});
-	const out = [];
-	for (const [i, source] of sources.entries()) {
-		try { out.push({ svg: annotate((await mermaid.render("mm" + i + "-" + theme, source)).svg) }); }
-		catch (e) { out.push({ error: String(e.message ?? e).split("\\n").slice(0, 3).join(" ") }); }
+const SUPPORTED =
+	/^(flowchart|graph|stateDiagram(-v2)?|sequenceDiagram|classDiagram|erDiagram|xychart(-beta)?)$/;
+
+/** What to draw instead, per Mermaid type pack cannot render. The kit names are the files `kit <file>` documents. */
+const INSTEAD: Record<string, string> = {
+	pie: "a pie or, better for comparing, a bar chart with kit:charts.js (ECharts)",
+	gantt: "a horizontal bar chart on a time axis with kit:charts.js, or a table of dates",
+	timeline: "an ordered list or a table, or a flowchart LR with one node per period",
+	journey: "a line chart of the scores per step with kit:plot.js or kit:charts.js",
+	quadrantChart: "a scatter chart with kit:charts.js, with markLine at the two midpoints",
+	gitGraph: "a flowchart LR with one node per commit and a subgraph per branch",
+	"sankey-beta": "a sankey chart with kit:charts.js",
+	sankey: "a sankey chart with kit:charts.js",
+	"architecture-beta": "a flowchart with a subgraph per group",
+	"packet-beta": "an HTML table with one column per bit range",
+	packet: "an HTML table with one column per bit range",
+	mindmap: "a flowchart LR or a nested list",
+};
+
+const SUPPORTED_LIST =
+	"flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram, xychart-beta";
+
+/** The source without front matter and `%%` comment lines; the header keyword is the first word left. */
+function stripPreamble(source: string): string {
+	return source
+		.replace(/^\s*---\n[\s\S]*?\n---\s*\n/, "")
+		.split("\n")
+		.filter((line) => !line.trim().startsWith("%%"))
+		.join("\n")
+		.trim();
+}
+
+/** Mermaid's `;` statement separator, outside quoted labels, as a new line: the renderer reads one statement per line. */
+function splitStatements(source: string): string {
+	let quoted = false;
+	let out = "";
+	for (const ch of source) {
+		quoted = ch === '"' ? !quoted : quoted;
+		out += ch === ";" && !quoted ? "\n" : ch;
 	}
 	return out;
-})`;
-
-interface Rendered {
-	svg?: string;
-	error?: string;
 }
 
-/** Renders every source in the page under the emulated colour scheme; one entry per source. */
-async function renderTheme(
-	cdp: Cdp,
-	sources: string[],
-	theme: (typeof THEMES)[number],
-): Promise<Rendered[]> {
-	await cdp.send("Emulation.setEmulatedMedia", {
-		features: [{ name: "prefers-color-scheme", value: theme }],
-	});
-	try {
-		return await cdp.evaluate<Rendered[]>(
-			`${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`,
-			true,
-		);
-	} catch (e) {
-		throw new Error(`mermaid render failed: ${e instanceof Error ? e.message : String(e)}`);
+/** A flowchart link (`-->`, `---`, `-.->`, `==>`, `--x`, `<-->`), with its optional `|label|`. */
+const LINK = String.raw`<?(?:-{2,}|={2,}|-\.+-)[->ox]?(?:\|[^|]*\|)?`;
+const NO_TARGET = new RegExp(`${LINK}\\s*$`);
+const NO_SOURCE = new RegExp(`^\\s*${LINK}`);
+/** A sequence message: sender, arrow (`->>`, `-->`, `-x`, `-)` and their dashed forms), receiver with an optional activation sign, text. */
+const MESSAGE = /^([^:]*?)\s*(--?>>|--?>|--?x|--?\))\s*([+-]?)([^:]*?)\s*(:.*)?$/;
+
+const isFlowchart = (type: string) => type === "flowchart" || type === "graph";
+
+/**
+ * Statements the renderer draws wrong without an error, each with what to write instead: a markdown string (it prints the
+ * backticks), a link missing an end (it drops the arrow), a message missing a participant (it invents one named after the arrow).
+ */
+const MISRENDERS: Array<(type: string, line: string) => string | undefined> = [
+	(_, line) =>
+		line.includes('"`')
+			? 'markdown strings ("`...`") are not supported; drop the backticks: a["**bold** and *italic*"] still renders'
+			: undefined,
+	(type, line) =>
+		isFlowchart(type) && NO_TARGET.test(line)
+			? `"${line}" has no target node; write it as "${line} next", naming the node it points to`
+			: undefined,
+	(type, line) =>
+		isFlowchart(type) && NO_SOURCE.test(line)
+			? `"${line}" has no source node; write it as "prev ${line}", naming the node it starts from`
+			: undefined,
+	(type, line) => {
+		const [, from, arrow, sign, to, text = ""] =
+			(type === "sequenceDiagram" && MESSAGE.exec(line)) || [];
+		return arrow && !(from && to)
+			? `"${line}" is missing a participant; write it as "${from || "A"}${arrow}${sign}${to || "B"}${text}", sender before the arrow and receiver after`
+			: undefined;
+	},
+];
+
+/** The first misrender among the statements after the header, as its message. */
+function misrender(type: string, statements: string[]): string | undefined {
+	for (const statement of statements) {
+		const line = statement.trim();
+		for (const check of MISRENDERS) {
+			const problem = check(type, line);
+			if (problem) {
+				return problem;
+			}
+		}
 	}
+	return undefined;
+}
+
+const EDGE_ID = /\b([A-Za-z_][\w-]*)@(?=[-=.~<])/g;
+const pairKey = (from: string, to: string) => `${from}\u0000${to}`;
+
+/**
+ * Removes Mermaid's edge ids (`a e1@--> b`), which the renderer does not parse, and returns every edge's ref grouped by its
+ * endpoints, in source order: the author's id, else Mermaid's `L_<from>_<to>_<n>`. The rendered SVG lists edges per subgraph,
+ * not in source order, so its edges are matched by endpoints (annotateEdges). An id's edge is the one the parser reaches next
+ * after the text before it.
+ */
+function takeEdgeIds(source: string): { text: string; refs: Map<string, string[]> } {
+	const named = new Map<number, string>();
+	let text = "";
+	let last = 0;
+	for (const m of source.matchAll(EDGE_ID)) {
+		text += source.slice(last, m.index);
+		named.set(parseMermaid(text).edges.length, m[1] ?? "");
+		last = m.index + m[0].length;
+	}
+	text += source.slice(last);
+	const refs = new Map<string, string[]>();
+	parseMermaid(text).edges.forEach((edge, i) => {
+		const queue = refs.get(pairKey(edge.source, edge.target)) ?? [];
+		queue.push(named.get(i) ?? `L_${edge.source}_${edge.target}_${queue.length}`);
+		refs.set(pairKey(edge.source, edge.target), queue);
+	});
+	return { text, refs };
+}
+
+/** Gives every edge and edge label the data-ref takeEdgeIds found for its endpoints, in order among edges with the same endpoints. */
+function annotateEdges(svg: string, refs: Map<string, string[]>): string {
+	const tagged = (pattern: RegExp, markup: string) => {
+		const queues = new Map([...refs].map(([key, list]) => [key, [...list]]));
+		return markup.replace(pattern, (tag, from: string, to: string) => {
+			const ref = queues.get(pairKey(from, to))?.shift();
+			return ref ? `${tag} data-ref="${ref}"` : tag;
+		});
+	};
+	return tagged(
+		/<g class="edge-label" data-from="([^"]*)" data-to="([^"]*)"/g,
+		tagged(/<polyline class="edge" data-from="([^"]*)" data-to="([^"]*)"/g, svg),
+	);
+}
+
+/** data-ref on nodes, groups, classes, entities and participants (their id), lifelines (their participant) and messages (m1, m2, ...). */
+function annotateParts(svg: string): string {
+	let message = 0;
+	return svg
+		.replace(
+			/<g class="(?:node|subgraph|class-node|entity|actor)" data-id="([^"]*)"/g,
+			(tag, id: string) => `${tag} data-ref="${id}"`,
+		)
+		.replace(
+			/<line class="lifeline" data-actor="([^"]*)"/g,
+			(tag, id: string) => `${tag} data-ref="${id}"`,
+		)
+		.replace(/<g class="message"/g, (tag) => `${tag} data-ref="m${++message}"`);
 }
 
 /**
- * Renders each Mermaid source to SVG once per colour scheme, in headless Chrome with the kit's fonts and tokens.
- * Returns one `{ light, dark }` pair per source; a source that fails to parse is reported as an Error in its slot.
- * `pageCss` is the page's own inline <style> text, loaded after the kit stylesheet so per-page token overrides (a different `--accent`)
- * reach the diagram. The 5 MB Mermaid bundle stays in vendor/: only the finished SVG ships in the page.
+ * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide `svg`/`text`
+ * rules; theme.css maps the renderer's variables instead) and fixed colours, prefixes its ids so markers of two diagrams do not clash, scopes the xychart
+ * stylesheet to this diagram and draws its series in the kit palette, and lets the diagram shrink to the column (at most SCALE times its size).
  */
-export async function renderMermaid(
-	sources: string[],
-	pageCss = "",
-): Promise<Array<{ light: string; dark: string } | Error>> {
-	const dir = mkdtempSync(join(tmpdir(), "artifact-mermaid-"));
-	try {
-		const page = join(dir, "render.html");
-		writeFileSync(
-			page,
-			// The theme is inlined whole (its parts included); the base makes its font urls resolve in kit/ as they do in pack.
-			`<!doctype html><base href="file://${KIT_DIR}/"><style>${readKitText(kitPath("theme.css"))}</style><style>${pageCss}</style><body class="mermaid"><script src="file://${join(SKILL_ROOT, "vendor/mermaid.min.js")}"></script>`,
+function inline(svg: string, id: string): string {
+	return svg
+		.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, "")
+		.replace(/\bsvg \{/g, `#${id} {`)
+		.replace(/--xychart-color-(\d+): [^;]+;/g, (_, n: string) => {
+			return `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`;
+		})
+		.replace(/ id="([^"]+)"/g, ` id="${id}-$1"`)
+		.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`)
+		.replace(
+			/^<svg ([^>]*?)width="([\d.]+)" height="[\d.]+" style="[^"]*"/,
+			(_, attrs: string, width: string) =>
+				`<svg id="${id}" ${attrs}width="100%" style="max-width: ${Math.ceil(Number(width) * SCALE)}px"`,
 		);
-		return await withPage(async (cdp) => {
-			await cdp.send("Runtime.enable");
-			const loaded = cdp.once("Page.loadEventFired");
-			await cdp.send("Page.enable");
-			await cdp.send("Page.navigate", { url: `file://${page}` });
-			await loaded;
-			const light = await renderTheme(cdp, sources, "light");
-			const dark = await renderTheme(cdp, sources, "dark");
-			return sources.map((_, i) => {
-				const [l, d] = [light[i], dark[i]];
-				if (!l?.svg || !d?.svg) {
-					return new Error(l?.error ?? d?.error ?? "no SVG produced");
-				}
-				return { light: l.svg, dark: d.svg };
-			});
-		});
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
+}
+
+/** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */
+function renderOne(source: string, n: number): Diagram {
+	const body = stripPreamble(source);
+	const type = /^\S+/.exec(body)?.[0] ?? "";
+	if (!SUPPORTED.test(type)) {
+		const instead = INSTEAD[type];
+		throw new Error(
+			`"${type}" diagrams are not supported (pack draws ${SUPPORTED_LIST})${instead ? `; draw it as ${instead}` : ""}`,
+		);
 	}
+	const problem = misrender(type, splitStatements(body).split("\n").slice(1));
+	if (problem) {
+		throw new Error(problem);
+	}
+	const graphLike = /^(flowchart|graph|stateDiagram)/.test(type);
+	// Only flowcharts and state diagrams have edges with ids; the other types keep their own syntax.
+	const { text, refs } = graphLike
+		? takeEdgeIds(splitStatements(body))
+		: { text: body, refs: new Map<string, string[]>() };
+	const raw = renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist" });
+	const svg = annotateParts(annotateEdges(inline(raw, `mm${n}`), refs));
+	return { svg, refs: [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? "") };
+}
+
+/**
+ * Renders each Mermaid source to one inline SVG, with no browser: beautiful-mermaid parses and lays it out (ELK) in this process,
+ * estimating text widths. Returns one entry per source; a source that fails, or whose type is not supported, is an Error in its slot.
+ * Every part carries the data-ref of its Mermaid id (see annotateParts, annotateEdges), and colours come from the kit's tokens (theme.css).
+ */
+export function renderMermaid(sources: string[]): Array<Diagram | Error> {
+	return sources.map((source, n) => {
+		try {
+			return renderOne(source, n);
+		} catch (e) {
+			return e instanceof Error ? e : new Error(String(e));
+		}
+	});
 }

@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => document.getElementById("s")
 ${checks.join("\n")}</script></body></html>`;
 
 const edgeSteps = (id: string) =>
-	`[...document.querySelectorAll('[data-et="edge"][data-id="${id}"]')].map((e) => e.dataset.step).join()`;
+	`[...document.querySelectorAll('.edge[data-ref="${id}"]')].map((e) => e.dataset.step).join()`;
 
 const CHECKS = [
 	assertLater(
@@ -30,7 +30,7 @@ const CHECKS = [
 	),
 	assertLater(
 		"an unmapped edge appears with its later endpoint",
-		`${edgeSteps("L_a_b_0")} === "2,2" && ${edgeSteps("L_b_c_0")} === "3,3"`,
+		`${edgeSteps("L_a_b_0")} === "2" && ${edgeSteps("L_b_c_0")} === "3"`,
 	),
 	assertLater(
 		"data-labels renames the controls and keeps the defaults it leaves empty",

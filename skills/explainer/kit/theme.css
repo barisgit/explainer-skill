@@ -49,7 +49,7 @@
 	display: none;
 }
 
-/* Linked highlighting: parts that share a data-ref are lit together. Mermaid's stylesheet is scoped by id and wins any stroke rule, so SVG parts get a halo and dimmed neighbours. */
+/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill. */
 :is(span, b, strong, em, code, mark)[data-ref] {
 	text-decoration: underline dotted var(--muted) 1px;
 	text-underline-offset: 0.22em;

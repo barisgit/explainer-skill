@@ -77,26 +77,17 @@ const refsIn = (markup: string) =>
 	[...markup.matchAll(DATA_REF)].flatMap((m) => (m[1] ?? "").split(/\s+/).filter(Boolean));
 
 /**
- * Replaces every `<pre class="mermaid">` block with its rendered diagram in both colour schemes
- * (`<svg class="light">` and `<svg class="dark">`, switched by theme.css). Syntax errors are returned as problems,
- * and so is a `data-steps="id:1,2 ..."` map that names an id the diagram does not have. `diagramRefs` collects every part id.
+ * Replaces every `<pre class="mermaid">` block with its rendered diagram: one SVG whose colours follow the page's tokens
+ * (theme.css maps them), so light and dark need no second copy. Syntax errors and unsupported
+ * types are returned as problems, and so is a `data-steps="id:1,2 ..."` map that names an id the diagram does not have.
+ * `diagramRefs` collects every part id.
  */
-async function renderMermaidBlocks(
-	html: string,
-	problems: string[],
-	diagramRefs: Set<string>,
-): Promise<string> {
+function renderMermaidBlocks(html: string, problems: string[], diagramRefs: Set<string>): string {
 	const blocks = [...html.matchAll(MERMAID_BLOCK)];
 	if (!blocks.length) {
 		return html;
 	}
-	const pageCss = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
-		.map((m) => m[1])
-		.join("\n");
-	const rendered = await renderMermaid(
-		blocks.map((b) => unescapeHtml(b[3] ?? "")),
-		pageCss,
-	);
+	const rendered = renderMermaid(blocks.map((b) => unescapeHtml(b[3] ?? "")));
 	let n = 0;
 	return html.replace(MERMAID_BLOCK, (_, _tag, attrs: string) => {
 		const r = rendered[n++] ?? new Error("no rendering produced");
@@ -104,7 +95,7 @@ async function renderMermaidBlocks(
 			problems.push(`mermaid block ${n}: ${r.message}`);
 			return "";
 		}
-		const ids = new Set(refsIn(r.light));
+		const ids = new Set(r.refs);
 		for (const id of ids) {
 			diagramRefs.add(id);
 		}
@@ -118,7 +109,7 @@ async function renderMermaidBlocks(
 				`mermaid block ${n}: data-steps names ${unknown.map((u) => `"${u}"`).join(", ")}, not in the diagram. Ids: ${[...ids].join(", ")}`,
 			);
 		}
-		return `<div${attrs}>${r.light.replace("<svg ", '<svg class="light" ')}${r.dark.replace("<svg ", '<svg class="dark" ')}</div>`;
+		return `<div${attrs}>${r.svg}</div>`;
 	});
 }
 
@@ -234,7 +225,7 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 
 /**
  * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
- * Mermaid blocks are pre-rendered (needs Chrome). Throws PackError listing every remaining network dependency
+ * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
  * (remote src/href/url(), srcset) and every diagram that fails to render. `warnings` lists links that go nowhere.
  */
 export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
@@ -242,7 +233,7 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
 	const original = readFileSync(inputPath, "utf8");
-	const source = await renderMermaidBlocks(original, problems, diagramRefs);
+	const source = renderMermaidBlocks(original, problems, diagramRefs);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);
 	if (problems.length) {
