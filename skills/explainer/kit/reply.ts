@@ -26,8 +26,9 @@
    then; one the page replaces (also in answer to a restored value) keeps its answer. Controls are matched by id (else radio form,
    group and value, else position), so give inputs ids; a saved value is dropped when the control's own label or type differs from
    when it was saved (a regenerated page). The "Clear answers and notes" button (bottom right, shown while anything is answered, a
-   note exists, or answers wait for a control not yet shown) puts every control back to its default, again with events, and drops
-   the notes and the saved copy.
+   note exists, or answers wait for a control not yet shown) asks first: one click turns it red ("Clear everything?"), a second
+   within 4 s puts every control back to its default, again with events, and drops the notes and the saved copy. Escape, leaving
+   the button or the wait cancels.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
@@ -209,7 +210,7 @@
 		} catch {
 			// file:// pages and some browsers refuse the async API; selecting a textarea inside the open dialog still copies.
 			const area = dialog.appendChild(
-				h("textarea", { "aria-hidden": "true", class: "reply-scratch" }),
+				h("textarea", { "aria-hidden": "true", class: "reply-invisible" }),
 			);
 			area.value = text;
 			area.select();
@@ -254,13 +255,52 @@
 			dialog.showModal();
 		},
 	});
-	const clear = h(
-		"button",
-		{ type: "button", class: "btn", onclick: clearAll },
-		"Clear answers and notes",
+	const CLEAR_LABEL = "Clear answers and notes";
+	const CONFIRM_LABEL = "Clear everything?";
+	const CONFIRM_MS = 4000;
+	const clear = h("button", { type: "button", class: "btn", onclick: onClear }, CLEAR_LABEL);
+	// A live region announces the state change: screen readers do not reliably re-read a focused button whose text changed.
+	const announce = h("span", { role: "status", class: "reply-invisible" });
+	const bar = document.body.appendChild(
+		h("div", { class: "reply-ui reply-bar" }, announce, clear, button),
 	);
-	const bar = document.body.appendChild(h("div", { class: "reply-ui reply-bar" }, clear, button));
 	const asked = Boolean(document.querySelector("[data-reply]"));
+	let confirmTimer = 0;
+
+	/** Clearing is irreversible, so the first click only asks; a second click while armed clears. */
+	function onClear() {
+		if (!clear.classList.contains("is-armed")) {
+			arm();
+			return;
+		}
+		disarm();
+		clearAll();
+	}
+
+	function arm() {
+		// The longer label sets the button's width; pin it so the bar does not shift under the pointer.
+		clear.style.inlineSize = `${clear.getBoundingClientRect().width}px`;
+		clear.classList.add("is-armed");
+		clear.textContent = CONFIRM_LABEL;
+		announce.textContent = "Press again to clear all answers and notes.";
+		confirmTimer = window.setTimeout(() => disarm("Clear cancelled."), CONFIRM_MS);
+	}
+
+	/** Back to the idle label; `message` is announced for a cancel the reader did not make by moving on. */
+	function disarm(message = "") {
+		clearTimeout(confirmTimer);
+		clear.classList.remove("is-armed");
+		clear.style.inlineSize = "";
+		clear.textContent = CLEAR_LABEL;
+		announce.textContent = message;
+	}
+
+	clear.addEventListener("blur", () => disarm());
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && clear.classList.contains("is-armed")) {
+			disarm("Clear cancelled.");
+		}
+	});
 
 	function clearAll() {
 		notes.length = 0;
@@ -273,6 +313,9 @@
 		const count = filledNotes().length + answers().filter((a) => a.touched).length;
 		button.hidden = !count && !asked;
 		clear.hidden = !kept;
+		if (clear.hidden) {
+			disarm();
+		}
 		bar.hidden = button.hidden && clear.hidden;
 		button.textContent = count ? `Reply (${count})` : "Reply";
 	}

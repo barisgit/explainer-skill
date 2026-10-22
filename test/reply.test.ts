@@ -10,6 +10,7 @@ const $ = (id) => document.getElementById(id);
 const saved = () => Object.keys(localStorage).filter((k) => k.startsWith("explainer:")).length;
 const clearButton = () => document.querySelector(".reply-bar .btn:not(.primary)");
 const replyButton = () => document.querySelector(".reply-bar .primary");
+const armed = () => clearButton().classList.contains("is-armed");
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;`;
 
 /** A small page: \`body\` inside <main>, then reply.js, then the helpers and \`script\`. */
@@ -42,6 +43,9 @@ document.addEventListener("input", show);
 document.addEventListener("change", show);
 ${script}
 </script></body></html>`;
+
+/** Clear asks for confirmation first, so the reader clicks it twice. */
+const CLEAR = ["click:.reply-bar .btn:not(.primary)", "click:.reply-bar .btn:not(.primary)"];
 
 /** The reader's inputs, as check --do steps. */
 const ENTER = [
@@ -87,7 +91,7 @@ ${onLoad(2, "the entered values are back and the page's own listener drew them",
 ${onLoad(2, "the Clear button and the note are back", `clearButton() && !clearButton().hidden && clearButton().textContent === "Clear answers and notes" && replyButton().textContent === "Reply (1)" && saved() === 1`)}
 ${onLoad(3, "after Clear and a reload the defaults stay and nothing is stored", `state() === "${DEFAULTS}" && saved() === 0 && clearButton().hidden`)}
 document.addEventListener("click", (e) => {
-	if (e.target === clearButton()) {
+	if (e.target === clearButton() && !armed()) {
 		setTimeout(() => { if (!(state() === "${DEFAULTS}" && $("out").textContent === "${DEFAULTS}" && saved() === 0 && clearButton().hidden && replyButton().hidden)) throw new Error("keep contract: Clear resets the controls, the display, the notes and the storage"); }, 150);
 	}
 });`;
@@ -95,15 +99,96 @@ document.addEventListener("click", (e) => {
 	const output = dir.path("keep.out.html");
 
 	const packed = await runCli(["pack", input, "-o", output]);
-	const checked = await run(output, [
-		...ENTER,
-		"reload",
-		"click:.reply-bar .btn:not(.primary)",
-		"reload",
-	]);
+	const checked = await run(output, [...ENTER, "reload", ...CLEAR, "reload"]);
 
 	expect(packed.code).toBe(0);
 	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+/** A page with one answered radio group; `script` gets `answer()`, the chosen value, and `probe(...checks)`. */
+const CONFIRM_BODY = `<fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" checked> A</label> <label><input type="radio" name="p" value="b" id="b"> B</label></fieldset><input type="text" id="name" aria-label="Name">`;
+
+/**
+ * Runs the next check 100 ms after each Clear click, Escape press or other click, in order, so a --do sequence can assert after
+ * every step. A failed check throws "confirm contract: <name>".
+ */
+const CONFIRM_PROBE = `
+const answer = () => document.querySelector("[name=p]:checked").value;
+let width = 0;
+document.addEventListener("click", (e) => { if (e.target === clearButton()) width = clearButton().getBoundingClientRect().width; }, true);
+const queue = [];
+const probe = (...checks) => queue.push(...checks);
+const next = () => { const [name, ok] = queue.shift() ?? []; setTimeout(() => { if (ok && !ok()) throw new Error("confirm contract: " + name); }, 100); };
+document.addEventListener("click", next);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") next(); });
+const asking = () => armed() && clearButton().textContent === "Clear everything?" && !clearButton().hidden;
+const idle = () => !armed() && clearButton().textContent === "Clear answers and notes";
+const kept = () => answer() === "b" && !clearButton().hidden;`;
+
+test("Clear asks first: one click keeps the answers and turns red in place, a second clears", async () => {
+	const script = `${CONFIRM_PROBE}
+probe(["answering", () => answer() === "b"],
+	["first click asks", () => asking() && kept() && clearButton().getBoundingClientRect().width === width && getComputedStyle(clearButton()).backgroundColor !== getComputedStyle(replyButton()).backgroundColor && document.querySelector(".reply-bar [role=status]").textContent !== ""],
+	["second click clears", () => answer() === "a" && clearButton().hidden && saved() === 0]);`;
+	const input = dir.write("confirm.html", SMALL(CONFIRM_BODY, script));
+	const output = dir.path("confirm.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["click:#b", ...CLEAR]);
+
+	expect(checked.stdout).not.toContain("confirm contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("Clear confirms from the keyboard, and Escape or leaving the button cancels without clearing", async () => {
+	const script = `${CONFIRM_PROBE}
+probe(["answering", () => answer() === "b"],
+	["Enter asks", () => asking() && kept()],
+	["Escape cancels", () => idle() && kept()],
+	["Enter asks again", () => asking() && kept()],
+	["leaving the button cancels", () => idle() && kept()],
+	["Enter asks once more", () => asking() && kept()],
+	["Enter again clears", () => answer() === "a" && clearButton().hidden]);`;
+	const input = dir.write("confirm-keys.html", SMALL(CONFIRM_BODY, script));
+	const output = dir.path("confirm-keys.out.html");
+	const button = ".reply-bar .btn:not(.primary)";
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, [
+		"click:#b",
+		`focus:${button}`,
+		"key:Enter",
+		"key:Escape",
+		"key:Enter",
+		"click:#name",
+		`focus:${button}`,
+		"key:Enter",
+		"key:Enter",
+	]);
+
+	expect(checked.stdout).not.toContain("confirm contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("an unconfirmed Clear cancels itself after about four seconds", async () => {
+	// The page holds back the kit's timer so the test neither sleeps nor races: it records the delay and fires the callback by hand.
+	// The last step clicks the heading, which is not focusable, so only the timer can cancel.
+	const hold = `<script>const waiting = []; const realSetTimeout = window.setTimeout; window.setTimeout = (fn, ms, ...rest) => ms >= 3000 && ms <= 5000 ? waiting.push([fn, ms]) : realSetTimeout(fn, ms, ...rest);</script>`;
+	const script = `${CONFIRM_PROBE}
+probe(["answering", () => answer() === "b"],
+	["the first click starts a timer of about four seconds", () => asking() && waiting.length === 1 && waiting[0][1] >= 3500 && waiting[0][1] <= 4500],
+	["the timer cancels", () => { waiting[0][0](); return idle() && kept(); }]);`;
+	const input = dir.write(
+		"confirm-timeout.html",
+		SMALL(CONFIRM_BODY, script).replace("<script src", `${hold}<script src`),
+	);
+	const output = dir.path("confirm-timeout.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["click:#b", CLEAR[0] as string, "click:h1"]);
+
+	expect(checked.stdout).not.toContain("confirm contract");
 	expect(checked.code).toBe(0);
 }, 60_000);
 
@@ -112,7 +197,7 @@ test("a page without usable storage still works from memory", async () => {
 	const script = `
 document.addEventListener("click", (e) => {
 	if (e.target.id === "pick-b") setTimeout(() => { if (!(clearButton() && !clearButton().hidden)) throw new Error("keep contract: Clear is offered without storage"); }, 100);
-	if (e.target === clearButton()) setTimeout(() => { if (state() !== "${DEFAULTS}") throw new Error("keep contract: Clear works without storage"); }, 100);
+	if (e.target === clearButton() && !armed()) setTimeout(() => { if (state() !== "${DEFAULTS}") throw new Error("keep contract: Clear works without storage"); }, 100);
 });`;
 	const input = dir.write(
 		"blocked.html",
@@ -121,7 +206,7 @@ document.addEventListener("click", (e) => {
 	const output = dir.path("blocked.out.html");
 
 	await runCli(["pack", input, "-o", output]);
-	const checked = await run(output, ["click:#pick-b", "click:.reply-bar .btn:not(.primary)"]);
+	const checked = await run(output, ["click:#pick-b", ...CLEAR]);
 
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
@@ -262,13 +347,13 @@ test("Clear on a radio group that starts with no choice tells the page nothing i
 	const script = `
 document.addEventListener("change", () => { $("out").textContent = document.querySelector(":checked")?.value ?? "none"; });
 document.addEventListener("click", (e) => {
-	if (e.target === clearButton()) setTimeout(() => { if ($("out").textContent !== "none") throw new Error("keep contract: Clear tells the page"); }, 150);
+	if (e.target === clearButton() && !armed()) setTimeout(() => { if ($("out").textContent !== "none") throw new Error("keep contract: Clear tells the page"); }, 150);
 });`;
 	const input = dir.write("none.html", SMALL(body, script));
 	const output = dir.path("none.out.html");
 
 	await runCli(["pack", input, "-o", output]);
-	const checked = await run(output, ["click:#q", "click:.reply-bar .btn:not(.primary)"]);
+	const checked = await run(output, ["click:#q", ...CLEAR]);
 
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
@@ -339,7 +424,7 @@ ${onLoad(2, "Clear is offered for answers that wait for their panel", `!clearBut
 		"focus:#late",
 		"key:z",
 		"reload",
-		"click:.reply-bar .btn:not(.primary)",
+		...CLEAR,
 		"click:#add",
 	]);
 
