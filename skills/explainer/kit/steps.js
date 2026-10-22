@@ -8,6 +8,7 @@
    Steps count from 1; the number of steps is the number of captions, else the highest step used. The stepper opens on the last
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
+   An edge data-steps does not name appears with its later endpoint, so mapping the nodes is enough; an edge listed in data-steps keeps its own steps.
    Mermaid ids are the diagram's own: `flowchart LR; api --> cache` has nodes api and cache; `api e1@--> cache` names the edge e1;
    sequence diagrams have participants by id and messages m1, m2, ... in order. pack fails when data-steps names an id the diagram lacks.
    Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
@@ -24,15 +25,56 @@
 	const PLAY_MS = 3000;
 	const steppers = new WeakMap();
 
+	/** The two node ids of a Mermaid edge id `L_<from>_<to>_<n>`; node ids may hold underscores, so only a split that names two nodes counts. */
+	function endpointsOf(edgeId, nodeIds) {
+		const parts = /^L_(.+)_\d+$/.exec(edgeId)?.[1].split("_") ?? [];
+		for (let cut = 1; cut < parts.length; cut++) {
+			const ends = [parts.slice(0, cut).join("_"), parts.slice(cut).join("_")];
+			if (ends.every((id) => nodeIds.has(id))) {
+				return ends;
+			}
+		}
+		return [];
+	}
+
+	/** An edge the author did not map appears with its later endpoint (an endpoint with no step is there from the start). */
+	function followEndpoints(diagram, firstStep) {
+		const nodeIds = new Set(
+			[...diagram.querySelectorAll(".node[data-ref], .cluster[data-ref]")].map(
+				(n) => n.dataset.ref,
+			),
+		);
+		for (const edge of diagram.querySelectorAll('[data-et="edge"][data-id]:not([data-step])')) {
+			const steps = endpointsOf(edge.dataset.id, nodeIds).map((id) => firstStep.get(id) ?? 0);
+			const step = Math.max(0, ...steps);
+			if (step > 0) {
+				for (const part of diagram.querySelectorAll(
+					`[data-ref~="${CSS.escape(edge.dataset.id)}"]:not([data-step])`,
+				)) {
+					part.dataset.step = step;
+					part.dataset.stepAuto = "";
+				}
+			}
+		}
+	}
+
 	/** `data-steps="api:1 cache:2,4"` on a diagram: copies each id's steps onto the diagram parts that carry that data-ref. */
 	function expandDiagramSteps(root) {
 		for (const diagram of root.querySelectorAll("[data-steps]")) {
+			// Derived steps are redone from the current data-steps, so drop the earlier ones first.
+			for (const part of diagram.querySelectorAll("[data-step-auto]")) {
+				part.removeAttribute("data-step");
+				part.removeAttribute("data-step-auto");
+			}
+			const firstStep = new Map();
 			for (const token of diagram.dataset.steps.split(/\s+/).filter(Boolean)) {
 				const [ref = "", steps = ""] = token.split(":");
+				firstStep.set(ref, Math.min(...steps.split(",").map(Number)));
 				for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`)) {
 					part.dataset.step = steps.replaceAll(",", " ");
 				}
 			}
+			followEndpoints(diagram, firstStep);
 		}
 	}
 
