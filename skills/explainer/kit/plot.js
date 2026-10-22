@@ -30,10 +30,10 @@
 	const esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 	const px = (v) => +v.toFixed(1);
 	const finite = ([x, y]) => Number.isFinite(x) && Number.isFinite(y);
-	const line = (cls, x1, x2, y1, y2, style = "") =>
+	const svgLine = (cls, x1, x2, y1, y2, style = "") =>
 		`<line class="${cls}" style="${style}" x1="${px(x1)}" x2="${px(x2)}" y1="${px(y1)}" y2="${px(y2)}"/>`;
 	/** Text centred vertically on y; anchor is start, middle or end. */
-	const label = (cls, x, y, anchor, s) =>
+	const svgText = (cls, x, y, anchor, s) =>
 		`<text class="${cls}" x="${px(x)}" y="${px(y)}" dy="0.35em" text-anchor="${anchor}">${esc(s)}</text>`;
 	const seriesColor = (s, i) => s.color ?? SERIES_COLORS[i % SERIES_COLORS.length];
 
@@ -84,7 +84,6 @@
 		labels: names.map(String),
 		name: spec.name,
 		vertical,
-		format: String,
 	});
 
 	/** Gives the axis its pixel interval [a, b] and at(value), which maps a number, or a category index to its band centre. */
@@ -121,8 +120,8 @@
 				const dot = `<circle class="dot" style="${style}" cx="${px(cx)}" cy="${px(cy)}" r="4.5"/>`;
 				const half = t ? textWidth(t) / 2 : 0;
 				const ty = cy <= base ? Math.max(cy - 14, FONT) : cy + 14;
-				const text = t ? label("value", clamp(cx, half + 4, W - half - 4), ty, "middle", t) : "";
-				return line("stem", cx, cx, base, cy, style) + dot + text;
+				const text = t ? svgText("value", clamp(cx, half + 4, W - half - 4), ty, "middle", t) : "";
+				return svgLine("stem", cx, cx, base, cy, style) + dot + text;
 			})
 			.join("");
 	}
@@ -151,7 +150,7 @@
 			: length >= FONT + 6 && each >= tw + 6;
 		const centre = start + length / 2;
 		return fits
-			? label("value inside", horizontal ? centre : mid, horizontal ? mid : centre, "middle", t)
+			? svgText("value inside", horizontal ? centre : mid, horizontal ? mid : centre, "middle", t)
 			: "";
 	}
 
@@ -163,8 +162,8 @@
 		const { horizontal, end, mid, positive } = bar;
 		const away = positive ? 1 : -1;
 		return horizontal
-			? label("value", end + away * 6, mid, positive ? "start" : "end", t)
-			: label("value", mid, end - away * (FONT / 2 + 4), "middle", t);
+			? svgText("value", end + away * 6, mid, positive ? "start" : "end", t)
+			: svgText("value", mid, end - away * (FONT / 2 + 4), "middle", t);
 	}
 
 	/** One bar (series j, category i) with its title and value label. */
@@ -232,10 +231,10 @@
 		const marks = axis.names
 			? ""
 			: v
-				? line(grid, L, R, p, p) + line("axis", L - TICK, L, p, p)
-				: line(grid, p, p, T, B) + line("axis", p, p, B, B + TICK);
+				? svgLine(grid, L, R, p, p) + svgLine("axis", L - TICK, L, p, p)
+				: svgLine(grid, p, p, T, B) + svgLine("axis", p, p, B, B + TICK);
 		const at = v ? [L - TICK - 4, p, "end"] : [p, B + TICK + 3 + FONT / 2, "middle"];
-		return marks + (text === null ? "" : label("", ...at, text));
+		return marks + (text === null ? "" : svgText("", ...at, text));
 	}
 
 	/** Gridlines, axis lines, ticks, tick labels and axis names. */
@@ -246,9 +245,9 @@
 			const every = labelEvery(axis, textWidth);
 			out += axis.ticks.map((t, i) => tickMarks(axis, t, i, every, ctx)).join("");
 		}
-		out += line("axis", L, R, B, B) + line("axis", L, L, T, B);
-		out += xa.name ? label("name", R, H - FONT / 2 - 2, "end", xa.name) : "";
-		out += ya.name ? label("name", PAD, FONT / 2 + 3, "start", ya.name) : "";
+		out += svgLine("axis", L, R, B, B) + svgLine("axis", L, L, T, B);
+		out += xa.name ? svgText("name", R, H - FONT / 2 - 2, "end", xa.name) : "";
+		out += ya.name ? svgText("name", PAD, FONT / 2 + 3, "start", ya.name) : "";
 		return out;
 	}
 
