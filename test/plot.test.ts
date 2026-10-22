@@ -101,3 +101,39 @@ test("bar labels stay inside the panel and keep zero bars; a line without finite
 	expect(checked.stdout).not.toContain("plot contract");
 	expect(checked.code).toBe(0);
 }, 60_000);
+
+const UNLABELLED_PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><h1>Unlabelled</h1>
+<figure class="fig"><div class="chart" id="b"></div></figure>
+<figure class="fig"><div class="chart" id="s"></div></figure>
+<script src="kit:plot.js"></script>
+<script>
+const showValues = false;
+Plot.make(document.getElementById("b"), { categories: ["A", "B"], series: [{ type: "bar", data: [1, 2], label: showValues }] });
+Plot.make(document.getElementById("s"), { series: [{ type: "stem", data: [[0, 1], [1, 2]], label: showValues }] });
+${pageAssertion(
+	"plot contract",
+	"label: false draws the marks without value text",
+	'document.querySelectorAll("#b .bar").length === 2 && document.querySelectorAll("#s .dot").length === 2 && !document.querySelector("text.value")',
+)}
+</script></body></html>`;
+
+test("label: false draws bars and stems without value text instead of throwing", async () => {
+	const input = dir.write("unlabelled.html", UNLABELLED_PAGE);
+	const output = dir.path("unlabelled.out.html");
+
+	const packed = await runCli(["pack", input, "-o", output]);
+	const checked = await runCli([
+		"check",
+		output,
+		"--quick",
+		"--view",
+		"none",
+		"--out",
+		dir.path("unlabelled-shots"),
+	]);
+
+	expect(packed.code).toBe(0);
+	expect(checked.stdout).not.toContain("plot contract");
+	expect(checked.code).toBe(0);
+}, 60_000);

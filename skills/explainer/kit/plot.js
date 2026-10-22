@@ -37,6 +37,8 @@
 	/** Text centred vertically on y; anchor is start, middle or end. */
 	const svgText = (cls, x, y, anchor, s) =>
 		`<text class="${cls}" x="${px(x)}" y="${px(y)}" dy="0.35em" text-anchor="${anchor}">${esc(s)}</text>`;
+	/** The function that writes a mark's value text: `auto` for label: true, the series' own function, else none. */
+	const labeller = (label, auto) => (label === true ? auto : label || undefined);
 	const seriesColor = (s, i) => s.color ?? SERIES_COLORS[i % SERIES_COLORS.length];
 
 	/** 1, 2, 5 times a power of ten giving about `count` steps over `span`. */
@@ -115,7 +117,7 @@
 	function stemMark(s, i, { X, Y, ya, W, textWidth }) {
 		const base = Y(clamp(0, ya.lo, ya.hi));
 		const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2.5}`;
-		const format = s.label === true ? (_, y) => ya.format(y) : s.label;
+		const format = labeller(s.label, (_, y) => ya.format(y));
 		return s.data
 			.filter(finite)
 			.map(([x, y]) => {
@@ -202,7 +204,7 @@
 				dir: v >= 0 ? grow : -grow,
 				bound: bounds[+(v >= 0)],
 			},
-			format: s.label === true ? val.format : s.label,
+			format: labeller(s.label, val.format),
 		};
 	}
 
