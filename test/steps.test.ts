@@ -16,12 +16,20 @@ const PAGE = (
 <pre class="mermaid" data-steps="a:1 b:2 c:3">flowchart LR; a --> b; b --> c</pre>
 <ol data-captions><li>one</li><li>two</li><li>three</li></ol></figure>
 <script src="kit:steps.js"></script>
-<script>${checks.join("\n")}</script></body></html>`;
+<script>
+const heard = [];
+document.getElementById("s").addEventListener("stepchange", (e) => heard.push(e.detail.step));
+document.addEventListener("DOMContentLoaded", () => document.getElementById("s").addEventListener("stepchange", (e) => heard.push(\`dcl\${e.detail.step}\`)));
+${checks.join("\n")}</script></body></html>`;
 
 const edgeSteps = (id: string) =>
 	`[...document.querySelectorAll('[data-et="edge"][data-id="${id}"]')].map((e) => e.dataset.step).join()`;
 
 const CHECKS = [
+	assertLater(
+		"the opening step reaches listeners the page adds in its scripts or in DOMContentLoaded handlers",
+		'heard.join() === "1,dcl1"',
+	),
 	assertLater(
 		"an unmapped edge appears with its later endpoint",
 		`${edgeSteps("L_a_b_0")} === "2,2" && ${edgeSteps("L_b_c_0")} === "3,3"`,
