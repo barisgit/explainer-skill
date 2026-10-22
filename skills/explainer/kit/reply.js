@@ -23,10 +23,11 @@
    selected) or chose on a data-reply question, even when that equals the default. Restored controls get input and change events,
    so the page's own listeners redraw charts and outputs; a control changed by script without events is saved at the next click or
    when the page is left. Controls the page renders later (views, panels) are picked up as they appear and get their saved value
-   then; one the page replaces keeps counting if the new control differs from the authored default. Controls are matched by id
-   (else radio form, group and value, else position), so give inputs ids; a saved value is dropped when the control's label
-   differs from when it was saved (a regenerated page). The "Clear answers and notes" button (bottom right, shown while anything is
-   answered or a note exists) puts every control back to its default, again with events, and drops the notes and the saved copy.
+   then; one the page replaces (also in answer to a restored value) keeps its answer. Controls are matched by id (else radio form,
+   group and value, else position), so give inputs ids; a saved value is dropped when the control's own label or type differs from
+   when it was saved (a regenerated page). The "Clear answers and notes" button (bottom right, shown while anything is answered, a
+   note exists, or answers wait for a control not yet shown) puts every control back to its default, again with events, and drops
+   the notes and the saved copy.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
@@ -79,6 +80,19 @@
 				"control",
 		);
 	}
+
+	/** What a control is, by its own label and kind alone (never its group's): a saved value is put only into a control with the same one. */
+	const signature = (c) =>
+		clean(
+			`${c.type}|${
+				c.getAttribute("aria-label") ||
+				(c.labels?.[0] && ownText(c.labels[0])) ||
+				c.closest(".field")?.firstElementChild?.textContent ||
+				c.name ||
+				c.placeholder ||
+				""
+			}`,
+		);
 
 	/** A checkbox group answers with the checked labels ("none" when empty), a lone checkbox with on/off. */
 	function checkboxValue(cs) {
@@ -147,10 +161,15 @@
 	// ---- keeping what the reader entered ----
 	// Chrome gives every file:// page one origin, so the page's own address is what tells their saved state apart.
 	const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
-	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, label }. A control the page rebuilds with its current value in the markup is still compared with the authored one. */
+	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, sig }. A control the page rebuilds with its current value in the markup is still compared with the authored one. */
 	const defaults = new Map();
-	/** Saved entries { value, label } by key, for controls that have not appeared yet. */
+	/** Saved entries { value, sig } by key that no control has taken for good yet. */
 	let pending = {};
+	/** Who last took each pending entry: { el, tries }. An entry is settled once its control is still in the page at the next look. */
+	const taken = new Map();
+	const MAX_TRIES = 3;
+	/** True while values are being written and announced; page listeners that rebuild controls run then, so nothing is settled yet. */
+	let applying = false;
 	/** False until the saved state is restored, so the page at script time cannot overwrite it. */
 	let ready = false;
 
@@ -194,7 +213,7 @@
 	const fits = (unit, value) => kind(value) === kind(unit.initial);
 	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-	/** The kept controls in the page now: { el, key, initial, label, first }, `first` when the key has not been seen before. */
+	/** The kept controls in the page now: { el, key, initial, sig, first }, `first` when the key has not been seen before. */
 	function units() {
 		const controls = [...document.querySelectorAll(CONTROL)].filter(
 			(c) => !c.closest(".reply-ui, [data-keep=off]"),
@@ -203,7 +222,7 @@
 			const key = unitKey(el, i);
 			const first = !defaults.has(key);
 			if (first) {
-				defaults.set(key, { initial: initialValue(el), label: unitLabel(el) });
+				defaults.set(key, { initial: initialValue(el), sig: signature(el) });
 			}
 			return { el, key, first, ...defaults.get(key) };
 		});
@@ -245,33 +264,61 @@
 	 * switched. Written controls count as the reader's.
 	 */
 	function apply(writes) {
-		for (const { el, value } of writes) {
-			writeControl(el, value);
-			touched.add(el);
-		}
-		for (const el of speakers(writes)) {
-			announce(el);
+		applying = true;
+		try {
+			for (const { el, value } of writes) {
+				writeControl(el, value);
+				touched.add(el);
+			}
+			for (const el of speakers(writes)) {
+				announce(el);
+			}
+		} finally {
+			applying = false;
 		}
 	}
 
-	/** Gives controls that appeared since the last look the saved value waiting for their key, if it was saved from the same control. */
+	/** Entries whose control survived the page's reaction to the restore are done. */
+	function settle() {
+		for (const [key, { el }] of taken) {
+			if (el.isConnected) {
+				taken.delete(key);
+				delete pending[key];
+			}
+		}
+	}
+
+	/**
+	 * Gives controls the saved value waiting for their key: one that appeared, or one that replaced the control that took it (a page
+	 * that rebuilds a field when another is restored). An entry is dropped when the control is not the one it was saved from.
+	 */
 	function adopt() {
+		settle();
 		const writes = [];
-		for (const u of units().filter((x) => x.first)) {
+		for (const u of units()) {
 			const entry = pending[u.key];
-			delete pending[u.key];
-			if (entry?.label === u.label && fits(u, entry.value)) {
+			if (!entry) {
+				continue;
+			}
+			const tries = taken.get(u.key)?.tries ?? 0;
+			if (tries && moved(u)) {
+				taken.set(u.key, { el: u.el, tries }); // the page filled the replacement itself
+			} else if (entry.sig === u.sig && fits(u, entry.value) && tries < MAX_TRIES) {
 				writes.push({ el: u.el, value: entry.value });
+				taken.set(u.key, { el: u.el, tries: tries + 1 });
+			} else {
+				delete pending[u.key];
+				taken.delete(u.key);
 			}
 		}
 		apply(writes);
 	}
 
-	/** What to keep: the answered controls' values by key, and the notes. */
+	/** Everything to keep: the answered controls by key over the entries still waiting for theirs, and the notes. */
 	function snapshot() {
-		const controls = {};
+		const controls = { ...pending };
 		for (const u of units().filter(answered)) {
-			controls[u.key] = { value: readControl(u.el), label: u.label };
+			controls[u.key] = { value: readControl(u.el), sig: u.sig };
 		}
 		return { controls, notes: filledNotes() };
 	}
@@ -324,6 +371,7 @@
 		notes.length = 0;
 		touched = new WeakSet();
 		pending = {};
+		taken.clear();
 		sync();
 	}
 
@@ -412,7 +460,7 @@
 
 	/** Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls. */
 	function sync() {
-		if (ready) {
+		if (ready && !applying) {
 			adopt();
 		}
 		const count = filledNotes().length + answers().filter((a) => a.touched).length;
@@ -422,8 +470,7 @@
 		bar.hidden = button.hidden && clear.hidden;
 		button.textContent = count ? `Reply (${count})` : "Reply";
 		if (ready) {
-			// Entries still waiting for their control stay saved; a control that has appeared speaks for itself.
-			persist({ ...state, controls: { ...pending, ...state.controls } });
+			persist(state);
 		}
 	}
 

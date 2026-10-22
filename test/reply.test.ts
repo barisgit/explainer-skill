@@ -84,7 +84,7 @@ test("what the reader entered survives a reload, reaches the page's listeners, a
 	const script = `
 ${onLoad(1, "nothing is saved before the reader enters anything", "saved() === 0 && clearButton().hidden")}
 ${onLoad(2, "the entered values are back and the page's own listener drew them", `$("out").textContent === "${ENTERED}" && state() === "${ENTERED}"`)}
-${onLoad(2, "the Clear button and the note are back", `clearButton() && !clearButton().hidden && replyButton().textContent === "Reply (1)" && saved() === 1`)}
+${onLoad(2, "the Clear button and the note are back", `clearButton() && !clearButton().hidden && clearButton().textContent === "Clear answers and notes" && replyButton().textContent === "Reply (1)" && saved() === 1`)}
 ${onLoad(3, "after Clear and a reload the defaults stay and nothing is stored", `state() === "${DEFAULTS}" && saved() === 0 && clearButton().hidden`)}
 document.addEventListener("click", (e) => {
 	if (e.target === clearButton()) {
@@ -175,7 +175,7 @@ document.addEventListener("click", (e) => {
 	if (e.target.id === "carry") setTimeout(() => { if (clearButton().hidden || saved() !== 1) fail("a replaced control keeps its value"); }, 150);
 	if (e.target.id === "add" && sessionStorage.loads === "2") setTimeout(() => { if ($("late").value !== "z" || clearButton().hidden) fail("a late control gets its saved value"); }, 150);
 });
-${onLoad(2, "a value waiting for a control that has not appeared is kept", "saved() === 1 && clearButton().hidden")}`;
+${onLoad(2, "a value waiting for a control that has not appeared is kept", "saved() === 1 && !clearButton().hidden")}`;
 	const input = dir.write("late.html", PAGE(script));
 	const output = dir.path("late.out.html");
 
@@ -269,6 +269,65 @@ document.addEventListener("click", (e) => {
 
 	await runCli(["pack", input, "-o", output]);
 	const checked = await run(output, ["click:#q", "click:.reply-bar .btn:not(.primary)"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("restoring one control that makes the page rebuild another does not lose the rebuilt one's answer", async () => {
+	const body = `<fieldset><legend>Country</legend><label><input type="radio" name="c" value="us" id="us" checked> US</label> <label><input type="radio" name="c" value="si" id="si"> SI</label></fieldset>
+<label>City <input type="text" id="city"></label>`;
+	const script = `
+document.addEventListener("change", (e) => {
+	if (e.target.name === "c") $("city").replaceWith(Object.assign(document.createElement("input"), { id: "city", type: "text" }));
+});
+const keptKeys = () => Object.keys(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith("explainer:"))) ?? '{"controls":{}}').controls);
+${onLoad(2, "the rebuilt city got its answer and it is still saved", `$("si").checked && $("city").value === "r" && keptKeys().includes("#city")`)}`;
+	const input = dir.write("dependent.html", SMALL(body, script));
+	const output = dir.path("dependent.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["click:#si", "focus:#city", "key:r", "reload"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("a saved value is judged by the control's own label, not its fieldset's", async () => {
+	const body = `<fieldset><legend>Contact</legend><label>Email <input type="text"></label></fieldset>`;
+	const script = `
+if (sessionStorage.loads === "2") document.querySelector("fieldset").insertAdjacentHTML("afterbegin", '<label>Name <input type="text"></label>');
+${onLoad(2, "the saved email is not put into the new Name field", `document.querySelector("fieldset input").value === ""`)}`;
+	const input = dir.write("contact.html", SMALL(body, script));
+	const output = dir.path("contact.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["focus:input", "key:z", "reload"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("answers waiting for a panel that is not shown yet can be cleared, and stay cleared when it appears", async () => {
+	const body = `<button type="button" id="add">Add</button>`;
+	const script = `
+document.getElementById("add").addEventListener("click", () => document.querySelector("main").insertAdjacentHTML("beforeend", '<label>Late <input type="text" id="late"></label>'));
+document.addEventListener("click", (e) => {
+	if (e.target.id === "add" && sessionStorage.loads === "2") setTimeout(() => { if ($("late").value !== "" || saved() !== 0) throw new Error("keep contract: cleared answers stay cleared"); }, 150);
+});
+${onLoad(2, "Clear is offered for answers that wait for their panel", `!clearButton().hidden`)}`;
+	const input = dir.write("waiting.html", SMALL(body, script));
+	const output = dir.path("waiting.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, [
+		"click:#add",
+		"focus:#late",
+		"key:z",
+		"reload",
+		"click:.reply-bar .btn:not(.primary)",
+		"click:#add",
+	]);
 
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
