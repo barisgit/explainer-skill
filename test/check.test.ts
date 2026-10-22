@@ -27,6 +27,34 @@ test("check reports a page error as a problem with where it was thrown, and exit
 	expect(result.stdout.trimEnd().split("\n").at(-1)).toBe("Verdict: FAIL, 1 problem, 0 warnings.");
 }, 30_000);
 
+const tall = (script: string) =>
+	page(script).replace(
+		"</h1>",
+		`</h1>${[1, 2, 3, 4, 5].map((n) => `<section id="s${n}" style="height:1200px">Section ${n}</section>`).join("")}`,
+	);
+
+test("check scrolls the page, so an observer or scroll handler that throws only after scrolling is a problem", async () => {
+	const observer = dir.write(
+		"observer.html",
+		tall(
+			'const spy = (entries) => { for (const e of entries) if (e.isIntersecting && e.target.id === "s4") document.querySelector("#no-menu-link").setAttribute("aria-current", "true"); };\nconst io = new IntersectionObserver(spy);\ndocument.querySelectorAll("section").forEach((s) => io.observe(s));',
+		),
+	);
+	const listener = dir.write(
+		"listener.html",
+		tall(
+			'addEventListener("scroll", () => { if (scrollY > 2000) throw new Error("late scroll"); });',
+		),
+	);
+
+	const [io, scroll] = await Promise.all([observer, listener].map(checkQuick));
+
+	expect(io?.code).toBe(1);
+	expect(io?.stdout).toMatch(/page error: TypeError: .*setAttribute.* \(at spy \d+:\d+/);
+	expect(scroll?.code).toBe(1);
+	expect(scroll?.stdout).toMatch(/page error: Error: late scroll \(at <anonymous> \d+:\d+/);
+}, 60_000);
+
 test("check exits 0 for a page that only shows kit: in text, which is not an unpacked page", async () => {
 	const sample = `<pre>&lt;link rel="stylesheet" href="kit:theme.css"&gt;</pre>`;
 	const file = dir.write(

@@ -66,7 +66,7 @@ Run as `bun <skill directory>/cli.ts <command>`; `--help` on any command lists i
 |---|---|
 | `kit [file]` | Lists what a page can use, or documents one kit file |
 | `pack page.html -o artifact.html` | Inlines the kit and local assets and renders Mermaid diagrams into one offline file |
-| `check artifact.html` | Opens the page headless in light and dark at desktop and phone width, saves screenshots and reports problems (exit 1) |
+| `check artifact.html` | Opens the page headless in light and dark at desktop and phone width, scrolls it end to end, saves screenshots and reports problems (exit 1) |
 
 ## Layout
 

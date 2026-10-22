@@ -161,6 +161,26 @@ const DISCOVER_JS = `(() => {
 })()`;
 const MAX_DISCOVERED = 6;
 
+const SWEEP_BUDGET_MS = 3000;
+const SWEEP_TICK_MS = 80;
+/**
+ * Runs in the page: scrolls the document down one viewport at a time to its end and back to the top in one jump, waiting after each step for the
+ * frames that deliver IntersectionObserver callbacks and scroll events. Every position is seen, content that grows while scrolling is
+ * followed, and the run is cut off after 3 s. Page errors those handlers throw reach the check as they would at any other time.
+ */
+const SWEEP_JS = `(async () => {
+	const end = performance.now() + ${SWEEP_BUDGET_MS};
+	const tick = () => new Promise((done) => {
+		const timer = setTimeout(done, ${SWEEP_TICK_MS});
+		requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(timer); done(); }));
+	});
+	const maxTop = () => document.documentElement.scrollHeight - innerHeight;
+	let y = 0;
+	const to = async (top) => { y = top; scrollTo({ top, behavior: "instant" }); await tick(); };
+	while (y < maxTop() && performance.now() < end) await to(Math.min(y + innerHeight, maxTop()));
+	if (y > 0) await to(0);
+})()`;
+
 /** The view a hash belongs to: "#repo/mobile" is a link into the view "repo". */
 const viewName = (hash: string) => hash.slice(1).split("/")[0] ?? "";
 
@@ -331,6 +351,9 @@ async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScre
 	};
 }
 
+/** Scrolls the page end to end and back, so what only runs on scroll (observers, scroll listeners) runs before the shots; ends at the top. */
+const sweep = (run: Run) => run.cdp.evaluate(SWEEP_JS, true);
+
 /** Finds the drill-down hashes on the freshly loaded overview and records them in the report and in `run.viewHashes`. */
 async function discoverViews(run: Run) {
 	const found = await run.cdp.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
@@ -365,6 +388,7 @@ async function shootOverview(run: Run, screen: Screen) {
 	if (theme === THEMES[0] && name === "desktop") {
 		await discoverViews(run);
 	}
+	await sweep(run);
 	await runSteps(run);
 	const png = join(
 		run.outDir,
@@ -394,6 +418,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 	) {
 		run.log.problems.push(`${hash}: no view is shown for this hash`);
 	}
+	await sweep(run);
 	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
 	const png = join(run.outDir, `${run.stem}-view-${slug}-${theme}-${name}.png`);
 	const warnings = await capture(run, png, screen);
@@ -412,7 +437,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 
 /**
  * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
- * the first viewport before any step, the full page after the `--do` steps (their state persists into those shots), and a full-page shot
+ * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
  * Reports console/page errors, network requests, failed loads and page-level horizontal overflow (problems), and warnings
  * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts). Reduced motion is emulated so animations are finished in the shots.
