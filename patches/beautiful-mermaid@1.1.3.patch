@@ -271,7 +271,7 @@ index 980f197ea9d84a4594705a89a94b525907b5f41b..278c23966c79d74b5b6dad213c5203e3
   * Normalize label text: strip surrounding quotes, convert <br> tags and
   * literal \n sequences to newline characters. Strips unsupported HTML tags
 diff --git a/src/parser.ts b/src/parser.ts
-index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7eefc8fb968 100644
+index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..bffd0c2169618968754bc390b9bbfde418db6ef9 100644
 --- a/src/parser.ts
 +++ b/src/parser.ts
 @@ -1,5 +1,5 @@
@@ -314,7 +314,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
          source: sourceId,
          target: targetId,
          label: edgeLabel,
-@@ -314,8 +316,25 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
+@@ -314,8 +316,34 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
        registerStateNode(graph, compositeStack, { id, label, shape: 'rounded' })
        continue
      }
@@ -326,21 +326,30 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
 +}
 +
 +/**
-+ * Gives each edge without an author id Mermaid's `L_<source>_<target>_<n>`, n counting every edge between that pair in source
-+ * order, so every edge has an id its line and its label share.
++ * Gives each edge without an author id Mermaid's `L_<source>_<target>_<n>`, so every edge has an id its line and its label
++ * share. n counts the earlier edges given the same `L_<source>_<target>_`, so `A_B --> C` and `A --> B_C` differ, and skips
++ * any id an author's `e1@`, a node or a subgraph already holds.
 + */
 +function withEdgeIds(graph: MermaidGraph): MermaidGraph {
-+  const counts = new Map<string, number>()
++  const subgraphIds = (list: MermaidSubgraph[]): string[] => list.flatMap((s) => [s.id, ...subgraphIds(s.children)])
++  const taken = new Set<string>([...graph.nodes.keys(), ...subgraphIds(graph.subgraphs)])
 +  for (const edge of graph.edges) {
-+    const pair = `${edge.source}\u0000${edge.target}`
-+    const n = counts.get(pair) ?? 0
-+    counts.set(pair, n + 1)
-+    edge.id ||= `L_${edge.source}_${edge.target}_${n}`
++    if (edge.id) taken.add(edge.id)
++  }
++  const next = new Map<string, number>()
++  for (const edge of graph.edges) {
++    if (edge.id) continue
++    const base = `L_${edge.source}_${edge.target}_`
++    let n = next.get(base) ?? 0
++    while (taken.has(base + n)) n++
++    edge.id = base + n
++    taken.add(edge.id)
++    next.set(base, n + 1)
 +  }
    return graph
  }
  
-@@ -325,10 +344,8 @@ function registerStateNode(
+@@ -325,10 +353,8 @@ function registerStateNode(
    compositeStack: MermaidSubgraph[],
    node: MermaidNode
  ): void {
@@ -353,7 +362,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
    if (compositeStack.length > 0) {
      const current = compositeStack[compositeStack.length - 1]!
      if (!current.nodeIds.includes(node.id)) {
-@@ -393,10 +410,14 @@ function parseStyleProps(propsStr: string): Record<string, string> {
+@@ -393,10 +419,14 @@ function parseStyleProps(propsStr: string): Record<string, string> {
   *   -.-> -.-       dotted arrow / dotted line
   *   ==>  ===       thick arrow / thick line
   *   <--> <-.-> <==>  bidirectional variants
@@ -369,7 +378,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
  
  /**
   * Text-embedded label regex — matches "-- label -->", "-. label .->", "== label ==>" syntax.
-@@ -410,32 +431,43 @@ const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|==
+@@ -410,32 +440,43 @@ const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|==
   * Node shape patterns — ordered from most specific delimiters to least.
   * Multi-char delimiters must be tried before single-char to avoid false matches.
   */
@@ -426,7 +435,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
  /** Regex for a bare node reference (just an ID, no shape brackets) */
  const BARE_NODE_REGEX = /^([\w-]+)/
  
-@@ -456,13 +488,19 @@ function parseEdgeLine(
+@@ -456,13 +497,19 @@ function parseEdgeLine(
  
    // Parse the first node group (possibly with & separators)
    const firstGroup = consumeNodeGroup(remaining, graph, subgraphStack)
@@ -447,7 +456,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
      let hasArrowStart: boolean
      let style: EdgeStyle
      let hasArrowEnd: boolean
-@@ -480,7 +518,7 @@ function parseEdgeLine(
+@@ -480,7 +527,7 @@ function parseEdgeLine(
      } else {
        // Fallback: text-embedded label syntax (-- Yes -->, -. Maybe .->, == Sure ==>)
        const textMatch = remaining.match(TEXT_ARROW_REGEX)
@@ -456,7 +465,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
        hasArrowStart = Boolean(textMatch[1])
        const rawLabel = textMatch[3]!.trim()
        edgeLabel = rawLabel ? normalizeBrTags(rawLabel) : undefined
-@@ -493,7 +531,7 @@ function parseEdgeLine(
+@@ -493,7 +540,7 @@ function parseEdgeLine(
  
      // Parse the next node group
      const nextGroup = consumeNodeGroup(remaining, graph, subgraphStack)
@@ -465,7 +474,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
  
      remaining = nextGroup.remaining.trim()
  
-@@ -501,6 +539,7 @@ function parseEdgeLine(
+@@ -501,6 +548,7 @@ function parseEdgeLine(
      for (const sourceId of prevGroupIds) {
        for (const targetId of nextGroup.ids) {
          graph.edges.push({
@@ -473,7 +482,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
            source: sourceId,
            target: targetId,
            label: edgeLabel,
-@@ -610,10 +649,8 @@ function registerNode(
+@@ -610,10 +658,8 @@ function registerNode(
    subgraphStack: MermaidSubgraph[],
    node: MermaidNode
  ): void {
@@ -486,7 +495,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..b81cb1bb7ae5cb589f68c4598015b7ee
    trackInSubgraph(subgraphStack, node.id)
  }
  
-@@ -627,13 +664,10 @@ function trackInSubgraph(subgraphStack: MermaidSubgraph[], nodeId: string): void
+@@ -627,13 +673,10 @@ function trackInSubgraph(subgraphStack: MermaidSubgraph[], nodeId: string): void
    }
  }
  

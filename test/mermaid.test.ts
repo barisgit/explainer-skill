@@ -381,6 +381,15 @@ test("each of two edges between the same nodes keeps its own id on its line and 
 	expect(svg).toMatch(/<g class="edge-label"[^>]* data-ref="e2"[^>]* data-label="second"/);
 });
 
+test("edges whose generated ids would read alike get different ones, and an author's id stays as written", () => {
+	const svg = svgOf("flowchart LR\n  A_B --> C\n  A --> B_C\n  x L_A_B_C_1@--> y");
+	const lines = [...svg.matchAll(/<polyline class="edge"[^>]* data-ref="([^"]*)"/g)].map(
+		(m) => m[1],
+	);
+
+	expect(lines).toEqual(["L_A_B_C_0", "L_A_B_C_2", "L_A_B_C_1"]);
+});
+
 test("every rule of an xychart's stylesheet applies inside that chart only", () => {
 	const svg = svgOf("xychart-beta\n  x-axis [a, b]\n  bar [1, 2]\n  line [2, 1]");
 	const sheets = [...svg.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1] ?? "");
