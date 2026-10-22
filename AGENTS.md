@@ -13,7 +13,7 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 skills/explainer/      the installable skill, copied as-is by installers: no dotfiles, tests or node_modules inside
   SKILL.md guide.md example.html
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
-  src/                 main.ts (dispatch, help), commands.ts (one spec per command), pack.ts, check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
+  src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, pack.ts, check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
   kit/                 what pages reference as kit:<file>: theme.css, charts.js, plot.js, steps.js, link.js, views.js, reply.js, echarts.js (generated), fonts/, licenses/
   vendor/mermaid.min.js  generated; used by pack to pre-render diagrams, never inlined
 build/                 vendor.ts regenerates kit/echarts.js, vendor/mermaid.min.js and the licence texts from the pinned devDependencies; verify-install.ts is the release check for the installers
@@ -30,7 +30,7 @@ Root files: `package.json` (devDependencies only), `bun.lock`, `tsconfig.json`, 
 | `bun run typecheck` | `tsc --noEmit`, strictest settings |
 | `bun run lint` | `biome check` (format check, lint, import order), warnings are errors; no writes |
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
-| `bun run test` | Contract tests (Chrome needed, about 4 s) |
+| `bun run test` | Contract tests (Chrome needed, about 10 s) |
 | `bun run ci` | typecheck, lint, test: the gate; the same command runs in GitHub Actions |
 | `bun run verify:install` | Release check, not in `ci` (needs network and Chrome): installs from a clone of HEAD with `npx skills` and Caplet into a temp HOME, then runs `kit`, `pack`, `check` from each copy |
 | `bun run vendor` | Regenerates ECharts bundle, Mermaid bundle and licence texts (dev only) |
@@ -63,7 +63,7 @@ TypeScript uses `erasableSyntaxOnly`: no parameter properties, enums or namespac
 
 ## Installing
 
-Verified with `npx skills` 1.7.4 and Caplet 0.2.0: both copy all 26 files byte for byte (npx skills symlinks the other agents to one canonical copy when several are chosen), and `kit`, `pack` and `check` run from the installed copy with no install step. `bun run verify:install` repeats this from a clone of HEAD (uncommitted changes are not tested); run it before a release and whenever `skills/explainer/` changes shape (new top-level file, dotfile, `package.json`).
+Verified with `npx skills` 1.7.4 and Caplet 0.2.0: both copy every file byte for byte (npx skills symlinks the other agents to one canonical copy when several are chosen), and `kit`, `pack` and `check` run from the installed copy with no install step. `bun run verify:install` repeats this from a clone of HEAD (uncommitted changes are not tested); run it before a release and whenever `skills/explainer/` changes shape (new top-level file, dotfile, `package.json`).
 
 Trying an installer by hand: always give it a disposable HOME (installers write to `~/.agents`, `~/.claude` and, for npx skills, `~/.agents/.skill-lock.json`), with `DISABLE_TELEMETRY=1` and `CLAUDE_CONFIG_DIR` unset. Caplet quirks that matter:
 
