@@ -63,7 +63,6 @@ function inlineCss(css: string, baseDir: string, from: string): string {
 /** `</script` and `<!--` inside inline script would end or alter the element. */
 const safeScript = (js: string) => js.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
 
-const MERMAID_BLOCK = /<(pre|div)\b([^>]*\bclass="[^"]*\bmermaid\b[^"]*"[^>]*)>([\s\S]*?)<\/\1>/g;
 const unescapeHtml = (s: string) =>
 	s
 		.replace(/&lt;/g, "<")
@@ -77,40 +76,55 @@ const refsIn = (markup: string) =>
 	[...markup.matchAll(DATA_REF)].flatMap((m) => (m[1] ?? "").split(/\s+/).filter(Boolean));
 
 /**
- * Replaces every `<pre class="mermaid">` block with its rendered diagram: one SVG whose colours follow the page's tokens
- * (theme.css maps them), so light and dark need no second copy. Syntax errors, unsupported types and data-steps on a
- * block (diagrams do not step) are returned as problems.
- * `diagramRefs` collects every part id.
+ * Replaces the source of every `pre.mermaid` (or `div.mermaid`) block with its rendered diagram in a `div`: one SVG whose
+ * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy. Syntax errors, unsupported
+ * types and data-steps or data-step on a block (diagrams do not step) are returned as problems. Blocks and attributes are
+ * found by the HTML parser, so any spelling the browser accepts counts. `diagramRefs` collects every part id.
  */
-function renderMermaidBlocks(html: string, problems: string[], diagramRefs: Set<string>): string {
-	const blocks = [...html.matchAll(MERMAID_BLOCK)];
-	if (!blocks.length) {
-		return html;
-	}
-	const rendered = renderMermaid(blocks.map((b) => unescapeHtml(b[3] ?? "")));
-	let n = 0;
-	return html.replace(MERMAID_BLOCK, (_, _tag, attrs: string) => {
-		const r = rendered[n++] ?? new Error("no rendering produced");
-		if (r instanceof Error) {
-			problems.push(`mermaid block ${n}: ${r.message}`);
-			return "";
-		}
-		if (/\sdata-steps?=/.test(attrs)) {
-			problems.push(
-				`mermaid block ${n}: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`,
-			);
-		}
-		for (const id of r.refs) {
-			diagramRefs.add(id);
-		}
-		return `<div${attrs}>${r.svg}</div>`;
-	});
+function renderMermaidBlocks(
+	html: string,
+	problems: string[],
+	diagramRefs: Set<string>,
+): Promise<string> {
+	let blocks = 0;
+	let source: string[] = [];
+	return new HTMLRewriter()
+		.on("pre.mermaid, div.mermaid", {
+			element(el) {
+				const n = ++blocks;
+				const stepped = el.hasAttribute("data-steps") || el.hasAttribute("data-step");
+				const text: string[] = [];
+				source = text;
+				el.tagName = "div";
+				el.onEndTag((end) => {
+					const diagram = renderMermaid(unescapeHtml(text.join("")), n - 1);
+					if (diagram instanceof Error) {
+						return void problems.push(`mermaid block ${n}: ${diagram.message}`);
+					}
+					if (stepped) {
+						problems.push(
+							`mermaid block ${n}: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`,
+						);
+					}
+					for (const id of diagram.refs) {
+						diagramRefs.add(id);
+					}
+					end.before(diagram.svg, { html: true });
+				});
+			},
+			text(chunk) {
+				source.push(chunk.text);
+				chunk.remove();
+			},
+		})
+		.transform(new Response(html))
+		.text();
 }
 
 /** data-ref values the author wrote that nothing else carries: a typo, or a link to nothing. Diagram parts count as partners. */
 function loneRefs(source: string, diagramRefs: Set<string>): string[] {
 	const counts = new Map<string, number>();
-	for (const ref of refsIn(source.replace(MERMAID_BLOCK, ""))) {
+	for (const ref of refsIn(source)) {
 		counts.set(ref, (counts.get(ref) ?? 0) + 1);
 	}
 	return [...counts]
@@ -227,7 +241,7 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
 	const original = readFileSync(inputPath, "utf8");
-	const source = renderMermaidBlocks(original, problems, diagramRefs);
+	const source = await renderMermaidBlocks(original, problems, diagramRefs);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);
 	if (problems.length) {

@@ -296,19 +296,18 @@ function renderOne(source: string, n: number): Diagram {
 }
 
 /**
- * Renders each Mermaid source to one inline SVG, with no browser: beautiful-mermaid parses and lays it out (ELK) in this process,
- * estimating text widths. Returns one entry per source; a source that fails, or whose type is not supported, is an Error in its slot.
+ * Renders one Mermaid source to one inline SVG, with no browser: beautiful-mermaid parses and lays it out (ELK) in this process,
+ * estimating text widths. `n`, the block's place on the page, keeps its ids apart from the other diagrams. A source that fails,
+ * or whose type is not supported, returns an Error whose message tells the author what to write instead.
  * Every part carries the data-ref of its Mermaid id (see annotateParts), and colours come from the kit's tokens (theme.css).
  */
-export function renderMermaid(sources: string[]): Array<Diagram | Error> {
-	return sources.map((source, n) => {
-		try {
-			return renderOne(source, n);
-		} catch (e) {
-			if (e instanceof UnreadInputError) {
-				return new Error(unreadMessage(e));
-			}
-			return e instanceof Error ? e : new Error(String(e));
+export function renderMermaid(source: string, n = 0): Diagram | Error {
+	try {
+		return renderOne(source, n);
+	} catch (e) {
+		if (e instanceof UnreadInputError) {
+			return new Error(unreadMessage(e));
 		}
-	});
+		return e instanceof Error ? e : new Error(String(e));
+	}
 }

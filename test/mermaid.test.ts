@@ -78,11 +78,17 @@ test("an unsupported diagram type fails the pack and says what to draw instead",
 	expect(result.stderr).toContain("kit:charts.js");
 });
 
-test("data-steps on a Mermaid block fails the pack and points to linked highlighting", async () => {
+test.each([
+	'data-steps="a:1 b:2"',
+	"DATA-STEPS='a:1'",
+	'data-steps = "a:1"',
+	"data-steps",
+	"data-step=1",
+])("%s on a Mermaid block fails the pack and points to linked highlighting", async (attribute) => {
 	const input = dir.write(
 		"stepped.html",
 		page(
-			`<figure class="fig" data-stepper><pre class="mermaid" data-steps="a:1 b:2">flowchart LR\n  a --> b</pre></figure>`,
+			`<figure class="fig" data-stepper><pre class=mermaid ${attribute}>flowchart LR\n  a --> b</pre></figure>`,
 		),
 	);
 
@@ -96,7 +102,7 @@ test("data-steps on a Mermaid block fails the pack and points to linked highligh
 
 /** The rendered diagram's SVG, failing the test when the source does not render. */
 function svgOf(source: string): string {
-	const [diagram = new Error("no diagram")] = renderMermaid([source]);
+	const diagram = renderMermaid(source);
 	if (diagram instanceof Error) {
 		throw diagram;
 	}
@@ -239,13 +245,13 @@ const misrenders = [
 ];
 
 test.each(misrenders)("$name fails with what to write instead", ({ input, message }) => {
-	const [diagram] = renderMermaid([input]);
+	const diagram = renderMermaid(input);
 	expect(diagram instanceof Error ? diagram.message : "rendered").toBe(message);
 });
 
 /** The message a source fails with, or "rendered". */
 function failureOf(source: string): string {
-	const [diagram] = renderMermaid([source]);
+	const diagram = renderMermaid(source);
 	return diagram instanceof Error ? diagram.message : "rendered";
 }
 
@@ -352,9 +358,7 @@ test.each([
 	"url(https://example.com/a.png)",
 ])("the label %p renders as written", (label) => {
 	const { svg, refs } = (() => {
-		const [diagram = new Error("no diagram")] = renderMermaid([
-			`flowchart LR\n  a["${label}"] --> b`,
-		]);
+		const diagram = renderMermaid(`flowchart LR\n  a["${label}"] --> b`);
 		if (diagram instanceof Error) {
 			throw diagram;
 		}
