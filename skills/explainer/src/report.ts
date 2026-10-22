@@ -76,7 +76,16 @@ function viewsSection(views: ViewReport): string[] {
 	return out;
 }
 
-/** The check result as text: first screens, then pass/fail per shot with problems, then warnings grouped by message. */
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+/** The last line: whether the check passed, with the number of distinct problems and warnings (the same grouping as above). */
+function verdict(shots: Shot[]): string {
+	const problems = new Set(shots.flatMap((s) => s.problems)).size;
+	const warned = new Set(shots.flatMap((s) => s.warnings)).size;
+	return `Verdict: ${problems ? "FAIL" : "ok"}, ${count(problems, "problem")}, ${count(warned, "warning")}.`;
+}
+
+/** The check result as text: first screens, then pass/fail per shot with problems, then warnings grouped by message, then a one-line verdict. */
 export function report(
 	outDir: string,
 	shots: Shot[],
@@ -91,5 +100,6 @@ export function report(
 		...warnings(shots),
 		...viewsSection(views),
 		"Open the PNGs (first-screen ones first) and look for clipped text, empty regions, weak contrast, broken layout.",
+		verdict(shots),
 	].join("\n");
 }

@@ -24,6 +24,7 @@ test("check reports a page error as a problem with where it was thrown, and exit
 	expect(result.stdout).toContain("FAIL");
 	expect(result.stdout).toContain("page error: Error: boom from the page (at inner 1:");
 	expect(result.stdout).toMatch(/, outer 2:\d+/);
+	expect(result.stdout.trimEnd().split("\n").at(-1)).toBe("Verdict: FAIL, 1 problem, 0 warnings.");
 }, 30_000);
 
 test("check exits 0 for a page that only shows kit: in text, which is not an unpacked page", async () => {
@@ -36,6 +37,7 @@ test("check exits 0 for a page that only shows kit: in text, which is not an unp
 	const result = await checkQuick(file);
 
 	expect(result.code).toBe(0);
+	expect(result.stdout.trimEnd().split("\n").at(-1)).toBe("Verdict: ok, 0 problems, 0 warnings.");
 }, 30_000);
 
 test("check names a first screen that is a list of in-page links, and keeps the hint for plain prose", async () => {
