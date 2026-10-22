@@ -37,7 +37,7 @@ const SVG_DATA = "data:image/svg+xml;base64,";
 
 /**
  * Replaces each `<img>` of a base64 svg (what `pack` makes of a local svg file) with one image per colour scheme, classes `light`
- * and `dark`, shown by theme.css like the Mermaid diagrams: an image document cannot read the page's CSS, so each copy carries
+ * and `dark`, one of which theme.css hides: an image document cannot read the page's CSS, so each copy carries
  * the scheme's colours instead. Attributes go to both copies, the id only to the first so it stays unique. An `<img>` inside
  * `<picture>` stays as it is, since the browser picks among the sources.
  */

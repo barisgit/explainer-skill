@@ -65,7 +65,7 @@ function svgOf(source: string): string {
 	return diagram.svg;
 }
 
-/** Each edge's endpoints, keyed "from>to"; a repeated pair keeps its first edge. */
+/** Each edge's endpoints, keyed "from>to"; a repeated pair keeps its last edge. */
 function edgeEnds(svg: string): Map<string, { start: number[]; end: number[] }> {
 	const ends = new Map<string, { start: number[]; end: number[] }>();
 	for (const [, from, to, points = ""] of svg.matchAll(

@@ -1,6 +1,6 @@
 /** Types for vendor/beautiful-mermaid.js (built by build/vendor.ts): the subset of beautiful-mermaid's RenderOptions that pack sets. */
 export interface RenderOptions {
-	/** Font family written into the SVG's style; text widths are estimated for Inter whatever this says. */
+	/** Font family written into the SVG's style; text is sized with the patch's Geist widths whatever this says. */
 	font?: string;
 	/** Canvas padding in px. Default 40. */
 	padding?: number;

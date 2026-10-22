@@ -135,8 +135,8 @@ export class Cdp {
  *
  * Where Chrome cannot build its sandbox (Ubuntu 23.10+ restricts the user namespaces it needs,
  * and so do most containers), Chrome exits with "No usable sandbox"; the launch is then retried
- * once without it. The tradeoff is acceptable because Chrome only ever opens the local page
- * being packed or checked.
+ * once without it. The tradeoff is acceptable because Chrome only ever opens a local page: the
+ * one being checked, or a build script's own.
  */
 async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
