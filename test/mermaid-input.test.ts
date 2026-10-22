@@ -187,6 +187,12 @@ const unreadable = [
 		hint: "leave it out",
 	},
 	{
+		name: "an empty last x-axis category",
+		input: "xychart-beta\n  x-axis [a, b,]\n  bar [1, 2]",
+		unread: "a, b,",
+		hint: "leave it out",
+	},
+	{
 		name: "a value that is not a number",
 		input: "xychart-beta\n  x-axis [a, b]\n  bar [1junk, 2]",
 		unread: "1junk",

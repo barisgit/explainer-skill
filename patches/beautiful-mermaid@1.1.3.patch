@@ -1125,7 +1125,7 @@ index 4e424621c9616f89c141a4010d40679bd5374cf9..ef20f9382ce7fdf2655809798d89369b
    target: string
    label?: string
 diff --git a/src/xychart/parser.ts b/src/xychart/parser.ts
-index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..f5b1548469d79fcc4d6ab9852e12de88ecfdcc93 100644
+index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..c7887fe0581858d2d9fc4d342ede51e67c19b4e6 100644
 --- a/src/xychart/parser.ts
 +++ b/src/xychart/parser.ts
 @@ -1,4 +1,5 @@
@@ -1222,7 +1222,7 @@ index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..f5b1548469d79fcc4d6ab9852e12de88
    }
  
    // Auto-derive y-axis range from data if not specified
-@@ -110,6 +110,25 @@ export function parseXYChart(lines: string[]): XYChart {
+@@ -110,6 +110,27 @@ export function parseXYChart(lines: string[]): XYChart {
    return { title, horizontal, xAxis, yAxis, series }
  }
  
@@ -1237,16 +1237,18 @@ index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..f5b1548469d79fcc4d6ab9852e12de88
 +  })
 +}
 +
-+/** Category labels, plain or quoted (a quoted one may hold commas); anything else in the list is unread input. */
++/**
++ * Category labels, plain or quoted (a quoted one may hold commas), with an item after every comma; anything else in the list,
++ * an empty item included, is unread input.
++ */
 +function parseCategories(str: string, line: string): string[] {
 +  const item = /\s*(?:"([^"]*)"|([^,"]*[^,"\s]))\s*(,|$)/y
 +  const categories: string[] = []
-+  while (item.lastIndex < str.length) {
++  for (;;) {
 +    const start = item.lastIndex
 +    const match = item.exec(str)
-+    if (!match) throw new UnreadInputError(line, str.slice(start).trim())
++    if (!match) throw new UnreadInputError(line, str.slice(start).trim() || str.trim())
 +    categories.push(match[1] ?? match[2]!)
-+    if (!match[3]) break
++    if (!match[3]) return categories
 +  }
-+  return categories
  }
