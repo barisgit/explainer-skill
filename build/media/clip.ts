@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { Cdp } from "../../skills/explainer/src/chrome.ts";
-import { settle } from "../../skills/explainer/src/chrome.ts";
+import type { Cdp } from "./chrome.ts";
+import { settle } from "./chrome.ts";
 import { boxOf, resolveRegion, SCALE, screenshot, scrollToTop } from "./page.ts";
 import type { Action, Clip, Frame, Rect, Target } from "./types.ts";
 import { DEFAULT_HOLD, DEFAULT_TRAVEL } from "./types.ts";

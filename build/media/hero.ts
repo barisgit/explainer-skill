@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Cdp, settle } from "../../skills/explainer/src/chrome.ts";
+import { type Cdp, settle } from "./chrome.ts";
 import { SCALE, screenshot } from "./page.ts";
 import type { Rect, Size } from "./types.ts";
 

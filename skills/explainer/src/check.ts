@@ -1,15 +1,17 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
-import type { Cdp, ExceptionDetails } from "./chrome.ts";
-import { settle, withPage } from "./chrome.ts";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { type Page, settle, withPage } from "./browser.ts";
+import { PageLog } from "./page-log.ts";
+import type { Settings } from "./probe.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
 	desktop: { width: 1440, height: 900 },
 	narrow: { width: 390, height: 844 },
 } as const;
-const STACK_FRAMES = 3;
 const THEMES = ["light", "dark"] as const;
+/** Every check load runs with reduced motion, so animations are finished in the shots. */
+const settingsFor = (scheme: Settings["scheme"]): Settings => ({ scheme, reduceMotion: true });
 /**
  * The first viewport before any `--do` step: its PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
  * in-page links (href="#...") that one list shows in the viewport, i.e. a text map of the page's questions or sections.
@@ -210,77 +212,10 @@ function chooseViews(
 	return { capture: firsts, skipped: found.filter((h) => !firsts.includes(h)) };
 }
 
-/** Collects what the page reports while it loads and runs: problems fail the check, warnings are only listed. */
-class PageLog {
-	problems: string[] = [];
-	warnings: string[] = [];
-
-	constructor(cdp: Cdp) {
-		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) => {
-			const message = `page error: ${d.exception?.description ?? d.text}`;
-			this.problems.push(`${message.split("\n")[0] ?? message} (at ${errorLocation(d)})`);
-		});
-		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => this.onConsole(type, consoleText(args)));
-		cdp.on("Log.entryAdded", ({ entry }) => {
-			if (entry.level === "warning" && entry.source !== "console-api") {
-				this.warnings.push(shorten(`${entry.source} warning: ${entry.text}`));
-			}
-			if (entry.level === "error") {
-				this.problems.push(`${entry.source}: ${entry.text} ${entry.url ?? ""}`);
-			}
-		});
-		cdp.on("Network.requestWillBeSent", ({ request }) => {
-			if (/^(https?|wss?|ftp):/.test(request.url)) {
-				this.problems.push(`network request: ${request.url}`);
-			}
-		});
-		cdp.on("Network.loadingFailed", ({ canceled, errorText }) => {
-			if (!canceled) {
-				this.problems.push(`failed load: ${errorText}`);
-			}
-		});
-	}
-
-	/** Forgets everything reported so far, before the next page load. */
-	reset() {
-		this.problems = [];
-		this.warnings = [];
-	}
-
-	private onConsole(type: string, text: string) {
-		if (type === "error") {
-			this.problems.push(`console.error: ${text}`);
-		}
-		// ECharts reports its own warnings (bad option, missing component) with console.log, so its prefix counts as a warning too.
-		if (type === "warning" || /^\[ECharts\]/.test(text)) {
-			const hint = /grid\.containLabel/.test(text)
-				? " [kit: delete containLabel; charts.js already keeps axis labels inside the grid margins]"
-				: "";
-			this.warnings.push(shorten(`console.${type}: ${text}`) + hint);
-		}
-	}
-}
-
-/** Where an exception was thrown, in the page's own line:column: the top frames ("fmt 3:38, render 4:28") or, without a stack (a syntax error), the position alone. */
-function errorLocation(d: ExceptionDetails): string {
-	const frames = (d.stackTrace?.callFrames ?? []).slice(0, STACK_FRAMES);
-	if (!frames.length) {
-		return `${d.lineNumber + 1}:${d.columnNumber + 1}`;
-	}
-	return frames
-		.map((f) => `${f.functionName || "<anonymous>"} ${f.lineNumber + 1}:${f.columnNumber + 1}`)
-		.join(", ");
-}
-
-const consoleText = (args: Array<{ value?: unknown; description?: string }>) =>
-	args.map((a) => a.value ?? a.description ?? "").join(" ");
-const shorten = (text: string) => (text.length > 220 ? `${text.slice(0, 217)}...` : text);
-
 /** Everything one check run shares: the page, its log, where files go, and what has been collected. */
 interface Run {
-	cdp: Cdp;
+	page: Page;
 	log: PageLog;
-	url: string;
 	outDir: string;
 	stem: string;
 	opts: CheckOptions;
@@ -291,59 +226,48 @@ interface Run {
 	stepNotes: Set<string>;
 }
 
+/** Moves what the page's probe has seen since the last call into the log. */
+async function collect(run: Run) {
+	run.log.add(await run.page.take(), run.page.injection);
+}
+
 /**
- * Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. Local storage is emptied
- * once the old page is gone: every file:// page shares one origin and one profile serves all shots, so a page that keeps what the
- * reader entered (kit:reply.js) would otherwise carry one shot's `--do` state into the next, and the old page saves again as it unloads.
+ * Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. The probe empties local
+ * storage at the start of the load: every shot starts from nothing, and a page that keeps what the reader entered (kit:reply.js)
+ * does not carry one shot's `--do` state into the next.
  */
-async function open(run: Run, hash: string) {
-	const { cdp } = run;
-	const blank = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url: "about:blank" });
-	await blank;
-	await cdp.send("Storage.clearDataForOrigin", {
-		origin: "file://",
-		storageTypes: "local_storage",
-	});
-	const loaded = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url: run.url + hash });
-	await loaded;
+async function open(run: Run, settings: Settings, hash: string) {
+	await run.page.loadServed(hash, settings);
 	await settle(400);
+	await collect(run);
 }
 
 interface Screen {
-	theme: string;
+	theme: Settings["scheme"];
 	name: string;
 	vp: { width: number; height: number };
 }
 
 /** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
 async function capture(run: Run, png: string, screen: Screen): Promise<string[]> {
-	const { cdp, log } = run;
+	const { page, log } = run;
 	const narrow = screen.name === "narrow";
-	const page = await cdp.evaluate<{
+	const analysis = await page.evaluate<{
 		overflow: boolean;
 		culprits: string[];
 		scrolls: string[];
 		warnings: string[];
 	}>(PAGE_JS(narrow));
-	if (page.overflow) {
+	await collect(run);
+	if (analysis.overflow) {
 		log.problems.push(
-			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
+			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${analysis.culprits.join(", ") || "unknown"}`,
 		);
 	}
-	const { contentSize } = await cdp.send<{ contentSize: { height: number } }>(
-		"Page.getLayoutMetrics",
-	);
-	const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
-		format: "png",
-		captureBeyondViewport: true,
-		clip: { x: 0, y: 0, width: screen.vp.width, height: Math.ceil(contentSize.height), scale: 1 },
-	});
-	writeFileSync(png, Buffer.from(data, "base64"));
+	writeFileSync(png, await page.fullScreenshot());
 	return [
-		...page.warnings,
-		...page.scrolls.map((s) => `scrolls sideways: ${s}`),
+		...analysis.warnings,
+		...analysis.scrolls.map((s) => `scrolls sideways: ${s}`),
 		...new Set(log.warnings),
 	];
 }
@@ -351,22 +275,22 @@ async function capture(run: Run, png: string, screen: Screen): Promise<string[]>
 /** The first viewport before any step: PNG, headline and the figures in view. */
 async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScreen> {
 	const png = join(run.outDir, `${run.stem}-first-${theme}-${name}.png`);
-	const { data } = await run.cdp.send<{ data: string }>("Page.captureScreenshot", {
-		format: "png",
-	});
-	writeFileSync(png, Buffer.from(data, "base64"));
+	writeFileSync(png, await run.page.screenshot());
 	return {
 		png,
-		...(await run.cdp.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)),
+		...(await run.page.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)),
 	};
 }
 
 /** Scrolls the page end to end and back, so what only runs on scroll (observers, scroll listeners) runs before the shots; ends at the top. */
-const sweep = (run: Run) => run.cdp.evaluate(SWEEP_JS, true);
+async function sweep(run: Run) {
+	await run.page.evaluate(SWEEP_JS);
+	await collect(run);
+}
 
 /** Finds the drill-down hashes on the freshly loaded overview and records them in the report and in `run.viewHashes`. */
 async function discoverViews(run: Run) {
-	const found = await run.cdp.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
+	const found = await run.page.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
 	const chosen = chooseViews(run.opts.views, found.hashes);
 	run.views.found = found.hashes;
 	run.views.uncaptured = chosen.skipped;
@@ -377,7 +301,10 @@ async function discoverViews(run: Run) {
 /** Runs the `--do` steps in order, recording their problems and notes. */
 async function runSteps(run: Run) {
 	for (const step of run.opts.steps) {
-		const result = await runStep(run.cdp, step);
+		// A reload discards the probe's record of the old document.
+		await collect(run);
+		const result = await runStep(run.page, step);
+		await collect(run);
 		if (result.problem) {
 			run.log.problems.push(`--do ${result.problem}`);
 		}
@@ -393,7 +320,7 @@ async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name, vp } = screen;
 	const { opts } = run;
 	run.log.reset();
-	await open(run, "");
+	await open(run, settingsFor(theme), "");
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
 	if (theme === THEMES[0] && name === "desktop") {
 		await discoverViews(run);
@@ -422,9 +349,9 @@ async function shootOverview(run: Run, screen: Screen) {
 async function shootView(run: Run, screen: Screen, hash: string) {
 	const { theme, name, vp } = screen;
 	run.log.reset();
-	await open(run, hash);
+	await open(run, settingsFor(theme), hash);
 	if (
-		!(await run.cdp.evaluate<boolean>(`document.documentElement.classList.contains("in-view")`))
+		!(await run.page.evaluate<boolean>(`document.documentElement.classList.contains("in-view")`))
 	) {
 		run.log.problems.push(`${hash}: no view is shown for this hash`);
 	}
@@ -463,41 +390,37 @@ export async function check(
 	const shots: Shot[] = [];
 	const views: ViewReport = { found: [], captured: [], uncaptured: [], templates: [] };
 	const stepNotes = new Set<string>();
-	await withPage(async (cdp) => {
-		const run: Run = {
-			cdp,
-			log: new PageLog(cdp),
-			url: `file://${resolve(file)}`,
-			outDir,
-			stem,
-			opts,
-			shots,
-			views,
-			viewHashes: [],
-			stepNotes,
-		};
-		await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
-		for (const theme of themes) {
-			for (const [name, vp] of Object.entries(VIEWPORTS)) {
-				const narrow = name === "narrow";
-				await cdp.send("Emulation.setDeviceMetricsOverride", {
-					...vp,
-					deviceScaleFactor: 1,
-					mobile: narrow,
-				});
-				await cdp.send("Emulation.setEmulatedMedia", {
-					features: [
-						{ name: "prefers-color-scheme", value: theme },
-						{ name: "prefers-reduced-motion", value: "reduce" },
-					],
-				});
-				const screen = { theme, name, vp };
-				await shootOverview(run, screen);
-				for (const hash of run.viewHashes) {
-					await shootView(run, screen, hash);
+	const html = readFileSync(file, "utf8");
+	const log = new PageLog();
+	const { width, height } = VIEWPORTS.desktop;
+	await withPage(
+		width,
+		height,
+		async (page) => {
+			page.serve(html, file);
+			const run: Run = {
+				page,
+				log,
+				outDir,
+				stem,
+				opts,
+				shots,
+				views,
+				viewHashes: [],
+				stepNotes,
+			};
+			for (const theme of themes) {
+				for (const [name, vp] of Object.entries(VIEWPORTS)) {
+					await page.resize(vp.width, vp.height);
+					const screen = { theme, name, vp };
+					await shootOverview(run, screen);
+					for (const hash of run.viewHashes) {
+						await shootView(run, screen, hash);
+					}
 				}
 			}
-		}
-	});
+		},
+		log,
+	);
 	return { shots, views, stepNotes: [...stepNotes] };
 }

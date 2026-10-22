@@ -5,7 +5,7 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 ## Requirements
 
 - Bun 1.4.3 (`curl -fsSL https://bun.sh/install | bash`). The CLI uses Bun's built-in `HTMLRewriter` and `import.meta.dir`; there is no npm install step for users. `node skills/explainer/cli.ts` prints an install hint and exits 2.
-- Google Chrome or Chromium for `check` and for rendering Mermaid in `pack` (`CHROME=/path` overrides the search, which also finds agent-browser and Playwright downloads; CI uses the runner's Chrome). `src/chrome.ts` retries without the sandbox when Chrome reports none is usable.
+- A headless browser for `check` and for rendering Mermaid in `pack`, through `Bun.WebView` (experimental): the system WKWebView on macOS, nothing to install; on Linux and Windows an installed Chrome, Chromium or Edge (CI uses the runner's Chrome). `EXPLAINER_BACKEND=chrome` forces Chrome on macOS, and `CHROME=/path` picks the binary (implies Chrome). `src/browser.ts` gives a Chrome it spawns a mock keychain and retries without the sandbox when it dies at launch.
 
 ## Layout
 
@@ -13,7 +13,7 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 skills/explainer/      the installable skill, copied as-is by installers: no dotfiles, tests or node_modules inside
   SKILL.md guide.md example.html
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
-  src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, kit.ts (kit file names, TypeScript to script), pack.ts, svg-theme.ts (svg files per colour scheme), check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
+  src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, kit.ts (kit file names, TypeScript to script), pack.ts, svg-theme.ts (svg files per colour scheme), check.ts, steps.ts, report.ts, mermaid.ts, browser.ts (`Bun.WebView` page: serve, load, screenshots), probe.ts (page-side script injected into the checked page: errors, CSP network blocking, colour scheme), page-log.ts (probe records and console to problems and warnings)
   kit/                 what pages reference as kit:<file>: theme.css, charts, plot, steps, link, views and reply as .ts sources that pages name .js, echarts.js (generated), fonts/, licenses/
     parts/<name>/      pieces of a kit script too long for one file; pack puts them in front of kit/<name>.ts in file name order, so a page still includes one file
   vendor/mermaid.min.js  generated; used by pack to pre-render diagrams, never inlined
@@ -38,7 +38,7 @@ Showcase assets stay in `examples/`, never in `skills/explainer/`, because insta
 | `bun run typecheck` | `bun check --all` for the CLI, build and tests, then for the kit (`tsconfig.kit.json`): Bun's built-in checker, same errors as `tsc`, strictest settings |
 | `bun run lint` | `biome check` (format check, lint, import order), warnings are errors; no writes |
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
-| `bun run test` | Contract tests (Chrome needed, about 10 s) |
+| `bun run test` | Contract tests (a headless browser is needed, about 2 min) |
 | `bun run ci` | typecheck, lint, test: the gate; the same command runs in GitHub Actions |
 | `bun run verify:install` | Release check, not in `ci` (needs network and Chrome): installs from a clone of HEAD with `npx skills` and Caplet into a temp HOME, then runs `kit`, `pack`, `check` from each copy |
 | `bun run media [--keep] [example ...]` | Regenerates `examples/media/` (gallery thumbnails, hero collage, animated WebP clips) in light and dark from the packed `examples/<name>/index.html` pages; a full run replaces the directory. Scenes are data at the top of `build/media.ts`. Needs Chrome and ffmpeg with libwebp_anim; about two minutes |
@@ -52,12 +52,12 @@ The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged fi
 ## Decisions
 
 - One skill named `explainer`: thin `SKILL.md` and the CLI as the toolbox; no custom elements; offline single-file output; the house style lives in `kit/theme.css` and `example.html`, not in instructions.
-- Runtime is Bun only. Headless Chrome (CDP over WebSocket, no Puppeteer) for `check` and Mermaid rendering.
+- Runtime is Bun only. `Bun.WebView` for `check` and Mermaid rendering, with nothing engine-specific: `check` serves an instrumented copy of the page from memory on 127.0.0.1 (a `file://` page in WebKit masks error messages and positions) and reads errors, network use (a CSP that allows only inline, `data:` and `blob:`) and the forced colour scheme through a probe script. `build/media/chrome.ts` keeps the CDP client the media recorder needs.
 - Layout is the packaging layout above: Caplet imports `skills/*/SKILL.md` as a bare skill and copies every non-hidden file. Do not add an `acf.yml`; it would make Caplet emit only the files listed in `assets:`.
 - Agent-facing text (SKILL.md, guide.md, kit file headers, CLI help) stays short and soft. A kit file's leading comment is its documentation: `kit <file>` prints it, and its first line (`name: description`) is the listing.
 - `pack` themes an SVG file in `<img>` without reading it as markup: the file stays an image (no script, network or page styling reaches it), packed twice as `img.light` and `img.dark` with a first `:where(:root)` rule that sets `color-scheme`, `color: var(--ink)` and the colour tokens copied from `theme.css`, and `theme.css` shows the copy for the scheme like the Mermaid copies. A page's own token overrides do not reach the file; parts that must link or respond need inline SVG.
 - Credits stay: visual-explainer (MIT, Nico Bailon), ECharts (Apache-2.0), Mermaid (MIT), Geist fonts (OFL); their licence texts ship in `kit/licenses/`.
-- No local-only dependencies at runtime: nothing but `kit/`, `vendor/` and Chrome is needed after install.
+- No local-only dependencies at runtime: nothing but `kit/`, `vendor/` and a browser Bun can drive is needed after install.
 
 ## Limits
 

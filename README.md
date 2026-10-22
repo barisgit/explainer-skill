@@ -35,7 +35,7 @@ Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/
 
 Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name. `bun ~/.claude/skills/explainer/cli.ts kit` checks an installed copy.
 
-**Requirements:** [Bun](https://bun.sh) (verified with 1.4.3), and Google Chrome or Chromium for `check` and for rendering Mermaid during `pack` (`CHROME=/path/to/chrome` if it is not found; a build downloaded by agent-browser or Playwright also works). Nothing else is installed: the skill runs as copied.
+**Requirements:** [Bun](https://bun.sh) (verified with 1.4.3), and, off macOS, Google Chrome, Chromium or Edge for `check` and for rendering Mermaid during `pack` (macOS uses the system WebKit; `CHROME=/path/to/chrome` if Bun does not find Chrome). Nothing else is installed: the skill runs as copied.
 
 <details>
 <summary>Update and uninstall</summary>
@@ -59,7 +59,7 @@ The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, 
 
 1. **Write** `page.html`: plain HTML that references kit files with a `kit:` prefix and adds behaviour through attributes. `kit` lists what is available and `kit <file>` documents one file.
 2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams in light and dark, so the result is one offline file.
-3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
+3. **Check**: `check out.html` opens it in a headless browser in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
 
 A step-through, for illustration:
 

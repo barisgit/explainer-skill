@@ -1,11 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Cdp } from "./chrome.ts";
-import { withPage } from "./chrome.ts";
+import { type Page, withPage } from "./browser.ts";
 import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
 
 const THEMES = ["light", "dark"] as const;
+const RENDER_SIZE = { width: 800, height: 600 };
 
 /**
  * Runs in the render page: gives every diagram part the `data-ref` of its Mermaid id, so prose, steppers and replies can address it
@@ -27,7 +27,7 @@ const ANNOTATE_JS = `(markup) => {
 	return svg.outerHTML;
 }`;
 
-/** Mermaid theme variables from the kit's tokens, resolved in the render page for the emulated colour scheme. */
+/** Mermaid theme variables from the kit's tokens, resolved in the render page for the colour scheme it was set to. */
 const RENDER_JS = `(async (sources, theme) => {
 	const annotate = ${ANNOTATE_JS};
 	const probe = document.body.appendChild(document.createElement("i"));
@@ -77,27 +77,22 @@ interface Rendered {
 	error?: string;
 }
 
-/** Renders every source in the page under the emulated colour scheme; one entry per source. */
+/** Renders every source in the page under the colour scheme (`data-scheme` on <html>, which the kit honours); one entry per source. */
 async function renderTheme(
-	cdp: Cdp,
+	page: Page,
 	sources: string[],
 	theme: (typeof THEMES)[number],
 ): Promise<Rendered[]> {
-	await cdp.send("Emulation.setEmulatedMedia", {
-		features: [{ name: "prefers-color-scheme", value: theme }],
-	});
+	await page.evaluate(`document.documentElement.dataset.scheme = "${theme}"`);
 	try {
-		return await cdp.evaluate<Rendered[]>(
-			`${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`,
-			true,
-		);
+		return await page.evaluate<Rendered[]>(`${RENDER_JS}(${JSON.stringify(sources)}, "${theme}")`);
 	} catch (e) {
 		throw new Error(`mermaid render failed: ${e instanceof Error ? e.message : String(e)}`);
 	}
 }
 
 /**
- * Renders each Mermaid source to SVG once per colour scheme, in headless Chrome with the kit's fonts and tokens.
+ * Renders each Mermaid source to SVG once per colour scheme, in a headless browser with the kit's fonts and tokens.
  * Returns one `{ light, dark }` pair per source; a source that fails to parse is reported as an Error in its slot.
  * `pageCss` is the page's own inline <style> text, loaded after the kit stylesheet so per-page token overrides (a different `--accent`)
  * reach the diagram. The 5 MB Mermaid bundle stays in vendor/: only the finished SVG ships in the page.
@@ -108,19 +103,15 @@ export async function renderMermaid(
 ): Promise<Array<{ light: string; dark: string } | Error>> {
 	const dir = mkdtempSync(join(tmpdir(), "artifact-mermaid-"));
 	try {
-		const page = join(dir, "render.html");
+		const file = join(dir, "render.html");
 		writeFileSync(
-			page,
+			file,
 			`<!doctype html><link rel="stylesheet" href="file://${join(KIT_DIR, "theme.css")}"><style>${pageCss}</style><body class="mermaid"><script src="file://${join(SKILL_ROOT, "vendor/mermaid.min.js")}"></script>`,
 		);
-		return await withPage(async (cdp) => {
-			await cdp.send("Runtime.enable");
-			const loaded = cdp.once("Page.loadEventFired");
-			await cdp.send("Page.enable");
-			await cdp.send("Page.navigate", { url: `file://${page}` });
-			await loaded;
-			const light = await renderTheme(cdp, sources, "light");
-			const dark = await renderTheme(cdp, sources, "dark");
+		return await withPage(RENDER_SIZE.width, RENDER_SIZE.height, async (page) => {
+			await page.load(`file://${file}`);
+			const light = await renderTheme(page, sources, "light");
+			const dark = await renderTheme(page, sources, "dark");
 			return sources.map((_, i) => {
 				const [l, d] = [light[i], dark[i]];
 				if (!l?.svg || !d?.svg) {

@@ -1,4 +1,4 @@
-import { ChromeError } from "./chrome.ts";
+import { BrowserError } from "./browser.ts";
 import { CLI, COMMANDS, type Command, usage } from "./commands.ts";
 
 function help(name?: string): string {
@@ -69,7 +69,7 @@ if ("error" in parsed) {
 try {
 	process.exit(await command.run(parsed.args, parsed.flags));
 } catch (e) {
-	if (!(e instanceof ChromeError)) {
+	if (!(e instanceof BrowserError)) {
 		throw e;
 	}
 	console.error(`error: ${e.message}`);

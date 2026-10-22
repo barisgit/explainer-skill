@@ -15,7 +15,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { withPage } from "../skills/explainer/src/chrome.ts";
+import { withPage } from "./media/chrome.ts";
 import { record } from "./media/clip.ts";
 import { encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
 import { CROP, renderHero } from "./media/hero.ts";
