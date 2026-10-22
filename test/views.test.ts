@@ -1,5 +1,5 @@
-import { afterAll, expect, test } from "bun:test";
-import { pageAssertion, runCli, scratch } from "./support.ts";
+import { afterAll, test } from "bun:test";
+import { packAndCheck, pageAssertion, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -21,23 +21,7 @@ ${pageAssertion(
 </script></body></html>`;
 
 test("a hash with a malformed percent escape does not break the router", async () => {
-	const input = dir.write("views.html", PAGE);
-	const output = dir.path("views.out.html");
-
-	const packed = await runCli(["pack", input, "-o", output]);
-	const checked = await runCli([
-		"check",
-		output,
-		"--quick",
-		"--view",
-		"none",
-		"--out",
-		dir.path("shots"),
-	]);
-
-	expect(packed.code).toBe(0);
-	expect(checked.stdout).not.toContain("views contract");
-	expect(checked.code).toBe(0);
+	await packAndCheck(dir, "views", PAGE, "views contract", ["--view", "none"]);
 }, 30_000);
 
 const ANCHOR_PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -61,21 +45,5 @@ addEventListener("load", () => {
 </script></body></html>`;
 
 test("a link from a view to an overview section's #id scrolls to that section", async () => {
-	const input = dir.write("anchor.html", ANCHOR_PAGE);
-	const output = dir.path("anchor.out.html");
-
-	const packed = await runCli(["pack", input, "-o", output]);
-	const checked = await runCli([
-		"check",
-		output,
-		"--quick",
-		"--view",
-		"none",
-		"--out",
-		dir.path("anchor"),
-	]);
-
-	expect(packed.code).toBe(0);
-	expect(checked.stdout).not.toContain("views contract");
-	expect(checked.code).toBe(0);
+	await packAndCheck(dir, "anchor", ANCHOR_PAGE, "views contract", ["--view", "none"]);
 }, 30_000);

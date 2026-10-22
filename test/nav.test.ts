@@ -1,5 +1,5 @@
-import { afterAll, expect, test } from "bun:test";
-import { pageAssertion, runCli, scratch } from "./support.ts";
+import { afterAll, test } from "bun:test";
+import { packAndCheck, pageAssertion, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -34,15 +34,6 @@ ${script}
 
 const contract = (name: string, body: string) => pageAssertion("nav contract", name, body);
 
-const run = async (name: string, page: string, args: string[]) => {
-	const output = dir.path(`${name}.out.html`);
-	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
-	const checked = await runCli(["check", output, "--quick", "--out", dir.path(name), ...args]);
-	expect(packed.code).toBe(0);
-	expect(checked.stdout).not.toContain("nav contract");
-	expect(checked.code).toBe(0);
-};
-
 test("the trail and previous/next follow the view the reader came from, and survive a reload", async () => {
 	const script = `
 ${contract("a page with views inside views has a rail of its sections", `location.hash || (document.documentElement.classList.contains("has-toc") && texts("#toc-list > li > a") === "Home|People|Items")`)}
@@ -50,7 +41,7 @@ ${contract("after a reload the trail names each step, a generic link text giving
 ${contract("the view's own .back link stays, as the first crumb", `!location.hash || (view().querySelectorAll(".back").length === 1 && view().querySelector(".crumbs li:first-child > .back"))`)}
 ${contract("after a reload previous/next walks the items of the person it was opened from", `sessionStorage.loads !== "2" || (sibs("prev") === "none" && sibs("next") === "#i/2" && count() === "1 / 2")`)}
 ${contract("after a reload the rail lists the trail's siblings and marks the open view", `sessionStorage.loads !== "2" || (sub(2) === "Person A|b" && sub(3) === "Four|Two" && document.querySelector('.toc [aria-current="page"]')?.textContent === "Four")`)}`;
-	await run("trail", NESTED(script), [
+	await packAndCheck(dir, "trail", NESTED(script), "nav contract", [
 		"--view",
 		"none",
 		"--do",
@@ -67,7 +58,7 @@ test("a view opened fresh walks every view of its kind in page order", async () 
 		"a fresh item has the overview as its only parent and all four items as siblings",
 		`location.hash !== "#i/4" || (texts(".view.active .crumbs li") === "Home|Four" && sibs("prev") === "#i/3" && sibs("next") === "none" && count() === "4 / 4")`,
 	);
-	await run("fresh", NESTED(script), ["--view", "i/4"]);
+	await packAndCheck(dir, "fresh", NESTED(script), "nav contract", ["--view", "i/4"]);
 }, 60_000);
 
 test("a page with one kind of view has no rail", async () => {
@@ -75,7 +66,7 @@ test("a page with one kind of view has no rail", async () => {
 <section class="view" data-view="f"><a class="back" href="#">All fixes</a><h1>Fix</h1></section></main>
 <script src="kit:views.js"></script>
 <script>${contract("no rail and no rail-side width", `!document.querySelector(".toc") && !document.documentElement.classList.contains("has-toc")`)}</script></body></html>`;
-	await run("single", page, ["--view", "none"]);
+	await packAndCheck(dir, "single", page, "nav contract", ["--view", "none"]);
 }, 30_000);
 
 test("a section with two folds gets Expand all, which follows the folds the reader toggles", async () => {
@@ -96,7 +87,7 @@ document.addEventListener("click", () => {
 	setTimeout(() => { if (ok && !ok()) throw new Error("nav contract: " + name); }, 100);
 });
 </script></body></html>`;
-	await run("folds", page, [
+	await packAndCheck(dir, "folds", page, "nav contract", [
 		"--view",
 		"none",
 		"--do",

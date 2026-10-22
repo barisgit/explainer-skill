@@ -1,3 +1,4 @@
+import { expect } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -47,6 +48,25 @@ export function scratch() {
  */
 export const pageAssertion = (contract: string, name: string, body: string) =>
 	`setTimeout(() => { if (!(${body})) throw new Error("${contract}: ${name}"); }, 300);`;
+
+/**
+ * Packs `page` as `<name>.html` in `dir` and runs `check --quick` on the result with `args`; fails the test when either command
+ * fails or a page script threw one of `contract`'s errors (see `pageAssertion`).
+ */
+export async function packAndCheck(
+	dir: ReturnType<typeof scratch>,
+	name: string,
+	page: string,
+	contract: string,
+	args: string[],
+) {
+	const output = dir.path(`${name}.out.html`);
+	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
+	const checked = await runCli(["check", output, "--quick", "--out", dir.path(name), ...args]);
+	expect(packed.code).toBe(0);
+	expect(checked.stdout).not.toContain(contract);
+	expect(checked.code).toBe(0);
+}
 
 /** The rendered diagram's SVG, failing the test when the source does not render. */
 export function svgOf(source: string): string {
