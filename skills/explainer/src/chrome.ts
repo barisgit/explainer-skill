@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 
 const { CHROME } = process.env;
@@ -173,7 +173,10 @@ async function start(
 			...extra,
 			"about:blank",
 		],
-		{ stdio: ["ignore", "ignore", "pipe"] },
+		// Chrome still adds keychain items at launch despite --use-mock-keychain, and macOS shows a
+		// "Keychain Not Found" dialog when HOME has none (a sandboxed HOME, such as verify:install's).
+		// The account's own home always has its keychain; the profile stays in --user-data-dir.
+		{ stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, HOME: userInfo().homedir } },
 	);
 	const port = await new Promise<number>((ok, fail) => {
 		let log = "";
