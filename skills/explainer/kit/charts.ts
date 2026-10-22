@@ -67,8 +67,8 @@
 		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
 	}
 
-	/** ECharts theme object built from the tokens, so every component starts in the page's look. */
-	function theme() {
+	/** ECharts theme object built from the tokens, so every component starts in the page's look; `el` is the chart's element. */
+	function theme(el: HTMLElement) {
 		// Resolved to rgb: --accent-soft and other derived tokens are color-mix(), which ECharts cannot parse.
 		const token = (name: string) => resolve(`var(--${name})`);
 		const ink = token("ink");
@@ -76,6 +76,8 @@
 		const rule = token("rule");
 		const ruleStrong = token("rule-strong");
 		const surface = token("surface");
+		// --under changes by block (page, panel, band), so it is read where the chart sits; the probe sees only the root's value.
+		const under = resolve(getComputedStyle(el).getPropertyValue("--under"));
 		const accent = token("accent");
 		const accentSoft = token("accent-soft");
 		const axis = {
@@ -85,8 +87,8 @@
 			nameTextStyle: { color: muted },
 			splitLine: { lineStyle: { color: rule } },
 		};
-		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a surface halo.
-		const label = { label: { color: ink, textBorderColor: surface, textBorderWidth: 2 } };
+		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a halo in the tone under the chart.
+		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
 		const labelled = Object.fromEntries(
 			[
 				"line",
@@ -237,7 +239,7 @@
 		let chart: ECharts | null = null;
 		const mount = () => {
 			chart?.dispose();
-			chart = echarts.init(el, theme());
+			chart = echarts.init(el, theme(el));
 			chart.setOption(resolveColors(option));
 			setup?.(chart);
 		};
