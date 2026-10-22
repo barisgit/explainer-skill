@@ -1329,13 +1329,252 @@ details > :last-child:not(summary) {
 	}
 }
 
+/* theme part: navigation kit:views.js builds from the page's own markup: breadcrumbs and previous/next in a view (.trail), the
+   contents rail (.toc) and Expand all (.fold-all). Pages write none of these classes. */
+/* Trail: breadcrumbs on the left, previous / position / next on the right; on phones the siblings take a row of their own. */
+.trail {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0 1.5rem;
+	margin-block-end: 1.25rem;
+	font-size: 0.9375rem;
+}
+.crumbs,
+.sibs {
+	display: flex;
+	align-items: center;
+	min-inline-size: 0;
+}
+.crumbs {
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.crumbs li {
+	display: flex;
+	align-items: center;
+	min-inline-size: 0;
+}
+/* The separator and the previous/next arrows are the border-drawn chevron of .back and summary. */
+:is(.crumbs li + li, .sibs [rel="prev"])::before,
+.sibs [rel="next"]::after {
+	content: "";
+	flex: none;
+	inline-size: 0.375rem;
+	block-size: 0.375rem;
+	border: solid currentColor;
+	border-width: 1.5px 1.5px 0 0;
+	transform: rotate(45deg);
+}
+.crumbs li + li::before {
+	margin-inline: 0.375rem 0.625rem;
+	color: var(--muted);
+}
+.sibs [rel="prev"]::before {
+	transform: rotate(-135deg);
+}
+.crumbs :is(a, span),
+.sibs a,
+.sibs a > span {
+	overflow: hidden;
+	min-block-size: 2.25rem;
+	line-height: 2.25rem;
+	font-weight: 500;
+	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.crumbs :is(a, span) {
+	max-inline-size: 16rem;
+}
+/* The view's own .back link as the first crumb: its chevron and spacing give way to the trail's. */
+.crumbs .back {
+	display: block;
+	margin: 0;
+}
+.crumbs .back::before {
+	content: none;
+}
+.crumbs [aria-current] {
+	color: var(--muted);
+	font-weight: 400;
+}
+.sibs {
+	gap: 0.75rem;
+	font-size: 0.875rem;
+}
+.sibs a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	max-inline-size: 11rem;
+}
+:is(.crumbs, .sibs) a:hover {
+	text-decoration: underline;
+}
+.sibs .count {
+	flex: none;
+	color: var(--muted);
+	font: 0.8125rem var(--mono);
+	font-variant-numeric: tabular-nums;
+}
+@media (max-width: 40rem) {
+	.sibs {
+		inline-size: 100%;
+		justify-content: space-between;
+		border-block-start: 1px solid var(--rule);
+	}
+	.sibs > :not(.count) {
+		inline-size: 40%;
+	}
+	.sibs [rel="next"] {
+		justify-content: flex-end;
+	}
+}
+
+/* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
+   its width; below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
+.toc ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.toc a {
+	display: block;
+	overflow: hidden;
+	padding: 0.3125rem 0.75rem;
+	border-inline-start: 2px solid transparent;
+	color: var(--muted);
+	font-size: 0.875rem;
+	line-height: 1.35;
+	text-decoration: none;
+}
+/* Section headings are sentences: two lines, clamped on the inner span so the link's padding shows no cut-off line. */
+.toc a > span {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+.toc a:hover,
+.toc a:is([aria-current], .is-trail) {
+	color: var(--ink);
+}
+.toc a:is([aria-current], .is-trail) {
+	font-weight: 600;
+}
+.toc a[aria-current] {
+	border-inline-start-color: var(--accent);
+}
+/* A trail step's siblings, on a hairline under their section; the current one carries the accent bar onto the line. */
+.toc ol ol {
+	margin: 0.125rem 0 0.5rem 0.75rem;
+	border-inline-start: 1px solid var(--rule);
+}
+.toc ol ol a {
+	margin-inline-start: -1px;
+	padding-block: 0.25rem;
+	font-size: 0.8125rem;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.toc-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	inline-size: 100%;
+	min-block-size: 2.75rem;
+	padding: 0;
+	background: none;
+	border: 0;
+	color: var(--ink);
+	font-size: 0.9375rem;
+	font-weight: 500;
+	cursor: pointer;
+}
+.toc-toggle::before {
+	content: "";
+	inline-size: 0.4375rem;
+	block-size: 0.4375rem;
+	margin-inline: 0.125rem 0.25rem;
+	border: solid var(--muted);
+	border-width: 0 1.5px 1.5px 0;
+	transform: rotate(-45deg);
+	transition: transform 0.2s var(--ease);
+}
+.toc-toggle[aria-expanded="true"]::before {
+	transform: rotate(45deg) translate(-0.125rem, -0.0625rem);
+}
+@media (max-width: 63.99rem) {
+	.toc {
+		margin-block: -0.75rem 1.75rem;
+		border-block-end: 1px solid var(--rule);
+	}
+	.toc > ol {
+		max-block-size: 60vh;
+		overflow-y: auto;
+		padding-block-end: 0.75rem;
+	}
+	.toc:not(.is-open) > ol {
+		display: none;
+	}
+}
+@media (min-width: 64rem) {
+	.has-toc .page {
+		inline-size: min(100% - 2 * var(--gutter), 81rem);
+		padding-inline-start: 15rem;
+	}
+	.toc {
+		position: fixed;
+		z-index: 1;
+		inset-block: 0;
+		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2);
+		inline-size: 12.5rem;
+		padding-block: clamp(1.75rem, 5vw, 3.5rem) 2rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+	}
+	.toc-toggle {
+		display: none;
+	}
+	/* .wide reaches into both margins of a centred column; beside the rail it stays in the column. */
+	.has-toc .wide {
+		margin-inline: 0;
+	}
+}
+
+/* Expand all: right-aligned just above the section's first fold, without .expand's +/- suffix. */
+.fold-all {
+	display: block;
+	margin: 1.25rem 0 -1rem auto;
+}
+.fold-all::after {
+	content: none;
+}
+
+@media print {
+	.trail,
+	.toc,
+	.fold-all {
+		display: none;
+	}
+	.has-toc .page {
+		padding-inline-start: 0;
+	}
+}
+
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
    To force one scheme instead of following the system: <html data-scheme="dark"> (or "light"); charts and diagrams follow it too.
-   The accent marks the answer: the headline phrase (h1 em), and on the page the readout or chart mark that answers a section;
-   colour the other marks neutral (var(--muted)).
+   Colour what the reader compares, each compared thing (a phase, an option, a series) in the same --c1..--c6 on every chart and
+   view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
+   (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
@@ -1350,7 +1589,7 @@ details > :last-child:not(summary) {
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
-   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views); pack
+   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
@@ -2126,20 +2365,346 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   window.Charts = { make, color: (token) => `var(--${token})` };
 })();
 </script>
-<script>/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored).
+<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once and
+   then the returned refresh() after every route change. A section (an overview section or a view) with two or more <details>
+   of its own (not inside a nested section or another fold) gets one button just above the block holding its first fold:
+   Expand all, or Collapse all once every fold is open, kept in step when the reader opens folds one at a time. Folds a view
+   handler draws count from its next refresh. */
+window.ViewsFolds = () => {
+  const buttons = new Map;
+  function foldsOf(section) {
+    return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section && !d.parentElement?.closest("details"));
+  }
+  function sync(section) {
+    const button = buttons.get(section);
+    const all = foldsOf(section).every((d) => d.open);
+    button?.setAttribute("aria-expanded", String(all));
+    if (button) {
+      button.textContent = all ? "Collapse all" : "Expand all";
+    }
+  }
+  function create(section) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "expand fold-all";
+    button.addEventListener("click", () => {
+      const folds = foldsOf(section);
+      const opening = !folds.every((d) => d.open);
+      for (const d of folds) {
+        d.open = opening;
+      }
+      sync(section);
+    });
+    section.addEventListener("toggle", () => sync(section), true);
+    buttons.set(section, button);
+    return button;
+  }
+  function blockOf(el, section) {
+    let block = el;
+    while (block.parentElement && block.parentElement !== section) {
+      block = block.parentElement;
+    }
+    return block;
+  }
+  return () => {
+    for (const section of document.querySelectorAll("section")) {
+      const [first, second] = foldsOf(section);
+      if (!(first && second)) {
+        buttons.get(section)?.remove();
+        continue;
+      }
+      const button = buttons.get(section) ?? create(section);
+      const block = blockOf(first, section);
+      if (button.nextElementSibling !== block) {
+        block.before(button);
+      }
+      sync(section);
+    }
+  };
+};
+
+/* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
+   views.js, which calls it once and then show(view, hash) after every route change, once the view's handler has drawn it.
+   All of it is derived from markup the page already has:
+     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
+               its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
+               else its param.
+     trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
+               that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
+               view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
+               every sibling. Steps live in history.state next to the hash, so Back, Forward and reload keep them; a link opened
+               fresh starts a new trail.
+     .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
+               listener or selector the page gave it), with previous and next on the right.
+     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
+               missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
+               past 12). Fixed beside the column from 64rem, a closed Contents disclosure below; the current section follows
+               scrolling. */
+window.ViewsNav = ({ views, decode }) => {
+  const KEY = "viewTrail";
+  const RAIL_LIST_MAX = 12;
+  const OWN = ".trail, .toc";
+  const overview = document.querySelector("[data-overview]");
+  const home = clean(document.querySelector(".back")?.textContent) || "Overview";
+  const nameOf = (hash) => hash.split("/")[0] ?? "";
+  const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
+  const drawn = new Map;
+  let steps = [];
+  function clean(text) {
+    return (text ?? "").replace(/\s+/g, " ").trim();
+  }
+  function make(tag, attrs = {}, text = "") {
+    const el = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      el.setAttribute(key, value);
+    }
+    el.textContent = text;
+    return el;
+  }
+  function item(child) {
+    const li = make("li");
+    li.append(child);
+    return li;
+  }
+  function linksTo(name, scope = document) {
+    const selector = `a[href^=${JSON.stringify(`#${name}/`)}]`;
+    return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(OWN));
+  }
+  const hashOf = (a) => (a.getAttribute("href") ?? "").slice(1);
+  const unique = (hashes) => [...new Set(hashes)];
+  function siblings(name) {
+    const statics = views.map((v) => v.dataset.view ?? "").filter((claim) => claim.startsWith(`${name}/`));
+    return unique([...linksTo(name).map(hashOf), ...statics]);
+  }
+  function labels(name) {
+    const texts = new Map;
+    const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: clean(a.textContent) }));
+    for (const { hash, text } of links) {
+      texts.set(text, (texts.get(text) ?? new Set).add(hash));
+    }
+    const found = new Map;
+    for (const { hash, text } of links) {
+      if (text && texts.get(text)?.size === 1 && !found.has(hash)) {
+        found.set(hash, text);
+      }
+    }
+    return found;
+  }
+  function label(hash, known = labels(nameOf(hash))) {
+    const view = [...drawn].find(([, h]) => h === hash)?.[0];
+    return known.get(hash) || clean(view?.querySelector("h1, h2")?.textContent) || decode(hash.split("/").slice(1).join("/"));
+  }
+  function saved() {
+    const state = history.state;
+    const trail = state && typeof state === "object" && KEY in state ? state[KEY] : null;
+    return Array.isArray(trail) ? trail.filter((s) => typeof s?.hash === "string") : null;
+  }
+  function listFor(hash, parent, replaced) {
+    if (replaced?.list?.includes(hash)) {
+      return replaced.list;
+    }
+    const view = parent && [...drawn].find(([, h]) => h === parent.hash)?.[0];
+    const list = view ? unique(linksTo(nameOf(hash), view).map(hashOf)) : [];
+    return list.includes(hash) ? list : undefined;
+  }
+  function extended(hash) {
+    const cut = steps.findIndex((s) => nameOf(s.hash) === nameOf(hash));
+    const before = cut < 0 ? steps : steps.slice(0, cut);
+    const list = listFor(hash, before.at(-1), steps[cut]);
+    return [...before, { hash, label: label(hash), ...list ? { list } : {} }];
+  }
+  function stamp(hash) {
+    const kept = saved();
+    if (kept?.at(-1)?.hash === hash) {
+      steps = kept;
+    } else {
+      steps = hash ? extended(hash) : [];
+    }
+    const state = history.state;
+    history.replaceState({ ...state && typeof state === "object" ? state : {}, [KEY]: steps }, "");
+  }
+  const listOf = (step) => step.list ?? siblings(nameOf(step.hash));
+  function crumbs(here, back) {
+    const list = make("ol", { class: "crumbs" });
+    list.append(item(back ?? make("a", { href: "#" }, home)));
+    for (const step of steps.slice(0, -1)) {
+      list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
+    }
+    list.append(item(make("span", { "aria-current": "page", title: here.label }, here.label)));
+    return list;
+  }
+  function neighbours(here) {
+    const list = listOf(here);
+    const at = list.indexOf(here.hash);
+    if (at < 0 || list.length < 2) {
+      return [];
+    }
+    const known = labels(nameOf(here.hash));
+    const link = (hash, rel) => {
+      if (!hash) {
+        return make("span");
+      }
+      const text = label(hash, known);
+      const a = make("a", { href: `#${hash}`, rel, title: text });
+      a.append(make("span", {}, text));
+      return a;
+    };
+    const box = make("div", { class: "sibs" });
+    box.append(link(list[at - 1], "prev"), make("span", { class: "count" }, `${at + 1} / ${list.length}`), link(list[at + 1], "next"));
+    return [box];
+  }
+  function trailBar(view) {
+    let bar = view.querySelector(".trail");
+    if (!bar) {
+      bar = make("nav", { class: "trail", "aria-label": "Breadcrumb" });
+      const back = view.querySelector(".back");
+      if (back) {
+        back.before(bar);
+      } else {
+        (view.querySelector(".view-head") ?? view).prepend(bar);
+      }
+    }
+    return bar;
+  }
+  const entries = [];
+  let rail = null;
+  let homeLink = null;
+  function sectionId(section, heading) {
+    if (!section.id) {
+      const slug = clean(heading.textContent).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
+      section.id = slug && !names.has(slug) && !document.getElementById(slug) ? slug : `section-${entries.length + 1}`;
+    }
+    return section.id;
+  }
+  function entry(section, heading, claimed) {
+    const text = clean(heading.textContent);
+    const link = make("a", { href: `#${sectionId(section, heading)}`, title: text });
+    link.append(make("span", {}, text));
+    const owns = [...names].filter((n) => !claimed.has(n) && linksTo(n, section).length);
+    for (const n of owns) {
+      claimed.add(n);
+    }
+    return { section, li: item(link), link, owns };
+  }
+  function buildRail(page, sections) {
+    const list = make("ol", { id: "toc-list" });
+    homeLink = make("a", { href: "#" }, home);
+    list.append(item(homeLink));
+    const claimed = new Set;
+    for (const section of sections) {
+      const heading = section.querySelector(":scope > h2");
+      if (heading) {
+        entries.push(entry(section, heading, claimed));
+      }
+    }
+    list.append(...entries.map((e) => e.li));
+    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, "Contents");
+    toggle.addEventListener("click", () => open(toggle.getAttribute("aria-expanded") !== "true"));
+    list.addEventListener("click", (e) => e.target instanceof Element && e.target.closest("a") && open(false));
+    rail = make("nav", { class: "toc", "aria-label": "Contents" });
+    rail.append(toggle, list);
+    page.prepend(rail);
+    addEventListener("scroll", spySoon, { passive: true });
+  }
+  function open(on) {
+    rail?.classList.toggle("is-open", on);
+    rail?.querySelector(".toc-toggle")?.setAttribute("aria-expanded", String(on));
+  }
+  function stepList(step, hash) {
+    const all = listOf(step);
+    const shown = all.length > RAIL_LIST_MAX ? [step.hash] : all;
+    const known = labels(nameOf(step.hash));
+    const sub = make("ol");
+    for (const h of shown) {
+      const text = h === step.hash ? step.label : label(h, known);
+      const a = make("a", { href: `#${h}`, title: text }, text);
+      a.classList.toggle("is-trail", h === step.hash && h !== hash);
+      if (h === hash) {
+        a.setAttribute("aria-current", "page");
+      }
+      sub.append(item(a));
+    }
+    return sub;
+  }
+  function updateRail(hash) {
+    if (!rail) {
+      return;
+    }
+    for (const { li, owns } of entries) {
+      for (const old of li.querySelectorAll("ol")) {
+        old.remove();
+      }
+      li.append(...steps.filter((s) => owns.includes(nameOf(s.hash))).map((s) => stepList(s, hash)));
+    }
+    const current = rail.querySelector('[aria-current="page"]');
+    if (current && rail.scrollHeight > rail.clientHeight) {
+      rail.scrollTop = current.offsetTop - rail.clientHeight / 3;
+    }
+    spy();
+  }
+  let spyQueued = false;
+  function spySoon() {
+    if (!spyQueued) {
+      spyQueued = true;
+      requestAnimationFrame(spy);
+    }
+  }
+  function spy() {
+    spyQueued = false;
+    const inView = document.documentElement.classList.contains("in-view");
+    const passed = entries.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3).at(-1);
+    const here = inView ? null : passed?.link ?? homeLink;
+    for (const a of [homeLink, ...entries.map((e) => e.link)]) {
+      a?.removeAttribute("aria-current");
+    }
+    here?.setAttribute("aria-current", "location");
+  }
+  const page = overview?.parentElement;
+  const hasRail = Boolean(page && overview) && names.size > 1;
+  document.documentElement.classList.toggle("has-toc", hasRail);
+  let started = false;
+  return {
+    show(view, hash) {
+      if (!started && hasRail && page && overview) {
+        buildRail(page, [...overview.querySelectorAll(":scope > section")]);
+      }
+      started = true;
+      if (view) {
+        drawn.set(view, hash);
+      }
+      stamp(view ? hash : "");
+      const here = steps.at(-1);
+      if (view && here) {
+        const back = view.querySelector(".back");
+        trailBar(view).replaceChildren(crumbs(here, back), ...neighbours(here));
+      }
+      updateRail(view ? hash : "");
+    }
+  };
+};
+
+/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail and Expand all.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
    no hash, or a hash no view claims (plain #anchors), shows the overview. A static view may claim one
    param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for its
    param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
-   (an async callback) runs its handler at once if the current hash is its view. */
+   (an async callback) runs its handler at once if the current hash is its view.
+   Navigation needs no markup of its own. Link every view from the overview (a table or list whose link text names it: "Blaž",
+   "1.6.3 Login form") and start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view
+   shows breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the
+   view it was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents
+   rail of its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more
+   <details> gets Expand all. */
 (() => {
   const root = document.documentElement;
   const views = [...document.querySelectorAll("[data-view]")];
   const handlers = {};
   let started = false;
   let overviewY = 0;
+  const nav = window.ViewsNav({ views, decode });
+  const refreshFolds = window.ViewsFolds();
   function decode(text) {
     try {
       return decodeURIComponent(text);
@@ -2152,6 +2717,13 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     const view = views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
     return { name, view, param: decode(rest.join("/")) };
   }
+  function draw(name, view, param) {
+    if (view) {
+      handlers[name]?.(view, param);
+    }
+    nav.show(view ?? null, location.hash.slice(1));
+    refreshFolds();
+  }
   function show() {
     const { name, view, param } = route();
     const wasInView = root.classList.contains("in-view");
@@ -2162,11 +2734,11 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       v.classList.toggle("active", v === view);
     }
     root.classList.toggle("in-view", Boolean(view));
+    if (started) {
+      draw(name, view, param);
+    }
     if (!view) {
       return wasInView ? scrollTo(0, overviewY) : undefined;
-    }
-    if (started) {
-      handlers[name]?.(view, param);
     }
     scrollTo(0, 0);
     const heading = view.querySelector("h1, h2");

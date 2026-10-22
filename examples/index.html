@@ -1329,13 +1329,252 @@ details > :last-child:not(summary) {
 	}
 }
 
+/* theme part: navigation kit:views.js builds from the page's own markup: breadcrumbs and previous/next in a view (.trail), the
+   contents rail (.toc) and Expand all (.fold-all). Pages write none of these classes. */
+/* Trail: breadcrumbs on the left, previous / position / next on the right; on phones the siblings take a row of their own. */
+.trail {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0 1.5rem;
+	margin-block-end: 1.25rem;
+	font-size: 0.9375rem;
+}
+.crumbs,
+.sibs {
+	display: flex;
+	align-items: center;
+	min-inline-size: 0;
+}
+.crumbs {
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.crumbs li {
+	display: flex;
+	align-items: center;
+	min-inline-size: 0;
+}
+/* The separator and the previous/next arrows are the border-drawn chevron of .back and summary. */
+:is(.crumbs li + li, .sibs [rel="prev"])::before,
+.sibs [rel="next"]::after {
+	content: "";
+	flex: none;
+	inline-size: 0.375rem;
+	block-size: 0.375rem;
+	border: solid currentColor;
+	border-width: 1.5px 1.5px 0 0;
+	transform: rotate(45deg);
+}
+.crumbs li + li::before {
+	margin-inline: 0.375rem 0.625rem;
+	color: var(--muted);
+}
+.sibs [rel="prev"]::before {
+	transform: rotate(-135deg);
+}
+.crumbs :is(a, span),
+.sibs a,
+.sibs a > span {
+	overflow: hidden;
+	min-block-size: 2.25rem;
+	line-height: 2.25rem;
+	font-weight: 500;
+	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.crumbs :is(a, span) {
+	max-inline-size: 16rem;
+}
+/* The view's own .back link as the first crumb: its chevron and spacing give way to the trail's. */
+.crumbs .back {
+	display: block;
+	margin: 0;
+}
+.crumbs .back::before {
+	content: none;
+}
+.crumbs [aria-current] {
+	color: var(--muted);
+	font-weight: 400;
+}
+.sibs {
+	gap: 0.75rem;
+	font-size: 0.875rem;
+}
+.sibs a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	max-inline-size: 11rem;
+}
+:is(.crumbs, .sibs) a:hover {
+	text-decoration: underline;
+}
+.sibs .count {
+	flex: none;
+	color: var(--muted);
+	font: 0.8125rem var(--mono);
+	font-variant-numeric: tabular-nums;
+}
+@media (max-width: 40rem) {
+	.sibs {
+		inline-size: 100%;
+		justify-content: space-between;
+		border-block-start: 1px solid var(--rule);
+	}
+	.sibs > :not(.count) {
+		inline-size: 40%;
+	}
+	.sibs [rel="next"] {
+		justify-content: flex-end;
+	}
+}
+
+/* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
+   its width; below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
+.toc ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.toc a {
+	display: block;
+	overflow: hidden;
+	padding: 0.3125rem 0.75rem;
+	border-inline-start: 2px solid transparent;
+	color: var(--muted);
+	font-size: 0.875rem;
+	line-height: 1.35;
+	text-decoration: none;
+}
+/* Section headings are sentences: two lines, clamped on the inner span so the link's padding shows no cut-off line. */
+.toc a > span {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+.toc a:hover,
+.toc a:is([aria-current], .is-trail) {
+	color: var(--ink);
+}
+.toc a:is([aria-current], .is-trail) {
+	font-weight: 600;
+}
+.toc a[aria-current] {
+	border-inline-start-color: var(--accent);
+}
+/* A trail step's siblings, on a hairline under their section; the current one carries the accent bar onto the line. */
+.toc ol ol {
+	margin: 0.125rem 0 0.5rem 0.75rem;
+	border-inline-start: 1px solid var(--rule);
+}
+.toc ol ol a {
+	margin-inline-start: -1px;
+	padding-block: 0.25rem;
+	font-size: 0.8125rem;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.toc-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	inline-size: 100%;
+	min-block-size: 2.75rem;
+	padding: 0;
+	background: none;
+	border: 0;
+	color: var(--ink);
+	font-size: 0.9375rem;
+	font-weight: 500;
+	cursor: pointer;
+}
+.toc-toggle::before {
+	content: "";
+	inline-size: 0.4375rem;
+	block-size: 0.4375rem;
+	margin-inline: 0.125rem 0.25rem;
+	border: solid var(--muted);
+	border-width: 0 1.5px 1.5px 0;
+	transform: rotate(-45deg);
+	transition: transform 0.2s var(--ease);
+}
+.toc-toggle[aria-expanded="true"]::before {
+	transform: rotate(45deg) translate(-0.125rem, -0.0625rem);
+}
+@media (max-width: 63.99rem) {
+	.toc {
+		margin-block: -0.75rem 1.75rem;
+		border-block-end: 1px solid var(--rule);
+	}
+	.toc > ol {
+		max-block-size: 60vh;
+		overflow-y: auto;
+		padding-block-end: 0.75rem;
+	}
+	.toc:not(.is-open) > ol {
+		display: none;
+	}
+}
+@media (min-width: 64rem) {
+	.has-toc .page {
+		inline-size: min(100% - 2 * var(--gutter), 81rem);
+		padding-inline-start: 15rem;
+	}
+	.toc {
+		position: fixed;
+		z-index: 1;
+		inset-block: 0;
+		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2);
+		inline-size: 12.5rem;
+		padding-block: clamp(1.75rem, 5vw, 3.5rem) 2rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+	}
+	.toc-toggle {
+		display: none;
+	}
+	/* .wide reaches into both margins of a centred column; beside the rail it stays in the column. */
+	.has-toc .wide {
+		margin-inline: 0;
+	}
+}
+
+/* Expand all: right-aligned just above the section's first fold, without .expand's +/- suffix. */
+.fold-all {
+	display: block;
+	margin: 1.25rem 0 -1rem auto;
+}
+.fold-all::after {
+	content: none;
+}
+
+@media print {
+	.trail,
+	.toc,
+	.fold-all {
+		display: none;
+	}
+	.has-toc .page {
+		padding-inline-start: 0;
+	}
+}
+
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
    To force one scheme instead of following the system: <html data-scheme="dark"> (or "light"); charts and diagrams follow it too.
-   The accent marks the answer: the headline phrase (h1 em), and on the page the readout or chart mark that answers a section;
-   colour the other marks neutral (var(--muted)).
+   Colour what the reader compares, each compared thing (a phase, an option, a series) in the same --c1..--c6 on every chart and
+   view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
+   (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
@@ -1350,7 +1589,7 @@ details > :last-child:not(summary) {
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
-   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views); pack
+   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
