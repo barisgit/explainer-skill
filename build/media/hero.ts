@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Cdp, settle } from "../../skills/explainer/src/chrome.ts";
 import { SCALE, screenshot } from "./page.ts";
-import type { Rect, Size, Theme } from "./types.ts";
+import type { Rect, Size } from "./types.ts";
 
 /** Width the README shows the hero at, in CSS pixels; the image is rendered at `SCALE` times this. */
 const HERO_WIDTH = 880;
@@ -15,13 +15,6 @@ const COLUMNS = 2;
  * margins the pages leave at 1440 wide, so the type is larger. The pages' column is 1056 px wide, centred.
  */
 export const CROP: Rect = { x: 160, y: 0, width: 1120, height: 840 };
-
-/**
- * The theme example `index` is shown in, alternating like a chessboard across the hero grid so both themes show and
- * no headline is split. The gallery thumbnail uses the same theme, so one screenshot per example serves both.
- */
-export const tileTheme = (index: number): Theme =>
-	(Math.floor(index / COLUMNS) + (index % COLUMNS)) % 2 === 1 ? "dark" : "light";
 
 /**
  * The collage page: one tile per first-screen PNG, in a grid. The page background is transparent so the image sits on

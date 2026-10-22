@@ -1,6 +1,7 @@
 /**
  * Regenerates the README and gallery media in `examples/media/` from the packed example pages:
- * a gallery thumbnail of each first screen, a hero collage of them, and animated WebP clips of interactions.
+ * a gallery thumbnail of each first screen, a hero collage of them, and animated WebP clips of interactions, each in
+ * light and in dark (`<name>-light.webp`, `<name>-dark.webp`) so the README and the gallery can follow the viewer's theme.
  *
  *   bun run media [--keep] [example ...]    all examples, or only the named ones (the hero needs all of them);
  *                                           --keep leaves the captured frames in a temp directory for inspection
@@ -8,7 +9,7 @@
  * Needs Chrome (see CHROME in AGENTS.md) and ffmpeg with libwebp_anim on PATH.
  *
  * Adding an example: append an entry to EXAMPLES; its page is `examples/<name>/index.html` and it gets a thumbnail
- * and a place in the hero. Adding a clip: append to that example's `clips`; it is written to `<example>-<clip name>.webp`.
+ * and a place in the hero. Adding a clip: append to that example's `clips`; it is written to `<example>-<clip name>-<theme>.webp`.
  * Actions play in order with a cursor dot; see `Action` in media/types.ts.
  */
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -17,9 +18,9 @@ import { join, resolve } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { record } from "./media/clip.ts";
 import { encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
-import { CROP, renderHero, tileTheme } from "./media/hero.ts";
+import { CROP, renderHero } from "./media/hero.ts";
 import { open, screenshot } from "./media/page.ts";
-import type { Example, Size } from "./media/types.ts";
+import { type Example, type Size, THEMES, type Theme } from "./media/types.ts";
 
 const VIEWPORT: Size = { width: 1440, height: 900 };
 /** Gallery thumbnail width in image pixels: a two-column card at the gallery's 1056 px column, at 2x. */
@@ -29,7 +30,6 @@ const CLIP_LIMIT = 2_000_000;
 
 /** What most clips share; an entry in `clips` may override any of it. */
 const CLIP = {
-	theme: "light",
 	viewport: VIEWPORT,
 	width: 1200,
 	fps: 12,
@@ -64,7 +64,6 @@ const EXAMPLES: Example[] = [
 			{
 				...CLIP,
 				name: "steps",
-				theme: "dark",
 				scrollTo: "#main",
 				region: { selector: "#main", pad: 4, height: 760 },
 				actions: [
@@ -132,17 +131,17 @@ const pageUrl = (example: Example) =>
 	`file://${join(ROOT, "examples", example.name, "index.html")}`;
 
 /**
- * Screenshots the first screen of every example in its hero theme and writes the gallery thumbnail from it; returns
- * the PNGs, in `examples` order, that the hero is built from.
+ * Screenshots the first screen of every example in `theme` and writes its gallery thumbnail; returns the PNGs, in
+ * `examples` order, that the hero of that theme is built from.
  */
-async function stills(examples: Example[], work: string): Promise<string[]> {
+async function stills(examples: Example[], theme: Theme, work: string): Promise<string[]> {
 	const pngs: string[] = [];
 	await withPage(async (cdp) => {
 		for (const example of examples) {
-			const png = join(work, `${example.name}.png`);
-			await open(cdp, pageUrl(example), VIEWPORT, tileTheme(EXAMPLES.indexOf(example)), true);
+			const png = join(work, `${example.name}-${theme}.png`);
+			await open(cdp, pageUrl(example), VIEWPORT, theme, true);
 			await screenshot(cdp, png);
-			const thumb = join(OUT, `${example.name}-thumb.webp`);
+			const thumb = join(OUT, `${example.name}-thumb-${theme}.webp`);
 			await encodeThumb(png, CROP, THUMB_WIDTH, thumb);
 			note(thumb);
 			pngs.push(png);
@@ -151,27 +150,28 @@ async function stills(examples: Example[], work: string): Promise<string[]> {
 	return pngs;
 }
 
-/** Writes the hero collage of the `tiles` PNGs. */
-async function hero(tiles: string[], work: string) {
-	const png = join(work, "hero.png");
-	const out = join(OUT, "hero.webp");
+/** Writes the hero collage of the `tiles` PNGs, all of one theme. */
+async function hero(tiles: string[], theme: Theme, work: string) {
+	const png = join(work, `hero-${theme}.png`);
+	const out = join(OUT, `hero-${theme}.webp`);
 	await withPage((cdp) => renderHero(cdp, tiles, VIEWPORT, work, png));
 	await encodeHero(png, out);
 	note(out);
 }
 
-/** Records and encodes every clip of `example`, each in a Chrome of its own because its page time is paused. */
-async function clips(example: Example, work: string) {
+/** Records and encodes every clip of `example` in `theme`, each in a Chrome of its own because its page time is paused. */
+async function clips(example: Example, theme: Theme, work: string) {
 	for (const clip of example.clips) {
-		const dir = join(work, `${example.name}-${clip.name}`);
+		const name = `${example.name}-${clip.name}-${theme}`;
+		const dir = join(work, name);
 		const frames = await withPage(async (cdp) => {
-			await open(cdp, pageUrl(example) + (clip.hash ?? ""), clip.viewport, clip.theme, false);
+			await open(cdp, pageUrl(example) + (clip.hash ?? ""), clip.viewport, theme, false);
 			return await record(cdp, clip, dir);
 		});
-		const out = join(OUT, `${example.name}-${clip.name}.webp`);
+		const out = join(OUT, `${name}.webp`);
 		await encodeClip(frames, 1000 / clip.fps, clip.quality, out);
 		note(out, true);
-		console.log(`${clip.name}: ${frames.length} frames`);
+		console.log(`${name}: ${frames.length} frames`);
 	}
 }
 
@@ -184,15 +184,21 @@ async function main(args: string[]) {
 			`no example named ${names.join(", ")}; known: ${EXAMPLES.map((e) => e.name).join(", ")}`,
 		);
 	}
+	if (examples.length === EXAMPLES.length) {
+		// A full run owns the directory: files from renamed or removed scenes go, so none is published stale.
+		rmSync(OUT, { recursive: true, force: true });
+	}
 	mkdirSync(OUT, { recursive: true });
 	const work = mkdtempSync(join(tmpdir(), "explainer-media-"));
 	try {
-		const tiles = await stills(examples, work);
-		for (const example of examples) {
-			await clips(example, work);
-		}
-		if (examples.length === EXAMPLES.length) {
-			await hero(tiles, work);
+		for (const theme of THEMES) {
+			const tiles = await stills(examples, theme, work);
+			for (const example of examples) {
+				await clips(example, theme, work);
+			}
+			if (examples.length === EXAMPLES.length) {
+				await hero(tiles, theme, work);
+			}
 		}
 	} finally {
 		if (keep) {

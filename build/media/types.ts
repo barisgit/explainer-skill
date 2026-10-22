@@ -2,6 +2,9 @@
 
 export type Theme = "light" | "dark";
 
+/** Every output is written once per theme, `<name>-<theme>.webp`, so the README and the gallery can follow the viewer's. */
+export const THEMES: readonly Theme[] = ["light", "dark"];
+
 export interface Size {
 	width: number;
 	height: number;
@@ -40,9 +43,8 @@ export interface Frame {
 export type Region = { selector: string; pad?: number; height?: number } | Rect;
 
 export interface Clip {
-	/** Names the file: `examples/media/<example>-<name>.webp`. */
+	/** Names the files: `examples/media/<example>-<name>-<theme>.webp`, one per theme. */
 	name: string;
-	theme: Theme;
 	viewport: Size;
 	/** Element to scroll to the top of the viewport before recording; the region is measured afterwards. */
 	scrollTo?: string;
