@@ -48,7 +48,8 @@ export function readKitText(path: string): string {
 	return [...parts, path]
 		.map((file) => {
 			const text = readFileSync(file, "utf8");
-			return file.endsWith(".ts") ? script(text) : text;
+			// Only kit sources are TypeScript; a page's own scripts are served as written.
+			return file.startsWith(KIT_DIR) && file.endsWith(".ts") ? script(text) : text;
 		})
 		.join("\n");
 }
