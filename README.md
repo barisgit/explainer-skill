@@ -19,8 +19,10 @@ Several agents share one copy in `~/.agents/skills/explainer` and the others get
 **Caplet** (verified with `caplet` v0.2.0)
 
 ```sh
-caplet add github:barisgit/explainer-skill --pin v0.1.0 --scope user
+caplet add github:barisgit/explainer-skill --pin main --scope user
 ```
+
+Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.1.0` instead to hold a version.
 
 Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
@@ -48,7 +50,7 @@ Caplet leaves empty `kit`, `src` and `vendor` folders under `skills/explainer/`;
 ### Publishing
 
 - npx skills needs a public GitHub repository (or any git URL). The skills.sh listing comes from install telemetry, so the skill appears there after people install it.
-- Caplet takes `github:<owner>/<repo>` or `git:<url>` and should be pinned with `--pin <ref>` so installs are reproducible.
+- Caplet takes `github:<owner>/<repo>` or `git:<url>` with a required `--pin <ref>`: a branch to follow, or a tag for a fixed version.
 - There is no `acf.yml` on purpose. Caplet then imports `skills/explainer/` whole; an `acf.yml` would limit it to `SKILL.md` and the files listed in `assets:`.
 
 ## Requirements
