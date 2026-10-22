@@ -176,9 +176,10 @@ h3,
 	padding-block: 1rem;
 	min-inline-size: 0;
 }
-/* Blueprint surface for diagrams. */
+/* Blueprint surface for diagrams; marks drawn on it sit on the page tone. */
 .stage,
 .fig-visual.stage {
+	--under: var(--bg);
 	background: var(--blueprint);
 }
 .fig-visual.stage {
@@ -227,7 +228,9 @@ h3,
 	background: var(--rule);
 	border-block: 1px solid var(--rule);
 }
+/* A column paints the tone the split sits on and passes it on, even when the column is a .stage. */
 .split > * {
+	--under: inherit;
 	min-inline-size: 0;
 	margin: 0;
 	padding: 0.875rem var(--inset) 1rem;

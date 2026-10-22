@@ -237,7 +237,7 @@
 	fill: var(--accent);
 	font: 500 12px var(--mono);
 	paint-order: stroke;
-	stroke: var(--bg);
+	stroke: var(--under);
 	stroke-width: 5px;
 	stroke-linejoin: round;
 }

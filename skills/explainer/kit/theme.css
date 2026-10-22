@@ -16,7 +16,7 @@
    sections (method, sources) are set smaller with the heading in its own column.
    Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
-   --under is the tone under the current block (page, panel or band): give a label halo of your own stroke: var(--under).
+   --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views); pack
