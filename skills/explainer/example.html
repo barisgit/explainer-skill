@@ -67,8 +67,8 @@
 flowchart TD
 	clump["4 customers in one minute"] --> backlog["Backlog: 6 minutes of work"]
 	backlog --> spare{"Spare time?"}
-	spare -->|"50% busy: 1 min in 2"| calm["Cleared in 12 minutes"]
-	spare -->|"90% busy: 1 min in 10"| slow["Cleared in 60 minutes"]
+	spare -->|"50% busy"| calm["Clear in 12 min"]
+	spare -->|"90% busy"| slow["Clear in 60 min"]
 	slow --> stack["Next clump stacks on top"]
 	stack --> backlog
 </pre>
