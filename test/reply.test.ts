@@ -332,3 +332,21 @@ ${onLoad(2, "Clear is offered for answers that wait for their panel", `!clearBut
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
 }, 60_000);
+
+test("a field the page rebuilds under the same id as a different field does not receive the old field's answer", async () => {
+	const body = `<fieldset><legend>Country</legend><label><input type="radio" name="c" value="us" id="us" checked> US</label> <label><input type="radio" name="c" value="si" id="si"> SI</label></fieldset>
+<label>City <input type="text" id="city"></label>`;
+	const script = `
+document.addEventListener("change", (e) => {
+	if (e.target.name === "c" && sessionStorage.loads !== "1") $("city").closest("label").outerHTML = '<label>Postal code <input type="text" id="city"></label>';
+});
+${onLoad(2, "the postal code field starts empty and no city answer waits for it", `$("city").closest("label").textContent.includes("Postal") && $("city").value === "" && saved() === 1 && !localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith("explainer:"))).includes("#city")`)}`;
+	const input = dir.write("renamed.html", SMALL(body, script));
+	const output = dir.path("renamed.out.html");
+
+	await runCli(["pack", input, "-o", output]);
+	const checked = await run(output, ["focus:#city", "key:r", "click:#si", "reload"]);
+
+	expect(checked.stdout).not.toContain("keep contract");
+	expect(checked.code).toBe(0);
+}, 60_000);

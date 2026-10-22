@@ -161,7 +161,7 @@
 	// ---- keeping what the reader entered ----
 	// Chrome gives every file:// page one origin, so the page's own address is what tells their saved state apart.
 	const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
-	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, sig }. A control the page rebuilds with its current value in the markup is still compared with the authored one. */
+	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, sig }. A control the page rebuilds the same way, with its current value in the markup, is still compared with the authored one. */
 	const defaults = new Map();
 	/** Saved entries { value, sig } by key that no control has taken for good yet. */
 	let pending = {};
@@ -213,18 +213,21 @@
 	const fits = (unit, value) => kind(value) === kind(unit.initial);
 	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-	/** The kept controls in the page now: { el, key, initial, sig, first }, `first` when the key has not been seen before. */
+	/**
+	 * The kept controls in the page now: { el, key, initial, sig }. A key keeps its recorded default only while the control
+	 * under it is the same kind of control (same signature); a different one under a reused id starts from its own markup.
+	 */
 	function units() {
 		const controls = [...document.querySelectorAll(CONTROL)].filter(
 			(c) => !c.closest(".reply-ui, [data-keep=off]"),
 		);
 		return controls.map((el, i) => {
 			const key = unitKey(el, i);
-			const first = !defaults.has(key);
-			if (first) {
-				defaults.set(key, { initial: initialValue(el), sig: signature(el) });
+			const sig = signature(el);
+			if (defaults.get(key)?.sig !== sig) {
+				defaults.set(key, { initial: initialValue(el), sig });
 			}
-			return { el, key, first, ...defaults.get(key) };
+			return { el, key, ...defaults.get(key) };
 		});
 	}
 
