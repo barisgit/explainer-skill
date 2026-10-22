@@ -13,13 +13,22 @@
 	let started = false;
 	let overviewY = 0;
 
+	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
+	function decode(text) {
+		try {
+			return decodeURIComponent(text);
+		} catch {
+			return text;
+		}
+	}
+
 	/** The view claimed by the current hash: `name/param` wins over `name`; param is decoded. */
 	function route() {
 		const [name = "", ...rest] = location.hash.slice(1).split("/");
 		const view =
 			views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ??
 			views.find((v) => v.dataset.view === name);
-		return { name, view, param: decodeURIComponent(rest.join("/")) };
+		return { name, view, param: decode(rest.join("/")) };
 	}
 
 	/** Shows the view for the hash, or the overview. Handlers run only once routing has started. */
