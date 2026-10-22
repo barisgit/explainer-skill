@@ -7,7 +7,8 @@
 			"!**/*.html",
 			"!**/*.md",
 			"!skills/explainer/kit/echarts.js",
-			"!skills/explainer/vendor/mermaid.min.js"
+			"!skills/explainer/vendor/mermaid.min.js",
+			"!examples/*/data.js"
 		]
 	},
 	"formatter": { "enabled": true, "indentStyle": "tab", "lineWidth": 100 },
