@@ -81,3 +81,20 @@ test("check warns about content cut off inside an overflow:hidden panel, but not
 	expect(result.stdout).toContain("div#panel has content cut off: 300px of content in 100px");
 	expect(result.stdout).not.toContain("p#title");
 }, 30_000);
+
+test("check ignores content inside a closed <details>: no cut-off warnings and no text map from hidden links", async () => {
+	const hiddenBoxes = Array.from(
+		{ length: 7 },
+		(_, n) =>
+			`<div id="hidden${n}" style="width:100px;overflow:hidden"><div style="width:300px">wide</div></div>`,
+	).join("");
+	const links = `<ol>${[1, 2, 3].map((n) => `<li><a href="#q${n}">Question ${n}?</a></li>`).join("")}</ol>`;
+	const body = `<details><summary>More</summary>${links}${hiddenBoxes}</details><div id="visible" style="width:100px;overflow:hidden"><div style="width:300px">wide</div></div>`;
+	const file = dir.write("folded.html", page("").replace("</h1>", `</h1>${body}`));
+
+	const result = await runCli(["check", file, "--view", "none", "--out", dir.path("folded")]);
+
+	expect(result.stdout).toContain("div#visible has content cut off");
+	expect(result.stdout).not.toContain("div#hidden");
+	expect(result.stdout).toContain("no figure in view");
+}, 30_000);

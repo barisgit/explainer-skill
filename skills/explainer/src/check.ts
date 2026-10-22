@@ -74,6 +74,17 @@ export async function kitReferences(html: string): Promise<string[]> {
 
 /** Page-side function naming an element in reports: `div#panel.card` (tag, id, first class). */
 const ELEMENT_NAME_JS = `(el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")`;
+/**
+ * Page-side function: true for an element laid out for the reader. Chrome still returns layout boxes for the descendants of a closed
+ * `<details>`, so a box alone does not mean visible; only the `<summary>` of a closed disclosure is.
+ */
+const SHOWN_JS = `(el) => {
+	if (el.getClientRects().length === 0) return false;
+	for (let child = el, p = el.parentElement; p; child = p, p = p.parentElement) {
+		if (p.tagName === "DETAILS" && !p.open && child.tagName !== "SUMMARY") return false;
+	}
+	return true;
+}`;
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
 
@@ -90,10 +101,10 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	const name = ${ELEMENT_NAME_JS};
 	const scrolls = (el) => { const o = getComputedStyle(el).overflowX; return o === "auto" || o === "scroll"; };
 	const clipped = (el) => { for (let p = el.parentElement; p; p = p.parentElement) if (scrolls(p)) return true; return false; };
-	const shown = (el) => el.getClientRects().length > 0;
+	const shown = ${SHOWN_JS};
 	const all = [...document.body.querySelectorAll("*")];
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
-	const inner = all.filter((el) => scrolls(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
+	const inner = all.filter((el) => scrolls(el) && shown(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
 	const cut = all.filter((el) => hides(el) && shown(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
 	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");
@@ -121,7 +132,8 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 /** Runs in the page before any step: the headline, the figures at least partly in the first viewport (outermost only) and the largest list of in-page links in view. */
 const FIRST_SCREEN_JS = `(() => {
 	const name = ${ELEMENT_NAME_JS};
-	const seen = (el) => { const r = el.getBoundingClientRect(); return r.width >= 120 && r.height >= 80 && Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) >= Math.min(200, r.height * 0.4); };
+	const shown = ${SHOWN_JS};
+	const seen = (el) => { if (!shown(el)) return false; const r = el.getBoundingClientRect(); return r.width >= 120 && r.height >= 80 && Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) >= Math.min(200, r.height * 0.4); };
 	const found = [...document.querySelectorAll("figure, .fig, .chart, .mermaid, .dg, svg, canvas, img")].filter(seen);
 	const outer = found.filter((el) => !found.some((o) => o !== el && o.contains(el)));
 	const headline = document.querySelector("h1")?.textContent.replace(/\\s+/g, " ").trim() ?? "";
@@ -129,7 +141,7 @@ const FIRST_SCREEN_JS = `(() => {
 	for (const a of document.querySelectorAll('a[href^="#"]')) {
 		const r = a.getBoundingClientRect();
 		const list = a.closest("ol, ul, nav");
-		if (list && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight) lists.set(list, (lists.get(list) ?? 0) + 1);
+		if (list && shown(a) && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight) lists.set(list, (lists.get(list) ?? 0) + 1);
 	}
 	return { links: Math.max(0, ...lists.values()), headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map(name) };
 })()`;
