@@ -25,7 +25,7 @@
 	document.documentElement.append(probe);
 
 	/** Resolves `var(--name)` to the colour for the current scheme (light-dark() included). */
-	function color(name) {
+	function color(name: string) {
 		probe.style.color = `var(--${name})`;
 		return getComputedStyle(probe).color;
 	}
@@ -36,16 +36,16 @@
 	const COLOR_EXPR = /^(var|color-mix|light-dark)\(/;
 
 	/** Concrete rgb(a) for a CSS colour expression in the current scheme. */
-	function resolve(expr) {
+	function resolve(expr: string) {
 		probe.style.color = expr;
 		const computed = getComputedStyle(probe).color;
-		if (computed.startsWith("rgb")) {
+		if (computed.startsWith("rgb") || !pixel) {
 			return computed;
 		}
 		pixel.clearRect(0, 0, 1, 1);
 		pixel.fillStyle = computed;
 		pixel.fillRect(0, 0, 1, 1);
-		const [r, g, b, a] = pixel.getImageData(0, 0, 1, 1).data;
+		const [r = 0, g = 0, b = 0, a = 0] = pixel.getImageData(0, 0, 1, 1).data;
 		return `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`;
 	}
 
@@ -53,7 +53,8 @@
 	 * Copy of an option with every colour expression under a colour key resolved for the current scheme. Plain objects and arrays are
 	 * copied, everything else (functions, class instances, number arrays) is shared. Run at every mount so saved options stay token-based.
 	 */
-	function resolveColors(value, key = "") {
+	function resolveColors<T>(value: T, key?: string): T;
+	function resolveColors(value: unknown, key = ""): unknown {
 		if (typeof value === "string") {
 			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
 		}
@@ -69,16 +70,14 @@
 	/** ECharts theme object built from the tokens, so every component starts in the page's look. */
 	function theme() {
 		// Resolved to rgb: --accent-soft and other derived tokens are color-mix(), which ECharts cannot parse.
-		const token = (name) => resolve(`var(--${name})`);
-		const [ink, muted, rule, ruleStrong, surface, accent, accentSoft] = [
-			"ink",
-			"muted",
-			"rule",
-			"rule-strong",
-			"surface",
-			"accent",
-			"accent-soft",
-		].map(token);
+		const token = (name: string) => resolve(`var(--${name})`);
+		const ink = token("ink");
+		const muted = token("muted");
+		const rule = token("rule");
+		const ruleStrong = token("rule-strong");
+		const surface = token("surface");
+		const accent = token("accent");
+		const accentSoft = token("accent-soft");
 		const axis = {
 			axisLine: { lineStyle: { color: ruleStrong } },
 			axisTick: { lineStyle: { color: ruleStrong } },
@@ -164,10 +163,11 @@
 	 * position; nested arrays such as data replaced. Remounts replay the saved option, so it must
 	 * match what the live chart shows.
 	 */
-	function merge(target, patch, topLevel = false) {
+	function merge(target: unknown, patch: unknown, topLevel = false): unknown {
 		if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
 			patch.forEach((item, index) => {
-				const at = item?.id == null ? index : target.findIndex((t) => t?.id === item.id);
+				const id = idOf(item);
+				const at = id == null ? index : target.findIndex((t) => idOf(t) === id);
 				if (at < 0 || at >= target.length) {
 					target.push(item);
 				} else {
@@ -186,7 +186,7 @@
 	}
 
 	/** Applies a top-level option patch to the saved option; see merge. Components named in `replace` are swapped for the patch's list. */
-	function mergeOption(option, patch, replace) {
+	function mergeOption(option: ChartOption, patch: ChartOption, replace: string[]) {
 		for (const key of replace) {
 			if (!(key in patch)) {
 				delete option[key];
@@ -200,12 +200,14 @@
 		}
 	}
 
-	function isObject(value) {
+	function isObject(value: unknown): value is Record<string, unknown> {
 		return value !== null && typeof value === "object" && !Array.isArray(value);
 	}
 
+	const idOf = (item: unknown) => (isObject(item) ? item.id : undefined);
+
 	// Remount callbacks of the live charts. One shared check, because the scheme can change by media query or by the page itself.
-	const remounts = new Set();
+	const remounts = new Set<() => void>();
 	let scheme = color("ink");
 	const checkScheme = () => {
 		const now = color("ink");
@@ -224,11 +226,15 @@
 		}
 	}
 
-	const made = new WeakMap();
+	const made = new WeakMap<HTMLElement, () => void>();
 
-	function make(el, option, setup) {
+	function make(
+		el: HTMLElement,
+		option: ChartOption,
+		setup?: (chart: ECharts) => void,
+	): ChartHandle {
 		made.get(el)?.(); // a view handler that runs again replaces the chart instead of stacking observers
-		let chart = null;
+		let chart: ECharts | null = null;
 		const mount = () => {
 			chart?.dispose();
 			chart = echarts.init(el, theme());

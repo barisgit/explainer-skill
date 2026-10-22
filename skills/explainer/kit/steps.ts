@@ -28,13 +28,13 @@
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const PLAY_MS = 3000;
-	const steppers = new WeakMap();
+	const steppers = new WeakMap<Element, (step?: number) => void>();
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
 
 	/** The two node ids of a Mermaid edge id `L_<from>_<to>_<n>`; node ids may hold underscores, so only a split that names two nodes counts. */
-	function endpointsOf(edgeId, nodeIds) {
-		const parts = /^L_(.+)_\d+$/.exec(edgeId)?.[1].split("_") ?? [];
+	function endpointsOf(edgeId: string, nodeIds: Set<string>) {
+		const parts = /^L_(.+)_\d+$/.exec(edgeId)?.[1]?.split("_") ?? [];
 		for (let cut = 1; cut < parts.length; cut++) {
 			const ends = [parts.slice(0, cut).join("_"), parts.slice(cut).join("_")];
 			if (ends.every((id) => nodeIds.has(id))) {
@@ -45,20 +45,23 @@
 	}
 
 	/** An edge the author did not map appears with its later endpoint (an endpoint with no step is there from the start). */
-	function followEndpoints(diagram, firstStep) {
+	function followEndpoints(diagram: Element, firstStep: Map<string, number>) {
 		const nodeIds = new Set(
-			[...diagram.querySelectorAll(".node[data-ref], .cluster[data-ref]")].map(
-				(n) => n.dataset.ref,
+			[...diagram.querySelectorAll<Part>(".node[data-ref], .cluster[data-ref]")].map(
+				(n) => n.dataset.ref ?? "",
 			),
 		);
-		for (const edge of diagram.querySelectorAll('[data-et="edge"][data-id]:not([data-step])')) {
-			const steps = endpointsOf(edge.dataset.id, nodeIds).map((id) => firstStep.get(id) ?? 0);
+		for (const edge of diagram.querySelectorAll<Part>(
+			'[data-et="edge"][data-id]:not([data-step])',
+		)) {
+			const id = edge.dataset.id ?? "";
+			const steps = endpointsOf(id, nodeIds).map((end) => firstStep.get(end) ?? 0);
 			const step = Math.max(0, ...steps);
 			if (step > 0) {
-				for (const part of diagram.querySelectorAll(
-					`[data-ref~="${CSS.escape(edge.dataset.id)}"]:not([data-step])`,
+				for (const part of diagram.querySelectorAll<Part>(
+					`[data-ref~="${CSS.escape(id)}"]:not([data-step])`,
 				)) {
-					part.dataset.step = step;
+					part.dataset.step = String(step);
 					part.dataset.stepAuto = "";
 				}
 			}
@@ -66,18 +69,18 @@
 	}
 
 	/** `data-steps="api:1 cache:2,4"` on a diagram: copies each id's steps onto the diagram parts that carry that data-ref. */
-	function expandDiagramSteps(root) {
-		for (const diagram of root.querySelectorAll("[data-steps]")) {
+	function expandDiagramSteps(root: Element) {
+		for (const diagram of root.querySelectorAll<Part>("[data-steps]")) {
 			// Derived steps are redone from the current data-steps, so drop the earlier ones first.
-			for (const part of diagram.querySelectorAll("[data-step-auto]")) {
+			for (const part of diagram.querySelectorAll<Part>("[data-step-auto]")) {
 				part.removeAttribute("data-step");
 				part.removeAttribute("data-step-auto");
 			}
-			const firstStep = new Map();
-			for (const token of diagram.dataset.steps.split(/\s+/).filter(Boolean)) {
+			const firstStep = new Map<string, number>();
+			for (const token of (diagram.dataset.steps ?? "").split(/\s+/).filter(Boolean)) {
 				const [ref = "", steps = ""] = token.split(":");
 				firstStep.set(ref, Math.min(...steps.split(",").map(Number)));
-				for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`)) {
+				for (const part of diagram.querySelectorAll<Part>(`[data-ref~="${CSS.escape(ref)}"]`)) {
 					part.dataset.step = steps.replaceAll(",", " ");
 				}
 			}
@@ -86,43 +89,63 @@
 	}
 
 	// Default texts in data-labels order; the page's list may leave entries empty to keep them.
-	const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"];
+	const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"] as const;
 
-	const button = (label, attrs, primary = false) =>
+	/** An element the stepper's own markup is known to contain. */
+	function need<T extends Element>(root: ParentNode, selector: string): T {
+		const el = root.querySelector<T>(selector);
+		if (!el) {
+			throw new Error(`kit:steps.js: no ${selector}`);
+		}
+		return el;
+	}
+
+	const button = (label: string, attrs: string, primary = false) =>
 		`<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
 
 	/** One stepper: its controls, the current step and the content it steps through. */
 	class Stepper {
-		parts = [];
-		captions = [];
+		parts: { el: Part; steps: number[] }[] = [];
+		captions: Element[] = [];
 		total = 0;
 		step = 0;
-		timer = null;
+		timer: number | undefined;
 		announced = "";
 		wired = false;
-		labels = [];
+		readonly root: HTMLElement;
+		readonly bar = document.createElement("div");
+		readonly back: HTMLButtonElement;
+		readonly play: HTMLButtonElement;
+		readonly next: HTMLButtonElement;
+		readonly range: HTMLInputElement;
+		readonly readout: HTMLOutputElement;
+		readonly watcher: MutationObserver;
+		readonly playText: string;
+		readonly pauseText: string;
 
-		constructor(root) {
+		constructor(root: HTMLElement) {
 			this.root = root;
 			const custom = (root.dataset.labels ?? "").split(",").map((label) => label.trim());
-			this.labels = LABELS.map((label, i) => custom[i] || label);
-			const [back, play, , next, group, scrubber] = this.labels;
-			this.bar = document.createElement("div");
+			const text = (i: 0 | 1 | 2 | 3 | 4 | 5) => custom[i] || LABELS[i];
+			this.playText = text(1);
+			this.pauseText = text(2);
 			this.bar.className = "player";
 			this.bar.setAttribute("role", "group");
-			this.bar.setAttribute("aria-label", group);
-			this.bar.innerHTML = `${button(back, 'data-go="-1"')}${button(play, "data-play", true)}${button(next, 'data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
-			[this.back, this.play, this.next] = this.bar.querySelectorAll("button");
-			this.range = this.bar.querySelector("input");
-			this.range.setAttribute("aria-label", scrubber);
-			this.readout = this.bar.querySelector("output");
+			this.bar.setAttribute("aria-label", text(4));
+			this.bar.innerHTML = `${button(text(0), 'data-go="-1"')}${button(this.playText, "data-play", true)}${button(text(3), 'data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
+			this.back = need(this.bar, "[data-go='-1']");
+			this.play = need(this.bar, "[data-play]");
+			this.next = need(this.bar, "[data-go='1']");
+			this.range = need(this.bar, "input");
+			this.range.setAttribute("aria-label", text(5));
+			this.readout = need(this.bar, "output");
 			this.bindControls();
 			this.bindKeys();
 			// Replacing the captions' children re-reads without the page's help. Re-pointed at every refresh, since the list itself may be new.
 			this.watcher = new MutationObserver(() => this.refresh());
 		}
 
-		show(target) {
+		show(target: number) {
 			this.step = Math.max(1, Math.min(this.total, target));
 			for (const { el, steps } of this.parts) {
 				el.classList.toggle("is-on", Math.min(...steps) <= this.step);
@@ -133,7 +156,7 @@
 			}
 			this.back.disabled = this.step === 1;
 			this.next.disabled = this.step === this.total;
-			this.range.value = this.step;
+			this.range.value = String(this.step);
 			this.readout.textContent = `${this.step} / ${this.total}`;
 			if (loaded) {
 				this.announce();
@@ -156,13 +179,13 @@
 
 		stop() {
 			clearInterval(this.timer);
-			this.timer = null;
-			this.play.textContent = this.labels[1];
+			this.timer = undefined;
+			this.play.textContent = this.playText;
 		}
 
 		bindControls() {
 			this.bar.addEventListener("click", (e) => {
-				const go = e.target.closest("[data-go]");
+				const go = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-go]") : null;
 				if (go) {
 					this.stop();
 					this.show(this.step + Number(go.dataset.go));
@@ -179,7 +202,7 @@
 				if (this.step === this.total) {
 					this.show(1);
 				}
-				this.play.textContent = this.labels[2];
+				this.play.textContent = this.pauseText;
 				this.timer = setInterval(
 					() => (this.step < this.total ? this.show(this.step + 1) : this.stop()),
 					PLAY_MS,
@@ -191,7 +214,7 @@
 			this.root.addEventListener("keydown", (e) => {
 				if (
 					!this.wired ||
-					e.target.matches("input, textarea, select") ||
+					(e.target instanceof Element && e.target.matches("input, textarea, select")) ||
 					e.altKey ||
 					e.ctrlKey ||
 					e.metaKey
@@ -199,7 +222,13 @@
 					return;
 				}
 				const { step, total } = this;
-				const target = { ArrowLeft: step - 1, ArrowRight: step + 1, Home: 1, End: total }[e.key];
+				const keys: Record<string, number> = {
+					ArrowLeft: step - 1,
+					ArrowRight: step + 1,
+					Home: 1,
+					End: total,
+				};
+				const target = keys[e.key];
 				if (target === undefined) {
 					return;
 				}
@@ -212,9 +241,9 @@
 		/** Re-reads captions, parts and data-steps; returns the captions list element, if any. */
 		readContent() {
 			expandDiagramSteps(this.root);
-			this.parts = [...this.root.querySelectorAll("[data-step]")].map((el) => ({
+			this.parts = [...this.root.querySelectorAll<Part>("[data-step]")].map((el) => ({
 				el,
-				steps: el.dataset.step.trim().split(/\s+/).map(Number),
+				steps: (el.dataset.step ?? "").trim().split(/\s+/).map(Number),
 			}));
 			const captionList = this.root.querySelector("[data-captions]");
 			this.captions = [...(captionList?.children ?? [])];
@@ -227,7 +256,7 @@
 		}
 
 		/** Puts the controls before the captions (else at the end of the stepper) and makes the stepper keyboard-reachable. */
-		mount(captionList) {
+		mount(captionList: Element | null) {
 			const { root, bar } = this;
 			if (captionList) {
 				if (bar.nextElementSibling !== captionList) {
@@ -237,7 +266,7 @@
 				root.append(bar);
 			}
 			captionList?.setAttribute("aria-live", "polite");
-			this.range.max = this.total;
+			this.range.max = String(this.total);
 			root.tabIndex = 0;
 			root.setAttribute("role", "group");
 			root.setAttribute(
@@ -248,7 +277,7 @@
 		}
 
 		/** Re-reads the content and re-applies the step: `wanted`, else the current one (or the new last step if it was on the last). */
-		refresh(wanted) {
+		refresh(wanted?: number) {
 			const wasLast = this.step === this.total;
 			const opening = this.step === 0;
 			const captionList = this.readContent();
@@ -270,7 +299,7 @@
 		}
 	}
 
-	const all = [...document.querySelectorAll("[data-stepper]")].map((root) => {
+	const all = [...document.querySelectorAll<HTMLElement>("[data-stepper]")].map((root) => {
 		const stepper = new Stepper(root);
 		steppers.set(root, (step) => stepper.refresh(step));
 		stepper.refresh();

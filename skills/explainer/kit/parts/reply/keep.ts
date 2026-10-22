@@ -13,14 +13,38 @@
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	/** What a control is, by its own label and kind alone (never its group's): a saved value is put only into a control with the same one. */
-	const signature = (c) =>
+	type Control = ReplyControl;
+	/** What a control holds: checked, selected values (multiple select), or its text. */
+	type Value = boolean | string | string[];
+	/** A kept control: its identity across loads, its markup default and its signature. */
+	interface Unit {
+		el: Control;
+		key: string;
+		initial: Value;
+		sig: string;
+	}
+	interface Write {
+		el: Control;
+		value: Value;
+	}
+	/** A saved entry no control has taken yet. */
+	interface Saved {
+		value: unknown;
+		sig: string;
+	}
+	const isRadio = (c: Control): c is HTMLInputElement => c.type === "radio";
+	const isToggle = (c: Control): c is HTMLInputElement => isRadio(c) || c.type === "checkbox";
+	const isMultiSelect = (c: Control): c is HTMLSelectElement =>
+		c instanceof HTMLSelectElement && c.multiple;
+
+	const signature = (c: Control) =>
 		clean(
 			`${c.type}|${
 				c.getAttribute("aria-label") ||
 				(c.labels?.[0] && ownText(c.labels[0])) ||
 				c.closest(".field")?.firstElementChild?.textContent ||
 				c.name ||
-				c.placeholder ||
+				("placeholder" in c && c.placeholder) ||
 				""
 			}`,
 		);
@@ -28,22 +52,22 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	// Chrome gives every file:// page one origin, so the page's own address is what tells their saved state apart.
 	const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
 	/** The controls the reader has touched, which a value equal to the default cannot show. */
-	let touched = new WeakSet();
+	let touched = new WeakSet<Control>();
 	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, sig }. A control the page rebuilds the same way, with its current value in the markup, is still compared with the authored one. */
-	const defaults = new Map();
+	const defaults = new Map<string, { initial: Value; sig: string }>();
 	/** Saved entries { value, sig } by key that no control has taken for good yet. */
-	let pending = {};
+	let pending: Record<string, Saved> = {};
 	/** Who last took each pending entry: { el, tries }. An entry is settled once its control is still in the page at the next look. */
-	const taken = new Map();
+	const taken = new Map<string, { el: Control; tries: number }>();
 	const MAX_TRIES = 3;
 	/** True while values are being written and announced; page listeners that rebuild controls run then, so nothing is settled yet. */
 	let applying = false;
 	/** False until the saved state is restored, so the page at script time cannot overwrite it. */
 	let ready = false;
 
-	const groupOf = (c) => `${[...document.forms].indexOf(c.form)}:${c.name}`;
+	const groupOf = (c: Control) => `${c.form ? [...document.forms].indexOf(c.form) : -1}:${c.name}`;
 	/** A control's identity across loads: its id, else (radio) form, group and value, else its type and position among the kept controls. */
-	function unitKey(c, index) {
+	function unitKey(c: Control, index: number) {
 		if (c.id) {
 			return `#${c.id}`;
 		}
@@ -51,80 +75,79 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	}
 
 	/** The value `c` has before the reader or a script touches it: that of a copy parsed from its markup. */
-	function initialValue(c) {
+	function initialValue(c: Control) {
 		const box = document.createElement("div");
 		box.innerHTML = c.outerHTML;
-		return readControl(box.firstElementChild);
+		return readControl(box.querySelector<Control>(selector) ?? c);
 	}
 
-	/** Only a select has options: an input can carry `multiple` too (email, file). */
-	const isMultiSelect = (c) => c.tagName === "SELECT" && c.multiple;
-
-	function readControl(c) {
-		if (c.type === "radio" || c.type === "checkbox") {
+	function readControl(c: Control): Value {
+		if (isToggle(c)) {
 			return c.checked;
 		}
 		return isMultiSelect(c) ? [...c.selectedOptions].map((o) => o.value) : c.value;
 	}
 
-	function writeControl(c, value) {
-		if (c.type === "radio" || c.type === "checkbox") {
-			c.checked = value;
-		} else if (isMultiSelect(c)) {
+	function writeControl(c: Control, value: Value) {
+		if (isToggle(c)) {
+			c.checked = value === true;
+		} else if (isMultiSelect(c) && Array.isArray(value)) {
 			for (const o of c.options) {
 				o.selected = value.includes(o.value);
 			}
 		} else {
-			c.value = value;
+			c.value = String(value);
 		}
 	}
 
 	/** Storage can hold anything: a stored value is used only when it has the shape `readControl` gives. */
-	const kind = (value) => Object.prototype.toString.call(value);
-	const fits = (unit, value) => kind(value) === kind(unit.initial);
-	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+	const kind = (value: unknown) => Object.prototype.toString.call(value);
+	const fits = (unit: Unit, value: unknown): value is Value => kind(value) === kind(unit.initial);
+	const same = (a: Value, b: Value) => JSON.stringify(a) === JSON.stringify(b);
 
 	/**
 	 * The kept controls in the page now: { el, key, initial, sig }. A key keeps its recorded default only while the control
 	 * under it is the same kind of control (same signature); a different one under a reused id starts from its own markup.
 	 */
-	function units() {
-		const controls = [...document.querySelectorAll(selector)].filter(
+	function units(): Unit[] {
+		const controls = [...document.querySelectorAll<Control>(selector)].filter(
 			(c) => !c.closest(".reply-ui, [data-keep=off]"),
 		);
 		return controls.map((el, i) => {
 			const key = unitKey(el, i);
 			const sig = signature(el);
-			if (defaults.get(key)?.sig !== sig) {
-				defaults.set(key, { initial: initialValue(el), sig });
+			let entry = defaults.get(key);
+			if (entry?.sig !== sig) {
+				entry = { initial: initialValue(el), sig };
+				defaults.set(key, entry);
 			}
-			return { el, key, ...defaults.get(key) };
+			return { el, key, ...entry };
 		});
 	}
 
-	const moved = (u) => !same(readControl(u.el), u.initial);
+	const moved = (u: Unit) => !same(readControl(u.el), u.initial);
 	/** Answered: moved off the default, or chosen by the reader even where that equals it. */
-	const answered = (u) => moved(u) || touched.has(u.el);
+	const answered = (u: Unit) => moved(u) || touched.has(u.el);
 
 	/** Page listeners hear a restored or cleared control the way they hear the reader: input, then change. */
-	function announce(c) {
+	function announce(c: Control) {
 		for (const type of ["input", "change"]) {
 			c.dispatchEvent(new Event(type, { bubbles: true }));
 		}
 	}
 
 	/** True when some radio of `c`'s group is checked; an unnamed radio is its own group. */
-	const groupChosen = (c) =>
+	const groupChosen = (c: Control) =>
 		Boolean(c.name) &&
 		[...document.getElementsByName(c.name)].some(
-			(r) => r.type === "radio" && r.form === c.form && r.checked,
+			(r) => r instanceof HTMLInputElement && r.type === "radio" && r.form === c.form && r.checked,
 		);
 
 	/** The controls to announce after `writes`: each written control except unchecked radios, plus one radio for a group left with no choice. */
-	function speakers(writes) {
-		const spoken = new Map();
+	function speakers(writes: Write[]) {
+		const spoken = new Map<string | Control, Control>();
 		for (const { el } of writes) {
-			if (el.type !== "radio" || el.checked) {
+			if (!isRadio(el) || el.checked) {
 				spoken.set(el, el);
 			} else if (!groupChosen(el)) {
 				spoken.set(el.name ? groupOf(el) : el, el);
@@ -137,7 +160,7 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	 * Sets `writes` ({ el, value }) and tells the page. Every value is written before any event, so no listener sees a radio group half
 	 * switched. Written controls count as the reader's.
 	 */
-	function apply(writes) {
+	function apply(writes: Write[]) {
 		applying = true;
 		try {
 			for (const { el, value } of writes) {
@@ -168,7 +191,7 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	 */
 	function adopt() {
 		settle();
-		const writes = [];
+		const writes: Write[] = [];
 		for (const u of units()) {
 			const entry = pending[u.key];
 			if (!entry) {
@@ -197,9 +220,10 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 		return { controls, notes: notes.list() };
 	}
 
-	const empty = (state) => !state.notes.length && !Object.keys(state.controls).length;
+	const empty = (state: { controls: object; notes: unknown[] }) =>
+		!state.notes.length && !Object.keys(state.controls).length;
 
-	function persist(state) {
+	function persist(state: { controls: object; notes: unknown[] }) {
 		try {
 			if (empty(state)) {
 				localStorage.removeItem(storeKey);
@@ -264,12 +288,14 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	}
 	addEventListener("pagehide", onChange);
 	// Controls the page renders, replaces or removes after load: only changes to the controls themselves matter, not to this UI.
-	const isControl = (n) => n.nodeType === 1 && (n.matches(selector) || n.querySelector(selector));
+	const isControl = (n: Node) =>
+		n instanceof Element && (n.matches(selector) || n.querySelector(selector));
 	new MutationObserver((records) => {
 		if (
 			records.some(
 				(m) =>
-					!m.target.closest?.(".reply-ui") && [...m.addedNodes, ...m.removedNodes].some(isControl),
+					!(m.target instanceof Element && m.target.closest(".reply-ui")) &&
+					[...m.addedNodes, ...m.removedNodes].some(isControl),
 			)
 		) {
 			later();

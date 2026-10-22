@@ -1,7 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
+import { kitFiles, kitPath, readKitText } from "./kit.ts";
 import { renderMermaid } from "./mermaid.ts";
-import { KIT_DIR } from "./paths.ts";
 import { themeSvgImages } from "./svg-theme.ts";
 
 const MIME: Record<string, string> = {
@@ -27,10 +27,10 @@ const isInline = (ref: string) => /^(data:|#|about:|javascript:)/i.test(ref);
 /** Resolves a reference to a file: `kit:name` points into the CLI's kit/, anything else is relative to `baseDir`. */
 function locate(ref: string, baseDir: string): string {
 	const path = ref.startsWith("kit:")
-		? join(KIT_DIR, ref.slice(4))
+		? kitPath(ref.slice(4))
 		: resolve(baseDir, ref.split(/[?#]/)[0] ?? ref);
 	if (!existsSync(path)) {
-		const hint = ref.startsWith("kit:") ? ` (kit has: ${readdirSync(KIT_DIR).join(", ")})` : "";
+		const hint = ref.startsWith("kit:") ? ` (kit has: ${kitFiles().join(", ")})` : "";
 		throw new PackError(`missing file: ${ref}${hint}`);
 	}
 	return path;
@@ -58,21 +58,6 @@ function inlineCss(css: string, baseDir: string, from: string): string {
 		}
 		return `url("${dataUri(locate(ref, baseDir))}")`;
 	});
-}
-
-/**
- * The text of a text file as a page receives it. A kit script too long for one file keeps parts in `kit/parts/<name>/`; they come first,
- * in file name order, so the page still includes the one file. Anything else is the file itself.
- */
-export function readKitText(path: string): string {
-	const partsDir = join(KIT_DIR, "parts", basename(path, extname(path)));
-	const parts =
-		dirname(path) === KIT_DIR && existsSync(partsDir)
-			? readdirSync(partsDir)
-					.sort()
-					.map((part) => readFileSync(join(partsDir, part), "utf8"))
-			: [];
-	return [...parts, readFileSync(path, "utf8")].join("\n");
 }
 
 /** `</script` and `<!--` inside inline script would end or alter the element. */

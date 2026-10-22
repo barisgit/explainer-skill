@@ -29,10 +29,30 @@ describe("pack inlines what is local", () => {
 		expect(html).toContain(".marker-css");
 		expect(html).toContain("data:image/gif;base64,");
 		expect(html).toContain("window.markerScript = 1;");
-		const kitSource = readFileSync(join(SKILL_DIR, "kit", "link.js"), "utf8");
+		const kitSource = readFileSync(join(SKILL_DIR, "kit", "link.ts"), "utf8");
 		expect(html).toContain(kitSource.slice(0, 60));
 		expect(html).not.toMatch(/(href|src)="(local\.(css|js)|kit:link\.js)"/);
 	});
+});
+
+test("a kit script ships as a classic script with its documentation comment", async () => {
+	const names = ["charts", "link", "plot", "reply", "steps", "views"];
+	const input = dir.write(
+		"kit-scripts.html",
+		page(names.map((n) => `<script src="kit:${n}.js"></script>`).join("")),
+	);
+	const output = dir.path("kit-scripts.out.html");
+
+	const result = await runCli(["pack", input, "-o", output]);
+
+	expect(result.code).toBe(0);
+	const scripts = [...readFileSync(output, "utf8").matchAll(/<script>([\s\S]*?)<\/script>/g)];
+	expect(scripts).toHaveLength(names.length);
+	for (const [, body = ""] of scripts) {
+		expect(body.trimStart()).toStartWith("/* ");
+		// Parsing as a function body rejects import/export, which a module-shaped output would contain.
+		expect(() => new Function(body)).not.toThrow();
+	}
 });
 
 test("pack of a missing page is a usage error (exit 2), not a stack trace", async () => {

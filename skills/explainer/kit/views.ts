@@ -8,13 +8,13 @@
    (an async callback) runs its handler at once if the current hash is its view. */
 (() => {
 	const root = document.documentElement;
-	const views = [...document.querySelectorAll("[data-view]")];
-	const handlers = {};
+	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
+	const handlers: Record<string, ViewHandler> = {};
 	let started = false;
 	let overviewY = 0;
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
-	function decode(text) {
+	function decode(text: string) {
 		try {
 			return decodeURIComponent(text);
 		} catch {
@@ -49,7 +49,7 @@
 			handlers[name]?.(view, param);
 		}
 		scrollTo(0, 0);
-		const heading = view.querySelector("h1, h2");
+		const heading = view.querySelector<HTMLElement>("h1, h2");
 		heading?.setAttribute("tabindex", "-1");
 		heading?.focus({ preventScroll: true });
 	}

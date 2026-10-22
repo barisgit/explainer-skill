@@ -58,11 +58,6 @@
 					}
 				}
 			}
-		},
-		{
-			"includes": ["skills/explainer/kit/**/*.js"],
-			"javascript": { "globals": ["echarts"] },
-			"linter": { "rules": { "correctness": { "noUndeclaredVariables": "error" } } }
 		}
 	]
 }

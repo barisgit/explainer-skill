@@ -9,7 +9,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 	const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
 
 	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption. */
-	const where = (el) => {
+	const where = (el: Element) => {
 		const figure = el.closest("figure");
 		const label = figure?.getAttribute("aria-label");
 		if (label) {
@@ -17,15 +17,16 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 		}
 		const heading = el.closest("[data-view], section")?.querySelector("h1, h2");
 		if (heading) {
-			return `§ ${quoted(heading.textContent)}`;
+			return `§ ${quoted(heading.textContent ?? "")}`;
 		}
 		const caption = figure?.querySelector("figcaption");
-		return caption ? `figure "${quoted(caption.textContent).slice(0, 60)}"` : "page";
+		return caption ? `figure "${quoted(caption.textContent ?? "").slice(0, 60)}"` : "page";
 	};
 
-	let hint = null;
+	type Target = Omit<ReplyNote, "text">;
+	let hint: HTMLButtonElement | null = null;
 	let hintFromSelection = false;
-	let pop = null;
+	let pop: HTMLElement | null = null;
 	const clearHint = () => {
 		hint?.remove();
 		hint = null;
@@ -36,22 +37,23 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 	};
 
 	/** A small button at a document position; clicking it opens the note editor for `target`, anchored under `at`. */
-	function showHint(label, x, y, target, fromSelection) {
+	function showHint(label: string, x: number, y: number, target: Target, fromSelection: boolean) {
 		clearHint();
 		hintFromSelection = fromSelection;
-		hint = h("button", { type: "button", class: "btn reply-ui reply-hint" }, label);
-		hint.style.left = `${Math.max(8, Math.min(x, scrollX + innerWidth - 220))}px`;
-		hint.style.top = `${y}px`;
-		hint.addEventListener("pointerdown", (e) => e.preventDefault()); // keeps the text selection alive until the click
-		hint.addEventListener("click", () => {
-			const at = hint.getBoundingClientRect();
+		const button = h("button", { type: "button", class: "btn reply-ui reply-hint" }, label);
+		button.style.left = `${Math.max(8, Math.min(x, scrollX + innerWidth - 220))}px`;
+		button.style.top = `${y}px`;
+		button.addEventListener("pointerdown", (e) => e.preventDefault()); // keeps the text selection alive until the click
+		button.addEventListener("click", () => {
+			const at = button.getBoundingClientRect();
 			clearHint();
 			openNote(target, at);
 		});
-		document.body.append(hint);
+		document.body.append(button);
+		hint = button;
 	}
 
-	function openNote(target, at) {
+	function openNote(target: Target, at: DOMRect) {
 		closePop();
 		const text = h("textarea", { "aria-label": "Note", placeholder: "Note for the agent" });
 		const save = () => {
@@ -61,7 +63,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 				addNote({ ...target, text: value });
 			}
 		};
-		pop = h(
+		const popup = h(
 			"div",
 			{ class: "reply-ui reply-pop", role: "dialog", "aria-label": "Add a note" },
 			h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `Part: ${target.part}`),
@@ -81,20 +83,21 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 				save();
 			}
 		});
-		document.body.append(pop);
-		pop.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
-		pop.style.top = `${at.bottom + scrollY + 6}px`;
+		document.body.append(popup);
+		popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
+		popup.style.top = `${at.bottom + scrollY + 6}px`;
+		pop = popup;
 		text.focus({ preventScroll: true });
 	}
 
-	const partTarget = (part) => ({
+	const partTarget = (part: Part) => ({
 		part:
-			clean(part.getAttribute("aria-label") || part.textContent).slice(0, 60) ||
-			part.dataset.ref.split(" ")[0],
+			clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) ||
+			(part.dataset.ref?.split(" ")[0] ?? ""),
 		where: where(part),
 	});
 
-	let timer;
+	let timer: number | undefined;
 	document.addEventListener("selectionchange", () => {
 		clearTimeout(timer);
 		timer = setTimeout(() => {
@@ -107,13 +110,12 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 			}
 			const quote = quoted(sel.toString());
 			const range = sel.getRangeAt(0);
-			const host =
-				range.commonAncestorContainer.nodeType === 1
-					? range.commonAncestorContainer
-					: range.commonAncestorContainer.parentElement;
+			const node = range.commonAncestorContainer;
+			const host = node instanceof Element ? node : node.parentElement;
 			if (
 				quote.length < 2 ||
 				quote.length > 400 ||
+				!host ||
 				!root.contains(host) ||
 				host.closest("textarea, input, select, .reply-ui") ||
 				pop ||
@@ -138,7 +140,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 			if (hint && e.target !== hint) {
 				clearHint();
 			}
-			if (pop && !pop.contains(e.target)) {
+			if (pop && !(e.target instanceof Node && pop.contains(e.target))) {
 				closePop();
 			}
 		},
@@ -146,12 +148,16 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 	);
 
 	document.addEventListener("click", (e) => {
-		const part = e.target.closest?.("[data-ref]");
+		const el = e.target;
+		if (!(el instanceof Element)) {
+			return;
+		}
+		const part = el.closest<Part>("[data-ref]");
 		if (
 			!part ||
 			!root.contains(part) ||
-			e.target.closest(NATIVE) ||
-			!getSelection().isCollapsed ||
+			el.closest(NATIVE) ||
+			getSelection()?.isCollapsed === false ||
 			paused()
 		) {
 			return;
@@ -160,7 +166,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
 		showHint(`Note on “${target.part}”`, e.pageX, e.pageY + 14, target, false);
 	});
 	document.addEventListener("keydown", (e) => {
-		const part = e.target.closest?.("[data-ref]");
+		const part = e.target instanceof Element ? e.target.closest<Part>("[data-ref]") : null;
 		if (
 			e.key !== "Enter" ||
 			!part ||

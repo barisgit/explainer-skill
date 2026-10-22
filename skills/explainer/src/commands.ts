@@ -1,16 +1,9 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
-import { PackError, pack, readKitText } from "./pack.ts";
-import { KIT_DIR } from "./paths.ts";
+import { kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { PackError, pack } from "./pack.ts";
 import { report } from "./report.ts";
 import { stepError } from "./steps.ts";
 
@@ -41,8 +34,8 @@ Phones: Mermaid scales the diagram to the column, so a wide left-to-right chart 
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {
-	const block = /^\s*\/\*([\s\S]*?)\*\//.exec(readFileSync(join(KIT_DIR, file), "utf8"))?.[1] ?? "";
-	return block
+	return leadingComment(readFileSync(kitPath(file), "utf8"))
+		.slice(2, -2)
 		.split("\n")
 		.map((l) => l.replace(/^\s{0,3}/, ""))
 		.join("\n")
@@ -51,12 +44,6 @@ function kitHeader(file: string): string {
 
 /** The one-line description of a kit file: the first line of its header without the leading "name: ". */
 const kitSummary = (file: string) => (kitHeader(file).split("\n")[0] ?? "").replace(/^\S+: /, "");
-
-const kitFiles = () =>
-	readdirSync(KIT_DIR, { withFileTypes: true })
-		.filter((e) => e.isFile())
-		.map((e) => e.name)
-		.sort();
 
 /** One spec per command: drives dispatch, flag validation and --help. Exit codes: 0 ok, 1 problems found, 2 usage. */
 export const COMMANDS: Record<string, Command> = {
@@ -83,7 +70,7 @@ export const COMMANDS: Record<string, Command> = {
 				`Reference kit files from the page with the kit: prefix; pack inlines each one used:\n  <link rel="stylesheet" href="kit:theme.css">\n  <script src="kit:charts.js"></script>      scripts run in the order written; charts.js needs kit:echarts.js before it\n  <script src="kit:plot.js"></script>        alone, for a few small plots without ECharts\n`,
 			);
 			for (const f of kitFiles()) {
-				const kb = `${(Buffer.byteLength(readKitText(join(KIT_DIR, f))) / 1024).toFixed(0)} KB`;
+				const kb = `${(Buffer.byteLength(readKitText(kitPath(f))) / 1024).toFixed(0)} KB`;
 				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
 			}
 			console.log(

@@ -1,0 +1,11 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"types": [],
+		// Off for the kit only: element.dataset is typed with an index signature, so every dataset.ref would need dataset["ref"],
+		// which Biome's useLiteralKeys rejects. The two rules contradict each other for browser code.
+		"noPropertyAccessFromIndexSignature": false
+	},
+	"include": ["skills/explainer/kit/*.ts", "skills/explainer/kit/parts/*/*.ts", "kit-types"]
+}

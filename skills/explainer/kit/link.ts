@@ -8,16 +8,18 @@
    A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires with the refs now lit ([] when none), for dispatching a highlight to ECharts. Wired once at load: set data-ref in the markup. */
 (() => {
-	const refsOf = (el) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
+	const refsOf = (el: Part | null) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
 	const NATIVE = "a[href], button, input, select, textarea, summary, [tabindex]";
-	let hovered = null;
-	let focused = null;
-	let pinned = null;
-	let lit = [];
-	let dimmed = [];
+	let hovered: Part | null = null;
+	let focused: Part | null = null;
+	let pinned: Part | null = null;
+	let lit: Part[] = [];
+	let dimmed: SVGSVGElement[] = [];
+	const partOf = (e: Event) =>
+		e.target instanceof Element ? e.target.closest<Part>("[data-ref]") : null;
 
 	// Prose terms and rows are keyboard-reachable; diagram parts are not (a diagram has dozens, prose links to the same refs).
-	for (const el of document.querySelectorAll("[data-ref]")) {
+	for (const el of document.querySelectorAll<Part>("[data-ref]")) {
 		if (!el.matches(NATIVE) && !el.closest("svg")) {
 			el.tabIndex = 0;
 		}
@@ -32,13 +34,21 @@
 		for (const svg of dimmed) {
 			svg.classList.remove("has-lit");
 		}
-		lit = selector ? [...document.querySelectorAll(selector)] : [];
+		lit = selector ? [...document.querySelectorAll<Part>(selector)] : [];
 		for (const el of lit) {
 			el.classList.add("is-lit");
 		}
 		// A lone part has nothing to be linked with, so it does not dim its neighbours.
 		dimmed =
-			lit.length > 1 ? [...new Set(lit.map((el) => el.ownerSVGElement).filter(Boolean))] : [];
+			lit.length > 1
+				? [
+						...new Set(
+							lit
+								.map((el) => (el instanceof SVGElement ? el.ownerSVGElement : null))
+								.filter((svg) => svg !== null),
+						),
+					]
+				: [];
 		for (const svg of dimmed) {
 			svg.classList.add("has-lit");
 		}
@@ -49,11 +59,11 @@
 		if (e.pointerType === "touch") {
 			return;
 		}
-		hovered = e.target.closest?.("[data-ref]") ?? null;
+		hovered = partOf(e);
 		paint();
 	});
 	document.addEventListener("focusin", (e) => {
-		focused = e.target.closest?.("[data-ref]") ?? null;
+		focused = partOf(e);
 		paint();
 	});
 	document.addEventListener("focusout", () => {
@@ -61,7 +71,7 @@
 		paint();
 	});
 	document.addEventListener("click", (e) => {
-		const target = e.target.closest?.("[data-ref]") ?? null;
+		const target = partOf(e);
 		pinned = target && target !== pinned ? target : null;
 		paint();
 	});
