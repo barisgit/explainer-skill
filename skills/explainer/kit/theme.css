@@ -1281,12 +1281,14 @@ svg.has-lit [data-ref]:not(.is-lit) {
 	opacity: 0.3;
 }
 
-/* Replies: the Reply button, the Note button and editor, and the reply dialog. */
+/* Replies: the Reply and Clear answers buttons, the Note button and editor, and the reply dialog. */
 /* The fixed bar would cover the last lines of the page, so reserve its height at the end. */
 body:has(.reply-bar) {
 	padding-block-end: 4.5rem;
 }
 .reply-bar {
+	display: flex;
+	gap: 0.5rem;
 	position: fixed;
 	inset: auto var(--gutter) max(1rem, env(safe-area-inset-bottom)) auto;
 	z-index: 20;

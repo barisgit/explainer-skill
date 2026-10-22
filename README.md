@@ -1,6 +1,6 @@
 # Explainer
 
-An agent skill that turns "show me" into one self-contained, interactive HTML page: charts you can explore, Mermaid diagrams you can step through, drill-down views, and replies that send the reader's notes and answers back to the agent. The page works offline from `file://`, in light and dark, on desktop and phone.
+An agent skill that turns "show me" into one self-contained, interactive HTML page: charts you can explore, Mermaid diagrams you can step through, drill-down views, and replies that send the reader's notes and answers back to the agent. What the reader enters is kept in the browser across reloads, with one button to clear it. The page works offline from `file://`, in light and dark, on desktop and phone.
 
 The agent reads `skills/explainer/SKILL.md` and drives a small CLI (see Commands). `skills/explainer/example.html` is a finished page to read for technique.
 

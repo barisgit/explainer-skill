@@ -88,7 +88,7 @@ export const COMMANDS: Record<string, Command> = {
 				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
 			}
 			console.log(
-				`<pre class="mermaid">...</pre>  diagram source (flowchart, sequence, state, class, ER, gantt, pie, ...); pack renders it in light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-steps, data-captions, data-ref, data-reply.`,
+				`<pre class="mermaid">...</pre>  diagram source (flowchart, sequence, state, class, ER, gantt, pie, ...); pack renders it in light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-steps, data-captions, data-ref, data-reply, data-keep.`,
 			);
 			return 0;
 		},

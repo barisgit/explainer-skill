@@ -111,7 +111,7 @@
 			this.bar.className = "player";
 			this.bar.setAttribute("role", "group");
 			this.bar.setAttribute("aria-label", group);
-			this.bar.innerHTML = `${button(back, 'data-go="-1"')}${button(play, "data-play", true)}${button(next, 'data-go="1"')}<input type="range" min="1"><output></output>`;
+			this.bar.innerHTML = `${button(back, 'data-go="-1"')}${button(play, "data-play", true)}${button(next, 'data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
 			[this.back, this.play, this.next] = this.bar.querySelectorAll("button");
 			this.range = this.bar.querySelector("input");
 			this.range.setAttribute("aria-label", scrubber);
