@@ -46,7 +46,7 @@
 	--c5: light-dark(#8a6d00, #e6b422);
 	--c6: light-dark(#3394cc, #7cc6f0);
 	--grid: color-mix(in srgb, var(--rule-strong) 45%, transparent);
-	/* Blueprint surface for diagrams (.stage, a Mermaid block): a faint dot grid on the page tone. */
+	/* Blueprint surface for diagrams (.stage, a Mermaid block in a panel): a faint dot grid on the page tone. */
 	--blueprint:
 		radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 1.5px) 0 0 / 20px 20px,
 		var(--bg);
@@ -381,7 +381,7 @@ h3,
 	background: var(--under);
 }
 
-/* theme part: charts, plots, Mermaid blocks, svg copies per scheme, hand-built diagrams. */
+/* theme part: charts, plots, Mermaid blocks, svg files per scheme, hand-built diagrams. */
 /* Charts (kit:echarts.js + kit:charts.js, or kit:plot.js): the element needs a height; the chart fills it. */
 .chart {
 	inline-size: 100%;
@@ -500,60 +500,58 @@ h3,
 	fill: var(--c);
 }
 
-/* Mermaid blocks are rendered by pack in both themes; show the one that matches. On the page they sit on the blueprint surface. */
+/* Mermaid blocks: pack renders each to one SVG drawn with the renderer's private variables (--_line, --_node-fill, ...), set here
+   from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no frame or surface of its own:
+   bare or in a plain figure it sits on the tone around it like a chart; a box means controls, so only a panel frames it and gives
+   it the blueprint surface (the panel rule in 02-layout.css). */
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
 	padding: 1.25rem 1rem;
 	text-align: center;
 	overflow-x: auto;
-	border-radius: var(--radius);
-	--under: var(--bg);
-	background: var(--blueprint);
-	border: 1px solid var(--rule);
 }
-/* In a figure the diagram has no frame or surface of its own: a plain figure sets it on the tone around it like a chart, and a
-   panel frames it and gives it the blueprint surface (the panel rule in 02-layout.css). */
 .fig > .mermaid {
 	margin: 0;
-	border: 0;
-	border-radius: 0;
-	--under: inherit;
-	background: none;
 }
-/* Mermaid paints its edge-label boxes in --bg; they take the tone under the diagram instead, so a diagram in a band has no light
-   boxes. Its stylesheet is scoped by id, which outranks any class rule. */
-.mermaid :is(.edgeLabel, .edgeLabel p, .labelBkg) {
-	/* biome-ignore lint/complexity/noImportantStyles: Mermaid's id-scoped stylesheet sets this background and outranks the kit */
-	background-color: var(--under) !important;
+/* The renderer fills edge-label boxes, hollow markers and end states with --bg: here the tone under the diagram, so a diagram in a
+   band or panel has no page-coloured boxes. */
+.mermaid > svg {
+	--bg: var(--under);
+	--fg: var(--ink);
+	--_text: var(--ink);
+	--_text-sec: var(--muted);
+	--_text-muted: var(--muted);
+	--_text-faint: color-mix(in srgb, var(--muted) 70%, var(--under));
+	--_line: var(--muted);
+	--_arrow: var(--muted);
+	--_node-fill: var(--surface);
+	--_node-stroke: var(--rule-strong);
+	--_group-fill: transparent;
+	--_group-hdr: var(--sunken);
+	--_inner-stroke: var(--rule);
+	--_key-badge: var(--sunken);
+	font-family: var(--font);
+	overflow: visible;
 }
-.mermaid .edgeLabel rect {
-	/* biome-ignore lint/complexity/noImportantStyles: Mermaid's id-scoped stylesheet sets this fill and outranks the kit */
-	fill: var(--under) !important;
+.mermaid > svg .mono {
+	font-family: var(--mono);
 }
-.mermaid .label {
-	margin: 0;
-	font: inherit;
-	color: inherit;
-} /* mermaid's own .label, not the kit's caption */
-/* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). Diagrams and svg files in
-   <img> (packed once per scheme) share this; only the other copy is hidden so the page's own display rule for an <img> stays. */
-.mermaid > :is(.light, .dark) {
-	display: inline-block;
-}
-:root[data-scheme="dark"] :is(.mermaid > .light, img.light),
-:root[data-scheme="light"] :is(.mermaid > .dark, img.dark) {
+/* pack inlines an svg file in <img> once per scheme; the copy shown follows the system scheme unless <html data-scheme> forces one
+   (light-dark() cannot switch display). Only the other copy is hidden, so the page's own display rule for the <img> stays. */
+:root[data-scheme="dark"] img.light,
+:root[data-scheme="light"] img.dark {
 	/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
 	display: none !important;
 }
 @media (prefers-color-scheme: dark) {
-	:root:not([data-scheme="light"]) :is(.mermaid > .light, img.light) {
+	:root:not([data-scheme="light"]) img.light {
 		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
 		display: none !important;
 	}
 }
 @media (prefers-color-scheme: light) {
-	:root:not([data-scheme="dark"]) :is(.mermaid > .dark, img.dark) {
+	:root:not([data-scheme="dark"]) img.dark {
 		/* biome-ignore lint/complexity/noImportantStyles: the other copy of an svg file must hide even when the <img> carries an inline display */
 		display: none !important;
 	}
@@ -1382,7 +1380,7 @@ details > :last-child:not(summary) {
 	display: none;
 }
 
-/* Linked highlighting: parts that share a data-ref are lit together. Mermaid's stylesheet is scoped by id and wins any stroke rule, so SVG parts get a halo and dimmed neighbours. */
+/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill. */
 :is(span, b, strong, em, code, mark)[data-ref] {
 	text-decoration: underline dotted var(--muted) 1px;
 	text-underline-offset: 0.22em;
@@ -1782,27 +1780,24 @@ dialog.reply-dialog[open] {
   }
 })();
 </script>
-<script>/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts, <ol data-captions>, data-steps="id:1,2" on a Mermaid block; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
+<script>/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts (HTML or hand-built SVG), <ol data-captions>; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
    <figure class="fig" data-stepper>             any element; the controls are added before the captions (else at its end)
      <g data-step="2">  <p data-step="0 3">      a part appears at the first listed step and is lit (is-now) on every listed one;
                                                  0 = visible from the start, lit later; a part without data-step never changes
-     <pre class="mermaid" data-steps="api:1 cache:2,4 e1:3">   steps for diagram parts by id: <ref>:<steps, comma separated>
      <ol data-captions><li>Step 1 text</li><li>Step 2 text</li></ol>   one li per step; the current one shows
    </figure>
    Steps count from 1; the number of steps is the number of captions, else the highest step used. The stepper opens on the last
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
-   An edge data-steps does not name appears with its later endpoint, so mapping the nodes is enough; an edge listed in data-steps keeps its own steps.
-   Mermaid ids are the diagram's own: `flowchart LR; api --> cache` has nodes api and cache; `api e1@--> cache` names the edge e1;
-   sequence diagrams have participants by id and messages m1, m2, ... in order. pack fails when data-steps names an id the diagram lacks.
+   A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
    Labels: data-labels="Back,Play,Pause,Next,Step controls,Step" on the stepper replaces the button texts and the two accessible names, in
    this order; leave an entry empty to keep its default (no commas inside a label).
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
    Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
-   Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts and data-steps. Replacing
+   Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts. Replacing
    the children of the [data-captions] list is picked up by itself; after any other replacement call Steps.refresh(el, step?). It re-reads
-   captions, parts and data-steps, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
+   captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
    have different lengths. Position: it stays on the current step (clamped to the new count), or on the new last step if it was on the last;
    Steps.refresh(el, 1) restarts. A stepper left with fewer than 2 steps hides its controls and shows everything; they return when it grows.
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
@@ -1813,47 +1808,6 @@ dialog.reply-dialog[open] {
   const PLAY_MS = 3000;
   const steppers = new WeakMap;
   let loaded = false;
-  function endpointsOf(edgeId, nodeIds) {
-    const parts = /^L_(.+)_\d+$/.exec(edgeId)?.[1]?.split("_") ?? [];
-    for (let cut = 1;cut < parts.length; cut++) {
-      const ends = [parts.slice(0, cut).join("_"), parts.slice(cut).join("_")];
-      if (ends.every((id) => nodeIds.has(id))) {
-        return ends;
-      }
-    }
-    return [];
-  }
-  function followEndpoints(diagram, firstStep) {
-    const nodeIds = new Set([...diagram.querySelectorAll(".node[data-ref], .cluster[data-ref]")].map((n) => n.dataset.ref ?? ""));
-    for (const edge of diagram.querySelectorAll('[data-et="edge"][data-id]:not([data-step])')) {
-      const id = edge.dataset.id ?? "";
-      const steps = endpointsOf(id, nodeIds).map((end) => firstStep.get(end) ?? 0);
-      const step = Math.max(0, ...steps);
-      if (step > 0) {
-        for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(id)}"]:not([data-step])`)) {
-          part.dataset.step = String(step);
-          part.dataset.stepAuto = "";
-        }
-      }
-    }
-  }
-  function expandDiagramSteps(root) {
-    for (const diagram of root.querySelectorAll("[data-steps]")) {
-      for (const part of diagram.querySelectorAll("[data-step-auto]")) {
-        part.removeAttribute("data-step");
-        part.removeAttribute("data-step-auto");
-      }
-      const firstStep = new Map;
-      for (const token of (diagram.dataset.steps ?? "").split(/\s+/).filter(Boolean)) {
-        const [ref = "", steps = ""] = token.split(":");
-        firstStep.set(ref, Math.min(...steps.split(",").map(Number)));
-        for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`)) {
-          part.dataset.step = steps.replaceAll(",", " ");
-        }
-      }
-      followEndpoints(diagram, firstStep);
-    }
-  }
   const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"];
   function need(root, selector) {
     const el = root.querySelector(selector);
@@ -1979,7 +1933,6 @@ dialog.reply-dialog[open] {
       });
     }
     readContent() {
-      expandDiagramSteps(this.root);
       this.parts = [...this.root.querySelectorAll("[data-step]")].map((el) => ({
         el,
         steps: (el.dataset.step ?? "").trim().split(/\s+/).map(Number)
