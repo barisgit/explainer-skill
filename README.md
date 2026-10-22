@@ -1,8 +1,10 @@
 # Explainer
 
-An agent skill that turns "show me" into one self-contained, interactive HTML page: charts you can explore, Mermaid diagrams you can step through, drill-down views, and replies that send the reader's notes and answers back to the agent. What the reader enters is kept in the browser across reloads, with one button to clear it. The page works offline from `file://`, in light and dark, on desktop and phone.
+An agent skill that turns "show me" into one interactive HTML page: charts to explore, diagrams to step through, drill-down views, and questions the reader answers on the page. The page is a single file that works offline from `file://`, in light and dark, on desktop and phone.
 
-The agent reads `skills/explainer/SKILL.md` and drives a small CLI (see Commands). `skills/explainer/example.html` is a finished page to read for technique.
+[![First screens of four example pages: a Fourier series study page, a Dijkstra step-through, a world electricity explorer and a password hashing decision page](examples/media/hero.webp)](https://aristovnik.me/explainer-skill/)
+
+**Live examples**, each written by an agent following the skill: [Fourier series](https://aristovnik.me/explainer-skill/fourier-series/) (study page), [Dijkstra's algorithm](https://aristovnik.me/explainer-skill/dijkstra/) (step-through), [World electricity mix](https://aristovnik.me/explainer-skill/electricity-mix/) (data explorer), [Choosing a password hash](https://aristovnik.me/explainer-skill/password-hashing/) (decision page). Sources are in [`examples/`](examples/).
 
 ## Install
 
@@ -26,67 +28,79 @@ Caplet needs a ref for GitHub sources. `main` follows the latest commit on each 
 
 Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
-An installed skill can be checked with `bun ~/.claude/skills/explainer/cli.ts kit`. Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name (see [AGENTS.md](AGENTS.md)).
+Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name. `bun ~/.claude/skills/explainer/cli.ts kit` checks an installed copy.
 
-### Update
+**Requirements:** [Bun](https://bun.sh) (verified with 1.4.3), and Google Chrome or Chromium for `check` and for rendering Mermaid during `pack` (`CHROME=/path/to/chrome` if it is not found; a build downloaded by agent-browser or Playwright also works). Nothing else is installed: the skill runs as copied.
 
-```sh
-npx skills add ~/Programming_local/Projects/explainer-skill --global --agent claude-code --agent codex -y   # local path: add again
-npx skills update explainer --global                                                                         # GitHub source
-caplet update explainer --scope user                                                                        # re-reads the source and applies
-```
-
-`npx skills update` cannot check a local path, and plain `caplet apply` reuses the snapshot of a local source, so use the commands above after changing the checkout.
-
-### Uninstall
+<details>
+<summary>Update and uninstall</summary>
 
 ```sh
+npx skills update explainer --global                                     # GitHub source
+npx skills add <path> --global --agent claude-code --agent codex -y      # local checkout: add again
+caplet update explainer --scope user                                    # re-reads the source and applies
+
 npx skills remove explainer --global -y
 caplet remove explainer --scope user && caplet apply --scope user
 ```
 
-Caplet leaves empty `kit`, `src` and `vendor` folders under `skills/explainer/`; delete them if they bother you.
+`npx skills update` cannot check a local path, and plain `caplet apply` reuses the snapshot of a local source, so use the commands above after changing a checkout. Caplet leaves empty `kit`, `src` and `vendor` folders under `skills/explainer/` after removal.
 
-### Publishing
+</details>
 
-- npx skills needs a public GitHub repository (or any git URL). The skills.sh listing comes from install telemetry, so the skill appears there after people install it.
-- Caplet takes `github:<owner>/<repo>` or `git:<url>` with a required `--pin <ref>`: a branch to follow, or a tag for a fixed version.
-- There is no `acf.yml` on purpose. Caplet then imports `skills/explainer/` whole; an `acf.yml` would limit it to `SKILL.md` and the files listed in `assets:`.
+## How it works
 
-## Requirements
+The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, run as `bun <skill directory>/cli.ts`:
 
-- [Bun](https://bun.sh), verified with 1.4.3. Nothing else is installed: no `npm install`, the installed skill runs as copied. The CLI does not run under node; `node cli.ts` prints how to get Bun and exits 2.
-- Google Chrome or Chromium, for `check` and for rendering Mermaid diagrams during `pack` (`CHROME=/path/to/chrome` if it is not found). Without a system Chrome, a build downloaded by agent-browser or Playwright is used. Where the host blocks Chrome's sandbox (Ubuntu 23.10+, most containers), Chrome runs without it.
+1. **Write** `page.html`: plain HTML that references kit files with a `kit:` prefix and adds behaviour through attributes. `kit` lists what is available and `kit <file>` documents one file.
+2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams in light and dark, so the result is one offline file.
+3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
 
-## Commands
+A step-through, for illustration:
 
-Run as `bun <skill directory>/cli.ts <command>`; `--help` on any command lists its options.
+```html
+<link rel="stylesheet" href="kit:theme.css">
 
-| Command | What it does |
-|---|---|
-| `kit [file]` | Lists what a page can use, or documents one kit file |
-| `pack page.html -o artifact.html` | Inlines the kit and local assets and renders Mermaid diagrams into one offline file |
-| `check artifact.html` | Opens the page headless in light and dark at desktop and phone width, scrolls it end to end, saves screenshots and reports problems (exit 1) |
+<figure class="fig" data-stepper data-start="1">
+  <pre class="mermaid" data-steps="req:1 cache:2 db:3">flowchart TD; req --> cache --> db</pre>
+  <ol data-captions><li>A request arrives.</li><li>The cache misses.</li><li>The database answers.</li></ol>
+</figure>
 
-## Layout
+<script src="kit:steps.js"></script>
+```
 
-| Path | Contents |
-|---|---|
-| `skills/explainer/` | The installable skill: `SKILL.md`, `guide.md`, `example.html`, the CLI (`cli.ts`, `src/`), the kit (`kit/`) and `vendor/` |
-| `build/` | Regenerates the ECharts bundle, the Mermaid bundle and their licence texts |
-| `test/` | Contract tests for the CLI |
-| `AGENTS.md` | Commands, decisions and limits for contributors and agents |
+## What a page can use
+
+**Charts that redraw as the reader moves a control.** ECharts in the page theme, with zoom, legend toggles and click-to-drill, or the light `plot.js` for a few small plots.
+
+![Fourier series page: dragging the terms slider sharpens the partial sum of a square wave](examples/media/fourier-series-terms.webp)
+
+**Step-through figures.** Back, Play, Next, a scrubber and arrow keys from a few attributes; Mermaid diagrams, SVG parts and captions step together.
+
+![Dijkstra page in dark: stepping the algorithm on a street grid updates the graph, the queue and the distance table](examples/media/dijkstra-steps.webp)
+
+**Drill-down views.** A hash router inside the one file: a bar, row or link opens its own view, and Back returns with the scroll position kept.
+
+![Electricity page: switching the coal ranking to TWh, then opening the United States view and going back](examples/media/electricity-mix-coal-ranking.webp)
+
+**Questions the reader answers.** Form controls marked `data-reply` become one Markdown reply the reader sends back to the agent, together with notes on selected text or diagram parts. Inputs and notes survive a reload, with a Clear button.
+
+![Password hashing page: deployment presets change the recommended OWASP setting, down to nothing fits](examples/media/password-hashing-presets.webp)
+
+Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time, linked highlighting between prose, table rows and diagram parts, and a stylesheet that follows the system's light or dark setting.
+
+[`skills/explainer/example.html`](skills/explainer/example.html) is one short page that uses each feature where it helps its subject.
 
 ## Development
 
 ```sh
 bun install               # dev tools and the git hook
 bun run ci                # typecheck, lint (Biome), tests; what GitHub Actions runs
-bun run format            # apply formatting and safe lint fixes
+bun run media             # regenerates the README and gallery media from examples/ (Chrome, ffmpeg)
 bun run verify:install    # before a release: installs with both installers into a temp HOME (network, Chrome)
 ```
 
-GitHub Actions runs the same gate (`.github/workflows/ci.yml`). Details and decisions are in [AGENTS.md](AGENTS.md).
+Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are published from `examples/` by `.github/workflows/pages.yml`.
 
 ## Credits
 
@@ -94,8 +108,8 @@ GitHub Actions runs the same gate (`.github/workflows/ci.yml`). Details and deci
 - [Apache ECharts](https://echarts.apache.org) (Apache-2.0) and [Mermaid](https://mermaid.js.org) (MIT), bundled in the kit.
 - [Geist and Geist Mono](https://vercel.com/font) by Vercel (SIL OFL 1.1).
 
-Licence texts are in `skills/explainer/kit/licenses/`.
+Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data).
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). A copy sits in `skills/explainer/` so installed copies carry it.
+MIT, see [LICENSE](LICENSE). A copy sits in `skills/explainer/` so installed copies carry it. The password hashing example adapts the OWASP Password Storage Cheat Sheet and is under CC BY-SA 4.0, as stated on the page.
