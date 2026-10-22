@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { renderMermaid } from "./mermaid.ts";
 import { KIT_DIR } from "./paths.ts";
 
@@ -57,6 +57,21 @@ function inlineCss(css: string, baseDir: string, from: string): string {
 		}
 		return `url("${dataUri(locate(ref, baseDir))}")`;
 	});
+}
+
+/**
+ * The text of a text file as a page receives it. A kit script too long for one file keeps parts in `kit/parts/<name>/`; they come first,
+ * in file name order, so the page still includes the one file. Anything else is the file itself.
+ */
+export function readKitText(path: string): string {
+	const partsDir = join(KIT_DIR, "parts", basename(path, extname(path)));
+	const parts =
+		dirname(path) === KIT_DIR && existsSync(partsDir)
+			? readdirSync(partsDir)
+					.sort()
+					.map((part) => readFileSync(join(partsDir, part), "utf8"))
+			: [];
+	return [...parts, readFileSync(path, "utf8")].join("\n");
 }
 
 /** `</script` and `<!--` inside inline script would end or alter the element. */
@@ -176,7 +191,7 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 				}
 				const type = el.getAttribute("type");
 				el.replace(
-					`<script${type ? ` type="${type}"` : ""}>${safeScript(readFileSync(path, "utf8"))}</script>`,
+					`<script${type ? ` type="${type}"` : ""}>${safeScript(readKitText(path))}</script>`,
 					{ html: true },
 				);
 			},

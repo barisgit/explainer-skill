@@ -4,13 +4,12 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
-import { PackError, pack } from "./pack.ts";
+import { PackError, pack, readKitText } from "./pack.ts";
 import { KIT_DIR } from "./paths.ts";
 import { report } from "./report.ts";
 import { stepError } from "./steps.ts";
@@ -84,7 +83,7 @@ export const COMMANDS: Record<string, Command> = {
 				`Reference kit files from the page with the kit: prefix; pack inlines each one used:\n  <link rel="stylesheet" href="kit:theme.css">\n  <script src="kit:charts.js"></script>      scripts run in the order written; charts.js needs kit:echarts.js before it\n  <script src="kit:plot.js"></script>        alone, for a few small plots without ECharts\n`,
 			);
 			for (const f of kitFiles()) {
-				const kb = `${(statSync(join(KIT_DIR, f)).size / 1024).toFixed(0)} KB`;
+				const kb = `${(Buffer.byteLength(readKitText(join(KIT_DIR, f))) / 1024).toFixed(0)} KB`;
 				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
 			}
 			console.log(

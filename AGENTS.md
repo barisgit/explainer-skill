@@ -15,6 +15,7 @@ skills/explainer/      the installable skill, copied as-is by installers: no dot
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
   src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, pack.ts, check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
   kit/                 what pages reference as kit:<file>: theme.css, charts.js, plot.js, steps.js, link.js, views.js, reply.js, echarts.js (generated), fonts/, licenses/
+    parts/<name>/      pieces of a kit script too long for one file; pack puts them in front of kit/<name>.js in file name order, so a page still includes one file
   vendor/mermaid.min.js  generated; used by pack to pre-render diagrams, never inlined
 build/                 vendor.ts regenerates kit/echarts.js, vendor/mermaid.min.js and the licence texts from the pinned devDependencies; verify-install.ts is the release check for the installers
 test/                  contract tests, outside the skill so installs do not ship them
@@ -53,7 +54,7 @@ The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged fi
 
 Biome (pinned 2.6.2) enforces the quality baseline at error: cognitive complexity 15, function length 80 lines without blanks, file length 600 lines, no `any`, no non-null assertions, no `@ts-ignore`, no import cycles, no unused code. Suppressions need a rule-specific reason and are rare; today they are:
 
-- `kit/*.js`: each file is one IIFE that keeps its names out of the page's global scope, so the function-length rule sees one long function. The code inside is split into small functions.
+- `kit/**/*.js`: each file is one IIFE (a part is one function that hangs on `window` for its entry) that keeps its names out of the page's global scope, so the function-length rule sees one long function. The code inside is split into small functions.
 - `kit/theme.css`: deliberate `!important` overrides (`[hidden]`, reduced motion, print) and selector orders whose properties are disjoint.
 - `kit/theme.css` has a file limit of 1400 lines (the formatter puts one declaration per line) instead of 600. It is one stylesheet by design, because `pack` rejects `@import`; lower the limit when it shrinks.
 

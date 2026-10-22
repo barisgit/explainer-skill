@@ -56,8 +56,6 @@ const DEFAULTS = "a|3||||false|x";
 const later = (name: string, body: string) => pageAssertion("keep contract", name, body);
 const onLoad = (n: number, name: string, body: string) =>
 	later(name, `sessionStorage.loads !== "${n}" || (${body})`);
-const flow = (...extra: string[]) =>
-	extra.flatMap((step) => (step === "reload" ? ["--do", "reload"] : ["--do", step]));
 const run = (file: string, steps: string[]) =>
 	runCli([
 		"check",
@@ -67,13 +65,13 @@ const run = (file: string, steps: string[]) =>
 		"none",
 		"--out",
 		dir.path("shots"),
-		...flow(...steps),
+		...steps.flatMap((step) => ["--do", step]),
 	]);
 
 test("what the reader entered survives a reload, reaches the page's listeners, and one button clears it", async () => {
 	const script = `
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
-${onLoad(1, "nothing is saved before the reader enters anything", "saved() === 0 && !clearButton() || clearButton()?.hidden")}
+${onLoad(1, "nothing is saved before the reader enters anything", "saved() === 0 && clearButton().hidden")}
 ${onLoad(2, "the entered values are back and the page's own listener drew them", `$("out").textContent === "${ENTERED}" && state() === "${ENTERED}"`)}
 ${onLoad(2, "the Clear button and the note are back", `clearButton() && !clearButton().hidden && document.querySelector(".reply-bar .primary").textContent === "Reply (1)" && saved() === 1`)}
 ${onLoad(3, "after Clear and a reload the defaults stay and nothing is stored", `state() === "${DEFAULTS}" && saved() === 0 && clearButton().hidden`)}

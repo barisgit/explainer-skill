@@ -20,16 +20,18 @@
    without data-reply, and the notes are saved in localStorage under the page's own address and restored after load. Restored
    controls get input and change events, so the page's own listeners redraw charts and outputs; a control changed by script
    without events is saved at the next click or when the page is left. Controls are matched by id (else radio group and value,
-   else position), so give inputs ids; defaults are what the markup says (value, checked, selected). A "Clear answers" button (bottom right, shown only while something differs from the defaults or a note exists) puts
-   every control back to its default, again with events, and drops the notes and the saved copy. Put data-keep="off" on a control
-   or its container to leave it out. Without usable storage the page works as before. Open <details> are not kept.
+   else position), so give inputs ids. Defaults are what the markup says (value, checked, selected). Controls are those present at
+   load: one the page adds later is not kept, one it removes or rebuilds stops counting. If the page's controls or their labels
+   differ from when the state was saved (a regenerated page), the saved values are dropped and the notes stay.
+   A "Clear answers" button (bottom right, shown only while something differs from the defaults or a note exists) puts every control
+   back to its default, again with events, and drops the notes and the saved copy. Put data-keep="off" on a control or its
+   container to leave it out. Without usable storage the page works as before. Open <details> are not kept.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const root = document.querySelector("main") ?? document.body;
 	const CONTROL =
 		"input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
-	const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
 	const notes = [];
 	let touched = new WeakSet();
 
@@ -38,21 +40,6 @@
 	const quoted = (s) => clean(s).replaceAll('"', "'");
 	const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
 	const title = () => quoted(document.querySelector("h1")?.textContent || document.title);
-	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption. */
-	const where = (el) => {
-		const figure = el.closest("figure");
-		const label = figure?.getAttribute("aria-label");
-		if (label) {
-			return `figure "${quoted(label)}"`;
-		}
-		const heading = el.closest("[data-view], section")?.querySelector("h1, h2");
-		if (heading) {
-			return `§ ${quoted(heading.textContent)}`;
-		}
-		const caption = figure?.querySelector("figcaption");
-		return caption ? `figure "${quoted(caption.textContent).slice(0, 60)}"` : "page";
-	};
-
 	function h(tag, props = {}, ...kids) {
 		const el = document.createElement(tag);
 		for (const [k, v] of Object.entries(props)) {
@@ -207,13 +194,14 @@
 		}
 	}
 
-	function keptUnits() {
+	function findUnits() {
 		const controls = [...document.querySelectorAll(CONTROL)].filter(
 			(c) => !c.closest(".reply-ui, [data-keep=off]"),
 		);
 		return controls.map((el, i) => ({ key: unitKey(el, i), el, initial: initialValue(el) }));
 	}
 
+	/** Controls the reader moved off their defaults. One a page has since removed or rebuilt is gone, and so is what it held. */
 	const changed = () =>
 		units.filter((u) => JSON.stringify(readControl(u.el)) !== JSON.stringify(u.initial));
 
@@ -221,7 +209,7 @@
 	function snapshot() {
 		return {
 			controls: Object.fromEntries(changed().map((u) => [u.key, readControl(u.el)])),
-			notes: kept(),
+			notes: filledNotes(),
 		};
 	}
 
@@ -239,7 +227,7 @@
 		}
 	}
 
-	function saved() {
+	function stored() {
 		try {
 			return JSON.parse(localStorage.getItem(storeKey) ?? "{}") ?? {};
 		} catch {
@@ -275,8 +263,8 @@
 	}
 
 	function restore() {
-		units = keptUnits();
-		const state = saved();
+		units = findUnits();
+		const state = stored();
 		restoreControls(state);
 		restoreNotes(state);
 		ready = true;
@@ -291,7 +279,7 @@
 	}
 
 	// ---- the reply ----
-	const kept = () => notes.filter((n) => n.text.trim());
+	const filledNotes = () => notes.filter((n) => n.text.trim());
 	const noteLine = (n) =>
 		`- On ${n.quote ? `"${n.quote}"` : `part "${n.part}"`} (${n.where}): ${n.text.trim().split("\n").join("\n  ")}`;
 	// A legend that is already a question reads badly with a colon after it: "Which fix?: Second barista".
@@ -302,7 +290,7 @@
 		const given = answers();
 		const sections = [
 			[`Reply on "${title()}" (${file})`],
-			kept().length ? ["Notes", ...kept().map(noteLine)] : [],
+			filledNotes().length ? ["Notes", ...filledNotes().map(noteLine)] : [],
 			given.length ? ["Answers", ...given.map(answerLine)] : [],
 		];
 		return `${sections
@@ -336,8 +324,8 @@
 			title: title(),
 			page: file,
 			markdown: markdown(),
-			notes: kept().map(({ where: w, quote, part, text }) => ({
-				where: w,
+			notes: filledNotes().map(({ where, quote, part, text }) => ({
+				where,
 				quote,
 				part,
 				text: text.trim(),
@@ -375,7 +363,7 @@
 
 	/** Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls. */
 	function sync() {
-		const count = kept().length + answers().filter((a) => a.touched).length;
+		const count = filledNotes().length + answers().filter((a) => a.touched).length;
 		const state = snapshot();
 		button.hidden = !count && !asked;
 		clear.hidden = empty(state);
@@ -446,155 +434,16 @@
 		}
 	});
 
-	let hint = null;
-	let hintFromSelection = false;
-	let pop = null;
-	const clearHint = () => {
-		hint?.remove();
-		hint = null;
-	};
-	const closePop = () => {
-		pop?.remove();
-		pop = null;
-	};
-
-	/** A small button at a document position; clicking it opens the note editor for `target`, anchored under `at`. */
-	function showHint(label, x, y, target, fromSelection) {
-		clearHint();
-		hintFromSelection = fromSelection;
-		hint = h("button", { type: "button", class: "btn reply-ui reply-hint" }, label);
-		hint.style.left = `${Math.max(8, Math.min(x, scrollX + innerWidth - 220))}px`;
-		hint.style.top = `${y}px`;
-		hint.addEventListener("pointerdown", (e) => e.preventDefault()); // keeps the text selection alive until the click
-		hint.addEventListener("click", () => {
-			const at = hint.getBoundingClientRect();
-			clearHint();
-			openNote(target, at);
-		});
-		document.body.append(hint);
-	}
-
-	function openNote(target, at) {
-		closePop();
-		const text = h("textarea", { "aria-label": "Note", placeholder: "Note for the agent" });
-		const save = () => {
-			const value = text.value.trim();
-			closePop();
-			if (value) {
-				notes.push({ ...target, text: value });
-				sync();
-			}
-		};
-		pop = h(
-			"div",
-			{ class: "reply-ui reply-pop", role: "dialog", "aria-label": "Add a note" },
-			h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `Part: ${target.part}`),
-			text,
-			h(
-				"div",
-				{ class: "reply-row" },
-				h("button", { type: "button", class: "btn", onclick: closePop }, "Cancel"),
-				h("button", { type: "button", class: "btn primary", onclick: save }, "Save note"),
-			),
-		);
-		text.addEventListener("keydown", (e) => {
-			if (e.key === "Escape") {
-				closePop();
-			}
-			if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-				save();
-			}
-		});
-		document.body.append(pop);
-		pop.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
-		pop.style.top = `${at.bottom + scrollY + 6}px`;
-		text.focus({ preventScroll: true });
-	}
-
-	const partTarget = (part) => ({
-		part:
-			clean(part.getAttribute("aria-label") || part.textContent).slice(0, 60) ||
-			part.dataset.ref.split(" ")[0],
-		where: where(part),
-	});
-
-	let timer;
-	document.addEventListener("selectionchange", () => {
-		clearTimeout(timer);
-		timer = setTimeout(() => {
-			const sel = getSelection();
-			if (!sel || sel.isCollapsed) {
-				if (hintFromSelection) {
-					clearHint();
-				}
-				return;
-			}
-			const quote = quoted(sel.toString());
-			const range = sel.getRangeAt(0);
-			const host =
-				range.commonAncestorContainer.nodeType === 1
-					? range.commonAncestorContainer
-					: range.commonAncestorContainer.parentElement;
-			if (
-				quote.length < 2 ||
-				quote.length > 400 ||
-				!root.contains(host) ||
-				host.closest("textarea, input, select, .reply-ui") ||
-				pop ||
-				dialog.open
-			) {
-				return;
-			}
-			const rect = range.getBoundingClientRect();
-			showHint(
-				"Add note",
-				rect.left + scrollX,
-				rect.bottom + scrollY + 6,
-				{ quote, where: where(host) },
-				true,
-			);
-		}, 200);
-	});
-
-	document.addEventListener(
-		"pointerdown",
-		(e) => {
-			if (hint && e.target !== hint) {
-				clearHint();
-			}
-			if (pop && !pop.contains(e.target)) {
-				closePop();
-			}
+	window.ReplyNotes({
+		h,
+		clean,
+		quoted,
+		root,
+		paused: () => dialog.open,
+		addNote: (note) => {
+			notes.push(note);
+			sync();
 		},
-		true,
-	);
-
-	document.addEventListener("click", (e) => {
-		const part = e.target.closest?.("[data-ref]");
-		if (
-			!part ||
-			!root.contains(part) ||
-			e.target.closest(NATIVE) ||
-			!getSelection().isCollapsed ||
-			dialog.open
-		) {
-			return;
-		}
-		const target = partTarget(part);
-		showHint(`Note on “${target.part}”`, e.pageX, e.pageY + 14, target, false);
-	});
-	document.addEventListener("keydown", (e) => {
-		const part = e.target.closest?.("[data-ref]");
-		if (
-			e.key !== "Enter" ||
-			!part ||
-			e.target !== part ||
-			part.matches(NATIVE) ||
-			!root.contains(part)
-		) {
-			return;
-		}
-		openNote(partTarget(part), part.getBoundingClientRect());
 	});
 
 	// An answer is a reader's act: input covers text, selects and ranges; a click also covers re-choosing the preselected radio.
