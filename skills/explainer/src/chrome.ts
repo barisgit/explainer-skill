@@ -59,7 +59,7 @@ interface ConsoleArg {
 }
 
 /** The DevTools events the tool listens for, with the parts of their parameters it reads. */
-export interface CdpEvents {
+interface CdpEvents {
 	"Runtime.exceptionThrown": { exceptionDetails: ExceptionDetails };
 	"Runtime.consoleAPICalled": { type: string; args: ConsoleArg[] };
 	"Log.entryAdded": { entry: { level: string; source: string; text: string; url?: string } };
@@ -138,7 +138,7 @@ export class Cdp {
  * once without it. The tradeoff is acceptable because Chrome only ever opens the local page
  * being packed or checked.
  */
-export async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
+async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
 		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
