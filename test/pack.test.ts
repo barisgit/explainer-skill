@@ -67,9 +67,9 @@ test("a kit script ships as a classic script with its documentation comment", as
 	}
 });
 
-test("kit:theme.css ships with its parts in front of it, in name order, and its fonts inlined", async () => {
+test("kit:theme.css ships whole: its parts in name order, then theme.css, with the fonts inlined", async () => {
 	const partsDir = join(SKILL_DIR, "kit", "parts", "theme");
-	const files = [
+	const sources = [
 		...readdirSync(partsDir)
 			.sort()
 			.map((part) => join(partsDir, part)),
@@ -82,11 +82,13 @@ test("kit:theme.css ships with its parts in front of it, in name order, and its 
 
 	expect(result.code).toBe(0);
 	const html = readFileSync(output, "utf8");
-	const positions = files.map((file) =>
+	// Each source opens with its own comment line, which marks where it starts in the packed stylesheet.
+	const starts = sources.map((file) =>
 		html.indexOf(readFileSync(file, "utf8").split("\n")[0] ?? ""),
 	);
-	expect(positions.every((p) => p >= 0)).toBe(true);
-	expect(positions).toEqual(positions.toSorted((a, b) => a - b));
+	expect(starts).not.toContain(-1);
+	expect(starts).toEqual(starts.toSorted((a, b) => a - b));
+	// The parts' font urls resolve against kit/, where theme.css lies.
 	expect(html).toContain("data:font/woff2;base64,");
 });
 
