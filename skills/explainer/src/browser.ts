@@ -91,24 +91,26 @@ export class Page {
 	static async open(width: number, height: number, sink?: PageSink): Promise<Page> {
 		for (const noSandbox of [false, true]) {
 			const { backend, option } = backendOptions(noSandbox);
-			const view = new Bun.WebView({
-				width,
-				height,
-				...(option && { backend: option }),
-				...(sink && { console: (type, ...args) => sink.onConsole(type, args) }),
-			});
+			let view: Bun.WebView | undefined;
 			try {
+				view = new Bun.WebView({
+					width,
+					height,
+					...(option && { backend: option }),
+					...(sink && { console: (type, ...args) => sink.onConsole(type, args) }),
+				});
 				await view.navigate("about:blank");
 				// Chrome's first view can come up shorter than asked for.
 				await view.resize(width, height);
 				return new Page(view, backend, width, height);
 			} catch (error) {
-				view.close();
-				// Bun spawns one browser per process; a dead one must be cleared before another is started.
-				Bun.WebView.closeAll();
+				view?.close();
 				if (noSandbox || backend !== "chrome") {
 					throw new BrowserError(`cannot start a headless browser: ${String(error)}`);
 				}
+				// Bun spawns one browser per process; the dead one is cleared asynchronously, and a spawn before that fails.
+				Bun.WebView.closeAll();
+				await Bun.sleep(500);
 			}
 		}
 		throw new BrowserError("unreachable");
