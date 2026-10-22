@@ -11,7 +11,7 @@ const PAGE = (
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><h1>Steps</h1>
 <figure class="fig" id="s" data-stepper data-start="1" data-labels="Nazaj,Predvajaj,Premor,Naprej,,Korak">
-<pre class="mermaid" data-steps="a:1 b:2 c:3">flowchart LR; a --> b; b --> c</pre>
+<svg viewBox="0 0 90 20" width="270"><rect id="a" data-step="1" width="20" height="20"/><rect id="b" data-step="2 3" x="35" width="20" height="20"/><rect id="c" data-step="3" x="70" width="20" height="20"/></svg>
 <ol data-captions><li>one</li><li>two</li><li>three</li></ol></figure>
 <script src="kit:steps.js"></script>
 <script>
@@ -20,17 +20,14 @@ document.getElementById("s").addEventListener("stepchange", (e) => heard.push(e.
 document.addEventListener("DOMContentLoaded", () => document.getElementById("s").addEventListener("stepchange", (e) => heard.push(\`dcl\${e.detail.step}\`)));
 ${checks.join("\n")}</script></body></html>`;
 
-const edgeSteps = (id: string) =>
-	`[...document.querySelectorAll('.edge[data-ref="${id}"]')].map((e) => e.dataset.step).join()`;
-
 const CHECKS = [
 	assertLater(
 		"the opening step reaches listeners the page adds in its scripts or in DOMContentLoaded handlers",
 		'heard.join() === "1,dcl1"',
 	),
 	assertLater(
-		"an unmapped edge appears with its later endpoint",
-		`${edgeSteps("L_a_b_0")} === "2" && ${edgeSteps("L_b_c_0")} === "3"`,
+		"an SVG part appears at its first step and is lit on each listed one",
+		`["a", "b", "c"].map((id) => document.getElementById(id).getAttribute("class") ?? "").join() === "is-on is-now,,"`,
 	),
 	assertLater(
 		"data-labels renames the controls and keeps the defaults it leaves empty",
@@ -42,7 +39,7 @@ const CHECKS = [
 	),
 ];
 
-test("a stepper in a Mermaid diagram", async () => {
+test("a stepper over hand-built SVG parts", async () => {
 	const input = dir.write("steps.html", PAGE(CHECKS));
 	const output = dir.path("steps.out.html");
 

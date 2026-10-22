@@ -1,24 +1,21 @@
-/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts, <ol data-captions>, data-steps="id:1,2" on a Mermaid block; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
+/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts (HTML or hand-built SVG), <ol data-captions>; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
    <figure class="fig" data-stepper>             any element; the controls are added before the captions (else at its end)
      <g data-step="2">  <p data-step="0 3">      a part appears at the first listed step and is lit (is-now) on every listed one;
                                                  0 = visible from the start, lit later; a part without data-step never changes
-     <pre class="mermaid" data-steps="api:1 cache:2,4 e1:3">   steps for diagram parts by id: <ref>:<steps, comma separated>
      <ol data-captions><li>Step 1 text</li><li>Step 2 text</li></ol>   one li per step; the current one shows
    </figure>
    Steps count from 1; the number of steps is the number of captions, else the highest step used. The stepper opens on the last
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
-   An edge data-steps does not name appears with its later endpoint, so mapping the nodes is enough; an edge listed in data-steps keeps its own steps.
-   Mermaid ids are the diagram's own: `flowchart LR; api --> cache` has nodes api and cache; `api e1@--> cache` names the edge e1;
-   sequence diagrams have participants by id and messages m1, m2, ... in order. pack fails when data-steps names an id the diagram lacks.
+   A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
    Labels: data-labels="Back,Play,Pause,Next,Step controls,Step" on the stepper replaces the button texts and the two accessible names, in
    this order; leave an entry empty to keep its default (no commas inside a label).
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
    Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step).
-   Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts and data-steps. Replacing
+   Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts. Replacing
    the children of the [data-captions] list is picked up by itself; after any other replacement call Steps.refresh(el, step?). It re-reads
-   captions, parts and data-steps, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
+   captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
    have different lengths. Position: it stays on the current step (clamped to the new count), or on the new last step if it was on the last;
    Steps.refresh(el, 1) restarts. A stepper left with fewer than 2 steps hides its controls and shows everything; they return when it grows.
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
@@ -31,41 +28,6 @@
 	const steppers = new WeakMap<Element, (step?: number) => void>();
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
-
-	/** An edge the author did not map appears with its later endpoint (an endpoint with no step is there from the start). Edges and
-	 * their labels name their endpoints in data-from and data-to. */
-	function followEndpoints(diagram: Element, firstStep: Map<string, number>) {
-		for (const edge of diagram.querySelectorAll<Part>(
-			":is(.edge, .edge-label)[data-from][data-to]:not([data-step])",
-		)) {
-			const ends = [edge.dataset.from ?? "", edge.dataset.to ?? ""];
-			const step = Math.max(0, ...ends.map((end) => firstStep.get(end) ?? 0));
-			if (step > 0) {
-				edge.dataset.step = String(step);
-				edge.dataset.stepAuto = "";
-			}
-		}
-	}
-
-	/** `data-steps="api:1 cache:2,4"` on a diagram: copies each id's steps onto the diagram parts that carry that data-ref. */
-	function expandDiagramSteps(root: Element) {
-		for (const diagram of root.querySelectorAll<Part>("[data-steps]")) {
-			// Derived steps are redone from the current data-steps, so drop the earlier ones first.
-			for (const part of diagram.querySelectorAll<Part>("[data-step-auto]")) {
-				part.removeAttribute("data-step");
-				part.removeAttribute("data-step-auto");
-			}
-			const firstStep = new Map<string, number>();
-			for (const token of (diagram.dataset.steps ?? "").split(/\s+/).filter(Boolean)) {
-				const [ref = "", steps = ""] = token.split(":");
-				firstStep.set(ref, Math.min(...steps.split(",").map(Number)));
-				for (const part of diagram.querySelectorAll<Part>(`[data-ref~="${CSS.escape(ref)}"]`)) {
-					part.dataset.step = steps.replaceAll(",", " ");
-				}
-			}
-			followEndpoints(diagram, firstStep);
-		}
-	}
 
 	// Default texts in data-labels order; the page's list may leave entries empty to keep them.
 	const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"] as const;
@@ -217,9 +179,8 @@
 			});
 		}
 
-		/** Re-reads captions, parts and data-steps; returns the captions list element, if any. */
+		/** Re-reads captions and parts; returns the captions list element, if any. */
 		readContent() {
-			expandDiagramSteps(this.root);
 			this.parts = [...this.root.querySelectorAll<Part>("[data-step]")].map((el) => ({
 				el,
 				steps: (el.dataset.step ?? "").trim().split(/\s+/).map(Number),

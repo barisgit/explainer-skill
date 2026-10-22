@@ -86,58 +86,63 @@
 			</div>
 
 			<div class="beside" data-mig="login">
-				<p>The user's <span data-ref="l_verify">old-hash check</span> is the only moment you hold the plaintext password, so that is when the <span data-ref="l_rehash">new hash</span> gets made. Users who never return keep their old hash until you act on them.</p>
-				<figure class="fig" data-stepper aria-label="Re-hash at login, step by step">
-					<pre class="mermaid" data-steps="l_login:1 l_e1:2 l_verify:2 l_e2:3 l_ok:3 l_e3:4 l_reject:4 l_e4:5 l_rehash:5 l_e5:6 l_store:6">
-flowchart TD
-	l_login["User logs in"] l_e1@--> l_verify["Check against old hash"]
-	l_verify l_e2@--> l_ok{"Correct?"}
-	l_ok l_e3@-->|"no"| l_reject["Reject"]
-	l_ok l_e4@-->|"yes"| l_rehash["Hash with new algorithm"]
-	l_rehash l_e5@--> l_store["Store new hash, drop old"]
-</pre>
-					<ol data-captions>
-						<li>The user enters their password.</li>
-						<li>Your code reads the stored hash and its algorithm tag, and checks the password with the old algorithm.</li>
-						<li>The old hash is the only judge of whether this is the right password.</li>
-						<li>A wrong password is rejected; nothing is stored.</li>
-						<li>A correct one is hashed again with the new algorithm and cost.</li>
-						<li>The new hash replaces the old one. This user no longer has a weak hash at rest.</li>
+				<div>
+					<p>The user's <span data-ref="l_verify">old-hash check</span> is the only moment you hold the plaintext password, so that is when the <span data-ref="l_rehash">new hash</span> gets made. Users who never return keep their old hash until you act on them.</p>
+					<ol>
+						<li><span data-ref="l_login">The user enters their password.</span></li>
+						<li>Your code reads the stored hash and its algorithm tag, and <span data-ref="l_verify">checks the password with the old algorithm</span>, the only judge of whether it is right.</li>
+						<li>A wrong password is <span data-ref="l_reject">rejected</span>; nothing is stored.</li>
+						<li>A correct one is <span data-ref="l_rehash">hashed again</span> with the new algorithm and cost.</li>
+						<li><span data-ref="l_store">The new hash replaces the old one.</span> This user no longer has a weak hash at rest.</li>
 					</ol>
+				</div>
+				<figure class="fig" aria-label="Re-hash at login">
+					<pre class="mermaid">
+flowchart TD
+	l_login["User logs in"] --> l_verify["Check against old hash"]
+	l_verify --> l_ok{"Correct?"}
+	l_ok -->|"no"| l_reject["Reject"]
+	l_ok -->|"yes"| l_rehash["Hash with new algorithm"]
+	l_rehash --> l_store["Store new hash, drop old"]
+</pre>
 				</figure>
 			</div>
 
 			<div class="beside" data-mig="wrap" hidden>
-				<p>OWASP's second method feeds the <span data-ref="w_old">existing hash</span> into the new algorithm, so you can protect every row now without knowing any password. It also notes that layering can make hashes easier to crack, so the <span data-ref="w_plain">direct hash</span> should replace it at the next login.</p>
-				<figure class="fig" data-stepper aria-label="Wrap the stored hash, step by step">
-					<pre class="mermaid" data-steps="w_old:1 w_e1:2 w_wrap:2 w_e2:3 w_login:3 w_e3:4 w_plain:4">
-flowchart TD
-	w_old["Stored: old(password)"] w_e1@--> w_wrap["Stored: new(old(password))"]
-	w_wrap w_e2@--> w_login["User logs in"]
-	w_login w_e3@--> w_plain["Stored: new(password)"]
-</pre>
-					<ol data-captions>
-						<li>Every row holds a hash made by the legacy algorithm, such as <code>md5(password)</code>.</li>
-						<li>A batch job hashes each stored hash with the new algorithm. No password is needed. Layering has algorithm- and encoding-specific risks, so it is a stopgap, to be replaced by a direct hash at the next login.</li>
-						<li>At the next login, check the password through both layers.</li>
-						<li>Then hash the plain password directly with the new algorithm and drop the layered form.</li>
+				<div>
+					<p>OWASP's second method feeds the <span data-ref="w_old">existing hash</span> into the new algorithm, so you can protect every row now without knowing any password. It also notes that layering can make hashes easier to crack, so the <span data-ref="w_plain">direct hash</span> should replace it at the next login.</p>
+					<ol>
+						<li>Every row holds <span data-ref="w_old">a hash made by the legacy algorithm</span>, such as <code>md5(password)</code>.</li>
+						<li>A batch job <span data-ref="w_wrap">hashes each stored hash with the new algorithm</span>. No password is needed. Layering has algorithm- and encoding-specific risks, so it is a stopgap.</li>
+						<li>At the <span data-ref="w_login">next login</span>, check the password through both layers.</li>
+						<li>Then <span data-ref="w_plain">hash the plain password directly</span> with the new algorithm and drop the layered form.</li>
 					</ol>
+				</div>
+				<figure class="fig" aria-label="Wrap the stored hash">
+					<pre class="mermaid">
+flowchart TD
+	w_old["Stored: old(password)"] --> w_wrap["Stored: new(old(password))"]
+	w_wrap --> w_login["User logs in"]
+	w_login --> w_plain["Stored: new(password)"]
+</pre>
 				</figure>
 			</div>
 
 			<div class="beside" data-mig="expire" hidden>
-				<p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p>
-				<figure class="fig" data-stepper aria-label="Expire inactive users, step by step">
-					<pre class="mermaid" data-steps="x_idle:1 x_e1:2 x_expire:2 x_e2:3 x_reset:3">
-flowchart TD
-	x_idle["Inactive for a long time"] x_e1@--> x_expire["Delete old hash"]
-	x_expire x_e2@--> x_reset["Reset required to log in"]
-</pre>
-					<ol data-captions>
-						<li>Some users never log in, so the re-hash at login never reaches them.</li>
-						<li>After the inactivity period you choose, their old hashes are deleted from the database.</li>
-						<li>Their next login needs a password reset, which creates a hash with the new algorithm.</li>
+				<div>
+					<p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p>
+					<ol>
+						<li><span data-ref="x_idle">Some users never log in</span>, so the re-hash at login never reaches them.</li>
+						<li>After the inactivity period you choose, <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
+						<li>Their next login <span data-ref="x_reset">needs a password reset</span>, which creates a hash with the new algorithm.</li>
 					</ol>
+				</div>
+				<figure class="fig" aria-label="Expire inactive users">
+					<pre class="mermaid">
+flowchart TD
+	x_idle["Inactive for a long time"] --> x_expire["Delete old hash"]
+	x_expire --> x_reset["Reset required to log in"]
+</pre>
 				</figure>
 			</div>
 			<p class="caveat"><b>Inferred</b>OWASP gives no inactivity period, and no migration advice that depends on the target algorithm. Existing bcrypt hashes at cost 10 or more are what OWASP calls acceptable for legacy systems, so they are not urgent to move.</p>
@@ -212,7 +217,6 @@ flowchart TD
 <script src="kit:echarts.js"></script>
 <script src="kit:charts.js"></script>
 <script src="kit:views.js"></script>
-<script src="kit:steps.js"></script>
 <script src="kit:link.js"></script>
 <script src="kit:reply.js"></script>
 <script>
@@ -374,7 +378,7 @@ $("algo-rows").innerHTML = ORDER.map((id) => {
 		<td data-label="OWASP's role">${a.role}</td><td data-label="Minimum setting">${a.minimum}</td><td data-label="Nominal memory">${a.memory}</td><td data-label="Watch out for">${a.watch}</td></tr>`;
 }).join("");
 
-/* ---- Migration: one stepper shown at a time. ---- */
+/* ---- Migration: one method shown at a time. ---- */
 function showMigration() {
 	const method = document.querySelector('input[name="mig"]:checked').value;
 	document.querySelectorAll("[data-mig]").forEach((el) => { el.hidden = el.dataset.mig !== method; });

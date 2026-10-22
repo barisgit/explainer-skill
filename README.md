@@ -61,17 +61,21 @@ The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, 
 2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams in light and dark, so the result is one offline file.
 3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
 
-A step-through, for illustration:
+A diagram whose parts light up from the text, for illustration:
 
 ```html
 <link rel="stylesheet" href="kit:theme.css">
 
-<figure class="fig" data-stepper data-start="1">
-  <pre class="mermaid" data-steps="req:1 cache:2 db:3">flowchart TD; req --> cache --> db</pre>
-  <ol data-captions><li>A request arrives.</li><li>The cache misses.</li><li>The database answers.</li></ol>
+<figure class="fig">
+  <pre class="mermaid">flowchart TD; req --> cache --> db</pre>
 </figure>
+<ol>
+  <li><span data-ref="req">A request</span> arrives.</li>
+  <li><span data-ref="cache">The cache</span> misses.</li>
+  <li><span data-ref="db">The database</span> answers.</li>
+</ol>
 
-<script src="kit:steps.js"></script>
+<script src="kit:link.js"></script>
 ```
 
 ## What a page can use

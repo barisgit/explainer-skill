@@ -78,8 +78,8 @@ const refsIn = (markup: string) =>
 
 /**
  * Replaces every `<pre class="mermaid">` block with its rendered diagram: one SVG whose colours follow the page's tokens
- * (theme.css maps them), so light and dark need no second copy. Syntax errors and unsupported
- * types are returned as problems, and so is a `data-steps="id:1,2 ..."` map that names an id the diagram does not have.
+ * (theme.css maps them), so light and dark need no second copy. Syntax errors, unsupported types and data-steps on a
+ * block (diagrams do not step) are returned as problems.
  * `diagramRefs` collects every part id.
  */
 function renderMermaidBlocks(html: string, problems: string[], diagramRefs: Set<string>): string {
@@ -95,19 +95,13 @@ function renderMermaidBlocks(html: string, problems: string[], diagramRefs: Set<
 			problems.push(`mermaid block ${n}: ${r.message}`);
 			return "";
 		}
-		const ids = new Set(r.refs);
-		for (const id of ids) {
-			diagramRefs.add(id);
-		}
-		const mapped = (/\bdata-steps="([^"]*)"/.exec(attrs)?.[1] ?? "")
-			.split(/\s+/)
-			.filter(Boolean)
-			.map((t) => t.split(":")[0] ?? "");
-		const unknown = mapped.filter((id) => !ids.has(id));
-		if (unknown.length) {
+		if (/\sdata-steps?=/.test(attrs)) {
 			problems.push(
-				`mermaid block ${n}: data-steps names ${unknown.map((u) => `"${u}"`).join(", ")}, not in the diagram. Ids: ${[...ids].join(", ")}`,
+				`mermaid block ${n}: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`,
 			);
+		}
+		for (const id of r.refs) {
+			diagramRefs.add(id);
 		}
 		return `<div${attrs}>${r.svg}</div>`;
 	});

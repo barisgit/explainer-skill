@@ -26,11 +26,11 @@ Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the 
   flowchart / state / class / ER   nodes and subgraphs: the node id (cache in "api --> cache[(Cache)]")
   edges                            the edge id: name one with "api e1@--> cache" (otherwise Mermaid's, e.g. L_api_cache_0)
   sequence                         participants and lifelines: the participant id; messages: m1, m2, ... in order
-Use the ids from prose, steps and replies:
+Use the ids from prose and replies:
   <span data-ref="cache">the cache</span>                  hover or focus lights the node (kit:link.js)
-  <pre class="mermaid" data-steps="api:1 cache:2,4 e1:3"> inside a data-stepper: api appears on step 1, cache on 2 and again lit on 4 (kit:steps.js)
   clicking a node offers a note on it (kit:reply.js)
-pack fails when data-steps names an id the diagram lacks, and lists the ids it has. Keep ids short and meaningful: they are what you type here.
+Diagrams do not step: pack fails on data-steps. To walk through one, show it whole and give each step's text the data-ref of its parts.
+Keep ids short and meaningful: they are what you type here.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
 Phones: the diagram scales to the column, so a wide left-to-right chart gets tiny text; prefer top-down (flowchart TD) and few nodes. check warns under 9 px.`;
 
@@ -76,7 +76,7 @@ export const COMMANDS: Record<string, Command> = {
 				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
 			}
 			console.log(
-				`<pre class="mermaid">...</pre>  diagram source (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-steps, data-captions, data-ref, data-reply, data-keep.`,
+				`<pre class="mermaid">...</pre>  diagram source (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-captions, data-ref, data-reply, data-keep.`,
 			);
 			return 0;
 		},

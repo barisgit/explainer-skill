@@ -40,6 +40,22 @@ test("an unsupported diagram type fails the pack and says what to draw instead",
 	expect(result.stderr).toContain("kit:charts.js");
 });
 
+test("data-steps on a Mermaid block fails the pack and points to linked highlighting", async () => {
+	const input = dir.write(
+		"stepped.html",
+		page(
+			`<figure class="fig" data-stepper><pre class="mermaid" data-steps="a:1 b:2">flowchart LR\n  a --> b</pre></figure>`,
+		),
+	);
+
+	const result = await runCli(["pack", input, "-o", dir.path("stepped.out.html")]);
+
+	expect(result.code).not.toBe(0);
+	expect(result.stderr).toContain(
+		'mermaid block 1: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)',
+	);
+});
+
 /** The rendered diagram's SVG, failing the test when the source does not render. */
 function svgOf(source: string): string {
 	const [diagram = new Error("no diagram")] = renderMermaid([source]);

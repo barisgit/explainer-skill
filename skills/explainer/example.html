@@ -62,27 +62,26 @@
 
 		<section>
 			<h2>Why one clump of customers costs an hour</h2>
-			<!-- data-ref terms light the diagram node with the same Mermaid id (kit:link.js). -->
-			<p>A <span data-ref="clump">clump</span> leaves a <span data-ref="backlog">backlog</span>, and the barista works it off only in <span data-ref="spare">spare time</span>. At 90% busy that is one minute in ten, so the <span data-ref="stack">next clump</span> usually lands first.</p>
-			<figure class="fig" id="mechanism" data-stepper aria-label="How a backlog grows, step by step">
-				<pre class="mermaid" data-steps="clump:1 e1:2 backlog:2,6 e2:3 spare:3 e3:4 calm:4 e4:5 slow:5 e5:6 stack:6 e6:6">
+			<figure class="fig" id="mechanism" aria-label="How a backlog grows">
+				<pre class="mermaid">
 flowchart TD
-	clump["4 customers in one minute"] e1@--> backlog["Backlog: 6 minutes of work"]
-	backlog e2@--> spare{"Spare time?"}
-	spare e3@-->|"50% busy: 1 min in 2"| calm["Cleared in 12 minutes"]
-	spare e4@-->|"90% busy: 1 min in 10"| slow["Cleared in 60 minutes"]
-	slow e5@--> stack["Next clump stacks on top"]
-	stack e6@--> backlog
+	clump["4 customers in one minute"] --> backlog["Backlog: 6 minutes of work"]
+	backlog --> spare{"Spare time?"}
+	spare -->|"50% busy: 1 min in 2"| calm["Cleared in 12 minutes"]
+	spare -->|"90% busy: 1 min in 10"| slow["Cleared in 60 minutes"]
+	slow --> stack["Next clump stacks on top"]
+	stack --> backlog
 </pre>
-				<ol data-captions>
-					<li>Four customers walk in within the same minute. Random arrivals do this several times a day.</li>
-					<li>One is served, three wait: 6 minutes of work on top of everyone who arrives next.</li>
-					<li>The backlog shrinks only in spare time, the minutes when nobody new is ordering.</li>
-					<li>At 50% busy every other minute is spare: the 6 minutes are gone in about 12.</li>
-					<li>At 90% busy one minute in ten is spare: the same backlog takes about an hour.</li>
-					<li>Within that hour the next clump arrives and stacks on top. That is where the 18-minute average comes from.</li>
-				</ol>
 			</figure>
+			<!-- data-ref terms light the diagram part with the same Mermaid id (kit:link.js). -->
+			<ol>
+				<li><span data-ref="clump">Four customers</span> walk in within the same minute. Random arrivals do this several times a day.</li>
+				<li>One is served, three wait: a <span data-ref="backlog">backlog</span> of 6 minutes on top of everyone who arrives next.</li>
+				<li>The backlog shrinks only in <span data-ref="spare">spare time</span>, the minutes when nobody new is ordering.</li>
+				<li>At 50% busy every other minute is spare: <span data-ref="calm">the 6 minutes are gone in about 12</span>.</li>
+				<li>At 90% busy one minute in ten is spare: <span data-ref="slow">the same backlog takes about an hour</span>.</li>
+				<li>Within that hour <span data-ref="stack">the next clump</span> arrives and stacks on top. That is where the 18-minute average comes from.</li>
+			</ol>
 		</section>
 
 		<!-- The one band: the section where the reader compares fixes and answers. -->
