@@ -34,8 +34,8 @@ const script = (source: string): string =>
 	`${leadingComment(source).trim()}\n${transpiler.transformSync(source)}`;
 
 /**
- * The text of a text file as a page receives it. A kit script too long for one file keeps parts in `kit/parts/<name>/`; they come first,
- * in file name order, so the page still includes the one file. Anything else is the file itself.
+ * The text of a text file as a page receives it. A kit file too long for one file (a script, or theme.css) keeps parts in
+ * `kit/parts/<name>/`; they come first, in file name order, so the page still includes the one file. Anything else is the file itself.
  */
 export function readKitText(path: string): string {
 	const partsDir = join(KIT_DIR, "parts", basename(path, extname(path)));

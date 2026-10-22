@@ -1,0 +1,241 @@
+/* theme part: control row, fields, segmented choice, toggle, inputs, buttons, playback, tabs. */
+/* Controls: a row at the top of a panel. Field captions keep the case you write. */
+.controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1.5rem;
+	align-items: center;
+	padding-block: 0.875rem;
+	border-block-end: 1px solid var(--rule);
+	font-size: 0.875rem;
+}
+.controls:has(+ .controls) {
+	padding-block-end: 0.25rem;
+	border-block-end: 0;
+}
+.field {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.625rem;
+}
+.field > span:first-child {
+	font-size: 0.8125rem;
+	font-weight: 500;
+	color: var(--muted);
+}
+/* A slider field takes the row's spare width, so caption, slider and readout stay on one line on a phone. */
+.controls > .field:has(> input[type="range"]) {
+	flex: 1 1 16rem;
+	flex-wrap: nowrap;
+	max-inline-size: 30rem;
+}
+.field > input[type="range"] {
+	flex: 1 1 4rem;
+	min-inline-size: 4rem;
+	inline-size: auto;
+}
+.field > output {
+	min-inline-size: 3ch;
+}
+fieldset {
+	min-inline-size: 0;
+	margin: 1.25rem 0;
+	padding: 0;
+	border: 0;
+}
+legend {
+	margin-block-end: 0.625rem;
+	padding: 0;
+	font-weight: 600;
+}
+/* Segmented choice: a sunken track; the chosen option is a raised tile in bold ink. */
+.seg {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	padding: 2px;
+	background: var(--sunken);
+	border: 1px solid var(--rule);
+	border-radius: 0.5rem;
+}
+.seg label {
+	position: relative;
+	display: block;
+}
+.seg input {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.seg span {
+	display: block;
+	padding: 0.3125rem 0.75rem;
+	min-block-size: 2rem;
+	line-height: 1.375rem;
+	border-radius: 0.375rem;
+	color: var(--muted);
+	transition:
+		background 0.15s,
+		color 0.15s;
+}
+.seg label:hover span {
+	color: var(--ink);
+}
+.seg input:checked + span {
+	background: var(--surface);
+	color: var(--ink);
+	font-weight: 600;
+	box-shadow:
+		0 0 0 1px var(--rule-strong),
+		0 1px 3px var(--lift);
+}
+.seg input:focus-visible + span {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+.toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
+	min-block-size: 2.25rem;
+}
+.toggle input {
+	appearance: none;
+	margin: 0;
+	inline-size: 2.125rem;
+	block-size: 1.25rem;
+	border-radius: 1rem;
+	background: color-mix(in oklab, var(--muted) 75%, var(--surface));
+	position: relative;
+	cursor: pointer;
+	transition: background 0.15s;
+	flex: none;
+}
+.toggle input::after {
+	content: "";
+	position: absolute;
+	inset: 0.1875rem auto 0.1875rem 0.1875rem;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	background: var(--surface);
+	transition: transform 0.2s var(--ease);
+}
+.toggle input:checked {
+	background: var(--swatch, var(--accent));
+}
+.toggle input:checked::after {
+	transform: translateX(0.875rem);
+}
+.toggle input:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+.toggle input:not(:checked) + span {
+	color: var(--muted);
+}
+select,
+input[type="number"],
+input[type="text"],
+input[type="search"],
+input[type="date"] {
+	padding: 0.3125rem 0.5rem;
+	min-block-size: 2.25rem;
+	border: 1px solid var(--rule-strong);
+	border-radius: 0.375rem;
+	background: var(--surface);
+}
+/* biome-ignore lint/style/noDescendingSpecificity: the .field-scoped slider rule above outranks this default by specificity, so their order does not matter */
+input[type="range"] {
+	accent-color: var(--accent);
+	inline-size: min(14rem, 60vw);
+}
+/* biome-ignore lint/style/noDescendingSpecificity: the .field-scoped readout rule above sets only min-inline-size, a property this default leaves alone */
+output {
+	font: 500 0.8125rem var(--mono);
+	font-variant-numeric: tabular-nums;
+}
+.btn {
+	min-block-size: 2.25rem;
+	padding: 0.375rem 0.875rem;
+	background: var(--surface);
+	border: 1px solid var(--rule-strong);
+	border-radius: 0.375rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition:
+		border-color 0.15s,
+		background 0.15s;
+}
+.btn:hover:not(:disabled) {
+	border-color: var(--ink);
+}
+.btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-ink);
+	font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) {
+	background: color-mix(in oklab, var(--accent) 88%, var(--ink));
+	border-color: transparent;
+}
+.reset {
+	margin-inline-start: auto;
+	background: none;
+	border: 0;
+	padding: 0;
+	color: var(--accent);
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+	min-block-size: 2.25rem;
+}
+/* Playback: Back / Play / Next, a range over the steps, and a step counter in an output */
+.player {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	padding-block: 0.875rem;
+}
+.player input[type="range"] {
+	flex: 1 1 8rem;
+}
+
+/* Tabs for parallel panels inside one figure; not for page navigation (use sections or views) */
+[role="tablist"] {
+	display: flex;
+	gap: 0.25rem;
+	border-block-end: 1px solid var(--rule);
+	overflow-x: auto;
+}
+[role="tab"] {
+	background: none;
+	border: 0;
+	border-block-end: 2px solid transparent;
+	padding: 0.625rem 0.75rem 0.5rem;
+	color: var(--muted);
+	cursor: pointer;
+	white-space: nowrap;
+}
+[role="tab"]:hover {
+	color: var(--ink);
+}
+[role="tab"][aria-selected="true"] {
+	color: var(--ink);
+	font-weight: 600;
+	border-block-end-color: var(--accent);
+}
+[role="tabpanel"] {
+	padding-block: 1rem;
+}

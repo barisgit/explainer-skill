@@ -15,7 +15,7 @@ skills/explainer/      the installable skill, copied as-is by installers: no dot
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
   src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, kit.ts (kit file names, TypeScript to script), pack.ts, svg-theme.ts (svg files per colour scheme), check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
   kit/                 what pages reference as kit:<file>: theme.css, charts, plot, steps, link, views and reply as .ts sources that pages name .js, echarts.js (generated), fonts/, licenses/
-    parts/<name>/      pieces of a kit script too long for one file; pack puts them in front of kit/<name>.ts in file name order, so a page still includes one file
+    parts/<name>/      pieces of a kit file too long for one file (a script, or theme.css by concern); pack puts them in front of kit/<name> in file name order, so a page still includes one file
   vendor/mermaid.min.js  generated; used by pack to pre-render diagrams, never inlined
 build/                 vendor.ts regenerates kit/echarts.js, vendor/mermaid.min.js and the licence texts from the pinned devDependencies; verify-install.ts is the release check for the installers; media.ts (with media/) renders the README and gallery media
 test/                  contract tests, outside the skill so installs do not ship them
@@ -51,7 +51,7 @@ The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged fi
 
 ## Decisions
 
-- One skill named `explainer`: thin `SKILL.md` and the CLI as the toolbox; no custom elements; offline single-file output; the house style lives in `kit/theme.css` and `example.html`, not in instructions.
+- One skill named `explainer`: thin `SKILL.md` and the CLI as the toolbox; no custom elements; offline single-file output; the house style lives in `kit/theme.css` (with `kit/parts/theme/`) and `example.html`, not in instructions.
 - Runtime is Bun only. Headless Chrome (CDP over WebSocket, no Puppeteer) for `check` and Mermaid rendering.
 - Layout is the packaging layout above: Caplet imports `skills/*/SKILL.md` as a bare skill and copies every non-hidden file. Do not add an `acf.yml`; it would make Caplet emit only the files listed in `assets:`.
 - Agent-facing text (SKILL.md, guide.md, kit file headers, CLI help) stays short and soft. A kit file's leading comment is its documentation: `kit <file>` prints it, and its first line (`name: description`) is the listing.
@@ -64,8 +64,7 @@ The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged fi
 Biome (pinned 2.6.2) enforces the quality baseline at error: cognitive complexity 15, function length 80 lines without blanks, file length 600 lines, no `any`, no non-null assertions, no `@ts-ignore`, no import cycles, no unused code. Suppressions need a rule-specific reason and are rare; today they are:
 
 - `kit/**/*.ts`: each file is one IIFE (a part is one function that hangs on `window` for its entry) that keeps its names out of the page's global scope, so the function-length rule sees one long function. The code inside is split into small functions.
-- `kit/theme.css`: deliberate `!important` overrides (`[hidden]`, reduced motion, print) and selector orders whose properties are disjoint.
-- `kit/theme.css` has a file limit of 1400 lines (the formatter puts one declaration per line) instead of 600. It is one stylesheet by design, because `pack` rejects `@import`; lower the limit when it shrinks.
+- `kit/theme.css` and `kit/parts/theme/*.css`: deliberate `!important` overrides (`[hidden]`, reduced motion, print) and selector orders whose properties are disjoint. Biome compares specificity only within one file, so the order across parts is checked by eye: the parts keep the cascade order of one stylesheet, and `theme.css` comes last.
 
 Excluded by path: `kit/echarts.js`, `vendor/mermaid.min.js` (generated), HTML and Markdown.
 

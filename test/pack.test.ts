@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runCli, SKILL_DIR, scratch } from "./support.ts";
 
@@ -65,6 +65,29 @@ test("a kit script ships as a classic script with its documentation comment", as
 		// Parsing as a function body rejects import/export, which a module-shaped output would contain.
 		expect(() => new Function(body)).not.toThrow();
 	}
+});
+
+test("kit:theme.css ships with its parts in front of it, in name order, and its fonts inlined", async () => {
+	const partsDir = join(SKILL_DIR, "kit", "parts", "theme");
+	const files = [
+		...readdirSync(partsDir)
+			.sort()
+			.map((part) => join(partsDir, part)),
+		join(SKILL_DIR, "kit", "theme.css"),
+	];
+	const input = dir.write("theme.html", page('<link rel="stylesheet" href="kit:theme.css">'));
+	const output = dir.path("theme.out.html");
+
+	const result = await runCli(["pack", input, "-o", output]);
+
+	expect(result.code).toBe(0);
+	const html = readFileSync(output, "utf8");
+	const positions = files.map((file) =>
+		html.indexOf(readFileSync(file, "utf8").split("\n")[0] ?? ""),
+	);
+	expect(positions.every((p) => p >= 0)).toBe(true);
+	expect(positions).toEqual(positions.toSorted((a, b) => a - b));
+	expect(html).toContain("data:font/woff2;base64,");
 });
 
 test("pack of a missing page is a usage error (exit 2), not a stack trace", async () => {

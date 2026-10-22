@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Cdp } from "./chrome.ts";
 import { withPage } from "./chrome.ts";
+import { kitPath, readKitText } from "./kit.ts";
 import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
 
 const THEMES = ["light", "dark"] as const;
@@ -111,7 +112,8 @@ export async function renderMermaid(
 		const page = join(dir, "render.html");
 		writeFileSync(
 			page,
-			`<!doctype html><link rel="stylesheet" href="file://${join(KIT_DIR, "theme.css")}"><style>${pageCss}</style><body class="mermaid"><script src="file://${join(SKILL_ROOT, "vendor/mermaid.min.js")}"></script>`,
+			// The theme is inlined whole (its parts included); the base makes its font urls resolve in kit/ as they do in pack.
+			`<!doctype html><base href="file://${KIT_DIR}/"><style>${readKitText(kitPath("theme.css"))}</style><style>${pageCss}</style><body class="mermaid"><script src="file://${join(SKILL_ROOT, "vendor/mermaid.min.js")}"></script>`,
 		);
 		return await withPage(async (cdp) => {
 			await cdp.send("Runtime.enable");

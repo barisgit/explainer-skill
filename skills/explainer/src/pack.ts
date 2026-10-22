@@ -159,7 +159,8 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 				const path = attempt(() => locate(href, baseDir), "");
 				if (path) {
 					el.replace(
-						`<style>${inlineCss(readFileSync(path, "utf8"), dirname(path), href)}</style>`,
+						// readKitText puts kit:theme.css's parts in front of it; a page's own stylesheet is read as it is.
+						`<style>${inlineCss(readKitText(path), dirname(path), href)}</style>`,
 						{ html: true },
 					);
 				}

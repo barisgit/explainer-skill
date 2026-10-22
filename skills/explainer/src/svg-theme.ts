@@ -1,13 +1,11 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { KIT_DIR } from "./paths.ts";
+import { kitPath, readKitText } from "./kit.ts";
 
 const SCHEMES = ["light", "dark"] as const;
 type Scheme = (typeof SCHEMES)[number];
 
-/** The colour tokens of theme.css's `:root` block: the one place their values live, so a file sees what the page sees. */
+/** The colour tokens of the theme's `:root` block (in its first part): the one place their values live, so a file sees what the page sees. */
 function colourTokens(): string {
-	const css = readFileSync(join(KIT_DIR, "theme.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+	const css = readKitText(kitPath("theme.css")).replace(/\/\*[\s\S]*?\*\//g, "");
 	return (/:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "")
 		.split(";")
 		.map((declaration) => declaration.trim())

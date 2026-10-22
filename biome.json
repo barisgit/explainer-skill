@@ -47,17 +47,5 @@
 			}
 		}
 	},
-	"javascript": { "formatter": { "quoteStyle": "double" } },
-	"overrides": [
-		{
-			"includes": ["skills/explainer/kit/theme.css"],
-			"linter": {
-				"rules": {
-					"style": {
-						"noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 1400 } }
-					}
-				}
-			}
-		}
-	]
+	"javascript": { "formatter": { "quoteStyle": "double" } }
 }
