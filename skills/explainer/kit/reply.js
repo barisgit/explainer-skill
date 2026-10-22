@@ -17,6 +17,7 @@
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }. Replies live in memory: reloading the page clears them.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const root = document.querySelector("main") ?? document.body;
 	const CONTROL =
@@ -34,9 +35,13 @@
 	const where = (el) => {
 		const figure = el.closest("figure");
 		const label = figure?.getAttribute("aria-label");
-		if (label) return `figure "${quoted(label)}"`;
+		if (label) {
+			return `figure "${quoted(label)}"`;
+		}
 		const heading = el.closest("[data-view], section")?.querySelector("h1, h2");
-		if (heading) return `§ ${quoted(heading.textContent)}`;
+		if (heading) {
+			return `§ ${quoted(heading.textContent)}`;
+		}
 		const caption = figure?.querySelector("figcaption");
 		return caption ? `figure "${quoted(caption.textContent).slice(0, 60)}"` : "page";
 	};
@@ -44,8 +49,11 @@
 	function h(tag, props = {}, ...kids) {
 		const el = document.createElement(tag);
 		for (const [k, v] of Object.entries(props)) {
-			if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
-			else el.setAttribute(k, v);
+			if (k.startsWith("on")) {
+				el.addEventListener(k.slice(2), v);
+			} else {
+				el.setAttribute(k, v);
+			}
 		}
 		el.append(...kids);
 		return el;
@@ -54,7 +62,9 @@
 	// ---- answers: data-reply controls ----
 	const ownText = (label) => {
 		const copy = label.cloneNode(true);
-		for (const n of copy.querySelectorAll("input, select, textarea, output")) n.remove();
+		for (const n of copy.querySelectorAll("input, select, textarea, output")) {
+			n.remove();
+		}
 		return clean(copy.textContent);
 	};
 	const optionText = (c) => (c.labels?.[0] ? ownText(c.labels[0]) : c.value);
@@ -73,27 +83,42 @@
 		);
 	}
 
+	/** A checkbox group answers with the checked labels ("none" when empty), a lone checkbox with on/off. */
+	function checkboxValue(cs) {
+		if (cs.length === 1) {
+			return cs[0].checked ? "on" : "off";
+		}
+		return (
+			cs
+				.filter((x) => x.checked)
+				.map(optionText)
+				.join(", ") || "none"
+		);
+	}
+
+	const selectValue = (c) =>
+		[...c.selectedOptions].map((o) => clean(o.textContent)).join(", ") || null;
+
+	/** A range or number shows its <output> when it has one; any other field its text. */
+	function fieldValue(c) {
+		const shown = c.closest(".field, label")?.querySelector("output")?.textContent;
+		if (shown && (c.type === "range" || c.type === "number")) {
+			return clean(shown);
+		}
+		return c.value.trim() ? quoted(c.value) : null;
+	}
+
 	/** The answer a group of controls (one radio group, one checkbox group, or a single control) currently gives; null = nothing chosen. */
-	function valueOf(cs) {
+	function groupValue(cs) {
 		const [c] = cs;
 		if (c.type === "radio") {
 			const on = cs.find((r) => r.checked);
 			return on ? optionText(on) : null;
 		}
-		if (c.type === "checkbox")
-			return cs.length > 1
-				? cs
-						.filter((x) => x.checked)
-						.map(optionText)
-						.join(", ") || "none"
-				: c.checked
-					? "on"
-					: "off";
-		if (c.tagName === "SELECT")
-			return [...c.selectedOptions].map((o) => clean(o.textContent)).join(", ") || null;
-		const shown = c.closest(".field, label")?.querySelector("output")?.textContent;
-		if (shown && (c.type === "range" || c.type === "number")) return clean(shown);
-		return c.value.trim() ? quoted(c.value) : null;
+		if (c.type === "checkbox") {
+			return checkboxValue(cs);
+		}
+		return c.tagName === "SELECT" ? selectValue(c) : fieldValue(c);
 	}
 
 	function answers() {
@@ -116,7 +141,7 @@
 					groups.size === 1
 						? name || unitLabel(cs[0])
 						: [name, unitLabel(cs[0])].filter(Boolean).join(" › "),
-				value: valueOf(cs),
+				value: groupValue(cs),
 				touched: cs.some((c) => touched.has(c)),
 			}));
 		});
@@ -177,7 +202,9 @@
 			answers: answers(),
 		};
 		document.dispatchEvent(new CustomEvent("reply", { detail }));
-		if (parent !== window) parent.postMessage({ type: "explainer:reply", ...detail }, "*");
+		if (parent !== window) {
+			parent.postMessage({ type: "explainer:reply", ...detail }, "*");
+		}
 		return (await copy(detail.markdown))
 			? "Copied. Paste it to the agent."
 			: "Copy failed: select the text above and copy it.";
@@ -259,7 +286,9 @@
 		);
 	}
 	dialog.addEventListener("click", (e) => {
-		if (e.target === dialog) dialog.close();
+		if (e.target === dialog) {
+			dialog.close();
+		}
 	});
 
 	let hint = null;
@@ -314,8 +343,12 @@
 			),
 		);
 		text.addEventListener("keydown", (e) => {
-			if (e.key === "Escape") closePop();
-			if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+			if (e.key === "Escape") {
+				closePop();
+			}
+			if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+				save();
+			}
 		});
 		document.body.append(pop);
 		pop.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
@@ -336,7 +369,9 @@
 		timer = setTimeout(() => {
 			const sel = getSelection();
 			if (!sel || sel.isCollapsed) {
-				if (hintFromSelection) clearHint();
+				if (hintFromSelection) {
+					clearHint();
+				}
 				return;
 			}
 			const quote = quoted(sel.toString());
@@ -352,8 +387,9 @@
 				host.closest("textarea, input, select, .reply-ui") ||
 				pop ||
 				dialog.open
-			)
+			) {
 				return;
+			}
 			const rect = range.getBoundingClientRect();
 			showHint(
 				"Add note",
@@ -368,8 +404,12 @@
 	document.addEventListener(
 		"pointerdown",
 		(e) => {
-			if (hint && e.target !== hint) clearHint();
-			if (pop && !pop.contains(e.target)) closePop();
+			if (hint && e.target !== hint) {
+				clearHint();
+			}
+			if (pop && !pop.contains(e.target)) {
+				closePop();
+			}
 		},
 		true,
 	);
@@ -382,8 +422,9 @@
 			e.target.closest(NATIVE) ||
 			!getSelection().isCollapsed ||
 			dialog.open
-		)
+		) {
 			return;
+		}
 		const target = partTarget(part);
 		showHint(`Note on “${target.part}”`, e.pageX, e.pageY + 14, target, false);
 	});
@@ -395,21 +436,26 @@
 			e.target !== part ||
 			part.matches(NATIVE) ||
 			!root.contains(part)
-		)
+		) {
 			return;
+		}
 		openNote(partTarget(part), part.getBoundingClientRect());
 	});
 
 	// An answer is a reader's act: input covers text, selects and ranges; a click also covers re-choosing the preselected radio.
 	const mark = (e) => {
-		if (!e.target.matches?.(CONTROL) || !e.target.closest("[data-reply]")) return;
+		if (!e.target.matches?.(CONTROL) || !e.target.closest("[data-reply]")) {
+			return;
+		}
 		touched.add(e.target);
 		sync();
 	};
 	document.addEventListener("input", mark);
 	document.addEventListener("change", mark);
 	document.addEventListener("click", (e) => {
-		if (e.target.matches?.("input[type=radio], input[type=checkbox]")) mark(e);
+		if (e.target.matches?.("input[type=radio], input[type=checkbox]")) {
+			mark(e);
+		}
 	});
 
 	sync();

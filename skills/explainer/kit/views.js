@@ -26,11 +26,19 @@
 	function show() {
 		const { name, view, param } = route();
 		const wasInView = root.classList.contains("in-view");
-		if (view && !wasInView) overviewY = scrollY;
-		for (const v of views) v.classList.toggle("active", v === view);
+		if (view && !wasInView) {
+			overviewY = scrollY;
+		}
+		for (const v of views) {
+			v.classList.toggle("active", v === view);
+		}
 		root.classList.toggle("in-view", Boolean(view));
-		if (!view) return wasInView ? scrollTo(0, overviewY) : undefined;
-		if (started) handlers[name]?.(view, param);
+		if (!view) {
+			return wasInView ? scrollTo(0, overviewY) : undefined;
+		}
+		if (started) {
+			handlers[name]?.(view, param);
+		}
 		scrollTo(0, 0);
 		const heading = view.querySelector("h1, h2");
 		heading?.setAttribute("tabindex", "-1");
@@ -40,9 +48,13 @@
 	window.Views = {
 		on(name, fn) {
 			handlers[name] = fn;
-			if (!started) return;
+			if (!started) {
+				return;
+			}
 			const { name: current, view, param } = route();
-			if (view && current === name) fn(view, param);
+			if (view && current === name) {
+				fn(view, param);
+			}
 		},
 	};
 	root.classList.add("js-views");
@@ -52,6 +64,9 @@
 		started = true;
 		show();
 	};
-	if (document.readyState === "loading") addEventListener("DOMContentLoaded", start);
-	else start();
+	if (document.readyState === "loading") {
+		addEventListener("DOMContentLoaded", start);
+	} else {
+		start();
+	}
 })();

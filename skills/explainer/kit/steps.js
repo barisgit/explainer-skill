@@ -18,6 +18,7 @@
    stepchange fires when the step or the count changes (and on the first show), never for a refresh that changes neither: the page
    redraws its own state after replacing content, whether or not the event fires.
    Under reduced motion there are no transitions; Play still advances because the reader asked for it. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const PLAY_MS = 3000;
 	const steppers = new WeakMap();
@@ -27,8 +28,9 @@
 		for (const diagram of root.querySelectorAll("[data-steps]")) {
 			for (const token of diagram.dataset.steps.split(/\s+/).filter(Boolean)) {
 				const [ref = "", steps = ""] = token.split(":");
-				for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`))
+				for (const part of diagram.querySelectorAll(`[data-ref~="${CSS.escape(ref)}"]`)) {
 					part.dataset.step = steps.replaceAll(",", " ");
+				}
 			}
 		}
 	}
@@ -36,113 +38,140 @@
 	const button = (label, attrs, primary = false) =>
 		`<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
 
-	/** Wires one stepper once and returns its refresh(step?), which re-reads the content and re-applies the step. */
-	function create(root) {
-		let parts = [];
-		let captions = [];
-		let total = 0;
-		let step = 0;
-		let timer = null;
-		let announced = "";
-		let wired = false;
+	/** One stepper: its controls, the current step and the content it steps through. */
+	class Stepper {
+		parts = [];
+		captions = [];
+		total = 0;
+		step = 0;
+		timer = null;
+		announced = "";
+		wired = false;
 
-		const bar = document.createElement("div");
-		bar.className = "player";
-		bar.setAttribute("role", "group");
-		bar.setAttribute("aria-label", "Step controls");
-		bar.innerHTML = `${button("Back", 'data-go="-1"')}${button("Play", "data-play", true)}${button("Next", 'data-go="1"')}<input type="range" min="1" aria-label="Step"><output></output>`;
-		const [back, play, next] = bar.querySelectorAll("button");
-		const range = bar.querySelector("input");
-		const readout = bar.querySelector("output");
+		constructor(root) {
+			this.root = root;
+			this.bar = document.createElement("div");
+			this.bar.className = "player";
+			this.bar.setAttribute("role", "group");
+			this.bar.setAttribute("aria-label", "Step controls");
+			this.bar.innerHTML = `${button("Back", 'data-go="-1"')}${button("Play", "data-play", true)}${button("Next", 'data-go="1"')}<input type="range" min="1" aria-label="Step"><output></output>`;
+			[this.back, this.play, this.next] = this.bar.querySelectorAll("button");
+			this.range = this.bar.querySelector("input");
+			this.readout = this.bar.querySelector("output");
+			this.bindControls();
+			this.bindKeys();
+			// Replacing the captions' children re-reads without the page's help. Re-pointed at every refresh, since the list itself may be new.
+			this.watcher = new MutationObserver(() => this.refresh());
+		}
 
-		const show = (target) => {
-			step = Math.max(1, Math.min(total, target));
-			for (const { el, steps } of parts) {
-				el.classList.toggle("is-on", Math.min(...steps) <= step);
-				el.classList.toggle("is-now", steps.includes(step));
+		show(target) {
+			this.step = Math.max(1, Math.min(this.total, target));
+			for (const { el, steps } of this.parts) {
+				el.classList.toggle("is-on", Math.min(...steps) <= this.step);
+				el.classList.toggle("is-now", steps.includes(this.step));
 			}
-			captions.forEach((c, i) => c.classList.toggle("is-now", i === step - 1));
-			back.disabled = step === 1;
-			next.disabled = step === total;
-			range.value = step;
-			readout.textContent = `${step} / ${total}`;
-			if (announced !== `${step}/${total}`) {
-				announced = `${step}/${total}`;
-				root.dispatchEvent(
-					new CustomEvent("stepchange", { bubbles: true, detail: { step, steps: total } }),
+			for (const [i, caption] of this.captions.entries()) {
+				caption.classList.toggle("is-now", i === this.step - 1);
+			}
+			this.back.disabled = this.step === 1;
+			this.next.disabled = this.step === this.total;
+			this.range.value = this.step;
+			this.readout.textContent = `${this.step} / ${this.total}`;
+			if (this.announced !== `${this.step}/${this.total}`) {
+				this.announced = `${this.step}/${this.total}`;
+				this.root.dispatchEvent(
+					new CustomEvent("stepchange", {
+						bubbles: true,
+						detail: { step: this.step, steps: this.total },
+					}),
 				);
 			}
-		};
-		const stop = () => {
-			clearInterval(timer);
-			timer = null;
-			play.textContent = "Play";
-		};
+		}
 
-		bar.addEventListener("click", (e) => {
-			const go = e.target.closest("[data-go]");
-			if (go) {
-				stop();
-				show(step + Number(go.dataset.go));
-			}
-		});
-		range.addEventListener("input", () => {
-			stop();
-			show(Number(range.value));
-		});
-		play.addEventListener("click", () => {
-			if (timer) return stop();
-			if (step === total) show(1);
-			play.textContent = "Pause";
-			timer = setInterval(() => (step < total ? show(step + 1) : stop()), PLAY_MS);
-		});
-		root.addEventListener("keydown", (e) => {
-			if (
-				!wired ||
-				e.target.matches("input, textarea, select") ||
-				e.altKey ||
-				e.ctrlKey ||
-				e.metaKey
-			)
-				return;
-			const target = { ArrowLeft: step - 1, ArrowRight: step + 1, Home: 1, End: total }[e.key];
-			if (target === undefined) return;
-			e.preventDefault();
-			stop();
-			show(target);
-		});
+		stop() {
+			clearInterval(this.timer);
+			this.timer = null;
+			this.play.textContent = "Play";
+		}
 
-		// Replacing the captions' children re-reads without the page's help. Re-pointed at every refresh, since the list itself may be new.
-		const watcher = new MutationObserver(() => refresh());
+		bindControls() {
+			this.bar.addEventListener("click", (e) => {
+				const go = e.target.closest("[data-go]");
+				if (go) {
+					this.stop();
+					this.show(this.step + Number(go.dataset.go));
+				}
+			});
+			this.range.addEventListener("input", () => {
+				this.stop();
+				this.show(Number(this.range.value));
+			});
+			this.play.addEventListener("click", () => {
+				if (this.timer) {
+					return this.stop();
+				}
+				if (this.step === this.total) {
+					this.show(1);
+				}
+				this.play.textContent = "Pause";
+				this.timer = setInterval(
+					() => (this.step < this.total ? this.show(this.step + 1) : this.stop()),
+					PLAY_MS,
+				);
+			});
+		}
 
-		function refresh(wanted) {
-			const wasLast = step === total;
-			expandDiagramSteps(root);
-			parts = [...root.querySelectorAll("[data-step]")].map((el) => ({
+		bindKeys() {
+			this.root.addEventListener("keydown", (e) => {
+				if (
+					!this.wired ||
+					e.target.matches("input, textarea, select") ||
+					e.altKey ||
+					e.ctrlKey ||
+					e.metaKey
+				) {
+					return;
+				}
+				const { step, total } = this;
+				const target = { ArrowLeft: step - 1, ArrowRight: step + 1, Home: 1, End: total }[e.key];
+				if (target === undefined) {
+					return;
+				}
+				e.preventDefault();
+				this.stop();
+				this.show(target);
+			});
+		}
+
+		/** Re-reads captions, parts and data-steps; returns the captions list element, if any. */
+		readContent() {
+			expandDiagramSteps(this.root);
+			this.parts = [...this.root.querySelectorAll("[data-step]")].map((el) => ({
 				el,
 				steps: el.dataset.step.trim().split(/\s+/).map(Number),
 			}));
-			const captionList = root.querySelector("[data-captions]");
-			captions = [...(captionList?.children ?? [])];
-			total = captions.length || Math.max(0, ...parts.flatMap((p) => p.steps));
-			watcher.disconnect();
-			if (captionList) watcher.observe(captionList, { childList: true });
-
-			wired = total >= 2;
-			bar.hidden = !wired;
-			if (!wired) {
-				// Too short to step through: no controls, and without data-live everything shows (the no-JS picture).
-				stop();
-				delete root.dataset.live;
-				step = total = 0; // so growing again reopens on the last step
-				announced = "";
-				return;
-			}
+			const captionList = this.root.querySelector("[data-captions]");
+			this.captions = [...(captionList?.children ?? [])];
+			this.total = this.captions.length || Math.max(0, ...this.parts.flatMap((p) => p.steps));
+			this.watcher.disconnect();
 			if (captionList) {
-				if (bar.nextElementSibling !== captionList) captionList.before(bar);
-			} else if (bar.parentElement !== root) root.append(bar);
+				this.watcher.observe(captionList, { childList: true });
+			}
+			return captionList;
+		}
+
+		/** Puts the controls before the captions (else at the end of the stepper) and makes the stepper keyboard-reachable. */
+		mount(captionList) {
+			const { root, bar } = this;
+			if (captionList) {
+				if (bar.nextElementSibling !== captionList) {
+					captionList.before(bar);
+				}
+			} else if (bar.parentElement !== root) {
+				root.append(bar);
+			}
 			captionList?.setAttribute("aria-live", "polite");
-			range.max = total;
+			this.range.max = this.total;
 			root.tabIndex = 0;
 			root.setAttribute("role", "group");
 			root.setAttribute(
@@ -150,22 +179,40 @@
 				root.getAttribute("aria-label") ?? "Step-through; use the arrow keys",
 			);
 			root.dataset.live = "";
-			// The first read opens on the last step (the complete picture); later ones keep the place, and a stepper on its last step stays on it.
-			show(wanted ?? (wasLast ? total : step));
 		}
-		return refresh;
+
+		/** Re-reads the content and re-applies the step: `wanted`, else the current one (or the new last step if it was on the last). */
+		refresh(wanted) {
+			const wasLast = this.step === this.total;
+			const captionList = this.readContent();
+			this.wired = this.total >= 2;
+			this.bar.hidden = !this.wired;
+			if (!this.wired) {
+				// Too short to step through: no controls, and without data-live everything shows (the no-JS picture).
+				this.stop();
+				delete this.root.dataset.live;
+				this.step = this.total = 0; // so growing again reopens on the last step
+				this.announced = "";
+				return;
+			}
+			this.mount(captionList);
+			// The first read opens on the last step (the complete picture); later ones keep the place, and a stepper on its last step stays on it.
+			this.show(wanted ?? (wasLast ? this.total : this.step));
+		}
 	}
 
 	for (const root of document.querySelectorAll("[data-stepper]")) {
-		const refresh = create(root);
-		steppers.set(root, refresh);
-		refresh();
+		const stepper = new Stepper(root);
+		steppers.set(root, (step) => stepper.refresh(step));
+		stepper.refresh();
 	}
 
 	window.Steps = {
 		refresh(el, step) {
 			const refresh = steppers.get(el);
-			if (!refresh) throw new Error("Steps.refresh needs an element with data-stepper");
+			if (!refresh) {
+				throw new Error("Steps.refresh needs an element with data-stepper");
+			}
 			refresh(step);
 		},
 	};

@@ -15,9 +15,11 @@
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
    The page's colour scheme changing (system setting, or color-scheme / class / style on <html>) remounts the chart: zoom and legend
    state reset. Reduced motion turns animation off. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
-	if (!window.echarts)
+	if (!window.echarts) {
 		throw new Error('kit:charts.js needs <script src="kit:echarts.js"></script> before it');
+	}
 	const probe = document.createElement("i");
 	probe.hidden = true;
 	document.documentElement.append(probe);
@@ -37,7 +39,9 @@
 	function resolve(expr) {
 		probe.style.color = expr;
 		const computed = getComputedStyle(probe).color;
-		if (computed.startsWith("rgb")) return computed;
+		if (computed.startsWith("rgb")) {
+			return computed;
+		}
 		pixel.clearRect(0, 0, 1, 1);
 		pixel.fillStyle = computed;
 		pixel.fillRect(0, 0, 1, 1);
@@ -50,11 +54,15 @@
 	 * copied, everything else (functions, class instances, number arrays) is shared. Run at every mount so saved options stay token-based.
 	 */
 	function resolveColors(value, key = "") {
-		if (typeof value === "string")
+		if (typeof value === "string") {
 			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
-		if (Array.isArray(value))
+		}
+		if (Array.isArray(value)) {
 			return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
-		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) return value;
+		}
+		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
+			return value;
+		}
 		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
 	}
 
@@ -160,20 +168,30 @@
 		if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
 			patch.forEach((item, index) => {
 				const at = item?.id == null ? index : target.findIndex((t) => t?.id === item.id);
-				if (at < 0 || at >= target.length) target.push(item);
-				else target[at] = merge(target[at], item);
+				if (at < 0 || at >= target.length) {
+					target.push(item);
+				} else {
+					target[at] = merge(target[at], item);
+				}
 			});
 			return target;
 		}
-		if (!isObject(target) || !isObject(patch)) return patch;
-		for (const [key, value] of Object.entries(patch))
+		if (!isObject(target) || !isObject(patch)) {
+			return patch;
+		}
+		for (const [key, value] of Object.entries(patch)) {
 			target[key] = key in target ? merge(target[key], value) : value;
+		}
 		return target;
 	}
 
 	/** Applies a top-level option patch to the saved option; see merge. Components named in `replace` are swapped for the patch's list. */
 	function mergeOption(option, patch, replace) {
-		for (const key of replace) if (!(key in patch)) delete option[key];
+		for (const key of replace) {
+			if (!(key in patch)) {
+				delete option[key];
+			}
+		}
 		for (const [key, value] of Object.entries(patch)) {
 			option[key] =
 				key in option && !replace.includes(key)
@@ -191,13 +209,20 @@
 	let scheme = color("ink");
 	const checkScheme = () => {
 		const now = color("ink");
-		if (now === scheme) return;
+		if (now === scheme) {
+			return;
+		}
 		scheme = now;
-		for (const remount of remounts) remount();
+		for (const remount of remounts) {
+			remount();
+		}
 	};
 	matchMedia("(prefers-color-scheme: dark)").addEventListener("change", checkScheme);
-	for (const el of [document.documentElement, document.body])
-		if (el) new MutationObserver(checkScheme).observe(el, { attributes: true });
+	for (const el of [document.documentElement, document.body]) {
+		if (el) {
+			new MutationObserver(checkScheme).observe(el, { attributes: true });
+		}
+	}
 
 	const made = new WeakMap();
 
@@ -215,9 +240,14 @@
 			.load(`500 12px ${getComputedStyle(document.body).fontFamily}`)
 			.catch(() => []);
 		const resizer = new ResizeObserver(() => {
-			if (!el.clientWidth) return;
-			if (chart) chart.resize();
-			else void fontReady.then(() => !chart && el.clientWidth && mount());
+			if (!el.clientWidth) {
+				return;
+			}
+			if (chart) {
+				chart.resize();
+			} else {
+				void fontReady.then(() => !chart && el.clientWidth && mount());
+			}
 		});
 		const remount = () => chart && mount();
 		resizer.observe(el);

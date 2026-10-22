@@ -16,25 +16,38 @@
 	let dimmed = [];
 
 	// Prose terms and rows are keyboard-reachable; diagram parts are not (a diagram has dozens, prose links to the same refs).
-	for (const el of document.querySelectorAll("[data-ref]"))
-		if (!el.matches(NATIVE) && !el.closest("svg")) el.tabIndex = 0;
+	for (const el of document.querySelectorAll("[data-ref]")) {
+		if (!el.matches(NATIVE) && !el.closest("svg")) {
+			el.tabIndex = 0;
+		}
+	}
 
 	function paint() {
 		const refs = refsOf(hovered ?? focused ?? pinned);
 		const selector = refs.map((ref) => `[data-ref~="${CSS.escape(ref)}"]`).join(",");
-		for (const el of lit) el.classList.remove("is-lit");
-		for (const svg of dimmed) svg.classList.remove("has-lit");
+		for (const el of lit) {
+			el.classList.remove("is-lit");
+		}
+		for (const svg of dimmed) {
+			svg.classList.remove("has-lit");
+		}
 		lit = selector ? [...document.querySelectorAll(selector)] : [];
-		for (const el of lit) el.classList.add("is-lit");
+		for (const el of lit) {
+			el.classList.add("is-lit");
+		}
 		// A lone part has nothing to be linked with, so it does not dim its neighbours.
 		dimmed =
 			lit.length > 1 ? [...new Set(lit.map((el) => el.ownerSVGElement).filter(Boolean))] : [];
-		for (const svg of dimmed) svg.classList.add("has-lit");
+		for (const svg of dimmed) {
+			svg.classList.add("has-lit");
+		}
 		document.dispatchEvent(new CustomEvent("ref", { detail: { refs } }));
 	}
 
 	document.addEventListener("pointerover", (e) => {
-		if (e.pointerType === "touch") return;
+		if (e.pointerType === "touch") {
+			return;
+		}
 		hovered = e.target.closest?.("[data-ref]") ?? null;
 		paint();
 	});
