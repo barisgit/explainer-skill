@@ -3,6 +3,7 @@
      <p>The <span data-ref="cache">cache</span> answers most reads.</p>      a prose term (made focusable)
      <tr data-ref="cache">…</tr>   <div class="chart" data-ref="cache">…</div>   a table row, a chart panel, any element
      <pre class="mermaid">flowchart LR; api --> cache</pre>                   pack gives every diagram part the data-ref of its Mermaid id
+   Refs are page-wide: a prose data-ref lights every element with that ref on the page, across figures (two diagrams sharing a node id light together).
    One element may link several refs, space separated: data-ref="cache db". In a diagram that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires with the refs now lit ([] when none), for dispatching a highlight to ECharts. Wired once at load: set data-ref in the markup. */
