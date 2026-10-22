@@ -31,7 +31,7 @@
 	--rule-strong: light-dark(#b8ad99, #5a534a);
 	--accent: light-dark(#b93a05, #ff8a3d);
 	--accent-ink: light-dark(#fff, #1b1208);
-	/* Derived from --accent and --warn so a page that changes only --accent stays consistent. */
+	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
 	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
 	--ok: light-dark(#18744b, #5fcf99);
 	--bad: light-dark(#b3322a, #f2776b);
@@ -138,7 +138,7 @@ strong {
 	font-weight: 600;
 }
 
-/* theme part: page shell, headings, figures and panels. */
+/* theme part: page shell, headings, section rhythm (band, minor, beside), figures and panels, split columns. */
 /* Page shell: masthead, then sections divided by hairlines. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
@@ -184,7 +184,9 @@ h2 em {
 	font-style: normal;
 	color: var(--accent);
 }
-h3 {
+/* A minor section's heading is set as an h3: it labels reference, not a finding. */
+h3,
+.minor > h2 {
 	margin: 0;
 	font-size: 1.0625rem;
 	font-weight: 600;
@@ -233,8 +235,8 @@ h3 {
    the shadow carries the tone sideways and the clip keeps it to the band's height, so nothing scrolls sideways. */
 .band {
 	--under: var(--sunken);
-	background: var(--sunken);
-	box-shadow: 0 0 0 100vmax var(--sunken);
+	background: var(--under);
+	box-shadow: 0 0 0 100vmax var(--under);
 	clip-path: inset(0 -100vmax);
 }
 .page section.band,
@@ -252,10 +254,6 @@ h3 {
 }
 .minor > h2 {
 	margin-block-end: 0.75rem;
-	font-size: 1.0625rem;
-	font-weight: 600;
-	line-height: 1.35;
-	letter-spacing: -0.01em;
 }
 @media (min-width: 56rem) {
 	.minor {
@@ -287,10 +285,16 @@ h3 {
 .fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player)) {
 	--pad: var(--inset);
 	--under: var(--surface);
-	background: var(--surface);
+	background: var(--under);
 	border: 1px solid var(--rule);
 	border-radius: var(--radius);
 	overflow: hidden;
+
+	/* The panel frames the diagram, which runs edge to edge; on the page a diagram keeps its own frame. */
+	& > .mermaid {
+		border: 0;
+		border-radius: 0;
+	}
 }
 .fig > * {
 	padding-inline: var(--pad);
@@ -507,17 +511,11 @@ h3 {
 .fig > .mermaid {
 	margin: 0;
 }
-/* In a panel the diagram runs edge to edge; on the page it keeps its own frame. */
-.fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player))
-	> .mermaid {
-	border: 0;
-	border-radius: 0;
-}
 .mermaid .label {
 	margin: 0;
 	font: inherit;
 	color: inherit;
-} /* mermaid's own .label, not the section caption */
+} /* mermaid's own .label, not the kit's caption */
 /* The copy shown follows the system scheme unless <html data-scheme> forces one (light-dark() cannot switch display). Diagrams and svg files in
    <img> (packed once per scheme) share this; only the other copy is hidden so the page's own display rule for an <img> stays. */
 .mermaid > :is(.light, .dark) {
@@ -1330,7 +1328,8 @@ details > :last-child:not(summary) {
    Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
    sections (method, sources) are set smaller with the heading in its own column.
    Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
-   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono.
+   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
+   --under is the tone under the current block (page, panel or band): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views); pack
@@ -1800,13 +1799,14 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     }
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
   }
-  function theme() {
+  function theme(el) {
     const token = (name) => resolve(`var(--${name})`);
     const ink = token("ink");
     const muted = token("muted");
     const rule = token("rule");
     const ruleStrong = token("rule-strong");
     const surface = token("surface");
+    const under = resolve(getComputedStyle(el).getPropertyValue("--under"));
     const accent = token("accent");
     const accentSoft = token("accent-soft");
     const axis = {
@@ -1816,7 +1816,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       nameTextStyle: { color: muted },
       splitLine: { lineStyle: { color: rule } }
     };
-    const label = { label: { color: ink, textBorderColor: surface, textBorderWidth: 2 } };
+    const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
     const labelled = Object.fromEntries([
       "line",
       "bar",
@@ -1942,7 +1942,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     let chart = null;
     const mount = () => {
       chart?.dispose();
-      chart = echarts.init(el, theme());
+      chart = echarts.init(el, theme(el));
       chart.setOption(resolveColors(option));
       setup?.(chart);
     };
