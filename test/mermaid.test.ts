@@ -244,6 +244,26 @@ test("each of two edges between the same nodes keeps its own id on its line and 
 	expect(svg).toMatch(/<g class="edge-label"[^>]* data-ref="e2"[^>]* data-label="second"/);
 });
 
+test("a generated edge id counts every edge between its two nodes, named ones too", () => {
+	const svg = svgOf(
+		"flowchart LR\n  A first@-->|primary| B\n  A -->|retry| B\n  A -->|fallback| B",
+	);
+	const lines = [
+		...svg.matchAll(/<polyline class="edge"[^>]* data-ref="([^"]*)"[^>]* data-label="([^"]*)"/g),
+	];
+	const labels = [
+		...svg.matchAll(/<g class="edge-label"[^>]* data-ref="([^"]*)"[^>]* data-label="([^"]*)"/g),
+	];
+
+	const expected = [
+		["first", "primary"],
+		["L_A_B_1", "retry"],
+		["L_A_B_2", "fallback"],
+	];
+	expect(lines.map((m) => [m[1], m[2]])).toEqual(expected);
+	expect(labels.map((m) => [m[1], m[2]])).toEqual(expected);
+});
+
 test("edges whose generated ids would read alike get different ones, and an author's id stays as written", () => {
 	const svg = svgOf("flowchart LR\n  A_B --> C\n  A --> B_C\n  x L_A_B_C_1@--> y");
 	const lines = [...svg.matchAll(/<polyline class="edge"[^>]* data-ref="([^"]*)"/g)].map(
