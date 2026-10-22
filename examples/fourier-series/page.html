@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fourier series: building signals from sines</title>
+<link rel="stylesheet" href="kit:theme.css">
+<style>
+	/* Page-specific: everything else comes from kit:theme.css. */
+	:root { --accent: light-dark(#1f5fbf, #7fb0ff); }
+	#hero-chart { block-size: clamp(20rem, 40vw, 26rem); }
+	#gibbs-chart, #peak-chart, #sym-chart { block-size: clamp(16rem, 34vw, 21rem); }
+
+	/* Maths set in plain HTML: italic variables, stacked fractions, limits above and below a symbol. */
+	.eq { margin: 0.35rem 0; line-height: 2.1; }
+	.eqs { padding-block: 0.5rem; }
+	.frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.25; margin-inline: 0.15em; }
+	.frac > :first-child { border-bottom: 1px solid currentcolor; padding-inline: 0.2em; }
+	.lim { display: inline-flex; flex-direction: column; vertical-align: middle; align-items: center; line-height: 1.05; margin-inline: 0.15em; }
+	.lim > :first-child, .lim > :last-child { font-size: 0.7em; }
+	.lim > .sym { font-size: 1.5em; }
+
+	.questions { padding: 0; margin: 0; list-style: none; counter-reset: q; display: grid; gap: 1.5rem; }
+	.questions > li { counter-increment: q; }
+	.questions > li > p:first-child::before { content: counter(q) ". "; color: var(--accent); font-weight: 700; }
+	.questions textarea { inline-size: 100%; box-sizing: border-box; min-block-size: 4.5rem; margin-block: 0.4rem; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0.4rem; padding: 0.5rem 0.65rem; resize: vertical; }
+	.questions details p { margin-block: 0.5rem; }
+	.sources { color: var(--muted); font-size: 0.9rem; max-inline-size: 46rem; }
+	.sheet { border-top: 1px solid var(--rule-strong); }
+	.sheet-row { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: 0.25rem 1.5rem; padding-block: 0.6rem; border-bottom: 1px solid var(--rule); }
+	.sheet-row h3 { margin: 0; font-size: 0.95rem; line-height: 2.1; }
+	.sheet-row .eq { margin: 0; line-height: 2.2; }
+	@media (max-width: 40rem) { .sheet-row { grid-template-columns: 1fr; } .sheet-row h3 { line-height: 1.4; } }
+</style>
+</head>
+<body>
+<main class="page">
+	<header class="masthead">
+		<p class="eyebrow">Fourier series · study page · first-year engineering</p>
+		<h1>A square wave is a sum of sines, and the bump at its jump never goes away</h1>
+		<p class="lede">Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.</p>
+	</header>
+
+	<figure class="fig">
+		<div class="controls">
+			<div class="seg" role="radiogroup" aria-label="Signal to build">
+				<label><input type="radio" id="wave-square" name="wave" value="square" checked><span>Square wave</span></label>
+				<label><input type="radio" id="wave-saw" name="wave" value="saw"><span>Sawtooth</span></label>
+			</div>
+			<label class="field"><span>Terms in the sum</span><input type="range" id="terms" min="1" max="40" value="3"><output id="terms-out" for="terms">3</output></label>
+			<label class="toggle"><input type="checkbox" id="parts"><span>Show each sine</span></label>
+		</div>
+		<dl class="stats" aria-live="polite">
+			<div class="stat"><dt>Highest frequency used</dt><dd id="h-top"></dd></div>
+			<div class="stat"><dt>Highest point of the sum</dt><dd id="h-peak"></dd></div>
+			<div class="stat"><dt>Highest point vs target, share of the jump</dt><dd id="h-over"></dd></div>
+		</dl>
+		<div class="chart" id="hero-chart" role="img" aria-label="A square wave or sawtooth and the sum of its first sines, over two periods"></div>
+		<figcaption id="hero-cap">Dashed: the signal to build. Solid: the sum. Horizontal axis in radians, one period is 2π. Scroll or pinch to zoom.</figcaption>
+	</figure>
+
+	<section id="questions">
+		<p class="label">Try first</p>
+		<h2>Six questions to answer before you read on</h2>
+		<p>Write what you think in the box, then open the answer. What you type stays in this browser, so you can come back to it.</p>
+		<ol class="questions">
+			<li>
+				<p>What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?</p>
+				<textarea id="a1" rows="3" data-reply="1. What a Fourier series says" placeholder="Your answer"></textarea>
+				<details><summary>Show answer</summary>
+					<p>A periodic signal can be written as a constant plus sines and cosines whose frequencies are whole multiples of the signal's own frequency. Each multiple, a harmonic, has one amplitude for its cosine and one for its sine.</p>
+					<p>No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. Section 1 shows why the amounts can be read off one at a time.</p>
+				</details>
+			</li>
+			<li>
+				<p>For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?</p>
+				<textarea id="a2" rows="3" data-reply="2. Square wave harmonics" placeholder="Your answer"></textarea>
+				<details><summary>Show answer</summary>
+					<p>Only sines with odd n: <i>b</i><sub><i>n</i></sub> = 4/(<i>nπ</i>) for odd n, and zero for even n and for every cosine. The amplitudes fall like 1/n, so 4/π, 4/(3π), 4/(5π), …</p>
+				</details>
+			</li>
+			<li>
+				<p>The sawtooth <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?</p>
+				<textarea id="a3" rows="3" data-reply="3. Sawtooth versus square" placeholder="Your answer"></textarea>
+				<details><summary>Show answer</summary>
+					<p><i>b</i><sub><i>n</i></sub> = 2(−1)<sup><i>n</i>+1</sup>/<i>n</i>. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.</p>
+				</details>
+			</li>
+			<li>
+				<p>You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?</p>
+				<textarea id="a4" rows="3" data-reply="4. Overshoot with more terms" placeholder="Your answer"></textarea>
+				<details><summary>Show answer</summary>
+					<p>It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at <i>x</i> = π/(2k) for k terms. Section 3 lets you check.</p>
+				</details>
+			</li>
+			<li>
+				<p>If the bump never shrinks, in what sense does the series converge to the square wave? What value does it give exactly at the jump?</p>
+				<textarea id="a5" rows="3" data-reply="5. Convergence at a jump" placeholder="Your answer"></textarea>
+				<details><summary>Show answer</summary>
+					<p>At every point away from a jump the sum converges to the signal, because the bump has moved past any fixed point. The mean-square error also goes to zero, since the bump gets narrower while its height stays put. What does not happen is uniform convergence. Just beside a jump the sum is still near 0 while the signal is near ±1, so the largest error stays large, close to half the jump. The overshoot above the plateau tends to about 9% of the jump rather than to zero. At the jump itself, the series gives the midpoint of the two sides, 0 for the square wave.</p>
+				</details>
+			</li>
+			<li>
+				<p>Without integrating: which coefficients are zero for <i>x</i>², for <i>x</i>³, and for <i>x</i>² + <i>x</i> on (−π, π)?</p>
+				<textarea id="a6" rows="3" data-reply="6. Symmetry without integrating" placeholder="Your answer"></textarea>
+				<details><summary>Show answer</summary>
+					<p><i>x</i>² is even: all <i>b</i><sub><i>n</i></sub> are zero, only cosines (and <i>a</i><sub>0</sub>) remain. <i>x</i>³ is odd: <i>a</i><sub>0</sub> and all <i>a</i><sub><i>n</i></sub> are zero, only sines remain. <i>x</i>² + <i>x</i> is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from <i>x</i>² and its sines from <i>x</i>.</p>
+				</details>
+			</li>
+		</ol>
+	</section>
+
+	<section id="why">
+		<p class="label">1 · What a Fourier series is</p>
+		<h2>Why sines and cosines are enough</h2>
+		<p>Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:</p>
+		<div class="eq" id="eq-series"></div>
+		<p>Two facts make this work. First, every term repeats after 2π, so any sum of them does too. Second, the terms are <b>orthogonal</b>: over one period, the integral of the product of two different terms is zero, and for positive whole numbers the product of a sine or cosine with itself integrates to π. The constant term is its own case: its square integrates to 2π. Multiply the signal by one term and integrate, and every other term drops out. That leaves one number, the amount of that term in the signal. It is the formula for the coefficients used below.</p>
+		<p>The figure above is the series in action. With one term the square wave is a single sine of amplitude 4/π. Each added sine puts back detail the previous sum lacked, and the corners get steeper.</p>
+	</section>
+
+	<section id="coefficients">
+		<p class="label">2 · Computing coefficients</p>
+		<h2 id="coef-head"></h2>
+		<p>Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.</p>
+		<figure class="fig" id="deriv-fig" data-stepper data-start="1" aria-label="Derivation of the Fourier coefficients, step by step">
+			<div class="controls">
+				<div class="seg" role="radiogroup" aria-label="Wave to derive">
+					<label><input type="radio" id="coef-square" name="coef-wave" value="square" checked><span>Square wave</span></label>
+					<label><input type="radio" id="coef-saw" name="coef-wave" value="saw"><span>Sawtooth</span></label>
+				</div>
+			</div>
+			<ol data-captions><li>Loading</li><li>Loading</li></ol>
+			<div class="eqs" id="deriv"></div>
+			<div class="chart" id="coef-plot" role="img" aria-label="The sine coefficients b-n for n from 1 to 12"></div>
+			<figcaption>The sine coefficients <i>b</i><sub><i>n</i></sub>, first twelve. Square wave: ±1 jumps at 0 and ±π. Sawtooth: <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π), repeating, with jumps at ±π.</figcaption>
+		</figure>
+	</section>
+
+	<section id="gibbs">
+		<p class="label">3 · The Gibbs phenomenon</p>
+		<h2 id="gibbs-head"></h2>
+		<p>Here is the square wave from the top, close to its jump at <i>x</i> = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.</p>
+		<figure class="fig">
+			<div class="controls">
+				<label class="field"><span>Terms</span><input type="range" id="gk" min="1" max="200" value="5"><output id="gk-out" for="gk">5</output></label>
+				<label class="toggle"><input type="checkbox" id="gzoom"><span>Zoom in on the bump</span></label>
+			</div>
+			<dl class="stats" aria-live="polite">
+				<div class="stat"><dt>Highest point</dt><dd id="g-peak"></dd></div>
+				<div class="stat"><dt>Bump sits at</dt><dd id="g-at"></dd></div>
+				<div class="stat"><dt>Typical error (rms)</dt><dd id="g-rms"></dd></div>
+			</dl>
+			<div class="chart" id="gibbs-chart" role="img" aria-label="Partial sum of the square wave near its jump at zero, with the target and the limit of the peak"></div>
+			<figcaption>Dashed grey: the square wave. Dotted: the limit the peak approaches, 1.179. Horizontal axis in radians.
+				<span class="src">Computed in the page from the series. Peak position and the 9% limit: Wikipedia, “Gibbs phenomenon”.</span></figcaption>
+		</figure>
+		<p>The bump keeps its height and gets thinner. The typical error falls because the bump takes up less and less of the period, so the area under it goes to zero. The largest error does not fall: the bump stays, and just beside the jump the sum is still far from the wave. That is why the series converges at every fixed point away from the jump (convergence is not uniform) while no finite number of terms removes the bump.</p>
+		<figure class="fig">
+			<div class="chart" id="peak-chart" role="img" aria-label="Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179"></div>
+			<figcaption>Highest point of the partial sum for 1 to 200 terms (logarithmic horizontal axis). It does not head for 1; it levels off at 1.179, which is 1 + 0.179, and 0.179 is 8.95% of the jump of 2. The sawtooth behaves the same way at its jump.</figcaption>
+		</figure>
+	</section>
+
+	<section id="symmetry">
+		<p class="label">4 · Symmetry</p>
+		<h2 id="sym-head"></h2>
+		<p>An even function (<i>f</i>(−<i>x</i>) = <i>f</i>(<i>x</i>)) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.</p>
+		<figure class="fig">
+			<div class="controls">
+				<div class="seg" role="radiogroup" aria-label="Signal">
+					<label><input type="radio" id="sym-even" name="sym" value="even" checked><span>Even: triangle</span></label>
+					<label><input type="radio" id="sym-odd" name="sym" value="odd"><span>Odd: square wave</span></label>
+					<label><input type="radio" id="sym-none" name="sym" value="none"><span>Neither: half ramp</span></label>
+				</div>
+			</div>
+			<dl class="stats" aria-live="polite">
+				<div class="stat"><dt>Cosine terms that survive</dt><dd id="s-a"></dd></div>
+				<div class="stat"><dt>Sine terms that survive</dt><dd id="s-b"></dd></div>
+			</dl>
+			<div class="chart" id="sym-chart" role="img" aria-label="The chosen signal on one period, with its even part and odd part"></div>
+			<div class="split">
+				<div class="chart" id="sym-a" role="img" aria-label="Cosine coefficients a-n for n from 0 to 9"></div>
+				<div class="chart" id="sym-b" role="img" aria-label="Sine coefficients b-n for n from 1 to 9"></div>
+			</div>
+			<figcaption>Top: the signal over one period, with its even part (<i>f</i>(<i>x</i>) + <i>f</i>(−<i>x</i>))/2 and odd part (<i>f</i>(<i>x</i>) − <i>f</i>(−<i>x</i>))/2; click a legend entry to hide a line. Bottom: coefficients <i>a</i><sub>0</sub> to <i>a</i><sub>9</sub> (left) and <i>b</i><sub>1</sub> to <i>b</i><sub>9</sub> (right), where <i>a</i><sub>0</sub>/2 is the average.</figcaption>
+		</figure>
+		<p>Spotting the symmetry first halves the work, and saves a mistake: a stray cosine term in an odd function's answer is wrong. The half ramp is the sum of its even part, a triangle, and its odd part, a straight line, so it has both kinds of term.</p>
+	</section>
+
+	<section id="sheet">
+		<p class="label">Formula sheet</p>
+		<h2>Everything above on one table</h2>
+		<div class="sheet" id="sheet-rows"></div>
+		<p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is <i>a</i><sub>0</sub>/2, which makes the same <i>a<sub>n</sub></i> formula work for <i>n</i> = 0. Books that write plain <i>a</i><sub>0</sub> use the average, <i>a</i><sub>0</sub> = (1/2π)∫<i>f</i> d<i>x</i>.</p>
+		<p class="label">Sources</p>
+		<ul class="sources">
+			<li>H. Wilbraham, “On a certain periodic function”, <i>Cambridge and Dublin Mathematical Journal</i> 3 (1848), pp. 198–201: the first analysis of the overshoot.</li>
+			<li>J. W. Gibbs, letter in <i>Nature</i> 59 (27 April 1899), p. 606: the correction that describes the overshoot.</li>
+			<li>M. Bôcher, “Introduction to the theory of Fourier’s series”, <i>Annals of Mathematics</i> 7 (1906): the detailed analysis that gave the effect its name.</li>
+			<li>Wikipedia, “Gibbs phenomenon” (en.wikipedia.org/wiki/Gibbs_phenomenon, CC BY-SA 4.0): the constants Si(π) = 1.851937… and 0.0894898… of the jump, which the page’s own sums reproduce.</li>
+			<li>Coefficient formulas and symmetry rules are standard; see for example Kreyszig, <i>Advanced Engineering Mathematics</i>, the chapter on Fourier series.</li>
+		</ul>
+		<p class="meta">No external data is used. Every curve is computed in this page from the formulas above.</p>
+	</section>
+</main>
+
+<script src="kit:echarts.js"></script>
+<script src="kit:charts.js"></script>
+<script src="kit:plot.js"></script>
+<script src="kit:steps.js"></script>
+<script src="kit:reply.js"></script>
+<script>
+const PI = Math.PI;
+const MINUS = "\u2212";
+const $ = (id) => document.getElementById(id);
+
+/* ---- Maths in plain HTML ---- */
+const v = (name, sub) => `<i>${name}</i>${sub ? `<sub>${sub}</sub>` : ""}`;
+const frac = (top, bottom) => `<span class="frac"><span>${top}</span><span>${bottom}</span></span>`;
+const lim = (symbol, high, low) => `<span class="lim"><span>${high}</span><span class="sym">${symbol}</span><span>${low}</span></span>`;
+const integral = (low, high) => lim("\u222b", high, low);
+const sum = (low, high) => lim("\u03a3", high, low);
+const an = v("a", v("n")), bn = v("b", v("n"));
+const f = `<i>f</i>(<i>x</i>)`, nx = `<i>nx</i>`, dx = ` d<i>x</i>`;
+const alt = `(${MINUS}1)<sup><i>n</i></sup>`;
+
+/* ---- The two waves, defined once ----
+ * harmonic(k): frequency (a multiple of the base) of the k-th nonzero term
+ * coef(n): the sine amplitude b_n at that frequency
+ * yLim, yStep: the chart's vertical range and tick step
+ * jumpAt: x of a jump, top: the value the signal reaches just before it, jump: its height
+ * bumpAt(k): distance of the highest point of the k-term sum from the jump (known analytic maximum) */
+const WAVES = {
+	square: {
+		name: "Square wave", harmonic: (k) => 2 * k - 1, coef: (n) => 4 / (PI * n),
+		top: 1, jump: 2, jumpAt: 0, bumpAt: (k) => PI / (2 * k), side: 1, yLim: 1.5, yStep: 0.5,
+		target: [[-2 * PI, 1], [-PI, 1], [-PI, -1], [0, -1], [0, 1], [PI, 1], [PI, -1], [2 * PI, -1]],
+	},
+	saw: {
+		name: "Sawtooth", harmonic: (k) => k, coef: (n) => (2 * (n % 2 ? 1 : -1)) / n,
+		top: PI, jump: 2 * PI, jumpAt: PI, bumpAt: (k) => PI / (k + 1), side: -1, yLim: 4, yStep: 2,
+		target: [[-2 * PI, 0], [-PI, PI], [-PI, -PI], [PI, PI], [PI, -PI], [2 * PI, 0]],
+	},
+};
+
+const partial = (wave, k, x) => {
+	let s = 0;
+	for (let j = 1; j <= k; j++) { const n = wave.harmonic(j); s += wave.coef(n) * Math.sin(n * x); }
+	return s;
+};
+/** Highest value of the k-term sum next to the wave's jump, evaluated at the analytic maximum. */
+const peak = (wave, k) => partial(wave, k, wave.jumpAt + wave.side * wave.bumpAt(k));
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + ((b - a) * i) / (n - 1));
+const piLabel = (x) => {
+	const m = Math.round(x / PI);
+	return m === 0 ? "0" : `${m < 0 ? MINUS : ""}${Math.abs(m) === 1 ? "" : Math.abs(m)}\u03c0`;
+};
+const fixed = (x, d = 2) => x.toFixed(d).replace("-", MINUS);
+const pct = (x) => `${(x * 100).toFixed(1)}%`;
+
+/* ---- 1. Hero: build a wave from sines ---- */
+const PARTS_SHOWN = 8;
+const heroGrid = linspace(-2 * PI, 2 * PI, 1400);
+const heroLegend = { top: 8, left: 8 };
+const hero = Charts.make($("hero-chart"), {
+	grid: { top: 44, left: 8, right: 24, bottom: 8 },
+	legend: heroLegend,
+	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 3), axisPointer: { label: { formatter: (p) => `${fixed(p.value / PI)}\u03c0` } } },
+	xAxis: { type: "value", min: -2 * PI, max: 2 * PI, interval: PI, axisLabel: { formatter: piLabel } },
+	yAxis: { type: "value", min: -1.5, max: 1.5, interval: 0.5 },
+	dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none" }],
+	series: [],
+});
+
+function showHero() {
+	const wave = WAVES[document.querySelector('input[name="wave"]:checked').value];
+	const k = +$("terms").value, withParts = $("parts").checked;
+	const topHarmonic = wave.harmonic(k), sumName = `Sum of ${k} ${k === 1 ? "term" : "terms"}`;
+	const best = peak(wave, k);
+	$("terms-out").textContent = k;
+	$("h-top").innerHTML = `${topHarmonic}\u00d7 <small>base frequency</small>`;
+	$("h-peak").innerHTML = `${fixed(best, 3)} <small>target ${fixed(wave.top, wave === WAVES.saw ? 2 : 0)}</small>`;
+	const above = (best - wave.top) / wave.jump;
+	$("h-over").textContent = `${above < 0 ? MINUS : "+"}${pct(Math.abs(above))}`;
+	$("hero-cap").textContent = `Dashed: the ${wave.name.toLowerCase()} to build. Solid: the sum. ${withParts ? `Thin lines: the first ${Math.min(k, PARTS_SHOWN)} sines of the sum, each at its own amplitude. ` : ""}Horizontal axis in radians, one period is 2\u03c0. Scroll or pinch to zoom.`;
+	const parts = withParts ? Array.from({ length: Math.min(k, PARTS_SHOWN) }, (_, j) => {
+		const n = wave.harmonic(j + 1);
+		return { id: `part${j}`, name: `${n}\u00d7 sine`, type: "line", showSymbol: false, silent: true, lineStyle: { width: 1.2, opacity: 0.75 }, z: 1,
+			data: heroGrid.map((x) => [x, wave.coef(n) * Math.sin(n * x)]) };
+	}) : [];
+	hero.set({
+		legend: { ...heroLegend, data: ["Target", sumName] },
+		yAxis: { min: -wave.yLim, max: wave.yLim, interval: wave.yStep },
+		series: [
+			{ id: "target", name: "Target", type: "line", showSymbol: false, silent: true, color: Charts.color("muted"), lineStyle: { type: "dashed", width: 1.6 }, data: wave.target, z: 2 },
+			...parts,
+			{ id: "sum", name: sumName, type: "line", showSymbol: false, color: Charts.color("accent"), lineStyle: { width: 2.6 }, z: 3, data: heroGrid.map((x) => [x, partial(wave, k, x)]) },
+		],
+	}, ["series"]);
+}
+for (const id of ["terms", "parts"]) $(id).addEventListener("input", showHero);
+document.querySelectorAll('input[name="wave"]').forEach((r) => r.addEventListener("change", showHero));
+showHero();
+
+$("eq-series").innerHTML = `${f} = ${frac(v("a", "0"), "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an} cos ${nx} + ${bn} sin ${nx})`;
+
+/* ---- 2. Coefficients: a derivation to step through, with the resulting b_n ---- */
+const lineEq = (html) => `<p class="eq" data-step="STEP">${html}</p>`;
+const half = (low) => integral(low, "\u03c0");
+const DERIVATIONS = {
+	square: [
+		[`${an} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} ${f} cos ${nx}${dx} = 0`,
+			`Cosine coefficients first. The square wave is odd and cos <i>nx</i> is even, so the integrand is odd and its integral over a symmetric interval is zero. The same argument gives <i>a</i><sub>0</sub> = 0.`],
+		[`${bn} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} ${f} sin ${nx}${dx}`,
+			`The sine coefficient uses the same recipe with sin <i>nx</i>. Here <i>f</i> = ${MINUS}1 on the left half of the period and +1 on the right half.`],
+		[`= ${frac("2", "\u03c0")} ${half("0")} sin ${nx}${dx}`,
+			`<i>f</i> and sin <i>nx</i> are both odd, so their product is even: integrate over half the period and double. On (0, \u03c0) the square wave is 1.`],
+		[`= ${frac("2", "\u03c0")} [ ${MINUS}${frac("cos " + nx, "<i>n</i>")} ]<sub>0</sub><sup>\u03c0</sup> = ${frac("2", "<i>n</i>\u03c0")} (1 ${MINUS} cos <i>n</i>\u03c0)`,
+			`Integrate sin <i>nx</i> and put in the limits. cos 0 = 1 supplies the 1.`],
+		[`= ${frac("2", "<i>n</i>\u03c0")} (1 ${MINUS} ${alt}) = ${frac("4", "<i>n</i>\u03c0")} for odd <i>n</i>, and 0 for even <i>n</i>`,
+			`cos <i>n</i>\u03c0 is ${MINUS}1 or +1 as <i>n</i> is odd or even. Even harmonics cancel; odd ones keep 4/(<i>n</i>\u03c0).`],
+		[`${f} = ${frac("4", "\u03c0")} ( sin <i>x</i> + ${frac("1", "3")} sin 3<i>x</i> + ${frac("1", "5")} sin 5<i>x</i> + \u2026 )`,
+			`Put the coefficients back into the series. This is the sum being built at the top of the page.`],
+	],
+	saw: [
+		[`${an} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} <i>x</i> cos ${nx}${dx} = 0`,
+			`Cosine coefficients first. <i>x</i> is odd and cos <i>nx</i> is even, so the integrand is odd and integrates to zero over (${MINUS}\u03c0, \u03c0). So does <i>a</i><sub>0</sub>.`],
+		[`${bn} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} <i>x</i> sin ${nx}${dx}`,
+			`The sine coefficient with <i>f</i>(<i>x</i>) = <i>x</i> on one period.`],
+		[`= ${frac("2", "\u03c0")} ${half("0")} <i>x</i> sin ${nx}${dx}`,
+			`<i>x</i> and sin <i>nx</i> are both odd, so the product is even: integrate over (0, \u03c0) and double.`],
+		[`= ${frac("2", "\u03c0")} [ ${MINUS}${frac("<i>x</i> cos " + nx, "<i>n</i>")} + ${frac("sin " + nx, "<i>n</i><sup>2</sup>")} ]<sub>0</sub><sup>\u03c0</sup> = ${frac("2", "\u03c0")} \u00b7 ${MINUS}${frac("\u03c0 cos <i>n</i>\u03c0", "<i>n</i>")}`,
+			`Integration by parts. At both limits sin <i>nx</i> is 0, and the <i>x</i> cos <i>nx</i> term is 0 at <i>x</i> = 0, so only ${MINUS}\u03c0 cos <i>n</i>\u03c0/<i>n</i> remains.`],
+		[`= ${MINUS}${frac("2" + alt, "<i>n</i>")} = ${frac("2(" + MINUS + "1)<sup><i>n</i>+1</sup>", "<i>n</i>")}`,
+			`With cos <i>n</i>\u03c0 = ${alt}: +2/<i>n</i> for odd <i>n</i> and ${MINUS}2/<i>n</i> for even <i>n</i>. Every harmonic is present, with alternating signs.`],
+		[`${f} = 2 ( sin <i>x</i> ${MINUS} ${frac("1", "2")} sin 2<i>x</i> + ${frac("1", "3")} sin 3<i>x</i> ${MINUS} \u2026 )`,
+			`Put the coefficients back into the series. This is the sawtooth being built at the top of the page.`],
+	],
+};
+const derivFig = $("deriv-fig");
+const coefPlot = Plot.make($("coef-plot"), { series: [], x: { min: 0, max: 13, step: 1, name: "harmonic n" }, legend: false });
+
+function showDerivation() {
+	const key = document.querySelector('input[name="coef-wave"]:checked').value, wave = WAVES[key];
+	const steps = DERIVATIONS[key];
+	$("coef-head").textContent = key === "square"
+		? "Square wave: only odd harmonics, amplitudes 4/(nπ)"
+		: "Sawtooth: every harmonic, amplitudes 2/n with alternating sign";
+	$("deriv").innerHTML = steps.map(([eq], i) => lineEq(eq).replace("STEP", i + 1)).join("");
+	derivFig.querySelector("[data-captions]").innerHTML = steps.map(([, caption]) => `<li>${caption}</li>`).join("");
+	Steps.refresh(derivFig, 1);
+	const data = Array.from({ length: 12 }, (_, i) => {
+		const n = i + 1, isPresent = key === "saw" || n % 2 === 1;
+		return [n, isPresent ? wave.coef(n) : 0];
+	});
+	const reach = key === "square" ? { min: 0, max: 1.6 } : { min: -1.4, max: 2.4 };
+	coefPlot.set({ series: [{ name: "b", type: "stem", data, color: "var(--accent)", label: (_, y) => (y === 0 ? "0" : fixed(y)) }], y: reach });
+}
+document.querySelectorAll('input[name="coef-wave"]').forEach((r) => r.addEventListener("change", showDerivation));
+showDerivation();
+
+/* ---- 3. Gibbs: the bump keeps its height ---- */
+const LIMIT = (2 / PI) * 1.8519370519824662; // (2/pi) Si(pi): the peak of a +-1 square wave as terms grow
+const gWave = WAVES.square;
+const gGrid = linspace(-1.6, 1.6, 2400);
+const gibbs = Charts.make($("gibbs-chart"), {
+	grid: { top: 24, left: 8, right: 24, bottom: 8 },
+	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 3), axisPointer: { label: { formatter: (p) => `x = ${fixed(p.value, 3)}` } } },
+	xAxis: { type: "value", min: -1.6, max: 1.6, interval: 0.4, axisLabel: { formatter: (x) => fixed(x, 1).replace(".0", "") } },
+	yAxis: { type: "value", min: -1.4, max: 1.4 },
+	series: [],
+});
+const peakKs = Array.from({ length: 200 }, (_, i) => i + 1);
+const peakData = peakKs.map((k) => [k, peak(gWave, k)]);
+const peaks = Charts.make($("peak-chart"), {
+	grid: { top: 24, left: 8, right: 24, bottom: 36 },
+	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 4) },
+	xAxis: { type: "log", min: 1, max: 200, name: "terms in the sum", nameLocation: "middle", nameGap: 28, axisLabel: { formatter: "{value}" } },
+	yAxis: { type: "value", min: 0.9, max: 1.3 },
+	series: [],
+});
+const rule = (y, label, type) => ({ yAxis: y, lineStyle: { type, color: Charts.color("muted") }, label: { formatter: label, position: "insideEndTop", color: Charts.color("muted") } });
+
+function showGibbs() {
+	const k = +$("gk").value, best = peak(gWave, k), at = gWave.bumpAt(k), zoom = $("gzoom").checked;
+	// Parseval: the mean-square error is what the unused terms would carry.
+	let used = 0;
+	for (let j = 1; j <= k; j++) used += gWave.coef(gWave.harmonic(j)) ** 2 / 2;
+	$("gk-out").textContent = k;
+	$("g-peak").innerHTML = `${fixed(best, 3)} <small>wave is 1</small>`;
+	$("g-at").innerHTML = `${fixed(at, 3)} <small>radians from the jump</small>`;
+	$("g-rms").textContent = fixed(Math.sqrt(Math.max(0, 1 - used)), 3);
+	$("gibbs-head").textContent = `With ${k} ${k === 1 ? "term" : "terms"} the sum peaks at ${fixed(best, 3)}; as the number of terms grows, the peak approaches 1.179`;
+	gibbs.set({
+		xAxis: zoom ? { min: 0, max: 1.6 } : { min: -1.6, max: 1.6 },
+		yAxis: zoom ? { min: 0.8, max: 1.3 } : { min: -1.4, max: 1.4 },
+		series: [
+			{ id: "target", name: "Square wave", type: "line", showSymbol: false, silent: true, color: Charts.color("muted"), lineStyle: { type: "dashed", width: 1.6 }, data: [[-1.6, -1], [0, -1], [0, 1], [1.6, 1]] },
+			{ id: "sum", name: `Sum of ${k} terms`, type: "line", showSymbol: false, color: Charts.color("accent"), lineStyle: { width: 2.4 }, z: 3,
+				data: gGrid.map((x) => [x, partial(gWave, k, x)]),
+				markLine: { silent: true, symbol: "none", data: [rule(LIMIT, "limit 1.179", "dotted")] },
+				markPoint: { symbol: "circle", symbolSize: 11, itemStyle: { color: Charts.color("accent") }, label: { show: false }, data: [{ coord: [at, best] }] } },
+		],
+	}, ["series"]);
+	peaks.set({
+		series: [{ id: "peak", name: "Highest point", type: "line", showSymbol: false, color: Charts.color("accent"), lineStyle: { width: 2.4 }, data: peakData,
+			markLine: { silent: true, symbol: "none", data: [rule(1, "square wave = 1", "dashed"), rule(LIMIT, "limit 1.179", "dotted")] },
+			markPoint: { symbol: "circle", symbolSize: 12, itemStyle: { color: Charts.color("accent") }, label: { show: false }, data: [{ coord: [k, best] }] } }],
+	}, ["series"]);
+}
+for (const id of ["gk", "gzoom"]) $(id).addEventListener("input", showGibbs);
+showGibbs();
+
+/* ---- 4. Symmetry: which coefficients survive ---- */
+const SYMS = {
+	even: { name: "The triangle |x|", fn: (x) => Math.abs(x) },
+	odd: { name: "The square wave", fn: (x) => Math.sign(x) },
+	none: { name: "The half ramp", fn: (x) => Math.max(0, x) },
+};
+const symGrid = Array.from({ length: 1000 }, (_, i) => -PI + ((i + 0.5) * 2 * PI) / 1000);
+/** Fourier coefficient by midpoint rule: kind is Math.cos or Math.sin. */
+const coefficient = (fn, kind, n) => symGrid.reduce((s, x) => s + fn(x) * kind(n * x), 0) * (2 / 1000);
+const tidy = (x) => (Math.abs(x) < 1e-9 ? 0 : x);
+const sym = Charts.make($("sym-chart"), {
+	grid: { top: 44, left: 8, right: 24, bottom: 8 },
+	legend: { top: 8, left: 8 },
+	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 3) },
+	xAxis: { type: "value", min: -PI, max: PI, interval: PI / 2, axisLabel: { formatter: (x) => ["\u2212\u03c0", "\u2212\u03c0/2", "0", "\u03c0/2", "\u03c0"][Math.round(x / (PI / 2)) + 2] } },
+	yAxis: { type: "value", min: -1, max: 4, interval: 1 },
+	series: [],
+});
+const symA = Plot.make($("sym-a"), { series: [], x: { min: -0.5, max: 9.5, step: 1, name: "a\u2099 : cosine coefficients" }, legend: false });
+const symB = Plot.make($("sym-b"), { series: [], x: { min: 0.5, max: 9.5, step: 1, name: "b\u2099 : sine coefficients" }, legend: false });
+const survivors = (name, list) => {
+	const kept = list.filter(([, y]) => y !== 0).map(([n]) => `${name}${String.fromCodePoint(0x2080 + n)}`);
+	return kept.length === 0 ? "none" : kept.length > 6 ? `${kept.slice(0, 5).join(", ")}, \u2026` : kept.join(", ");
+};
+
+function showSymmetry() {
+	const key = document.querySelector('input[name="sym"]:checked').value, shape = SYMS[key];
+	const aList = Array.from({ length: 10 }, (_, n) => [n, tidy(coefficient(shape.fn, Math.cos, n))]);
+	const bList = Array.from({ length: 9 }, (_, i) => [i + 1, tidy(coefficient(shape.fn, Math.sin, i + 1))]);
+	const noCos = aList.every(([, y]) => y === 0), noSin = bList.every(([, y]) => y === 0);
+	$("sym-head").textContent = noSin ? `${shape.name} is even, so every sine coefficient is zero`
+		: noCos ? `${shape.name} is odd, so a\u2080 and every cosine coefficient are zero`
+			: `${shape.name} is neither even nor odd, so it needs sines and cosines`;
+	$("s-a").textContent = survivors("a", aList);
+	$("s-b").textContent = survivors("b", bList);
+	const reach = Math.max(...aList.map(([, y]) => Math.abs(y)), ...bList.map(([, y]) => Math.abs(y))) * 1.2;
+	const label = (_, y) => (y === 0 ? "0" : fixed(y));
+	symA.set({ series: [{ name: "a", type: "stem", data: aList, color: "var(--c1)", label }], y: { min: -reach, max: reach } });
+	symB.set({ series: [{ name: "b", type: "stem", data: bList, color: "var(--c2)", label }], y: { min: -reach, max: reach } });
+	const line = (id, name, color, fn) => ({ id, name, type: "line", showSymbol: false, color: Charts.color(color), lineStyle: id === "f" ? { width: 3 } : { width: 1.8, type: "dashed" }, data: symGrid.map((x) => [x, fn(x)]) });
+	const g = shape.fn;
+	sym.set({
+		yAxis: key === "odd" ? { min: -1.5, max: 1.5, interval: 0.5 } : { min: -1, max: 4, interval: 1 },
+		series: [
+			line("f", "f(x)", "accent", g),
+			line("even", "Even part", "c2", (x) => (g(x) + g(-x)) / 2),
+			line("odd", "Odd part", "c3", (x) => (g(x) - g(-x)) / 2),
+		],
+	}, ["series"]);
+}
+document.querySelectorAll('input[name="sym"]').forEach((r) => r.addEventListener("change", showSymmetry));
+showSymmetry();
+
+/* ---- Formula sheet ---- */
+const rep = v("T");
+const ft = `<i>f</i>(<i>t</i>)`, wt = `<i>n\u03c9t</i>`;
+const piInt = (low, high) => integral(low, high);
+const sym2 = `${integral(MINUS + "\u03c0", "\u03c0")}`;
+// Each entry: a name and a list of formulas, one per line.
+const SHEET = [
+	["Series, period 2\u03c0", [`${f} = ${frac(v("a", "0"), "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an} cos ${nx} + ${bn} sin ${nx})`]],
+	["Coefficients", [`${an} = ${frac("1", "\u03c0")} ${sym2} ${f} cos ${nx}${dx} &emsp; (<i>n</i> \u2265 0)`, `${bn} = ${frac("1", "\u03c0")} ${sym2} ${f} sin ${nx}${dx} &emsp; (<i>n</i> \u2265 1)`]],
+	["Period T, \u03c9 = 2\u03c0/T", [`${ft} = ${frac(v("a", "0"), "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an} cos ${wt} + ${bn} sin ${wt})`, `${an} = ${frac("2", rep)} ${piInt("0", rep)} ${ft} cos ${wt} d<i>t</i>, &emsp; ${bn} = ${frac("2", rep)} ${piInt("0", rep)} ${ft} sin ${wt} d<i>t</i>`]],
+	["Orthogonality", [`${sym2} sin <i>mx</i> sin ${nx}${dx} = ${sym2} cos <i>mx</i> cos ${nx}${dx} = \u03c0 if <i>m</i> = <i>n</i>, else 0 &emsp; (<i>m</i>, <i>n</i> = 1, 2, 3, \u2026)`, `${sym2} sin <i>mx</i> cos ${nx}${dx} = 0 for all <i>m</i>, <i>n</i> &emsp; ${sym2} cos ${nx}${dx} = 0 (<i>n</i> \u2265 1) &emsp; ${sym2} 1${dx} = 2\u03c0`]],
+	["Even <i>f</i>", [`${bn} = 0, &emsp; ${an} = ${frac("2", "\u03c0")} ${piInt("0", "\u03c0")} ${f} cos ${nx}${dx}`]],
+	["Odd <i>f</i>", [`<i>a</i><sub>0</sub> = ${an} = 0, &emsp; ${bn} = ${frac("2", "\u03c0")} ${piInt("0", "\u03c0")} ${f} sin ${nx}${dx}`]],
+	["Square wave, \u00b11, odd", [`${bn} = ${frac("4", "<i>n</i>\u03c0")} for odd <i>n</i>, 0 for even <i>n</i>`, `${f} = ${frac("4", "\u03c0")} ${sum("<i>n</i> odd", "")} ${frac("sin " + nx, "<i>n</i>")}`]],
+	[`Sawtooth, <i>f</i> = <i>x</i> on (${MINUS}\u03c0, \u03c0)`, [`${bn} = ${frac("2(" + MINUS + "1)<sup><i>n</i>+1</sup>", "<i>n</i>")}`, `${f} = 2 ( sin <i>x</i> ${MINUS} ${frac("sin 2<i>x</i>", "2")} + ${frac("sin 3<i>x</i>", "3")} ${MINUS} \u2026 )`]],
+	["At a jump", [`The series gives the midpoint of the two one-sided limits: ${frac("<i>f</i>(<i>x</i><sup>+</sup>) + <i>f</i>(<i>x</i><sup>" + MINUS + "</sup>)", "2")}`]],
+	["Gibbs overshoot", [`Square wave \u00b11: the <i>k</i>-term sum peaks at <i>x</i> = ${frac("\u03c0", "2<i>k</i>")}, and the peak tends to ${frac("2", "\u03c0")} Si(\u03c0) \u2248 1.179`, `Overshoot \u2192 0.0895 \u00d7 the jump, where Si(\u03c0) = ${piInt("0", "\u03c0")} ${frac("sin <i>t</i>", "<i>t</i>")} d<i>t</i> \u2248 1.852`]],
+	["Parseval", [`${frac("1", "\u03c0")} ${sym2} ${f}<sup>2</sup>${dx} = ${frac("<i>a</i><sub>0</sub><sup>2</sup>", "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an}<sup>2</sup> + ${bn}<sup>2</sup>)`, `After <i>N</i> terms the mean-square error is half the sum of the squared omitted coefficients.`]],
+];
+$("sheet-rows").innerHTML = SHEET.map(([name, eqs]) => `<div class="sheet-row"><h3>${name}</h3><div>${eqs.map((eq) => `<div class="eq">${eq}</div>`).join("")}</div></div>`).join("");
+</script>
+</body>
+</html>

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which password hash: Argon2id, scrypt, bcrypt or PBKDF2</title>
+<link rel="stylesheet" href="kit:theme.css">
+<style>
+	:root { --accent: light-dark(#0f6b5c, #5fd3bd); }
+	#budget-chart { block-size: clamp(22rem, 52vw, 27rem); }
+	#algo-chart { block-size: clamp(14rem, 36vw, 18rem); }
+	.presets { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+	.verdict-note { margin-block: 0.75rem; padding-inline: var(--inset); }
+	.sources li { margin-block: 0.35rem; }
+	.note-list { padding-inline-start: 1.1rem; }
+	.note-list li { margin-block: 0.4rem; }
+</style>
+</head>
+<body>
+<main class="page">
+	<div data-overview>
+		<header class="masthead">
+			<p class="eyebrow">Password hashing · OWASP Password Storage Cheat Sheet, read 22 Oct 2026</p>
+			<h1>Use <em>Argon2id</em>, unless a FIPS-140 requirement makes it <em>PBKDF2</em>. Memory per login decides the rest.</h1>
+			<p class="lede">OWASP ranks the four: Argon2id first, scrypt when Argon2id is unavailable, PBKDF2 when FIPS-140 is required, bcrypt only for legacy systems. Set your deployment below and see which OWASP setting fits.</p>
+		</header>
+
+		<figure class="fig">
+			<div class="controls">
+				<div class="presets" role="group" aria-label="Example deployments">
+					<span class="label">Try</span>
+					<button type="button" class="btn" data-preset="small">Small VM</button>
+					<button type="button" class="btn" data-preset="tiny">Tiny container</button>
+					<button type="button" class="btn" data-preset="roomy">Roomy server</button>
+					<button type="button" class="btn" data-preset="fips">FIPS customer</button>
+					<button type="button" class="btn" data-preset="noargon">No Argon2id library</button>
+				</div>
+			</div>
+			<div class="controls">
+				<label class="field"><span>Spare memory for hashing</span><input type="range" id="ram" min="64" max="2048" step="32" value="256"><output id="ram-out" for="ram"></output></label>
+				<label class="field"><span>Simultaneous logins</span><input type="range" id="conc" min="1" max="64" value="8"><output id="conc-out" for="conc"></output></label>
+			</div>
+			<div class="controls">
+				<label class="toggle"><input type="checkbox" id="fips"><span>A customer requires FIPS-140 validated cryptography</span></label>
+				<label class="toggle"><input type="checkbox" id="argon-ok" checked><span>Our stack has an Argon2id library</span></label>
+			</div>
+			<dl class="stats" aria-live="polite">
+				<div class="stat"><dt>Memory per login available</dt><dd id="v-budget"></dd></div>
+				<div class="stat"><dt>Choice</dt><dd id="v-algo"></dd></div>
+				<div class="stat"><dt>OWASP setting</dt><dd id="v-setting"></dd></div>
+				<div class="stat"><dt>Nominal algorithm memory</dt><dd id="v-mem"></dd></div>
+			</dl>
+			<p class="verdict-note" id="verdict-note"></p>
+			<div class="chart" id="budget-chart" role="img" aria-label="Memory needed by each OWASP Argon2id and scrypt setting, against the memory available per login"></div>
+			<figcaption>Dark: the setting chosen. Light: also fits. Grey: not usable here (too much memory for one login, FIPS-140 required, or no library). The dashed line is spare memory divided by simultaneous logins (not drawn above 150 MiB); capping simultaneous hashes with a queue is your design choice, not an OWASP setting. Memory figures are the algorithm's nominal allocation, not process memory: library overhead adds to it, so measure real use on your own stack. Click a bar to open that algorithm.
+				<span class="src">Settings: OWASP Password Storage Cheat Sheet. Each Argon2id row gives equal defence per OWASP, and so does each scrypt row; they trade memory against CPU time.</span></figcaption>
+		</figure>
+
+		<section>
+			<p class="label">Side by side</p>
+			<h2>What OWASP says about each algorithm</h2>
+			<table class="compare">
+				<thead><tr><th>Algorithm</th><th>OWASP's role for it</th><th>Minimum setting</th><th>Nominal memory</th><th>Watch out for</th></tr></thead>
+				<tbody id="algo-rows"></tbody>
+			</table>
+			<p class="caveat"><b>Inferred</b>The role and minimum columns restate the cheat sheet. Where this page says bcrypt or PBKDF2 has no memory-cost parameter and is not memory-hard, that is a property of the algorithms, not an OWASP statement; they still use some working memory. The cheat sheet names FIPS-140 validated implementations only for PBKDF2; it does not say whether the others have any, so for them FIPS status is unknown, not no. FIPS 140 validates cryptographic modules in an approved configuration, not an algorithm name: check the certificate of the module you would use.</p>
+			<details>
+				<summary>Rules that apply whichever you pick</summary>
+				<ul class="note-list">
+					<li><b>Salt:</b> a unique random salt per password. Most libraries generate and store it for you.</li>
+					<li><b>Pepper:</b> an optional secret shared by all passwords and stored outside the database (secrets vault or HSM). OWASP says it adds defence in depth but not security on its own. Changing a pepper forces every affected user to reset their password.</li>
+					<li><b>Work factor:</b> a hash should generally take under one second. Too high lets an attacker exhaust your CPU with login attempts. Benchmark on the servers you will actually run.</li>
+					<li><b>Unicode:</b> accept every code point, including NUL bytes, and do not reduce the entropy of what the user typed before hashing.</li>
+					<li><b>Fast hashes</b> such as plain SHA-256 are not suitable for password storage.</li>
+				</ul>
+			</details>
+		</section>
+
+		<section>
+			<p class="label">Legacy hashes</p>
+			<h2>Three ways OWASP describes to move old hashes forward</h2>
+			<p>Whatever you migrate to, store the algorithm and cost next to each hash, for example in the PHC string format, so old and new hashes can coexist during the transition.</p>
+			<div class="controls">
+				<div class="seg" role="radiogroup" aria-label="Migration method">
+					<label><input type="radio" name="mig" value="login" checked><span>Re-hash at login</span></label>
+					<label><input type="radio" name="mig" value="wrap"><span>Wrap the stored hash</span></label>
+					<label><input type="radio" name="mig" value="expire"><span>Expire inactive users</span></label>
+				</div>
+			</div>
+
+			<div data-mig="login">
+				<p>The user's <span data-ref="l_verify">old-hash check</span> is the only moment you hold the plaintext password, so that is when the <span data-ref="l_rehash">new hash</span> gets made. Users who never return keep their old hash until you act on them.</p>
+				<figure class="fig" data-stepper aria-label="Re-hash at login, step by step">
+					<pre class="mermaid" data-steps="l_login:1 l_e1:2 l_verify:2 l_e2:3 l_ok:3 l_e3:4 l_reject:4 l_e4:5 l_rehash:5 l_e5:6 l_store:6">
+flowchart TD
+	l_login["User logs in"] l_e1@--> l_verify["Check against old hash"]
+	l_verify l_e2@--> l_ok{"Correct?"}
+	l_ok l_e3@-->|"no"| l_reject["Reject"]
+	l_ok l_e4@-->|"yes"| l_rehash["Hash with new algorithm"]
+	l_rehash l_e5@--> l_store["Store new hash, drop old"]
+</pre>
+					<ol data-captions>
+						<li>The user enters their password.</li>
+						<li>Your code reads the stored hash and its algorithm tag, and checks the password with the old algorithm.</li>
+						<li>The old hash is the only judge of whether this is the right password.</li>
+						<li>A wrong password is rejected; nothing is stored.</li>
+						<li>A correct one is hashed again with the new algorithm and cost.</li>
+						<li>The new hash replaces the old one. This user no longer has a weak hash at rest.</li>
+					</ol>
+				</figure>
+			</div>
+
+			<div data-mig="wrap" hidden>
+				<p>OWASP's second method feeds the <span data-ref="w_old">existing hash</span> into the new algorithm, so you can protect every row now without knowing any password. It also notes that layering can make hashes easier to crack, so the <span data-ref="w_plain">direct hash</span> should replace it at the next login.</p>
+				<figure class="fig" data-stepper aria-label="Wrap the stored hash, step by step">
+					<pre class="mermaid" data-steps="w_old:1 w_e1:2 w_wrap:2 w_e2:3 w_login:3 w_e3:4 w_plain:4">
+flowchart TD
+	w_old["Stored: old(password)"] w_e1@--> w_wrap["Stored: new(old(password))"]
+	w_wrap w_e2@--> w_login["User logs in"]
+	w_login w_e3@--> w_plain["Stored: new(password)"]
+</pre>
+					<ol data-captions>
+						<li>Every row holds a hash made by the legacy algorithm, such as <code>md5(password)</code>.</li>
+						<li>A batch job hashes each stored hash with the new algorithm. No password is needed. Layering has algorithm- and encoding-specific risks, so it is a stopgap, to be replaced by a direct hash at the next login.</li>
+						<li>At the next login, check the password through both layers.</li>
+						<li>Then hash the plain password directly with the new algorithm and drop the layered form.</li>
+					</ol>
+				</figure>
+			</div>
+
+			<div data-mig="expire" hidden>
+				<p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p>
+				<figure class="fig" data-stepper aria-label="Expire inactive users, step by step">
+					<pre class="mermaid" data-steps="x_idle:1 x_e1:2 x_expire:2 x_e2:3 x_reset:3">
+flowchart TD
+	x_idle["Inactive for a long time"] x_e1@--> x_expire["Delete old hash"]
+	x_expire x_e2@--> x_reset["Reset required to log in"]
+</pre>
+					<ol data-captions>
+						<li>Some users never log in, so the re-hash at login never reaches them.</li>
+						<li>After the inactivity period you choose, their old hashes are deleted from the database.</li>
+						<li>Their next login needs a password reset, which creates a hash with the new algorithm.</li>
+					</ol>
+				</figure>
+			</div>
+			<p class="caveat"><b>Inferred</b>OWASP gives no inactivity period, and no migration advice that depends on the target algorithm. Existing bcrypt hashes at cost 10 or more are what OWASP calls acceptable for legacy systems, so they are not urgent to move.</p>
+		</section>
+
+		<section id="decision">
+			<p class="label">The choice</p>
+			<h2>How many hashing algorithms will you run?</h2>
+			<p>The constraints leave one real decision: whether the FIPS-140 requirement applies to everyone or only to some deployments.</p>
+			<table class="compare">
+				<thead><tr><th>Option</th><th>What it means</th><th>Cost</th></tr></thead>
+				<tbody>
+					<tr data-state="maybe"><th scope="row">A. Argon2id everywhere</th><td data-label="What it means">One code path, OWASP's first choice, at least 7 MiB per simultaneous login.</td><td data-label="Cost">Rules out customers who require FIPS-140 validated cryptography, unless your validated module also covers Argon2id (the cheat sheet does not say).</td></tr>
+					<tr data-state="maybe"><th scope="row">B. PBKDF2-HMAC-SHA256 everywhere</th><td data-label="What it means">One code path that can serve FIPS-140 customers, provided PBKDF2 runs in a validated module in its approved configuration. No memory-cost parameter.</td><td data-label="Cost">Gives up memory-hard hashing for everyone. OWASP recommends it only when FIPS-140 is required.</td></tr>
+					<tr data-state="maybe"><th scope="row">C. Argon2id by default, PBKDF2 where FIPS-140 is required</th><td data-label="What it means">Best algorithm where allowed; each record carries its algorithm and cost.</td><td data-label="Cost">Two code paths and two test matrices to maintain.</td></tr>
+				</tbody>
+			</table>
+			<p class="caveat"><b>Inferred</b>OWASP does not rank these three options; they come from combining its rules. Our reading: if no customer requires FIPS-140, choose A. If only some do, C usually costs less security than B. If all do, choose B. Whichever you pick, set the memory budget from a measurement on your smallest VM, not from this page's sliders.</p>
+
+			<fieldset data-reply>
+				<legend>Which option will you take?</legend>
+				<div class="seg">
+					<label><input type="radio" name="option" id="opt-a" value="A"><span>A. Argon2id everywhere</span></label>
+					<label><input type="radio" name="option" id="opt-b" value="B"><span>B. PBKDF2 everywhere</span></label>
+					<label><input type="radio" name="option" id="opt-c" value="C"><span>C. Argon2id plus PBKDF2 for FIPS</span></label>
+					<label><input type="radio" name="option" id="opt-d" value="Undecided"><span>Not yet</span></label>
+				</div>
+			</fieldset>
+			<fieldset data-reply>
+				<legend>What do you still need to find out?</legend>
+				<div class="controls"><label class="toggle"><input type="checkbox" id="q-fips" name="todo" value="fips"><span>Which customers require FIPS-140 validation, and for which part of the system</span></label></div>
+				<div class="controls"><label class="toggle"><input type="checkbox" id="q-mem" name="todo" value="mem"><span>Measured memory and time per login on the smallest VM</span></label></div>
+				<div class="controls"><label class="toggle"><input type="checkbox" id="q-legacy" name="todo" value="legacy"><span>Which legacy hash types are in the database</span></label></div>
+				<div class="controls"><label class="toggle"><input type="checkbox" id="q-lib" name="todo" value="lib"><span>Whether our language has a maintained Argon2id library</span></label></div>
+			</fieldset>
+		</section>
+
+		<section class="sources">
+			<p class="label">Sources</p>
+			<ul>
+				<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Cheat Sheet Series, Password Storage Cheat Sheet</a>, fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it unless marked inferred. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Settings are reproduced and rearranged here; this page is offered under the same licence.</li>
+				<li>The cheat sheet itself cites <a href="https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver">NIST SP 800-63B-4</a> (PBKDF2 permitted), <a href="https://www.rfc-editor.org/rfc/rfc9106.html">RFC 9106</a> (Argon2) and <a href="https://www.rfc-editor.org/rfc/rfc7914.html">RFC 7914</a> (scrypt).</li>
+			</ul>
+		</section>
+	</div>
+
+	<section class="view" data-view="algo">
+		<div class="view-head">
+			<a class="back" href="#">All algorithms</a>
+			<h1 id="algo-title"></h1>
+			<p class="lede" id="algo-lede"></p>
+		</div>
+		<dl class="stats" id="algo-stats"></dl>
+		<figure class="fig" id="algo-fig">
+			<div class="chart" id="algo-chart" role="img" aria-label="OWASP settings for this algorithm"></div>
+			<figcaption id="algo-cap"></figcaption>
+		</figure>
+		<section id="algo-settings" hidden>
+			<h2>Every OWASP setting</h2>
+			<table class="compare">
+				<thead><tr><th>Setting</th><th>Nominal memory</th><th>Trade-off</th></tr></thead>
+				<tbody id="algo-setting-rows"></tbody>
+			</table>
+		</section>
+		<section>
+			<h2>Notes from OWASP</h2>
+			<ul class="note-list" id="algo-notes"></ul>
+			<p><a id="algo-source" href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">Read this section in the cheat sheet</a></p>
+		</section>
+	</section>
+</main>
+
+<script src="kit:echarts.js"></script>
+<script src="kit:charts.js"></script>
+<script src="kit:views.js"></script>
+<script src="kit:steps.js"></script>
+<script src="kit:link.js"></script>
+<script src="kit:reply.js"></script>
+<script>
+/* OWASP Password Storage Cheat Sheet (CC BY-SA 4.0), fetched 2026-10-22. Memory in MiB. `lead` marks the line from its summary list. */
+const ARGON = [[46, 1, 47104], [19, 2, 19456, true], [12, 3, 12288], [9, 4, 9216], [7, 5, 7168]]
+	.map(([mib, t, kib, lead]) => ({ mib, t, kib, lead: !!lead }));
+const SCRYPT = [[17, 1, 128, true], [16, 2, 64], [15, 3, 32], [14, 5, 16], [13, 10, 8]]
+	.map(([logN, p, mib, lead]) => ({ logN, p, mib, lead: !!lead }));
+const ARGON_MIN = Math.min(...ARGON.map((s) => s.mib));
+const SCRYPT_MIN = Math.min(...SCRYPT.map((s) => s.mib));
+const PBKDF2 = [["HMAC-SHA256", 600000, "recommended"], ["HMAC-SHA512", 220000, ""], ["HMAC-SHA1", 1400000, "legacy only"]];
+
+const OWASP_URL = "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html";
+const argonLabel = (s) => `m=${s.mib} MiB, t=${s.t}, p=1`;
+const scryptLabel = (s) => `N=2^${s.logN}, r=8, p=${s.p}`;
+
+const ALGOS = {
+	argon2id: {
+		name: "Argon2id", role: "First choice", minimum: "m=19 MiB, t=2, p=1", memory: "7 to 46 MiB", watch: "Memory-hard, so it needs memory per login; use the Argon2id variant",
+		lede: "Winner of the 2015 Password Hashing Competition. The Argon2id variant balances resistance to side-channel and GPU-based attacks.",
+		settings: ARGON.map((s) => [`m=${s.kib} KiB, t=${s.t}, p=1`, `${s.mib} MiB`, `${s.t} pass${s.t > 1 ? "es" : ""}`]),
+		chart: { x: "Memory (MiB)", y: "Passes (t)", points: ARGON.map((s) => [s.mib, s.t]), name: "Argon2id" },
+		notes: [
+			"Three cost parameters: memory m in KiB, passes t, and parallelism p (lanes the memory is divided over). Raising p does not multiply memory or act as a pass count.",
+			"All five settings give an equal level of defence. The only difference is the trade between CPU and RAM.",
+			"The first two lines (46 MiB with t=1, 19 MiB with t=2) must not be used with Argon2i.",
+			"Tune memory and passes to make cracking expensive while keeping login practical under expected load, and benchmark on the target system. More parallelism is not guaranteed to slow guessing.",
+		],
+		anchor: "#argon2id",
+	},
+	scrypt: {
+		name: "scrypt", role: "If Argon2id is not available", minimum: "N=2^17, r=8, p=1", memory: "8 to 128 MiB", watch: "Memory-hard; its listed settings trade parallelism against memory",
+		lede: "A password-based key derivation function by Colin Percival. OWASP calls Argon2id the best choice and scrypt the one to use when Argon2id is not available.",
+		settings: SCRYPT.map((s) => [scryptLabel(s), `${s.mib} MiB`, `p=${s.p}`]),
+		chart: { x: "Memory (MiB)", y: "Parallelism (p)", points: SCRYPT.map((s) => [s.mib, s.p]), name: "scrypt" },
+		notes: [
+			"Parameters: CPU/memory cost N, block size r (8 means 1024 bytes) and parallelism p.",
+			"The five settings give a similar minimal level of defence; the trade-off is parallelism against RAM.",
+			"The summary line names N=2^17 with r=8 and p=1 as the minimum.",
+		],
+		anchor: "#scrypt",
+	},
+	bcrypt: {
+		name: "bcrypt", role: "Legacy systems only", minimum: "Work factor 10", memory: "No memory-cost parameter", watch: "72-byte input limit; pre-hashing is risky",
+		lede: "OWASP says bcrypt should only be used where Argon2 and scrypt are not available. Make the work factor as large as the verification server allows, with a minimum of 10.",
+		settings: null, chart: null,
+		notes: [
+			"Most implementations read at most 72 bytes of input, so enforce a maximum password length of 72 bytes, or less if your implementation has a smaller limit.",
+			"Pre-hashing the password with a fast hash before bcrypt is dangerous. A hash output can contain a NUL byte, which truncates the input in the original bcrypt, and password shucking lets a leaked fast hash of the same password be reused against yours.",
+			"If you must pre-hash, OWASP's summary is bcrypt(base64(hmac-sha384(data: password, key: pepper)), salt, cost), with the pepper stored outside the database.",
+			"A work factor of 10 or more is OWASP's bar for existing bcrypt systems.",
+		],
+		anchor: "#bcrypt",
+	},
+	pbkdf2: {
+		name: "PBKDF2", role: "When FIPS-140 is required", minimum: "HMAC-SHA256, 600,000 iterations", memory: "No memory-cost parameter", watch: "Long passwords can be slow in some implementations",
+		lede: "Permitted by NIST SP 800-63B-4 and with FIPS-140 validated implementations, so OWASP prefers it when those are required. HMAC-SHA-256 is widely supported and recommended by NIST.",
+		settings: PBKDF2.map(([h, n, note]) => [`PBKDF2-${h}`, "No memory-cost parameter", `${n.toLocaleString("en-US")} iterations${note ? ` (${note})` : ""}`]),
+		chart: { bars: PBKDF2.map(([h, n, note]) => [h + (note === "legacy only" ? " (legacy)" : ""), n]) },
+		notes: [
+			"The work factor is the iteration count, and it depends on the inner hash: SHA-1 needs the most and is legacy only, not for new systems.",
+			"When the password is longer than the hash's block size (64 bytes for SHA-256), HMAC pre-hashes it. Good implementations do that once before the iterations; some redo it every iteration, which makes very long passwords much more expensive and is a denial-of-service risk. Django disclosed such a vulnerability in 2013.",
+			"Manual pre-hashing reduces that risk but needs a salt in the pre-hash step.",
+		],
+		anchor: "#pbkdf2",
+	},
+};
+const ORDER = ["argon2id", "scrypt", "bcrypt", "pbkdf2"];
+
+/* ---- Budget: the memory one login may use, and the OWASP line that fits it. ---- */
+const $ = (id) => document.getElementById(id);
+const fmtMiB = (n) => `${Math.round(n * 10) / 10} MiB`;
+/** Budgets round down, so a budget just under a threshold never reads as meeting it. */
+const fmtBudget = (n) => `${Math.floor(n * 10) / 10} MiB`;
+const PRESETS = {
+	small: { ram: 128, conc: 16, fips: false, argon: true },
+	tiny: { ram: 64, conc: 16, fips: false, argon: true },
+	roomy: { ram: 2048, conc: 8, fips: false, argon: true },
+	fips: { ram: 256, conc: 8, fips: true, argon: true },
+	noargon: { ram: 1024, conc: 4, fips: false, argon: false },
+};
+
+/** The OWASP line to use: the summary line if it fits the budget, else the most memory that fits; undefined if none. */
+function pick(list, budget) {
+	const fit = list.filter((s) => s.mib <= budget);
+	return fit.find((s) => s.lead) ?? fit.sort((a, b) => b.mib - a.mib)[0];
+}
+
+function plan(state) {
+	if (state.fips) return { algo: "PBKDF2-HMAC-SHA256", setting: "600,000 iterations", mem: "no memory-cost parameter", why: "FIPS-140 is required, and PBKDF2 is the algorithm the cheat sheet names for it. PBKDF2 has no memory-cost parameter and is not memory-hard, so the budget does not choose its setting, though it still needs some working memory. FIPS 140 validates modules in an approved configuration: confirm your module covers PBKDF2 with HMAC-SHA-256. If FIPS applies only to some deployments, the others can still use Argon2id." };
+	const a = state.argon ? pick(ARGON, state.budget) : undefined;
+	if (a) {
+		const more = a.lead ? "With more memory to spare, 46 MiB with t=1 is equally strong per OWASP and needs fewer passes." : "This is the largest Argon2id line that fits; the 19 MiB, t=2 line in OWASP's summary does not.";
+		return { algo: "Argon2id", setting: argonLabel(a), mem: fmtMiB(a.mib), pick: `argon-${a.mib}`, why: `${more} Benchmark it: a login should generally take under a second.` };
+	}
+	const s = pick(SCRYPT, state.budget);
+	if (s && !state.argon) return { algo: "scrypt", setting: scryptLabel(s), mem: fmtMiB(s.mib), pick: `scrypt-${s.mib}`, why: "Argon2id is not available, so OWASP's next choice is scrypt. This is the largest scrypt line that fits." };
+	const need = state.argon ? ARGON_MIN : SCRYPT_MIN;
+	return { algo: "Nothing fits", setting: `needs at least ${need} MiB`, mem: `${fmtBudget(state.budget)} available`, why: `The smallest OWASP ${state.argon ? "Argon2id" : "scrypt"} line needs ${need} MiB per login. Raise the budget or queue logins so fewer hash at once. PBKDF2 has no memory-cost parameter, but OWASP names it only for FIPS-140 cases, so using it here is a judgement call (inferred), not an OWASP recommendation.` };
+}
+
+const ROWS = [
+	...ARGON.map((s) => ({ id: `argon-${s.mib}`, name: `Argon2id t=${s.t}`, mib: s.mib, tip: argonLabel(s), view: "argon2id" })),
+	...SCRYPT.map((s) => ({ id: `scrypt-${s.mib}`, name: `scrypt N=2^${s.logN}`, mib: s.mib, tip: scryptLabel(s), view: "scrypt" })),
+];
+const FIT = "color-mix(in srgb, var(--accent) 38%, transparent)";
+
+function barOption(state, result) {
+	const usable = (r) => !state.fips && r.mib <= state.budget && (state.argon || r.view !== "argon2id");
+	const colour = (r) => (!usable(r) ? "var(--rule-strong)" : r.id === result.pick ? "var(--accent)" : FIT);
+	return {
+		series: [{
+			id: "presets", type: "bar", barWidth: "58%", cursor: "pointer",
+			label: { show: true, position: "right", formatter: (p) => `${p.data.value} MiB` },
+			data: ROWS.map((r) => ({ value: r.mib, name: r.name, tip: r.tip, view: r.view, itemStyle: { color: colour(r) } })),
+			markLine: { silent: true, symbol: "none", lineStyle: { color: "var(--accent)", type: "dashed" }, label: { show: false }, data: state.budget <= 150 ? [{ xAxis: state.budget }] : [] },
+		}],
+	};
+}
+
+const budgetChart = Charts.make($("budget-chart"), {
+	grid: { top: 16, left: 8, right: 64, bottom: 8 },
+	tooltip: { trigger: "item", formatter: (p) => `${p.data.tip}<br>${p.data.value} MiB` },
+	xAxis: { type: "value", min: 0, max: 150, axisLabel: { formatter: "{value} MiB", hideOverlap: true } },
+	yAxis: { type: "category", inverse: true, data: ROWS.map((r) => r.name) },
+	series: [],
+}, (chart) => {
+	chart.on("click", (p) => { if (p.data?.view) location.hash = `#algo/${p.data.view}`; });
+});
+
+function readState() {
+	const ram = +$("ram").value, conc = +$("conc").value;
+	return { ram, conc, budget: ram / conc, fips: $("fips").checked, argon: $("argon-ok").checked };
+}
+
+function showBudget() {
+	const state = readState(), result = plan(state);
+	$("ram-out").textContent = `${state.ram} MiB`;
+	$("conc-out").textContent = `${state.conc}`;
+	$("v-budget").textContent = fmtBudget(state.budget);
+	$("v-algo").textContent = result.algo;
+	$("v-setting").textContent = result.setting;
+	$("v-mem").textContent = result.mem;
+	$("verdict-note").textContent = result.why;
+	budgetChart.set(barOption(state, result));
+}
+document.querySelectorAll("#ram, #conc, #fips, #argon-ok").forEach((el) => el.addEventListener("input", showBudget));
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+	const p = PRESETS[b.dataset.preset];
+	$("ram").value = p.ram; $("conc").value = p.conc; $("fips").checked = p.fips; $("argon-ok").checked = p.argon;
+	showBudget();
+}));
+showBudget();
+
+/* ---- Comparison table: rows open the algorithm's own view. ---- */
+$("algo-rows").innerHTML = ORDER.map((id) => {
+	const a = ALGOS[id];
+	return `<tr data-state="${id === "argon2id" ? "fit" : id === "bcrypt" ? "out" : "maybe"}"><th scope="row"><a href="#algo/${id}">${a.name}</a></th>
+		<td data-label="OWASP's role">${a.role}</td><td data-label="Minimum setting">${a.minimum}</td><td data-label="Nominal memory">${a.memory}</td><td data-label="Watch out for">${a.watch}</td></tr>`;
+}).join("");
+
+/* ---- Migration: one stepper shown at a time. ---- */
+function showMigration() {
+	const method = document.querySelector('input[name="mig"]:checked').value;
+	document.querySelectorAll("[data-mig]").forEach((el) => { el.hidden = el.dataset.mig !== method; });
+}
+document.querySelectorAll('input[name="mig"]').forEach((r) => r.addEventListener("change", showMigration));
+showMigration();
+
+/* ---- Algorithm view: a pure function of the URL. ---- */
+function algoChart(el, spec) {
+	if (spec.bars) {
+		return Charts.make(el, {
+			grid: { top: 16, left: 8, right: 96, bottom: 8 },
+			xAxis: { type: "value", min: 0, axisLabel: { formatter: (v) => `${v / 1000}k`, hideOverlap: true } },
+			yAxis: { type: "category", inverse: true, data: spec.bars.map(([n]) => n) },
+			series: [{ type: "bar", barWidth: "50%", label: { show: true, position: "right", formatter: (p) => p.value.toLocaleString("en-US") }, data: spec.bars.map(([n, v]) => ({ value: v, itemStyle: { color: n.includes("legacy") ? "var(--rule-strong)" : "var(--accent)" } })) }],
+		});
+	}
+	return Charts.make(el, {
+		grid: { top: 40, left: 8, right: 32, bottom: 36 },
+		tooltip: { trigger: "item", formatter: (p) => `${p.value[0]} MiB, ${spec.y.slice(0, spec.y.indexOf(" ("))} ${p.value[1]}` },
+		xAxis: { type: "value", name: spec.x, nameLocation: "middle", nameGap: 26, min: 0 },
+		yAxis: { type: "value", min: 0 }, // the quantity is named in the caption: a name at the canvas edge clips or collides with point labels
+		// Labels go right of the steep part of the curve, below the next point and above the last, so none sits on the line.
+		series: [{ type: "line", symbolSize: 14, label: { show: true, position: "top", formatter: (p) => `${p.value[0]} MiB` }, data: spec.points.map((pt) => ({ value: pt, label: { position: pt[1] >= 3 ? "right" : pt[1] === 2 ? "bottom" : "top" } })) }],
+	});
+}
+
+Views.on("algo", (el, id) => {
+	const a = ALGOS[id];
+	el.querySelector("#algo-title").textContent = a ? a.name : "No such algorithm";
+	el.querySelector("#algo-lede").textContent = a ? a.lede : "";
+	el.querySelector("#algo-stats").hidden = !a;
+	if (!a) return;
+	el.querySelector("#algo-stats").innerHTML = [["OWASP's role", a.role], ["Minimum setting", a.minimum], ["Nominal memory", a.memory]]
+		.map(([dt, dd]) => `<div class="stat"><dt>${dt}</dt><dd>${dd}</dd></div>`).join("");
+	el.querySelector("#algo-fig").hidden = !a.chart;
+	if (a.chart) {
+		algoChart(el.querySelector("#algo-chart"), a.chart);
+		el.querySelector("#algo-cap").textContent = a.chart.bars
+			? "Iterations OWASP gives for each inner hash. Grey is legacy only."
+			: `Vertical axis: ${a.chart.y.toLowerCase()}. Horizontal axis: nominal memory in MiB. OWASP's settings trade memory against ${id === "scrypt" ? "parallelism" : "passes"}.`;
+	}
+	el.querySelector("#algo-settings").hidden = !a.settings;
+	el.querySelector("#algo-setting-rows").innerHTML = (a.settings ?? [])
+		.map(([s, m, t]) => `<tr><th scope="row">${s}</th><td data-label="Nominal memory">${m}</td><td data-label="Trade-off">${t}</td></tr>`).join("");
+	el.querySelector("#algo-notes").innerHTML = a.notes.map((n) => `<li>${n}</li>`).join("");
+	el.querySelector("#algo-source").href = OWASP_URL + a.anchor;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explainer examples</title>
+<link rel="stylesheet" href="kit:theme.css">
+<style>
+	.gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-block: 2.5rem 3rem; }
+	.card { display: flex; flex-direction: column; gap: 0.6rem; color: inherit; text-decoration: none; }
+	.card img { inline-size: 100%; block-size: auto; aspect-ratio: 4 / 3; object-fit: cover; object-position: top;
+		border-radius: 10px; box-shadow: 0 0 0 1px var(--rule), 0 6px 20px rgb(0 0 0 / 0.08); transition: transform 0.15s; }
+	.card:hover img, .card:focus-visible img { transform: translateY(-2px); }
+	.card h2 { margin: 0.4rem 0 0; font-size: 1.15rem; }
+	.card:hover h2 { color: var(--accent); }
+	.card p { margin: 0; color: var(--muted); }
+	@media (max-width: 40rem) { .gallery { grid-template-columns: 1fr; } }
+	.links { display: flex; gap: 1.25rem; }
+</style>
+</head>
+<body>
+<main class="page">
+	<header class="masthead">
+		<p class="eyebrow">explainer · examples</p>
+		<h1>Four pages an agent built with the explainer skill</h1>
+		<p class="lede">Each one is a single HTML file that works offline. An agent wrote it from the skill's guide, <code>pack</code> made it self-contained, and <code>check</code> screenshotted it in light and dark at desktop and phone width.</p>
+		<p class="links"><a href="https://github.com/barisgit/explainer-skill">Install the skill on GitHub</a><a href="https://github.com/barisgit/explainer-skill/tree/main/examples">Page sources</a></p>
+	</header>
+
+	<section class="gallery" aria-label="Examples">
+		<a class="card" href="fourier-series/">
+			<img src="media/fourier-series-thumb.webp" alt="Fourier series study page: a square wave built from three sines, with a terms slider">
+			<h2>Fourier series</h2>
+			<p>Study page. Drag the terms slider to build a square wave, try each question before opening its answer, and find your own answers still there after a reload.</p>
+		</a>
+		<a class="card" href="dijkstra/">
+			<img src="media/dijkstra-thumb.webp" alt="Dijkstra step-through: a weighted graph, the priority queue and the distance table">
+			<h2>Dijkstra's algorithm</h2>
+			<p>Step-through. Four maps and any start node, with the queue and distance table at each step, and what one negative edge breaks.</p>
+		</a>
+		<a class="card" href="electricity-mix/">
+			<img src="media/electricity-mix-thumb.webp" alt="Electricity mix explorer: world generation by source from 2000 to 2024">
+			<h2>World electricity mix</h2>
+			<p>Data explorer. 223 places from Our World in Data: compare sources over any period, rank who left coal fastest, and click a bar to open that country.</p>
+		</a>
+		<a class="card" href="password-hashing/">
+			<img src="media/password-hashing-thumb.webp" alt="Password hashing decision page: deployment presets, memory sliders and the OWASP setting that fits">
+			<h2>Choosing a password hash</h2>
+			<p>Decision page. Set memory, concurrent logins and FIPS needs, and see which OWASP setting fits, or that none does.</p>
+		</a>
+	</section>
+</main>
+</body>
+</html>
