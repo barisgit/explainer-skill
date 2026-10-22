@@ -16,7 +16,7 @@ skills/explainer/      the installable skill, copied as-is by installers: no dot
   src/                 main.ts (dispatch, help), commands.ts (one spec per command), pack.ts, check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
   kit/                 what pages reference as kit:<file>: theme.css, charts.js, plot.js, steps.js, link.js, views.js, reply.js, echarts.js (generated), fonts/, licenses/
   vendor/mermaid.min.js  generated; used by pack to pre-render diagrams, never inlined
-build/                 vendor.ts regenerates kit/echarts.js, vendor/mermaid.min.js and the licence texts from the pinned devDependencies
+build/                 vendor.ts regenerates kit/echarts.js, vendor/mermaid.min.js and the licence texts from the pinned devDependencies; verify-install.ts is the release check for the installers
 test/                  contract tests, outside the skill so installs do not ship them
 ```
 
@@ -32,6 +32,7 @@ Root files: `package.json` (devDependencies only), `bun.lock`, `tsconfig.json`, 
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
 | `bun run test` | Contract tests (Chrome needed, about 4 s) |
 | `bun run ci` | typecheck, lint, test: the gate; the same command runs in GitHub Actions |
+| `bun run verify:install` | Release check, not in `ci` (needs network and Chrome): installs from a clone of HEAD with `npx skills` and Caplet into a temp HOME, then runs `kit`, `pack`, `check` from each copy |
 | `bun run vendor` | Regenerates ECharts bundle, Mermaid bundle and licence texts (dev only) |
 | `bun skills/explainer/cli.ts kit \| pack \| check` | The skill's CLI; `--help` on any command |
 
@@ -60,6 +61,16 @@ Excluded by path: `kit/echarts.js`, `vendor/mermaid.min.js` (generated), HTML an
 
 TypeScript uses `erasableSyntaxOnly`: no parameter properties, enums or namespaces, so node can strip types in `cli.ts`.
 
+## Installing
+
+Verified with `npx skills` 1.7.4 and Caplet 0.2.0: both copy all 26 files byte for byte (npx skills symlinks the other agents to one canonical copy when several are chosen), and `kit`, `pack` and `check` run from the installed copy with no install step. `bun run verify:install` repeats this from a clone of HEAD (uncommitted changes are not tested); run it before a release and whenever `skills/explainer/` changes shape (new top-level file, dotfile, `package.json`).
+
+Trying an installer by hand: always give it a disposable HOME (installers write to `~/.agents`, `~/.claude` and, for npx skills, `~/.agents/.skill-lock.json`), with `DISABLE_TELEMETRY=1` and `CLAUDE_CONFIG_DIR` unset. Caplet quirks that matter:
+
+- A project-scope Caplet command with no `.agents/` in the project walks up the directory tree. A sandbox below the real home therefore finds the real `~/.agents` and writes to it. Run `caplet init` in the project first (`verify-install.ts` does).
+- `caplet add` does not detect that another capability already emits a skill of the same name. Both write into one directory, the files mix, and `caplet check` stays stale. Retire the other source first.
+- A local-path source is snapshotted: after changing the checkout run `caplet update explainer`, not `caplet apply`.
+
 ## Changing the kit
 
 Kit files are behaviour, not just code. After a change: `pack` then `check` `skills/explainer/example.html` and a few real pages (light and dark, 1440 and 390 wide are covered by `check`), open the screenshots, and compare with the previous output. Pages reference local files relative to themselves, so pack them from where they are with `-o` elsewhere.
@@ -71,4 +82,3 @@ Conventional Commits (`feat(kit):`, `fix(check):`, `chore:`, `test:`, `docs:`), 
 ## Open questions
 
 - Licence for this project: not chosen. Until it is, do not add a LICENSE file or licence metadata.
-- Install instructions (Caplet and the other installer): written by a later change; see the placeholder in the README.
