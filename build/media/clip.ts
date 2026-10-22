@@ -3,8 +3,8 @@ import { join } from "node:path";
 import type { Cdp } from "../../skills/explainer/src/chrome.ts";
 import { settle } from "../../skills/explainer/src/chrome.ts";
 import { boxOf, resolveRegion, SCALE, screenshot, scrollToTop } from "./page.ts";
-import type { Action, Clip, Rect, Target } from "./types.ts";
-import { DEFAULT_TRAVEL } from "./types.ts";
+import type { Action, Clip, Frame, Rect, Target } from "./types.ts";
+import { DEFAULT_HOLD, DEFAULT_TRAVEL } from "./types.ts";
 
 /** How long the mouse button stays down in a click, long enough to show in at least one frame. */
 const PRESS_MS = 140;
@@ -30,12 +30,6 @@ interface Point {
 
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-/** What the recording keeps of each frame: its file and when it was captured, in ms since the first. */
-export interface Frame {
-	file: string;
-	at: number;
-}
 
 /**
  * Plays actions against the page in real time and captures the region as fast as the pace allows. The cursor and the slider
@@ -198,7 +192,7 @@ async function perform(cdp: Cdp, rec: Recorder, action: Action) {
 		case "click":
 			await rec.travel(await centreOf(cdp, action.target), travel);
 			await rec.click();
-			await rec.hold(action.hold ?? 600);
+			await rec.hold(action.hold ?? DEFAULT_HOLD);
 			return;
 		case "drag": {
 			const [first = 0, ...rest] = action.values;
@@ -208,7 +202,7 @@ async function perform(cdp: Cdp, rec: Recorder, action: Action) {
 				await rec.travel(await thumbAt(cdp, action.selector, value), action.ms);
 			}
 			await rec.release();
-			await rec.hold(action.hold ?? 600);
+			await rec.hold(action.hold ?? DEFAULT_HOLD);
 			return;
 		}
 	}

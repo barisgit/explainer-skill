@@ -15,7 +15,8 @@ export interface Rect extends Size {
 
 /**
  * One interaction in a clip. Times are milliseconds of page time; the cursor takes `travel` to reach the control
- * (default {@link DEFAULT_TRAVEL}) and recording goes on for `hold` after the action so the reaction is visible.
+ * (default {@link DEFAULT_TRAVEL}) and recording goes on for `hold` (default {@link DEFAULT_HOLD}) after the action so
+ * the reaction is visible.
  */
 export type Action =
 	| { do: "wait"; ms: number }
@@ -27,6 +28,13 @@ export type Action =
 export type Target = string | { bar: { chart: string; index: number } };
 
 export const DEFAULT_TRAVEL = 600;
+export const DEFAULT_HOLD = 600;
+
+/** What a recording keeps of each frame: its file and when it was captured, in ms since the first. */
+export interface Frame {
+	file: string;
+	at: number;
+}
 
 /** The recorded area: an element's box grown by `pad` and cut to `height` when given (measured once, after `scrollTo`), or a fixed rectangle. */
 export type Region = { selector: string; pad?: number; height?: number } | Rect;

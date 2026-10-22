@@ -16,12 +16,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { record } from "./media/clip.ts";
-import { encodeClip, encodeStill, encodeThumb, sizeOf } from "./media/encode.ts";
+import { encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
 import { CROP, renderHero, tileTheme } from "./media/hero.ts";
 import { open, screenshot } from "./media/page.ts";
 import type { Example, Size } from "./media/types.ts";
 
-const STILL_VIEWPORT: Size = { width: 1440, height: 900 };
+const VIEWPORT: Size = { width: 1440, height: 900 };
 /** Gallery thumbnail width in image pixels: a two-column card at the gallery's 1056 px column, at 2x. */
 const THUMB_WIDTH = 1040;
 /** A clip over this many bytes fails the run: GitHub is slow to show anything larger and the repository grows with each version. */
@@ -30,7 +30,7 @@ const CLIP_LIMIT = 2_000_000;
 /** What most clips share; an entry in `clips` may override any of it. */
 const CLIP = {
 	theme: "light",
-	viewport: STILL_VIEWPORT,
+	viewport: VIEWPORT,
 	width: 1200,
 	fps: 12,
 	quality: 75,
@@ -121,11 +121,11 @@ const EXAMPLES: Example[] = [
 const ROOT = resolve(import.meta.dir, "..");
 const OUT = join(ROOT, "examples/media");
 
-/** Output files with their sizes, in the order written. */
-const written: Array<{ file: string; bytes: number }> = [];
+/** Output files with their sizes, in the order written; `clip` marks the ones held to `CLIP_LIMIT`. */
+const written: Array<{ file: string; bytes: number; clip: boolean }> = [];
 
-function note(file: string) {
-	written.push({ file: file.replace(`${ROOT}/`, ""), bytes: sizeOf(file) });
+function note(file: string, clip = false) {
+	written.push({ file: file.replace(`${ROOT}/`, ""), bytes: sizeOf(file), clip });
 }
 
 const pageUrl = (example: Example) =>
@@ -138,10 +138,9 @@ const pageUrl = (example: Example) =>
 async function stills(examples: Example[], work: string): Promise<string[]> {
 	const pngs: string[] = [];
 	await withPage(async (cdp) => {
-		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
 		for (const example of examples) {
 			const png = join(work, `${example.name}.png`);
-			await open(cdp, pageUrl(example), STILL_VIEWPORT, tileTheme(EXAMPLES.indexOf(example)), true);
+			await open(cdp, pageUrl(example), VIEWPORT, tileTheme(EXAMPLES.indexOf(example)), true);
 			await screenshot(cdp, png);
 			const thumb = join(OUT, `${example.name}-thumb.webp`);
 			await encodeThumb(png, CROP, THUMB_WIDTH, thumb);
@@ -152,18 +151,26 @@ async function stills(examples: Example[], work: string): Promise<string[]> {
 	return pngs;
 }
 
+/** Writes the hero collage of the `tiles` PNGs. */
+async function hero(tiles: string[], work: string) {
+	const png = join(work, "hero.png");
+	const out = join(OUT, "hero.webp");
+	await withPage((cdp) => renderHero(cdp, tiles, VIEWPORT, work, png));
+	await encodeHero(png, out);
+	note(out);
+}
+
 /** Records and encodes every clip of `example`, each in a Chrome of its own because its page time is paused. */
 async function clips(example: Example, work: string) {
 	for (const clip of example.clips) {
 		const dir = join(work, `${example.name}-${clip.name}`);
 		const frames = await withPage(async (cdp) => {
-			await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
 			await open(cdp, pageUrl(example) + (clip.hash ?? ""), clip.viewport, clip.theme, false);
 			return await record(cdp, clip, dir);
 		});
 		const out = join(OUT, `${example.name}-${clip.name}.webp`);
 		await encodeClip(frames, 1000 / clip.fps, clip.quality, out);
-		note(out);
+		note(out, true);
 		console.log(`${clip.name}: ${frames.length} frames`);
 	}
 }
@@ -185,12 +192,7 @@ async function main(args: string[]) {
 			await clips(example, work);
 		}
 		if (examples.length === EXAMPLES.length) {
-			await withPage(async (cdp) => {
-				await cdp.send("Page.enable");
-				const hero = join(work, "hero.png");
-				await renderHero(cdp, tiles, STILL_VIEWPORT, work, hero);
-				note(await encodeStill(hero, join(OUT, "hero")));
-			});
+			await hero(tiles, work);
 		}
 	} finally {
 		if (keep) {
@@ -202,9 +204,7 @@ async function main(args: string[]) {
 	for (const { file, bytes } of written) {
 		console.log(`${(bytes / 1024).toFixed(0).padStart(6)} KB  ${file}`);
 	}
-	const heavy = written.filter(
-		({ file, bytes }) => file.includes("-") && file.endsWith(".webp") && bytes > CLIP_LIMIT,
-	);
+	const heavy = written.filter(({ clip, bytes }) => clip && bytes > CLIP_LIMIT);
 	if (heavy.length) {
 		throw new Error(`over ${CLIP_LIMIT} bytes: ${heavy.map((h) => h.file).join(", ")}`);
 	}

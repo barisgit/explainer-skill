@@ -1,7 +1,6 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Cdp } from "../../skills/explainer/src/chrome.ts";
-import { settle } from "../../skills/explainer/src/chrome.ts";
+import { type Cdp, settle } from "../../skills/explainer/src/chrome.ts";
 import { SCALE, screenshot } from "./page.ts";
 import type { Rect, Size, Theme } from "./types.ts";
 
@@ -53,11 +52,11 @@ export async function renderHero(
 	work: string,
 	out: string,
 ) {
+	await cdp.send("Page.enable");
 	const rows = Math.ceil(tiles.length / COLUMNS);
 	const tileWidth = (HERO_WIDTH - 2 * MARGIN - (COLUMNS - 1) * GAP) / COLUMNS;
 	const tileHeight = (tileWidth * CROP.height) / CROP.width;
 	const height = Math.ceil(2 * MARGIN + rows * tileHeight + (rows - 1) * GAP);
-	mkdirSync(work, { recursive: true });
 	const page = join(work, "hero.html");
 	writeFileSync(page, layout(tiles, still));
 	await cdp.send("Emulation.setDeviceMetricsOverride", {
