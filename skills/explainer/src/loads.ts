@@ -143,7 +143,15 @@ async function collect(html: string): Promise<Collected> {
 	let blocks = 0;
 	let block = 0;
 	const origin = (label: string): Origin => (block ? { label, block } : { label });
-	let sheet: string[] = [];
+	// The style element being read; it is read at its end tag, or at the end of the page when it has none (the browser then
+	// reads the rest of the page as its CSS).
+	let sheet: { text: string[]; where: Origin; inSvg: boolean } | undefined;
+	const readSheet = () => {
+		if (sheet) {
+			found.css(sheet.where, sheet.text.join(""), (text) => text, sheet.inSvg);
+			sheet = undefined;
+		}
+	};
 	await new HTMLRewriter()
 		.on("div.mermaid", {
 			element(el) {
@@ -173,15 +181,14 @@ async function collect(html: string): Promise<Collected> {
 		.on("style", {
 			element(el) {
 				// In SVG (foreign content) a style element's text is parsed like any text, so its entities are decoded.
-				const inSvg = svgDepth > 0;
-				const where = origin("<style>");
-				sheet = [];
-				el.onEndTag(() => found.css(where, sheet.join(""), (text) => text, inSvg));
+				sheet = { text: [], where: origin("<style>"), inSvg: svgDepth > 0 };
+				el.onEndTag(readSheet);
 			},
 			text(chunk) {
-				sheet.push(chunk.text);
+				sheet?.text.push(chunk.text);
 			},
 		})
+		.onDocument({ end: readSheet })
 		.transform(new Response(html))
 		.text();
 	return found;

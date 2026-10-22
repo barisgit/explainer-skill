@@ -139,6 +139,20 @@ test.each([
 	expect(result.stderr).toContain(message);
 });
 
+test("a style element left open at the end of the page is still read for what it loads", async () => {
+	const input = dir.write(
+		"open-style.html",
+		"<!doctype html><html><body><p>hi</p><style>body{background:\\75 rl(https://example.invalid/bg.png)}",
+	);
+	const output = dir.path("open-style.out.html");
+
+	const result = await runCli(["pack", input, "-o", output]);
+
+	expect(result.code).toBe(1);
+	expect(result.stderr).toContain("remote url(https://example.invalid/bg.png) in <style>");
+	expect(await Bun.file(output).exists()).toBe(false);
+});
+
 describe("pack rejects network dependencies", () => {
 	const remote = {
 		script: [
