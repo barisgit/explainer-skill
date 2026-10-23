@@ -38,7 +38,7 @@ An agent writes a page as MDX (Markdown prose plus components) with local data f
 - `Tree` takes the records and an optional `row` mapping (static, so a function is fine) and recurses; it pads every row to the tree's column count and fails the pack on a row that is both a link and a fold, or opens to nothing.
 - `Question` ids are `name-value`, stable across packs, for reply.js keeping. A bare `data-*` attribute on an HTML element in MDX (`<fieldset data-reply>`) compiles to an empty value, as in HTML; JSX would write "true", which reply.js would take as the label.
 - Short rail labels: a section heading written `<h2 data-nav="Price">The price is 40 €</h2>` starts a section like `##`, and its `data-nav` moves to the `<section>`. An explicit `<section data-nav>` wrapper keeps working.
-- GFM tables become `table.compare`: the first body cell of each row is `<th scope="row">`, every other cell gets its column header as `data-label`, and a Markdown alignment is kept as an inline `text-align`. No `.scroll` wrapper: v0.8 uses it only for `compare table`, which an author writes as HTML.
+- GFM tables become `table.compare`: the first body cell of each row is `<th scope="row">`, every other cell gets its column header as `data-label`, and Markdown column alignment is dropped (cells align to the start as in v0.8; an aligned cell broke the phone layout's label/value lines). No `.scroll` wrapper: v0.8 uses it only for `compare table`, which an author writes as HTML.
 
 ## As built (interactive components lane)
 

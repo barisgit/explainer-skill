@@ -80,7 +80,7 @@ Two phases, three people, one decision left.
 See [the method](#about).
 
 | Option | What it means | Cost |
-|---|---|---|
+|---|---|---:|
 | A. Ship now | Spike boards go out as they are. | Rework later. |
 | B. One more spin | A second board revision first. | Two weeks. |
 

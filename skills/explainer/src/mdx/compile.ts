@@ -144,8 +144,8 @@ function labelRow(row: Element, labels: string[]) {
 /**
  * Markdown tables become the kit's `table.compare`, as a v0.8 page writes one: each body row's first cell is its header
  * (`<th scope="row">`), and every other cell carries its column's header as `data-label`, which the phone layout shows beside
- * the value. A column aligned in Markdown (`---:`) keeps its alignment, as an inline style the theme's `text-align` does not
- * override.
+ * the value. Markdown column alignment (`---:`) is dropped: cells align to the start as in v0.8, and on phones an aligned cell
+ * would push its label away from the value.
  */
 function compareTables(tree: HastRoot) {
 	for (const table of elementsOf(tree)) {
@@ -159,10 +159,9 @@ function compareTables(tree: HastRoot) {
 			labelRow(row, labels);
 		}
 		for (const cell of elementsOf(table)) {
-			const { align, ...properties } = cell.properties;
-			if (typeof align === "string") {
-				cell.properties = { ...properties, style: `text-align: ${align}` };
-			}
+			cell.properties = Object.fromEntries(
+				Object.entries(cell.properties).filter(([key]) => key !== "align"),
+			);
 		}
 	}
 }
