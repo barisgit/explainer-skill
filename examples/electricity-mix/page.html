@@ -333,7 +333,7 @@ function showChange() {
 	else notes.push(`Generated less: ${list(less)}. Smaller share: ${list(smaller)}.`);
 	if (unknown.length && t0 && t1) notes.push(`No value for ${list(unknown.map((r) => r.src.name.toLowerCase()))} in ${gap.join(" or ")}, so ${unknown.length > 1 ? "their changes are" : "its change is"} not shown.`);
 	if (gap.length) notes.push(`In ${gap.join(" and ")} the release does not split all generation by source; the rest is "Not itemised".`);
-	$("c-note").innerHTML = `${notes.join(" ")} <a href="#place/${place.slug}">Open ${place.name} in full</a>`;
+	$("c-note").innerHTML = `${notes.join(" ")} Every year for <a href="#place/${place.slug}">${place.name}</a>`;
 	// Headline: only sources with a known change compete; zero is not growth.
 	const grew = top && top[key] > eps ? `${top.src.name.toLowerCase()} grew most (${fmt(top[key])}${suffix})` : "no source grew";
 	const fell = bottom && bottom[key] < -eps ? `${bottom.src.name.toLowerCase()} fell most (${fmt(bottom[key])}${suffix})` : "none fell";
