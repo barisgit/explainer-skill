@@ -29,7 +29,7 @@ Several agents share one copy in `~/.agents/skills/explainer` and the others get
 caplet add github:barisgit/explainer-skill --pin main --scope user
 ```
 
-Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.1.0` instead to hold a version.
+Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.7.1` instead to hold a version.
 
 Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
@@ -94,7 +94,7 @@ A diagram whose parts light up from the text, for illustration:
   <img alt="Dijkstra page: stepping the algorithm on a street grid updates the graph, the queue and the distance table" src="examples/media/dijkstra-steps-light.webp">
 </picture>
 
-**Drill-down views.** A hash router inside the one file: a bar, row or link opens its own view, and Back returns with the scroll position kept.
+**Drill-down views.** A hash router inside the one file: a bar, row or link opens its own view, and Back returns with the scroll position kept. The page's links give each view breadcrumbs and previous and next, pages with views inside views a contents rail, and a section with several folds Expand all.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/electricity-mix-coal-ranking-dark.webp">
@@ -108,7 +108,7 @@ A diagram whose parts light up from the text, for illustration:
   <img alt="Password hashing page: deployment presets change the recommended OWASP setting, down to nothing fits" src="examples/media/password-hashing-presets-light.webp">
 </picture>
 
-Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time (flowchart, state, sequence, class, ER and xychart), linked highlighting between prose, table rows and diagram parts, and a stylesheet that follows the system's light or dark setting.
+Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time (flowchart, state, sequence, class, ER and xychart), linked highlighting between prose, table rows and diagram parts, a stylesheet that follows the system's light or dark setting, and the kit's own buttons and messages in the page's language through `kitLabels`.
 
 [`skills/explainer/example.html`](skills/explainer/example.html) is one short page that uses each feature where it helps its subject.
 
