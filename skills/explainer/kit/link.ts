@@ -6,7 +6,9 @@
    Refs are page-wide: a prose data-ref lights every element with that ref on the page, across figures (two diagrams sharing a node id light together).
    One element may link several refs, space separated: data-ref="cache db". In a diagram that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
-   fires with the refs now lit ([] when none), for dispatching a highlight to ECharts. Wired once at load: set data-ref in the markup. */
+   fires with the refs now lit ([] when none), for dispatching a highlight to ECharts. Wired once at load: set data-ref in the markup.
+   A page filter may set is-lit on its own matches (rows of a .tree, whose closed folds then show they hold one); link.js clears only
+   the marks it set. */
 (() => {
 	const refsOf = (el: Part | null) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
 	const NATIVE = "a[href], button, input, select, textarea, summary, [tabindex]";
@@ -34,16 +36,18 @@
 		for (const svg of dimmed) {
 			svg.classList.remove("has-lit");
 		}
-		lit = selector ? [...document.querySelectorAll<Part>(selector)] : [];
+		const matches = selector ? [...document.querySelectorAll<Part>(selector)] : [];
+		// Only the parts it lights are its own to clear: a page filter's is-lit marks stay when the highlight moves on.
+		lit = matches.filter((el) => !el.classList.contains("is-lit"));
 		for (const el of lit) {
 			el.classList.add("is-lit");
 		}
 		// A lone part has nothing to be linked with, so it does not dim its neighbours.
 		dimmed =
-			lit.length > 1
+			matches.length > 1
 				? [
 						...new Set(
-							lit
+							matches
 								.map((el) => (el instanceof SVGElement ? el.ownerSVGElement : null))
 								.filter((svg) => svg !== null),
 						),

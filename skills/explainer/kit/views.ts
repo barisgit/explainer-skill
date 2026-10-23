@@ -1,6 +1,7 @@
-/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail and Expand all.
+/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
-   no hash, or a hash no view claims (plain #anchors), shows the overview. A static view may claim one
+   no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
+   on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to. A static view may claim one
    param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for its
    param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
@@ -12,12 +13,26 @@
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
-   gets Expand all.
+   gets Expand all, which opens them at every level.
+   Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
+   in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
+   its numbers, which line up in columns across rows and levels (--tree-cell on the .tree sets their width, 5rem). A leaf opens to
+   its full text. Give every row the same cells in the same order, units included; an empty <span></span> keeps a column:
+     <div class="tree">
+       <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
+         <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
+         <a href="#task/1.1.2"><span>1.1.2 Power stage</span><span>24 h</span><span>Ana</span></a>
+       </details>
+     </div>
+   A link to an id inside it (<a href="#spike">Spike boards: 4 tasks, 70 h</a>) opens that branch. A row link's label names its view
+   in the navigation. With kit:link.js, data-ref on a row lights it, and a closed fold that holds a lit row is tinted too; a page
+   filter may mark its matches with class is-lit for the same effect. Trees print fully open.
    Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
    one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
    Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
    expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
    .back link names it). A key left out stays English. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const root = document.documentElement;
 	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
@@ -55,30 +70,80 @@
 		return new URL(`#${hash}`, "file:///").hash.slice(1);
 	}
 
-	/** The view claimed by the current hash: `name/param` wins over `name`; param is decoded. */
-	function route() {
-		const [name = "", ...rest] = canonical(location.hash.slice(1)).split("/");
+	/** Where the page is: the view shown (none for the overview), its name, decoded param and canonical hash ("" for the overview). */
+	interface Route {
+		name: string;
+		view: HTMLElement | undefined;
+		param: string;
+		hash: string;
+	}
+	const OVERVIEW: Route = { name: "", view: undefined, param: "", hash: "" };
+	/** The route last drawn, once routing has started. */
+	let shown = OVERVIEW;
+
+	/** The view a canonical hash claims: `name/param` wins over `name`; param is decoded. */
+	function claim(hash: string): Route {
+		const [name = "", ...rest] = hash.split("/");
 		const view =
 			views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ??
 			views.find((v) => v.dataset.view === name);
-		return { name, view, param: decode(rest.join("/")) };
+		return view ? { name, view, param: decode(rest.join("/")), hash } : OVERVIEW;
+	}
+
+	/** The element a hash names by id, if any. */
+	const targetOf = (hash: string) => (hash ? document.getElementById(decode(hash)) : null);
+
+	/**
+	 * The route for the current hash: the view it claims; else, for a plain #anchor, the open view when the anchor's element is in
+	 * it, or the view this history entry was showing when the reader left it (Back, Forward and reload onto an anchor followed in a
+	 * view; the navigation keeps it in the entry's Navigation API state); else the overview.
+	 */
+	function route(): Route {
+		const hash = canonical(location.hash.slice(1));
+		const claimed = claim(hash);
+		if (claimed.view) {
+			return claimed;
+		}
+		if (shown.view?.contains(targetOf(hash))) {
+			return shown;
+		}
+		const saved = nav.savedHash();
+		return saved ? claim(saved) : OVERVIEW;
+	}
+
+	/** Opens every <details> that holds `target`, and `target` itself when it is one, so following a link to it shows it. */
+	function reveal(target: Element) {
+		for (let d = target.closest("details"); d; d = d.parentElement?.closest("details") ?? null) {
+			d.open = true;
+		}
+	}
+
+	/** The element the current hash names, when it is in the part of the page `at` shows: its view, or outside every view. */
+	function shownTarget(at: Route) {
+		const target = targetOf(canonical(location.hash.slice(1)));
+		const inView = target?.closest("[data-view]");
+		return target && (at.view ? at.view.contains(target) : !inView) ? target : null;
 	}
 
 	/**
 	 * Runs the view's handler, then the navigation, which reads the labels and folds the handler drew. A handler registered late
-	 * redraws the current view through here too, without the scroll and focus of a route change.
+	 * redraws the current view through here too, without the scroll and focus of a route change. `again`: the view is already
+	 * drawn for this hash (an anchor inside it was followed), so the handler does not run and the reader's folds and inputs stay.
 	 */
-	function draw(name: string, view: HTMLElement | undefined, param: string) {
-		if (view) {
-			handlers[name]?.(view, param);
+	function draw(at: Route, again = false) {
+		if (at.view && !again) {
+			handlers[at.name]?.(at.view, at.param);
 		}
-		nav.show(view ?? null, location.hash.slice(1));
+		shown = at;
+		nav.show(at.view ?? null, at.hash);
 		refreshFolds();
 	}
 
-	/** Shows the view for the hash, or the overview. Handlers run only once routing has started. */
+	/** Shows the view for the hash, or the overview, and the element a plain #anchor names. Handlers run once routing has started. */
 	function show() {
-		const { name, view, param } = route();
+		const at = route();
+		const { view } = at;
+		const again = started && at === shown && Boolean(view);
 		const wasInView = root.classList.contains("in-view");
 		if (view && !wasInView) {
 			overviewY = scrollY;
@@ -87,16 +152,32 @@
 			v.classList.toggle("active", v === view);
 		}
 		root.classList.toggle("in-view", Boolean(view));
-		if (started) {
-			draw(name, view, param);
+		if (!started) {
+			return;
 		}
-		if (!view) {
-			return wasInView ? scrollTo(0, overviewY) : undefined;
+		draw(at, again);
+		land(at, wasInView, again);
+	}
+
+	/**
+	 * Scrolls for a route just drawn: to the element a plain #anchor names, else back to where the reader left the overview, else to
+	 * the top of a newly opened view, whose heading takes focus.
+	 */
+	function land(at: Route, wasInView: boolean, again: boolean) {
+		const target = shownTarget(at);
+		if (target) {
+			reveal(target);
+			target.scrollIntoView();
+		} else if (!at.view) {
+			if (wasInView) {
+				scrollTo(0, overviewY);
+			}
+		} else if (!again) {
+			scrollTo(0, 0);
+			const heading = at.view.querySelector<HTMLElement>("h1, h2");
+			heading?.setAttribute("tabindex", "-1");
+			heading?.focus({ preventScroll: true });
 		}
-		scrollTo(0, 0);
-		const heading = view.querySelector<HTMLElement>("h1, h2");
-		heading?.setAttribute("tabindex", "-1");
-		heading?.focus({ preventScroll: true });
 	}
 
 	window.Views = {
@@ -105,14 +186,24 @@
 			if (!started) {
 				return;
 			}
-			const { name: current, view, param } = route();
-			if (view && current === name) {
-				draw(name, view, param);
+			const at = route();
+			if (at.view && at.name === name) {
+				draw(at);
 			}
 		},
 	};
 	root.classList.add("js-views");
 	addEventListener("hashchange", show);
+	// A link to the current hash fires no hashchange, so the folds its element is in (closed again since) open here; the browser
+	// then scrolls to it as it does for any link to the current hash.
+	document.addEventListener("click", (e) => {
+		const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+		const hash = canonical((link?.getAttribute("href") ?? "").slice(1));
+		const target = hash === canonical(location.hash.slice(1)) && shownTarget(shown);
+		if (target) {
+			reveal(target);
+		}
+	});
 	show(); // layout only: the right view is visible before the first paint
 	const start = () => {
 		started = true;
