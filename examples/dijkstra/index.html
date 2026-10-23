@@ -2021,7 +2021,7 @@ window.ViewsFolds = () => {
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
-window.ViewsNav = ({ views, decode }) => {
+window.ViewsNav = ({ views, decode, canonical }) => {
   const STATE_KEY = "viewTrail";
   const RAIL_LIST_MAX = 12;
   const KIT_NAV = ".trail, .toc";
@@ -2051,7 +2051,6 @@ window.ViewsNav = ({ views, decode }) => {
     const selector = `a[href^=${JSON.stringify(`#${name}/`)}]`;
     return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(KIT_NAV));
   }
-  const canonical = (hash) => new URL(`#${hash}`, "file:///").hash.slice(1);
   const hashOf = (a) => canonical((a.getAttribute("href") ?? "").slice(1));
   const unique = (hashes) => [...new Set(hashes)];
   const viewDrawnFor = (hash) => [...drawn].find(([, h]) => h === hash)?.[0];
@@ -2297,7 +2296,7 @@ window.ViewsNav = ({ views, decode }) => {
   const handlers = {};
   let started = false;
   let overviewY = 0;
-  const nav = window.ViewsNav({ views, decode });
+  const nav = window.ViewsNav({ views, decode, canonical });
   const refreshFolds = window.ViewsFolds();
   function decode(text) {
     try {
@@ -2306,9 +2305,12 @@ window.ViewsNav = ({ views, decode }) => {
       return text;
     }
   }
+  function canonical(hash) {
+    return new URL(`#${hash}`, "file:///").hash.slice(1);
+  }
   function route() {
-    const [name = "", ...rest] = location.hash.slice(1).split("/");
-    const view = views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
+    const [name = "", ...rest] = canonical(location.hash.slice(1)).split("/");
+    const view = views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
     return { name, view, param: decode(rest.join("/")) };
   }
   function draw(name, view, param) {
