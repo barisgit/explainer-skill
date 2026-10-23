@@ -1,6 +1,7 @@
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
    views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
-   every route change, once the view's handler has drawn it.
+   every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
+   was left from.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
                its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
@@ -27,6 +28,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	type Labels = Map<string, string>;
 
 	const STATE_KEY = "viewTrail";
+	/** The location hash the trail was saved for. A fragment navigation copies the state into its new entry, where it is not yet that entry's own. */
+	const AT_KEY = "viewTrailAt";
 	const RAIL_LIST_MAX = 12;
 	/** The navigation this part builds: its links are never the page's own. */
 	const KIT_NAV = ".trail, .toc";
@@ -123,13 +126,19 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	 * the entry has none and the trail in memory is extended instead.
 	 */
 	function savedTrail(): Step[] | null {
-		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
-		const trail =
-			state && typeof state === "object" ? (state as Record<string, unknown>)[STATE_KEY] : null;
+		const trail = entryState()[STATE_KEY];
 		return Array.isArray(trail)
 			? trail.filter((s): s is Step => typeof s?.hash === "string")
 			: null;
 	}
+
+	function entryState(): Record<string, unknown> {
+		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
+		return state && typeof state === "object" ? (state as Record<string, unknown>) : {};
+	}
+
+	/** The location hash, canonical: the one the trail is saved for. */
+	const locationHash = () => canonical(location.hash.slice(1));
 
 	/** The list a new step walks: the replaced step's while moving within it, else the parent view's links when they reach it. */
 	function inheritedList(hash: string, parent: Step | undefined, replaced: Step | undefined) {
@@ -162,7 +171,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 			steps = hash ? extended(hash) : [];
 		}
 		try {
-			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps } });
+			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
 		} catch {
 			// No Navigation API, or a document whose entries it disables (a sandboxed frame): the trail stays in memory.
 		}
@@ -370,7 +379,13 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	let toc: Rail | null = null;
 	let shownHash: string | null = null;
 
+	/** Whether this history entry was shown before (Back, Forward, reload) rather than just made by following a link. */
+	const revisited = () => entryState()[AT_KEY] === locationHash();
+
 	return {
+		revisited,
+		/** The view hash this history entry showed when it was left, from the trail saved with it; null for the overview or none. */
+		savedHash: () => (revisited() ? (savedTrail()?.at(-1)?.hash ?? null) : null),
 		show(view: HTMLElement | null, routeHash: string) {
 			const hash = canonical(routeHash);
 			// Shown again with no route change in between: a handler registered late has just drawn the view.
