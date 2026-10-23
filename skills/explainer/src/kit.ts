@@ -33,6 +33,9 @@ const transpiler = new Bun.Transpiler({ loader: "ts" });
 const script = (source: string): string =>
 	`${leadingComment(source).trim()}\n${transpiler.transformSync(source)}`;
 
+/** Whether a resolved path is one of the kit's files (a part included) rather than a page's own. */
+export const isKitFile = (path: string): boolean => path.startsWith(KIT_DIR + sep);
+
 /**
  * The files a text file is made of. A kit file split by concern (a script, or theme.css) keeps its parts in `kit/parts/<name>/`;
  * they come first, in file name order, and the kit file itself last, so a page still includes one file. Any other file is itself.
@@ -54,12 +57,12 @@ export function sourceFiles(path: string): string[] {
  * Any other file, a page's own included, is read as written.
  */
 export function readKitText(path: string): string {
-	const inKit = path.startsWith(KIT_DIR + sep);
+	const inKit = isKitFile(path);
 	const text = sourceFiles(path)
 		.map((file) => {
 			const source = readFileSync(file, "utf8");
 			return inKit && file.endsWith(".ts") ? script(source) : source;
 		})
 		.join("\n");
-	return inKit && path.endsWith(".css") ? `@layer kit {\n${text}\n}` : text;
+	return inKit && path.endsWith(".css") ? `@layer kit {\n${text.trimEnd()}\n}` : text;
 }

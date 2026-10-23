@@ -15,9 +15,9 @@
  * Selectors are read lexically (comments and string contents blanked, attribute selectors and functional pseudo-classes dropped,
  * a single-selector `:is()`/`:where()` unwrapped), which is enough to find classes; a nested page rule counts by its own selector.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
-import { kitPath, sourceFiles } from "./kit.ts";
+import { readFileSync } from "node:fs";
+import { relative } from "node:path";
+import { isKitFile, sourceFiles } from "./kit.ts";
 import { KIT_DIR } from "./paths.ts";
 
 /** A stylesheet's text and where the author finds it: `<style>`, a page's stylesheet href, or a kit file relative to kit/. */
@@ -120,8 +120,14 @@ function readKit(sheets: Sheet[]): { keys: KitKey[]; mentioned: Set<string> } {
 	return { keys, mentioned };
 }
 
-/** The page's stylesheets as written (`<style>` elements, local `<link>` files) and the kit stylesheets it links. */
-async function sheetsOf(html: string, baseDir: string): Promise<{ page: Sheet[]; kit: Sheet[] }> {
+/**
+ * The page's stylesheets as written (`<style>` elements, local `<link>` files) and the kit stylesheets it links. `localFile`
+ * resolves a stylesheet href as pack does, or returns undefined for one pack cannot read (remote or missing), which pack reports.
+ */
+async function sheetsOf(
+	html: string,
+	localFile: (href: string) => string | undefined,
+): Promise<{ page: Sheet[]; kit: Sheet[] }> {
 	const page: Sheet[] = [];
 	const kit: Sheet[] = [];
 	let style: string[] | undefined;
@@ -129,15 +135,14 @@ async function sheetsOf(html: string, baseDir: string): Promise<{ page: Sheet[];
 		.on("link[rel~=stylesheet][href]", {
 			element(el) {
 				const href = el.getAttribute("href") ?? "";
-				const local = href.startsWith("kit:") ? kitPath(href.slice(4)) : resolve(baseDir, href);
-				// A remote or missing file is pack's problem to report; here it has nothing to compare.
-				if (/^(https?:)?\/\//i.test(href) || !existsSync(local)) {
+				const path = localFile(href);
+				if (!path) {
 					return;
 				}
-				if (!href.startsWith("kit:")) {
-					return void page.push({ where: href, css: readFileSync(local, "utf8") });
+				if (!isKitFile(path)) {
+					return void page.push({ where: href, css: readFileSync(path, "utf8") });
 				}
-				for (const file of sourceFiles(local)) {
+				for (const file of sourceFiles(path)) {
 					kit.push({ where: relative(KIT_DIR, file), css: readFileSync(file, "utf8") });
 				}
 			},
@@ -159,10 +164,14 @@ async function sheetsOf(html: string, baseDir: string): Promise<{ page: Sheet[];
 
 /**
  * One warning per kit class that a page rule styles as its own (see the module comment), naming the class, the first such page
- * rule with where it is, and the kit file that styles the class. Empty when the page links no kit stylesheet.
+ * rule with where it is, and the kit file that styles the class. Empty when the page links no kit stylesheet. `localFile` is
+ * pack's resolution of a stylesheet href (see sheetsOf).
  */
-export async function classCollisions(html: string, baseDir: string): Promise<string[]> {
-	const sheets = await sheetsOf(html, baseDir);
+export async function classCollisions(
+	html: string,
+	localFile: (href: string) => string | undefined,
+): Promise<string[]> {
+	const sheets = await sheetsOf(html, localFile);
 	const { keys, mentioned } = readKit(sheets.kit);
 	const found = new Map<string, string>();
 	for (const { where, css } of sheets.page) {

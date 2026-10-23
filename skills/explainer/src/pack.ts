@@ -26,11 +26,13 @@ export class PackError extends Error {}
 const isRemote = (ref: string) => /^(https?:)?\/\//i.test(ref);
 const isInline = (ref: string) => /^(data:|#|about:|javascript:)/i.test(ref);
 
-/** Resolves a reference to a file: `kit:name` points into the CLI's kit/, anything else is relative to `baseDir`. */
+/** The path a local reference names: `kit:name` points into the CLI's kit/, anything else is relative to `baseDir`. */
+const refPath = (ref: string, baseDir: string): string =>
+	ref.startsWith("kit:") ? kitPath(ref.slice(4)) : resolve(baseDir, ref.split(/[?#]/)[0] ?? ref);
+
+/** Resolves a local reference to an existing file, or throws a PackError naming it. */
 function locate(ref: string, baseDir: string): string {
-	const path = ref.startsWith("kit:")
-		? kitPath(ref.slice(4))
-		: resolve(baseDir, ref.split(/[?#]/)[0] ?? ref);
+	const path = refPath(ref, baseDir);
 	if (!existsSync(path)) {
 		const hint = ref.startsWith("kit:") ? ` (kit has: ${kitFiles().join(", ")})` : "";
 		throw new PackError(`missing file: ${ref}${hint}`);
@@ -318,7 +320,10 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 		...loneRefs(original, diagramRefs).map(
 			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
 		),
-		...(await classCollisions(original, baseDir)),
+		...(await classCollisions(original, (href) => {
+			const path = isRemote(href) ? "" : refPath(href, baseDir);
+			return path && existsSync(path) ? path : undefined;
+		})),
 	];
 	return { html, warnings };
 }
