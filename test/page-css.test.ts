@@ -43,13 +43,14 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 		expect(warnings[0]).toContain("parts/theme/08-tree.css");
 	});
 
-	test("not for a page that uses kit classes in markup and styles only its own classes, variants and children of kit ones", async () => {
+	test("not for a page that uses kit classes in markup and styles only its own classes, variants, parts and children of kit ones", async () => {
 		const input = dir.write(
 			"no-collide.html",
 			`<!doctype html><html><head>${KIT}<style>
 .mine { color: red; } .chart.tall-mine { block-size: 30rem; } .compare th.num { text-align: end; } .stat dd { color: blue; }
 .relax .bad { color: red; } .dg-own .node circle { fill: red; } :root { --accent: #123456; }
-</style></head><body><main class="page"><div class="fig panel"><div class="chart tall-mine"></div></div>
+.tree { summary { color: red; } } .chart { &.tall-mine { color: red; } } .tree::before { content: ""; } .tree\\:wide { color: red; }
+</style><template><style>.tree { color: red; }</style></template></head><body><main class="page"><div class="fig panel"><div class="chart tall-mine"></div></div>
 <div class="tree"><details><summary><span>a</span><span>1</span></summary></details></div></main></body></html>`,
 		);
 
