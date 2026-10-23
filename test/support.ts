@@ -103,10 +103,7 @@ const WIDTHS = [
 ];
 
 /**
- * Packs `page` and opens it in headless Chrome at each width `check` uses, with reduced motion and the CPU slowed `slowdown` times
- * (1 runs at full speed), as the screen or, with `media` "print", as it prints. The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
- * the page takes: a page that never settles fails on the test's timeout, never by passing early. Returns those failures and every
- * uncaught page error, prefixed with the width; an empty list is a pass.
+ * Packs `page` as `<name>.html` and runs the packed file with `runPacked`; the pack must succeed without a message on stderr.
  */
 export async function packAndRun(
 	dir: ReturnType<typeof scratch>,
@@ -119,6 +116,21 @@ export async function packAndRun(
 	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
 	expect(packed.stderr).toBe("");
 	expect(packed.code).toBe(0);
+	return runPacked(output, slowdown, media);
+}
+
+/**
+ * Opens a packed page in headless Chrome at each width `check` uses, with reduced motion and the CPU slowed `slowdown` times
+ * (1 runs at full speed), as the screen or, with `media` "print", as it prints. The page's global `contract` is a promise of the
+ * failures it found, and the run waits for it, however long the page takes: a page that never settles fails on the test's
+ * timeout, never by passing early. Returns those failures and every uncaught page error, prefixed with the width; an empty list
+ * is a pass.
+ */
+export function runPacked(
+	output: string,
+	slowdown = 1,
+	media: "screen" | "print" = "screen",
+): Promise<string[]> {
 	return withPage(async (cdp) => {
 		const failures: string[] = [];
 		let width = 0;
