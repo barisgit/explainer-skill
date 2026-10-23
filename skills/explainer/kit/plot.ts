@@ -1,5 +1,5 @@
 /* plot: small line, stem and bar plots as SVG in the page theme, no ECharts. For zoom, drill-down, heatmaps or sankey use charts.js. Needs kit:theme.css.
-   Plot.make(el, option) -> { set(patch) }
+   Plot.make(el, option) -> { set(patch), dispose() }
      el      element with a height (.chart); Plot fills it with a legend and an SVG drawn at its pixel size and redrawn on resize,
              so text stays 13 px from phone to desktop. Colours are CSS tokens: light and dark switch with no redraw.
      option  { series, categories, horizontal, stack, x, y, legend }
@@ -16,6 +16,7 @@
               Range and step are automatic and round; format(v) => text writes the tick labels and values (decimal comma, units).
        legend false hides the legend (by default it shows when two or more series have a name)
      set(patch)  shallow-merges the patch into the option (x and y one level deeper) and redraws at once; series is replaced whole.
+     dispose()   stops redrawing on resize, for code that takes the element away
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A bar label sits past the bar's end, or inside the end when the panel has no room past it. A label on a stacked segment is left out
    when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
@@ -533,9 +534,16 @@
 		const resizer = new ResizeObserver(draw);
 		resizer.observe(area);
 		void document.fonts.load(`500 ${FONT}px ${getComputedStyle(el).fontFamily}`).then(draw, draw);
-		made.set(el, () => resizer.disconnect());
+		const dispose = () => {
+			resizer.disconnect();
+			if (made.get(el) === dispose) {
+				made.delete(el);
+			}
+		};
+		made.set(el, dispose);
 		draw();
 		return {
+			dispose,
 			set(patch: PlotOption) {
 				option = {
 					...option,

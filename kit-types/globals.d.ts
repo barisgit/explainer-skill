@@ -15,6 +15,8 @@ interface ChartHandle {
 	/** The live instance, null until the element has a width. */
 	readonly chart: ECharts | null;
 	set(patch: ChartOption, replace?: string[]): void;
+	/** Removes the chart and stops watching its element. */
+	dispose(): void;
 }
 
 type ViewHandler = (view: HTMLElement, param: string) => void;
@@ -115,7 +117,9 @@ declare var Charts: {
 	make(el: HTMLElement, option: ChartOption, setup?: (chart: ECharts) => void): ChartHandle;
 	color(token: string): string;
 };
-declare var Plot: { make(el: HTMLElement, option: PlotOption): { set(patch: PlotOption): void } };
+declare var Plot: {
+	make(el: HTMLElement, option: PlotOption): { set(patch: PlotOption): void; dispose(): void };
+};
 declare var Steps: { refresh(el: Element, step?: number): void };
 declare var Views: { on(name: string, fn: ViewHandler): void };
 declare var ReplyKeep: (options: ReplyKeepOptions) => ReplyKeepApi;
