@@ -13,8 +13,8 @@
    type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
    Expand all joins its end. Layout only: the page owns their state, and kit:reply.js keeps inputs with ids across reloads).
    Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour
-   before its word. A <p class="legend"> of them over the records keys each category once; rows repeat the marker, with its word,
-   or where rows are too dense for it the square alone: <span class="chip" role="img" aria-label="Firmware"><i></i></span>.
+   before its word. A <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word
+   or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
    hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
