@@ -23,7 +23,8 @@ Views.on("p", (el, p) => {
 	el.querySelector(".mine").innerHTML = p === "a" ? '<a href="#i/4">Four</a> <a href="#i/2">Two</a>' : "";
 });
 Views.on("i", (el, p) => { el.querySelector("h1").textContent = "Item " + p; });
-sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
+// The navigation type, not a load count: check opens the page fresh at each width, and the reload contracts run at both.
+const reloaded = () => performance.getEntriesByType("navigation")[0]?.type === "reload";
 const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
 const view = () => document.querySelector(".view.active");
 const sibs = (rel) => view().querySelector(".sibs [rel=" + rel + "]")?.getAttribute("href") ?? "none";
@@ -37,10 +38,10 @@ const contract = (name: string, body: string) => pageAssertion("nav contract", n
 test("the trail and previous/next follow the view the reader came from, and survive a reload", async () => {
 	const script = `
 ${contract("a page with views inside views has a rail of its sections", `location.hash || (document.documentElement.classList.contains("has-toc") && texts("#toc-list > li > a") === "Home|People|Items")`)}
-${contract("after a reload the trail names each step, a generic link text giving way to the view's heading", `sessionStorage.loads !== "2" || texts(".view.active .crumbs li") === "Home|Person A|Four"`)}
+${contract("after a reload the trail names each step, a generic link text giving way to the view's heading", `!reloaded() || texts(".view.active .crumbs li") === "Home|Person A|Four"`)}
 ${contract("the view's own .back link stays, as the first crumb", `!location.hash || (view().querySelectorAll(".back").length === 1 && view().querySelector(".crumbs li:first-child > .back"))`)}
-${contract("after a reload previous/next walks the items of the person it was opened from", `sessionStorage.loads !== "2" || (sibs("prev") === "none" && sibs("next") === "#i/2" && count() === "1 / 2")`)}
-${contract("after a reload the rail lists the trail's siblings and marks the open view", `sessionStorage.loads !== "2" || (sub(2) === "Person A|b" && sub(3) === "Four|Two" && document.querySelector('.toc [aria-current="page"]')?.textContent === "Four")`)}`;
+${contract("after a reload previous/next walks the items of the person it was opened from", `!reloaded() || (sibs("prev") === "none" && sibs("next") === "#i/2" && count() === "1 / 2")`)}
+${contract("after a reload the rail lists the trail's siblings and marks the open view", `!reloaded() || (sub(2) === "Person A|b" && sub(3) === "Four|Two" && document.querySelector('.toc [aria-current="page"]')?.textContent === "Four")`)}`;
 	await packAndCheck(dir, "trail", NESTED(script), "nav contract", [
 		"--view",
 		"none",
