@@ -21,6 +21,7 @@
    captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
    have different lengths. Position: it stays on the current step (clamped to the new count), or on the new last step if it was on the last;
    Steps.refresh(el, 1) restarts. A stepper left with fewer than 2 steps hides its controls and shows everything; they return when it grows.
+   A [data-stepper] the page adds after load starts with Steps.refresh(el).
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
    replacing content, whether or not the event fires. The opening step is announced once the page has loaded (after its scripts and
    DOMContentLoaded handlers), so a listener added while loading hears it, also with data-start; one added after load misses it.
@@ -28,7 +29,7 @@
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const PLAY_MS = 3000;
-	const steppers = new WeakMap<Element, (step?: number) => void>();
+	const steppers = new WeakMap<Element, Stepper>();
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
 
@@ -267,12 +268,17 @@
 		}
 	}
 
-	const all = [...document.querySelectorAll<HTMLElement>("[data-stepper]")].map((root) => {
+	const all: Stepper[] = [];
+	/** Wires a stepper root; refresh() then reads its content and shows the opening step. */
+	function register(root: HTMLElement) {
 		const stepper = new Stepper(root);
-		steppers.set(root, (step) => stepper.refresh(step));
-		stepper.refresh();
+		steppers.set(root, stepper);
+		all.push(stepper);
 		return stepper;
-	});
+	}
+	for (const root of document.querySelectorAll<HTMLElement>("[data-stepper]")) {
+		register(root).refresh();
+	}
 
 	/** The first announcement waits for DOMContentLoaded handlers too (the timeout runs after them), so any listener added during load hears it. */
 	function announceOpening() {
@@ -292,11 +298,13 @@
 
 	window.Steps = {
 		refresh(el, step) {
-			const refresh = steppers.get(el);
-			if (!refresh) {
+			const stepper =
+				steppers.get(el) ??
+				(el instanceof HTMLElement && el.matches("[data-stepper]") ? register(el) : undefined);
+			if (!stepper) {
 				throw new Error("Steps.refresh needs an element with data-stepper");
 			}
-			refresh(step);
+			stepper.refresh(step);
 		},
 	};
 })();
