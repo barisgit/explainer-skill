@@ -1,9 +1,9 @@
 /* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
    no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
-   on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to. A static view may claim one
-   param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for its
-   param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
+   on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to.
+   A static view may claim one param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for
+   its param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
@@ -14,12 +14,13 @@
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
    data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
-   link texts. Names in the navigation wrap and are never cut off. A section with two or more <details>
-   gets Expand all, which opens them at every level.
+   link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
+   opens them at every level.
    Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
    in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
-   its numbers, which line up in columns across rows and levels (--tree-cell on the .tree sets their width, 5rem). A leaf opens to
-   its full text. Give every row the same cells in the same order, units included; an empty <span></span> keeps a column:
+   its numbers, which line up in columns across rows and levels (--tree-cell on the .tree sets their width: 5rem, 4rem on
+   phones). A leaf opens to its full text. Give every row the same cells in the same order, units included; an empty
+   <span></span> keeps a column:
      <div class="tree">
        <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
          <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
@@ -72,7 +73,7 @@
 		return new URL(`#${hash}`, "file:///").hash.slice(1);
 	}
 
-	/** Where the page is: the view shown (none for the overview), its name, decoded param and canonical hash ("" for the overview). */
+	/** Where the page is: the view shown (none on the overview), its name, decoded param and canonical hash ("" on the overview). */
 	interface Route {
 		name: string;
 		view: HTMLElement | undefined;
@@ -150,7 +151,7 @@
 		refreshFolds();
 	}
 
-	/** Shows the view for the hash, or the overview, and the element a plain #anchor names. Handlers run once routing has started. */
+	/** Shows the view for the hash, or the overview, and the element a plain #anchor names. Handlers run once routing started. */
 	function show() {
 		// Read before draw() saves this entry's trail, which makes every entry revisited.
 		const revisited = nav.revisited();

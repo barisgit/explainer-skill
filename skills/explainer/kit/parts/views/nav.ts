@@ -3,9 +3,9 @@
    every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
    was left from.
    All of it is derived from markup the page already has:
-     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text (a .tree row
-               link's first cell) names its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
-               else its param.
+     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
+               its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
+               ("Open", "→") is passed over for the view's heading, else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
                view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
@@ -13,9 +13,9 @@
                Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
-     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their data-nav or else their
-               h2 (ids added when missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
-               past 12). The current section follows scrolling; 07-nav.css places the rail. */
+     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their data-nav or else
+               their h2 (ids added when missing), and under the section that first links to a view name, each trail step's
+               siblings (only the step itself past 12). The current section follows scrolling; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	/** One trail step: the view's hash, its name as the reader saw it, and the sibling hashes it walks (absent: every sibling). */
@@ -28,7 +28,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	type Labels = Map<string, string>;
 
 	const STATE_KEY = "viewTrail";
-	/** The location hash the trail was saved for. A fragment navigation copies the state into its new entry, where it is not yet that entry's own. */
+	/** The location hash the trail was saved for: a fragment navigation copies the state into its new entry, where it is not yet its own. */
 	const AT_KEY = "viewTrailAt";
 	const RAIL_LIST_MAX = 12;
 	/** The navigation this part builds: its links are never the page's own. */
@@ -138,6 +138,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 			: null;
 	}
 
+	/** This history entry's Navigation API state, {} when it has none. */
 	function entryState(): Record<string, unknown> {
 		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
 		return state && typeof state === "object" ? (state as Record<string, unknown>) : {};
