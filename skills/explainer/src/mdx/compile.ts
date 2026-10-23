@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import type { Element, Nodes as HastNodes, Root as HastRoot } from "hast";
-import type { Root } from "mdast";
+import type { Nodes, Root } from "mdast";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
 import { PackError } from "../pack-error.ts";
 import { structurePage } from "./structure.ts";
@@ -111,6 +111,37 @@ function mermaidFences(tree: HastRoot) {
 	}
 }
 
+/** Every node of a Markdown tree, depth first. */
+function* nodesOf(node: Nodes): Generator<Nodes> {
+	yield node;
+	if ("children" in node) {
+		for (const child of node.children) {
+			yield* nodesOf(child);
+		}
+	}
+}
+
+/**
+ * A bare `data-*` attribute on an HTML element written in the MDX (`<fieldset data-reply>`) is empty, as in HTML. JSX would make
+ * it `true`, which Preact writes as "true", and reply.js would take that for the question's label.
+ */
+function bareDataAttributes(tree: Root) {
+	for (const node of nodesOf(tree)) {
+		const isHtml =
+			(node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+			/^[a-z]/.test(node.name ?? "");
+		for (const attribute of isHtml ? node.attributes : []) {
+			if (
+				attribute.type === "mdxJsxAttribute" &&
+				attribute.name.startsWith("data-") &&
+				attribute.value == null
+			) {
+				attribute.value = "";
+			}
+		}
+	}
+}
+
 /** A message from the MDX parser: where in the file it is and what is wrong. */
 interface MdxMessage {
 	reason: string;
@@ -140,6 +171,7 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 					remarkFrontmatter,
 					remarkGfm,
 					() => (tree: Root) => {
+						bareDataAttributes(tree);
 						if (page) {
 							h1 = structurePage(tree);
 						}

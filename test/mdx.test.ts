@@ -125,6 +125,14 @@ describe("an .mdx page packs to one prerendered file", () => {
 		});
 		expect(state).toEqual({ before: { count: "3", bars: 3 }, after: { count: "4", bars: 4 } });
 	}, 30_000);
+
+	test("a bare data-* attribute is empty, as in HTML, so reply.js labels a question by its legend", async () => {
+		const { output } = await packMdx(
+			"bare-data",
+			'# T\n\n<fieldset data-reply><legend>Pick</legend><input type="radio" name="p" id="p" /></fieldset>\n',
+		);
+		expect(readFileSync(output, "utf8")).toMatch(/<fieldset data-reply(="")?><legend>Pick/);
+	});
 });
 
 describe("pack fails on page source that would not work in the browser", () => {
