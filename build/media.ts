@@ -18,11 +18,17 @@ import { join, resolve } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { record } from "./media/clip.ts";
 import { encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
-import { CROP, renderHero } from "./media/hero.ts";
+import { renderHero } from "./media/hero.ts";
 import { open, screenshot } from "./media/page.ts";
 import { type Example, type Size, THEMES, type Theme } from "./media/types.ts";
 
 const VIEWPORT: Size = { width: 1440, height: 900 };
+/**
+ * The window of the first screens the thumbnails and the hero show: the pages' 1056 px column with a narrow margin, so the
+ * type is larger than at 1440 wide, and the whole of the reply strip with its button at the window's right edge, which a
+ * crop of a wider window would cut off.
+ */
+const STILL: Size = { width: 1120, height: 840 };
 /** Gallery thumbnail width in image pixels: a two-column card at the gallery's 1056 px column, at 2x. */
 const THUMB_WIDTH = 1040;
 /** A clip over this many bytes fails the run: GitHub is slow to show anything larger and the repository grows with each version. */
@@ -139,10 +145,10 @@ async function stills(examples: Example[], theme: Theme, work: string): Promise<
 	await withPage(async (cdp) => {
 		for (const example of examples) {
 			const png = join(work, `${example.name}-${theme}.png`);
-			await open(cdp, pageUrl(example), VIEWPORT, theme, true);
+			await open(cdp, pageUrl(example), STILL, theme, true);
 			await screenshot(cdp, png);
 			const thumb = join(OUT, `${example.name}-thumb-${theme}.webp`);
-			await encodeThumb(png, CROP, THUMB_WIDTH, thumb);
+			await encodeThumb(png, THUMB_WIDTH, thumb);
 			note(thumb);
 			pngs.push(png);
 		}
@@ -154,7 +160,7 @@ async function stills(examples: Example[], theme: Theme, work: string): Promise<
 async function hero(tiles: string[], theme: Theme, work: string) {
 	const png = join(work, `hero-${theme}.png`);
 	const out = join(OUT, `hero-${theme}.webp`);
-	await withPage((cdp) => renderHero(cdp, tiles, VIEWPORT, work, png));
+	await withPage((cdp) => renderHero(cdp, tiles, STILL, work, png));
 	await encodeHero(png, out);
 	note(out);
 }

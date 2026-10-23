@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Cdp, settle } from "../../skills/explainer/src/chrome.ts";
 import { SCALE, screenshot } from "./page.ts";
-import type { Rect, Size } from "./types.ts";
+import type { Size } from "./types.ts";
 
 /** Width the README shows the hero at, in CSS pixels; the image is rendered at `SCALE` times this. */
 const HERO_WIDTH = 880;
@@ -11,13 +11,7 @@ const MARGIN = 20;
 const COLUMNS = 2;
 
 /**
- * The part of each first screen the collage and the gallery thumbnails show: the content column without the empty
- * margins the pages leave at 1440 wide, so the type is larger. The pages' column is 1056 px wide, centred.
- */
-export const CROP: Rect = { x: 160, y: 0, width: 1120, height: 840 };
-
-/**
- * The collage page: one tile per first-screen PNG, in a grid. The page background is transparent so the image sits on
+ * The collage page: one tile per first-screen PNG of `still` CSS pixels, in a grid. The page background is transparent so the image sits on
  * either GitHub theme; the faint ring and shadow keep tile edges visible on both.
  */
 function layout(tiles: string[], still: Size): string {
@@ -29,10 +23,9 @@ function layout(tiles: string[], still: Size): string {
 <style>
 	html, body { margin: 0; background: transparent; }
 	body { padding: ${MARGIN}px; display: grid; grid-template-columns: repeat(${COLUMNS}, 1fr); gap: ${GAP}px; }
-	.tile { position: relative; aspect-ratio: ${CROP.width} / ${CROP.height}; border-radius: 10px; overflow: hidden;
+	.tile { aspect-ratio: ${still.width} / ${still.height}; border-radius: 10px; overflow: hidden;
 		box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.3), 0 6px 20px rgba(0, 0, 0, 0.14); }
-	img { position: absolute; inline-size: ${(still.width / CROP.width) * 100}%;
-		inset-inline-start: ${(-CROP.x / CROP.width) * 100}%; inset-block-start: ${(-CROP.y / CROP.height) * 100}%; }
+	img { display: block; inline-size: 100%; }
 </style>
 ${cells}`;
 }
@@ -48,7 +41,7 @@ export async function renderHero(
 	await cdp.send("Page.enable");
 	const rows = Math.ceil(tiles.length / COLUMNS);
 	const tileWidth = (HERO_WIDTH - 2 * MARGIN - (COLUMNS - 1) * GAP) / COLUMNS;
-	const tileHeight = (tileWidth * CROP.height) / CROP.width;
+	const tileHeight = (tileWidth * still.height) / still.width;
 	const height = Math.ceil(2 * MARGIN + rows * tileHeight + (rows - 1) * GAP);
 	const page = join(work, "hero.html");
 	writeFileSync(page, layout(tiles, still));
