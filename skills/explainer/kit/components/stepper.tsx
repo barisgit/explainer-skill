@@ -1,4 +1,4 @@
-/* Stepper: a step-through figure (kit steps.js): Back/Play/Next, a scrubber and arrow keys over parts that carry data-step.
+/* Stepper: a step-through figure over parts (HTML or hand-built SVG) that carry data-step: Back/Play/Next, a scrubber and arrow keys.
    <Stepper start={1} captions={["The queue is empty", "A burst arrives", "The backlog clears"]}>
      <svg viewBox="0 0 90 20"><rect data-step="1" width="20" height="20" /><rect data-step="2 3" x="35" width="20" height="20" /></svg>
    </Stepper>

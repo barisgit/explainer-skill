@@ -1,4 +1,4 @@
-/* Question: a question the reader answers in the reply (kit reply.js): the legend is its label, the checked option its answer.
+/* Question: a question the reader answers in the reply: the legend is its label, the checked option its answer.
    <Question name="first-fix" legend="Which fix would you try first?" options={{ second: "Second barista", steady: "Steadier orders" }} />
      name      the option group, unique on the page: the inputs' ids (name-value) come from it, so a reload keeps the answer
      legend    the question

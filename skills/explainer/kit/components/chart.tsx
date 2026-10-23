@@ -1,4 +1,5 @@
-/* Chart: an ECharts chart (kit charts.js) that follows light and dark; pack includes echarts and charts.js when a page uses it.
+/* Chart: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light and dark.
+   kit charts.js draws it; pack includes echarts and charts.js when a page uses it.
    <Chart option={{ xAxis: {...}, yAxis: {}, series: [...] }} label="What the chart shows" />
      option  any ECharts option. Colours default to --c1..--c6; write "var(--accent)" for a token. A new option re-applies:
              series follow its list, other components merge into what the chart shows.

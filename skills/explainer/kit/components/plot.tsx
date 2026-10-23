@@ -1,4 +1,4 @@
-/* Plot: a small line, stem or bar plot as SVG in the page theme (kit plot.js), no ECharts. For zoom, drill-down, heatmaps or sankey use Chart.
+/* Plot: small line, stem and bar plots as SVG in the page theme, no ECharts. For zoom, drill-down, heatmaps or sankey use Chart.
    <Plot label="Calls per day" option={{ categories: ["Mon", "Tue"], series: [{ name: "Calls", type: "bar", data: [12, 18] }] }} />
      option  { series, categories, horizontal, stack, x, y, legend }
        series  [{ name, type, data, color, width, dash, label }]

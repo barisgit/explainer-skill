@@ -1,4 +1,4 @@
-/* View: a drill-down view (kit views.js), shown at #name or #name/param with Back, breadcrumbs, previous/next and a contents rail.
+/* View: a drill-down view at #name or #name/param inside the one file, with Back, breadcrumbs, previous/next and a contents rail.
    <View name="person" param="ana" back="Team">
 
    # Ana Novak

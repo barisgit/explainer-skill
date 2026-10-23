@@ -1,4 +1,4 @@
-/* Tree: one complete list of hierarchical records (phases > groups > items) as the kit's .tree, opened level by level (kit views.js).
+/* Tree: one complete list of hierarchical records (phases > groups > items), opened level by level, numbers in aligned columns.
    <Tree items={plan.phases} row={(r) => ({ label: r.name, cells: [`${r.hours} h`, r.owner], items: r.tasks, text: r.note })} />
      items  the top-level records
      row    (record) => its row; leave it out when the records already have this shape:

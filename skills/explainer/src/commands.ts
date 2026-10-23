@@ -27,8 +27,8 @@ export interface Command {
 	run: (args: string[], flags: Map<string, string[]>) => Promise<number>;
 }
 
-const MERMAID_DOC = `<pre class="mermaid"> blocks hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
-pack renders each block to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit charts.js).
+const MERMAID_DOC = `\`\`\`mermaid fences (<pre class="mermaid"> in HTML) hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
+pack renders each block to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
 It draws a subset of each type and fails on any line, or part of one, it cannot read (notes, titles, cross and circle edge ends, new-style shapes) and on a block left open, naming the line.
 Labels wrap at about 30 characters into tall boxes: keep them to a few words, or break one with <br>. Markdown strings ("\`...\`") are not supported; **bold** and *italic* work in plain labels.
 Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
@@ -53,52 +53,97 @@ function kitHeader(file: string): string {
 		.trim();
 }
 
-/** The documentation of the kit's Preact components: the index, then each component file's header. */
-function componentsDoc(): string {
-	const files = readdirSync(kitPath("components"))
+/** The kit's Preact components, by the name a page imports ("Chart"), each from the header of its file in kit/components. */
+function components(): { name: string; file: string; summary: string }[] {
+	return readdirSync(kitPath("components"))
 		.filter((name) => name !== "index.ts")
-		.sort();
-	return ["index.ts", ...files].map((name) => kitHeader(`components/${name}`)).join("\n\n");
+		.sort()
+		.map((name) => {
+			const file = `components/${name}`;
+			const [, component = name, summary = ""] = /^(\w+): (.*)/.exec(kitHeader(file)) ?? [];
+			return { name: component, file, summary };
+		});
 }
+
+/** The kit scripts a page using each component carries, for the sizes `kit` lists; pack decides inclusion on its own. */
+const COMPONENT_SCRIPTS: Record<string, string[]> = {
+	Chart: ["echarts.js", "charts.js"],
+	Plot: ["plot.js"],
+	Question: ["reply.js"],
+	Stepper: ["steps.js"],
+	Tree: ["views.js"],
+	View: ["views.js"],
+};
+
+/** The size of kit files as a page carries them, e.g. "16 KB". */
+const kitSize = (files: string[]) =>
+	`${(files.reduce((sum, f) => sum + Buffer.byteLength(readKitText(kitPath(f))), 0) / 1024).toFixed(0)} KB`;
 
 /** The one-line description of a kit file: the first line of its header without the leading "name: ". */
 const kitSummary = (file: string) => (kitHeader(file).split("\n")[0] ?? "").replace(/^\S+: /, "");
+
+/** The documentation of the kit's Preact components: the index (the page conventions), then each component file's header. */
+const componentsDoc = (): string =>
+	["components/index.ts", ...components().map((c) => c.file)].map(kitHeader).join("\n\n");
+
+/** The page conventions of an .mdx page: the index header after its first line. */
+const pageDoc = () => kitHeader("components/index.ts").split("\n").slice(1).join("\n");
+
+/** What `kit` prints: everything an .mdx page can use, with where each one's documentation is. */
+function kitListing(): string {
+	const list = components().map(
+		(c) =>
+			`${c.name.padEnd(9)} ${kitSize(COMPONENT_SCRIPTS[c.name] ?? []).padStart(7)}  ${c.summary}`,
+	);
+	return `An .mdx page imports the kit's components; pack renders the page, adds the stylesheet and inlines the kit scripts its parts use:
+  import { Chart, View } from "kit"
+
+${list.join("\n")}
+\`\`\`mermaid          a fenced diagram (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)
+theme.css  ${kitSize(["theme.css"]).padStart(6)}  ${kitSummary("theme.css")} Its classes and tokens: kit theme.css
+Attributes you write on your own elements:
+  data-ref="cache"     elements sharing a ref light up together on hover, focus and click; Mermaid node ids are refs (kit link.js)
+  data-reply="Label"   on a panel around controls with ids: their values join the reader's reply; select text or click a data-ref part to add a note (kit reply.js)
+  data-keep="off"      on a control or its container: reloads do not keep it (kit reply.js)
+  data-step="2 4"      on a Stepper's parts (kit stepper)
+
+${pageDoc()}
+
+Documentation of one component or kit file: ${CLI} kit <name>; kit components prints every component. Fonts are inlined from theme.css.
+The texts the kit adds (buttons, accessible names, messages) are English; a page in another language sets them with labels in its frontmatter.`;
+}
 
 /** One spec per command: drives dispatch, flag validation and --help. Exit codes: 0 ok, 1 problems found, 2 usage. */
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List the kit files a page can reference (pack inlines only the ones it uses), or print the documentation of one file, of the mermaid blocks or of the components for .mdx pages.",
-		usage: "kit [file | mermaid | components]",
+			"List what an .mdx page can use (the kit's components, Mermaid fences, the stylesheet, the attributes the kit reads, the page conventions), or print the documentation of one component, kit file, the mermaid fences or every component.",
+		usage: "kit [Component | file | mermaid | components]",
 		flags: [],
-		examples: ["kit", "kit steps.js", "kit mermaid", "kit components"],
-		run: async ([file]) => {
-			if (file === "mermaid") {
+		examples: ["kit", "kit Stepper", "kit theme.css", "kit mermaid", "kit components"],
+		run: async ([topic]) => {
+			if (!topic) {
+				console.log(kitListing());
+				return 0;
+			}
+			if (topic === "mermaid") {
 				console.log(MERMAID_DOC);
 				return 0;
 			}
-			if (file === "components") {
+			if (topic === "components") {
 				console.log(componentsDoc());
 				return 0;
 			}
-			if (file) {
-				const name = file.replace(/^kit:/, "");
-				if (!kitFiles().includes(name)) {
-					return usage(`no kit file "${name}". Run: ${CLI} kit`);
-				}
-				console.log(kitHeader(name));
+			const component = components().find((c) => c.name.toLowerCase() === topic.toLowerCase());
+			if (component) {
+				console.log(kitHeader(component.file));
 				return 0;
 			}
-			console.log(
-				`Reference kit files from the page with the kit: prefix; pack inlines each one used:\n  <link rel="stylesheet" href="kit:theme.css">\n  <script src="kit:charts.js"></script>      scripts run in the order written; charts.js needs kit:echarts.js before it\n  <script src="kit:plot.js"></script>        alone, for a few small plots without ECharts\n`,
-			);
-			for (const f of kitFiles()) {
-				const kb = `${(Buffer.byteLength(readKitText(kitPath(f))) / 1024).toFixed(0)} KB`;
-				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
+			const name = topic.replace(/^kit:/, "");
+			if (!kitFiles().includes(name)) {
+				return usage(`no kit component or file "${name}". Run: ${CLI} kit`);
 			}
-			console.log(
-				`<pre class="mermaid">...</pre>  diagram source (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\nimport { Chart } from "kit"     in an .mdx page: Preact components that render the markup the kit scripts read (kit components)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-nav, data-stepper, data-start, data-step, data-captions, data-ref, data-reply, data-keep.\nThe texts the kit scripts add (buttons, accessible names, messages) are English; a page in another language sets them in var kitLabels = { ... } at the top level of any of its scripts, with the keys each file's documentation lists.`,
-			);
+			console.log(kitHeader(name));
 			return 0;
 		},
 	},

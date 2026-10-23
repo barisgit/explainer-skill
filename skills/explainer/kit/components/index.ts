@@ -1,17 +1,16 @@
-/* components: the kit's Preact components for .mdx pages: import { Chart } from "kit". Each renders the markup the kit scripts read.
-   Chart   an ECharts chart that follows light and dark
-   Plot    a small line, stem or bar plot as SVG, no ECharts
-   Stepper a step-through figure: Back/Play/Next, scrubber and arrow keys over parts with data-step
-   View    a drill-down view at #name or #name/param, with Back, breadcrumbs, previous/next and a contents rail
-   Tree    hierarchical records as rows with their numbers in aligned columns, opened level by level
-   Question a question the reader answers in the reply
-   Each ## starts a section; to give one its short name in the contents rail (data-nav), write its heading as
-   <h2 data-nav="Price">The price is 40 €</h2>. A Markdown table is a table.compare: its first column names the rows, and on
+/* components: the kit's Preact components for .mdx pages: import { Chart, View } from "kit". Each renders the markup the kit scripts read.
+   Frontmatter: title (default: the text of the #), lang (default en), labels (the kit's own texts in the page's language, by the
+   keys kit views.js, steps.js and reply.js list), reply: true (notes and kept inputs on a page without a Question or data-reply).
+   The # and the paragraphs right under it are the masthead, the first one its lede. Each ## starts a section; to give one its
+   short name in the contents rail, write its heading as <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
+   yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, and on
    phones each row stacks its cells under the column names.
-   Your own components live in .tsx files next to the page. pack renders every component to static HTML; a module whose first
-   line is "use client" is also hydrated in the browser, so its state and handlers work. Props from the page into such a component
-   must be JSON. A control such a component renders from its state is kept across reloads like any other (kit reply.js): give it
-   an id and set the state in onInput or onChange, which the restore and Clear fire too. */
+   Data and styles are imported files: import plan from "./plan.json", import { rows } from "./data.ts", import "./page.css".
+   Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
+   pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
+   state and handlers work. Props from the page into such a component must be JSON. A control such a component renders from its
+   state is kept across reloads like any other (kit reply.js): give it an id and set the state in onInput or onChange, which the
+   restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
