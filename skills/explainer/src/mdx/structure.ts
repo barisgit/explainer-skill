@@ -50,11 +50,26 @@ function mastheadOf(nodes: Flow[], at: number): { element: MdxJsxFlowElement; ne
 	return { element: element("header", { class: "masthead" }, children), next };
 }
 
+/**
+ * The `<section>` a `##` starts. A heading written `<h2 data-nav="Price">The price is 40 €</h2>` starts one too, and its
+ * data-nav, the section's short name in the contents rail, moves to the section, where views.js reads it.
+ */
+function sectionOf(heading: Heading | MdxJsxFlowElement, children: Flow[]): MdxJsxFlowElement {
+	const section = element("section", {}, children);
+	if (heading.type === "mdxJsxFlowElement") {
+		const isNav = (a: (typeof heading.attributes)[number]) =>
+			a.type === "mdxJsxAttribute" && a.name === "data-nav";
+		section.attributes = heading.attributes.filter(isNav);
+		heading.attributes = heading.attributes.filter((a) => !isNav(a));
+	}
+	return section;
+}
+
 /** A node a section does not take in: the next `#`, or a section the author wrote themselves (to give it data-nav, say). */
 const endsSection = (node: Flow) => isHeading(node, 1) || isJsx(node, "section");
 
 /**
- * The house layout of one flow container (the overview or a view): each `##` with what follows, up to the next `#`/`##` or a
+ * The house layout of one flow container (the overview or a view): each `##` (or `<h2>`) with what follows, up to the next `#`/`##` or a
  * `<section>` the author wrote themselves, becomes a `<section>`. With `masthead` (the overview), its first `#` with the
  * paragraphs right under it becomes the masthead; a View lays out its own head (kit/components/view.tsx), so that a view
  * rendered from data gets one too.
@@ -73,9 +88,9 @@ function layout(nodes: Flow[], masthead: boolean): Flow[] {
 			i = taken.next;
 			continue;
 		}
-		if (node && isHeading(node, 2)) {
+		if (node && (isHeading(node, 2) || isJsx(node, "h2"))) {
 			section = [node];
-			out.push(element("section", {}, section));
+			out.push(sectionOf(node, section));
 		} else if (node && endsSection(node)) {
 			section = undefined;
 			out.push(node);
