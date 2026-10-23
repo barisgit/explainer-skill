@@ -62,6 +62,51 @@ test("a view opened fresh walks every view of its kind in page order", async () 
 	await packAndCheck(dir, "fresh", NESTED(script), "nav contract", ["--view", "i/4"]);
 }, 60_000);
 
+/** Hashes written raw, with non-ASCII letters and spaces, which location.hash reports percent-encoded. Blaž links two items. */
+const RAW_HASHES = `${HEAD}<main class="page"><div data-overview><h1>Names</h1>
+<section><h2>People</h2><a href="#person/Blaž">Blaž</a> <a href="#person/Ana Marija">Ana Marija</a></section>
+<section><h2>Items</h2><a href="#item/my item">My item</a> <a href="#item/Čaj">Čaj</a> <a href="#item/third one">Third</a></section></div>
+<section class="view" data-view="person"><div class="view-head"><a class="back" href="#">Home</a><h1></h1></div><p class="mine"></p></section>
+<section class="view" data-view="item"><div class="view-head"><a class="back" href="#">Home</a><h1></h1></div></section></main>
+<script src="kit:views.js"></script>
+<script>
+Views.on("person", (el, p) => {
+	el.querySelector("h1").textContent = p;
+	el.querySelector(".mine").innerHTML = p === "Blaž" ? '<a href="#item/Čaj">Čaj</a> <a href="#item/my item">My item</a>' : "";
+});
+Views.on("item", (el, p) => { el.querySelector("h1").textContent = p; });
+const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const sibs = (rel) => decodeURIComponent(document.querySelector(".view.active .sibs [rel=" + rel + "]")?.getAttribute("href") ?? "none");
+const count = () => document.querySelector(".view.active .sibs .count")?.textContent;
+const railCurrent = () => document.querySelector('.toc [aria-current="page"]')?.textContent;
+const at = () => decodeURIComponent(location.hash);
+const journey = () => texts(".view.active .crumbs li") === "Home|Blaž|My item" && count() === "2 / 2" && sibs("prev") === "#item/Čaj" && sibs("next") === "none" && railCurrent() === "My item";
+const reloaded = () => performance.getEntriesByType("navigation")[0]?.type === "reload";
+// Load-time contracts: a load on a hash that is not a reload is a view check opened fresh.
+const fresh = () => !reloaded() && location.hash !== "";
+${contract("a person opened fresh by a raw Unicode hash walks every person", `!fresh() || at() !== "#person/Blaž" || (texts(".view.active .crumbs li") === "Home|Blaž" && count() === "1 / 2" && sibs("next") === "#person/Ana Marija" && railCurrent() === "Blaž")`)}
+${contract("an item opened fresh by a hash with a space walks every item", `!fresh() || at() !== "#item/my item" || (texts(".view.active .crumbs li") === "Home|My item" && count() === "1 / 3" && sibs("next") === "#item/Čaj" && railCurrent() === "My item")`)}
+${contract("after a reload the item opened from Blaž walks Blaž's items", "!reloaded() || journey()")}
+addEventListener("hashchange", () => setTimeout(() => {
+	if (at() === "#item/my item" && !journey()) throw new Error("nav contract: the item opened from Blaž walks Blaž's items");
+}, 100));
+</script></body></html>`;
+
+test("hashes with Unicode letters and spaces keep previous/next and the rail, fresh, through a person and after a reload", async () => {
+	await packAndCheck(dir, "raw", RAW_HASHES, "nav contract", [
+		"--view",
+		"person/Blaž",
+		"--view",
+		"item/my item",
+		"--do",
+		"click:a[href='#person/Blaž']",
+		"--do",
+		"click:.view.active a[href='#item/my item']",
+		"--do",
+		"reload",
+	]);
+}, 60_000);
+
 /** A page that writes its own history.state on every entry it shows, before the kit's navigation runs for that entry. */
 const OWN_STATE = (value: string) => `${HEAD}<main class="page"><div data-overview><h1>State</h1>
 <section><h2>Views</h2><a href="#v/a">A</a> <a href="#v/b">B</a></section></div>

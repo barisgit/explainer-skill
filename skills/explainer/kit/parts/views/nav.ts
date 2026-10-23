@@ -71,7 +71,13 @@ window.ViewsNav = ({ views, decode }) => {
 		);
 	}
 
-	const hashOf = (a: HTMLAnchorElement) => (a.getAttribute("href") ?? "").slice(1);
+	/**
+	 * A hash in the form location.hash reports it: spaces and non-ASCII percent-encoded, escapes already written (%2F among them)
+	 * kept. A link may write "#person/Blaž" where location.hash reads "#person/Bla%C5%BE"; links, static claims, saved lists and
+	 * the current hash are all compared in this form.
+	 */
+	const canonical = (hash: string) => new URL(`#${hash}`, "file:///").hash.slice(1);
+	const hashOf = (a: HTMLAnchorElement) => canonical((a.getAttribute("href") ?? "").slice(1));
 	const unique = (hashes: string[]) => [...new Set(hashes)];
 	const viewDrawnFor = (hash: string) => [...drawn].find(([, h]) => h === hash)?.[0];
 
@@ -79,7 +85,8 @@ window.ViewsNav = ({ views, decode }) => {
 	function allSiblings(name: string) {
 		const statics = views
 			.map((v) => v.dataset.view ?? "")
-			.filter((claim) => claim.startsWith(`${name}/`));
+			.filter((claim) => claim.startsWith(`${name}/`))
+			.map(canonical);
 		return unique([...linksTo(name).map(hashOf), ...statics]);
 	}
 
@@ -356,7 +363,8 @@ window.ViewsNav = ({ views, decode }) => {
 	let toc: Rail | null = null;
 
 	return {
-		show(view: HTMLElement | null, hash: string) {
+		show(view: HTMLElement | null, routeHash: string) {
+			const hash = canonical(routeHash);
 			// Built at the first route, which runs after the page's scripts, so the sections and links they write are listed.
 			if (railHost && !toc) {
 				toc = buildRail(railHost.page, railHost.overview);
