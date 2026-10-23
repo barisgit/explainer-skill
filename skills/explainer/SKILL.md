@@ -7,7 +7,7 @@ compatibility: Needs Bun 1.4.3 or later, and Google Chrome or Chromium for check
 
 # Explainer
 
-Shape the page around what the reader does next: learn a topic, make a decision, or explore data. Lead with the answer, or for study material with the questions the reader must be able to answer, and give each section one question; put detail behind clicks or drill-down views instead of fitting everything onto the first screen. Make it visual and add an interaction where it changes understanding, not to fill a section: the moment that makes the reader say wow is the one where they suddenly get it. Keep claims no stronger than the sources, and label what you inferred.
+Shape the page around what the reader does next: learn a topic, make a decision, or explore data. Lead with the answer, or for study material with the questions the reader must be able to answer, and give each section one question; put detail behind clicks or drill-down views instead of fitting everything onto the first screen. Make it visual and add an interaction where it changes understanding, not to fill a section: the moment that makes the reader say wow is the one where they suddenly get it. Keep claims no stronger than the sources, and say where your own reasoning, not a source, decides something the reader acts on.
 
 Guidance on design, wording, or presentation from the user, the project, or another skill you have loaded wins over this skill's defaults. Restyle the kit through its tokens rather than replacing it.
 
