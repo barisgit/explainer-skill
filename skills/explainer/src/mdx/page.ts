@@ -1,6 +1,7 @@
 import { realpathSync } from "node:fs";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { safeScript } from "../escape.ts";
+import { PackError } from "../pack-error.ts";
 import { KIT_DIR } from "../paths.ts";
 import { clientBundle, prerender, type Seen } from "./bundle.ts";
 import { compileMdx, type Frontmatter } from "./compile.ts";
@@ -21,6 +22,40 @@ const COMPONENT_SCRIPTS: Record<string, string[]> = { "chart.tsx": ["echarts.js"
  */
 const BEFORE_ISLANDS = ["echarts.js", "charts.js"];
 const AFTER_ISLANDS = ["views.js", "steps.js", "link.js", "reply.js"];
+
+/** Island markers, and the element a rendered View is wrapped in (VIEW_MARKER in kit/components/view.tsx) so pack can move it. */
+const VIEW = /<!--island:\d+-->|<!--\/island-->|<explainer-view>|<\/explainer-view>/g;
+
+/**
+ * The page's HTML with every view moved, in page order, after the overview, wherever the page rendered it, as views.js expects
+ * (it hides [data-overview] while a view shows). A View inside a View or inside a client component is a PackError: the first
+ * would be cut in two, and the second would leave the island's DOM out of step with its component.
+ */
+function hoistViews(html: string, file: string): string {
+	const views: string[] = [];
+	let rest = "";
+	let at = 0;
+	let open: number | undefined;
+	let inIsland = false;
+	for (const { 0: token, index } of html.matchAll(VIEW)) {
+		if (token.startsWith("<!--")) {
+			inIsland = token !== "<!--/island-->";
+		} else if (token === "<explainer-view>") {
+			if (open !== undefined || inIsland) {
+				throw new PackError(
+					`${file}: a View is inside ${inIsland ? "a client component" : "another View"}; put it in the page or a static component, and put client components inside the View instead`,
+				);
+			}
+			rest += html.slice(at, index);
+			open = index + token.length;
+		} else if (open !== undefined) {
+			views.push(html.slice(open, index));
+			at = index + token.length;
+			open = undefined;
+		}
+	}
+	return rest + html.slice(at) + views.join("");
+}
 
 const escapeHtml = (text: string) =>
 	text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -90,7 +125,7 @@ export async function mdxPage(file: string): Promise<string> {
 		...css,
 		"</head>",
 		"<body>",
-		`<main class="page">${html}</main>`,
+		`<main class="page">${hoistViews(html, relative(process.cwd(), path) || path)}</main>`,
 		...(islands.length
 			? [
 					`<script type="application/json" id="explainer-islands">${scriptJson(islandData)}</script>`,

@@ -5,12 +5,6 @@ import type {} from "mdast-util-to-hast"; // its Data fields (hName, hProperties
 /** Content of a flow container: everything a page, a section or a view holds. */
 type Flow = BlockContent | DefinitionContent;
 
-/** The element a container's head is wrapped in: `header.masthead` on the overview, `div.view-head` in a view. */
-interface Head {
-	tag: string;
-	className: string;
-}
-
 /** At the root of an MDX tree everything but `import`/`export` and frontmatter is flow content. */
 const isFlow = (node: Root["children"][number]): node is Flow =>
 	node.type !== "mdxjsEsm" && node.type !== "yaml";
@@ -46,38 +40,34 @@ const withClass = (paragraph: Paragraph, className: string) => {
 export const textOf = (node: Nodes): string =>
 	"value" in node ? node.value : "children" in node ? node.children.map(textOf).join("") : "";
 
-/** A `#` and the paragraphs right under it, as the container's head; the first paragraph is the `.lede`, later ones `.meta`. */
-function headOf(
-	nodes: Flow[],
-	at: number,
-	head: Head,
-): { element: MdxJsxFlowElement; next: number } {
+/** A `#` and the paragraphs right under it, as the page's `header.masthead`; the first paragraph is the `.lede`, later ones `.meta`. */
+function mastheadOf(nodes: Flow[], at: number): { element: MdxJsxFlowElement; next: number } {
 	const children: Flow[] = nodes.slice(at, at + 1);
 	let next = at + 1;
 	for (let node = nodes[next]; node?.type === "paragraph"; node = nodes[++next]) {
 		children.push(withClass(node, next === at + 1 ? "lede" : "meta"));
 	}
-	return { element: element(head.tag, { class: head.className }, children), next };
+	return { element: element("header", { class: "masthead" }, children), next };
 }
 
-/** A node a `##` section does not take in: the next `#`, or an element the author wrapped in `<section>` (or a view) themselves. */
-const endsSection = (node: Flow) =>
-	isHeading(node, 1) || isJsx(node, "section") || isJsx(node, "View");
+/** A node a section does not take in: the next `#`, or a section the author wrote themselves (to give it data-nav, say). */
+const endsSection = (node: Flow) => isHeading(node, 1) || isJsx(node, "section");
 
 /**
- * The house layout of one flow container (the overview or a view): its first `#` with the paragraphs right under it becomes the
- * head (`header.masthead` or `div.view-head`), and each `##` with what follows, up to the next `#`/`##` or an element the author
- * wrapped in `<section>` themselves, becomes a `<section>`.
+ * The house layout of one flow container (the overview or a view): each `##` with what follows, up to the next `#`/`##` or a
+ * `<section>` the author wrote themselves, becomes a `<section>`. With `masthead` (the overview), its first `#` with the
+ * paragraphs right under it becomes the masthead; a View lays out its own head (kit/components/view.tsx), so that a view
+ * rendered from data gets one too.
  */
-function layout(nodes: Flow[], head: Head): Flow[] {
+function layout(nodes: Flow[], masthead: boolean): Flow[] {
 	const out: Flow[] = [];
 	let section: Flow[] | undefined;
-	let headDone = false;
+	let headDone = !masthead;
 	for (let i = 0; i < nodes.length; ) {
 		const node = nodes[i];
 		if (node && isHeading(node, 1) && !headDone) {
 			headDone = true;
-			const taken = headOf(nodes, i, head);
+			const taken = mastheadOf(nodes, i);
 			out.push(taken.element);
 			section = undefined;
 			i = taken.next;
@@ -97,27 +87,34 @@ function layout(nodes: Flow[], head: Head): Flow[] {
 	return out;
 }
 
+/** Every `<View>` written in the MDX, at any depth. */
+function* viewsIn(node: Nodes): Generator<MdxJsxFlowElement> {
+	if (isJsx(node, "View")) {
+		yield node;
+	}
+	if ("children" in node) {
+		for (const child of node.children) {
+			yield* viewsIn(child);
+		}
+	}
+}
+
 /**
- * Reshapes an MDX page's tree into the page skeleton the theme and views.js expect: the content outside views goes into
- * `<div data-overview>` with the masthead and sections laid out, and every top-level `<View>` follows it, laid out the same way
- * inside. `import`/`export` and frontmatter stay at the top. Returns the text of the page's first `#`, the default title.
+ * Reshapes an MDX page's tree into the page skeleton the theme and views.js expect: the content goes into `<div data-overview>`
+ * with the masthead and sections laid out, and each `<View>` written in Markdown gets its sections laid out the same way.
+ * Views stay where they are written: pack moves every rendered view after the overview (src/mdx/page.ts), including views a
+ * page renders from data. `import`/`export` and frontmatter stay at the top. Returns the text of the page's first `#`, the
+ * default title.
  */
 export function structurePage(tree: Root): string | undefined {
-	const content = tree.children.filter(isFlow);
-	const views = content.filter((node) => isJsx(node, "View"));
-	for (const view of views) {
-		view.children = layout(view.children, { tag: "div", className: "view-head" });
+	for (const view of viewsIn(tree)) {
+		view.children = layout(view.children, false);
 	}
-	const overview = content.filter((node) => !isJsx(node, "View"));
-	const title = overview.find((node) => isHeading(node, 1));
+	const content = tree.children.filter(isFlow);
+	const title = content.find((node) => isHeading(node, 1));
 	tree.children = [
 		...tree.children.filter((node) => !isFlow(node)),
-		element(
-			"div",
-			{ "data-overview": "" },
-			layout(overview, { tag: "header", className: "masthead" }),
-		),
-		...views,
+		element("div", { "data-overview": "" }, layout(content, true)),
 	];
 	return title && textOf(title);
 }
