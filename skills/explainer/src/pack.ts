@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
+import { classCollisions } from "./collisions.ts";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
 import { findLoads, type Load } from "./loads.ts";
 import { renderMermaid } from "./mermaid.ts";
@@ -294,7 +295,8 @@ function loadMessage({ origin, kind, target }: Load): string {
 /**
  * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
  * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
- * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render. `warnings` lists links that go nowhere.
+ * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render.
+ * `warnings` lists links that go nowhere and page classes the kit styles too (see classCollisions).
  */
 export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
 	const baseDir = dirname(resolve(inputPath));
@@ -312,8 +314,11 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and reference them relatively, or use kit: files." : ""}`,
 		);
 	}
-	const warnings = loneRefs(original, diagramRefs).map(
-		(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
-	);
+	const warnings = [
+		...loneRefs(original, diagramRefs).map(
+			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
+		),
+		...(await classCollisions(original, baseDir)),
+	];
 	return { html, warnings };
 }

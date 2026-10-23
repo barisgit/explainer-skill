@@ -1,5 +1,5 @@
-import { afterAll, expect, test } from "bun:test";
-import { packAndRun, pageContract, scratch } from "./support.ts";
+import { afterAll, describe, expect, test } from "bun:test";
+import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -18,4 +18,44 @@ test("a plain page rule overrides the kit, whatever its specificity or place, an
 	})}</script></body></html>`;
 
 	expect(await packAndRun(dir, "layer", page)).toEqual([]);
+});
+
+describe("pack warns when the page's own CSS styles a class the kit styles", () => {
+	const OWN_TREE = "ul.tree { margin: 0; } .tree li { list-style: none; }";
+
+	test.each([
+		["<style>", `<style>${OWN_TREE}</style>`],
+		["own.css", '<link rel="stylesheet" href="own.css">'],
+	])("a page component named like a kit one, in %s", async (where, head) => {
+		dir.write("own.css", OWN_TREE);
+		const input = dir.write(
+			"collide.html",
+			`<!doctype html><html><head>${KIT}${head}</head><body><ul class="tree"><li>a</li></ul></body></html>`,
+		);
+
+		const result = await runCli(["pack", input, "-o", dir.path("collide.out.html")]);
+
+		expect(result.code).toBe(0);
+		const warnings = result.stdout.split("\n").filter((line) => line.startsWith("warning:"));
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain(".tree");
+		expect(warnings[0]).toContain(`"ul.tree" (${where})`);
+		expect(warnings[0]).toContain("parts/theme/08-tree.css");
+	});
+
+	test("not for a page that uses kit classes in markup and styles only its own classes, variants and children of kit ones", async () => {
+		const input = dir.write(
+			"no-collide.html",
+			`<!doctype html><html><head>${KIT}<style>
+.mine { color: red; } .chart.tall-mine { block-size: 30rem; } .compare th.num { text-align: end; } .stat dd { color: blue; }
+.relax .bad { color: red; } .dg-own .node circle { fill: red; } :root { --accent: #123456; }
+</style></head><body><main class="page"><div class="fig panel"><div class="chart tall-mine"></div></div>
+<div class="tree"><details><summary><span>a</span><span>1</span></summary></details></div></main></body></html>`,
+		);
+
+		const result = await runCli(["pack", input, "-o", dir.path("no-collide.out.html")]);
+
+		expect(result.code).toBe(0);
+		expect(result.stdout).not.toContain("warning:");
+	});
 });
