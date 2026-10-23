@@ -2433,8 +2433,8 @@ window.ViewsFolds = () => {
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
                view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
-               every sibling. Steps live in history.state next to the hash, so Back, Forward and reload keep them; a link opened
-               fresh starts a new trail.
+               every sibling. Steps live in the history entry (its Navigation API state; history.state stays the page's), so Back,
+               Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
@@ -2470,11 +2470,12 @@ window.ViewsNav = ({ views, decode }) => {
     const selector = `a[href^=${JSON.stringify(`#${name}/`)}]`;
     return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(KIT_NAV));
   }
-  const hashOf = (a) => (a.getAttribute("href") ?? "").slice(1);
+  const canonical = (hash) => new URL(`#${hash}`, "file:///").hash.slice(1);
+  const hashOf = (a) => canonical((a.getAttribute("href") ?? "").slice(1));
   const unique = (hashes) => [...new Set(hashes)];
   const viewDrawnFor = (hash) => [...drawn].find(([, h]) => h === hash)?.[0];
   function allSiblings(name) {
-    const statics = views.map((v) => v.dataset.view ?? "").filter((claim) => claim.startsWith(`${name}/`));
+    const statics = views.map((v) => v.dataset.view ?? "").filter((claim) => claim.startsWith(`${name}/`)).map(canonical);
     return unique([...linksTo(name).map(hashOf), ...statics]);
   }
   const siblingsOf = (step) => step.list ?? allSiblings(nameOf(step.hash));
@@ -2495,12 +2496,9 @@ window.ViewsNav = ({ views, decode }) => {
   function label(hash, known = linkLabels(nameOf(hash))) {
     return known.get(hash) || clean(viewDrawnFor(hash)?.querySelector("h1, h2")?.textContent) || decode(hash.split("/").slice(1).join("/"));
   }
-  function historyState() {
-    const state = history.state;
-    return state && typeof state === "object" ? state : {};
-  }
   function savedTrail() {
-    const trail = historyState()[STATE_KEY];
+    const state = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
+    const trail = state && typeof state === "object" ? state[STATE_KEY] : null;
     return Array.isArray(trail) ? trail.filter((s) => typeof s?.hash === "string") : null;
   }
   function inheritedList(hash, parent, replaced) {
@@ -2517,14 +2515,17 @@ window.ViewsNav = ({ views, decode }) => {
     const list = inheritedList(hash, before.at(-1), steps[cut]);
     return [...before, { hash, label: label(hash), ...list ? { list } : {} }];
   }
-  function stamp(hash) {
+  function stamp(hash, redrawn) {
     const kept = savedTrail();
-    if (kept?.at(-1)?.hash === hash) {
-      steps = kept;
+    const last = kept?.at(-1);
+    if (kept && last?.hash === hash) {
+      steps = redrawn ? [...kept.slice(0, -1), { ...last, label: label(hash) }] : kept;
     } else {
       steps = hash ? extended(hash) : [];
     }
-    history.replaceState({ ...historyState(), [STATE_KEY]: steps }, "");
+    try {
+      navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps } });
+    } catch {}
   }
   function crumbs(here, back) {
     const list = make("ol", { class: "crumbs" });
@@ -2568,10 +2569,14 @@ window.ViewsNav = ({ views, decode }) => {
     }
     return bar;
   }
+  const freeId = (id) => id !== "" && !names.has(id) && !document.getElementById(id);
   function sectionId(section, heading, n) {
     if (!section.id) {
-      const slug = clean(heading.textContent).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
-      section.id = slug && !names.has(slug) && !document.getElementById(slug) ? slug : `section-${n}`;
+      let id = clean(heading.textContent).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
+      for (let k = n;!freeId(id); k++) {
+        id = `section-${k}`;
+      }
+      section.id = id;
     }
     return section.id;
   }
@@ -2664,8 +2669,12 @@ window.ViewsNav = ({ views, decode }) => {
   const railHost = page && overview && names.size > 1 ? { page, overview } : null;
   document.documentElement.classList.toggle("has-toc", Boolean(railHost));
   let toc = null;
+  let shownHash = null;
   return {
-    show(view, hash) {
+    show(view, routeHash) {
+      const hash = canonical(routeHash);
+      const redrawn = hash === shownHash;
+      shownHash = hash;
       if (railHost && !toc) {
         toc = buildRail(railHost.page, railHost.overview);
       }
@@ -2673,7 +2682,7 @@ window.ViewsNav = ({ views, decode }) => {
         drawn.set(view, hash);
       }
       const current = view ? hash : "";
-      stamp(current);
+      stamp(current, redrawn);
       const here = steps.at(-1);
       if (view && here) {
         const back = view.querySelector(".back");
@@ -2757,7 +2766,7 @@ window.ViewsNav = ({ views, decode }) => {
       }
       const { name: current, view, param } = route();
       if (view && current === name) {
-        fn(view, param);
+        draw(name, view, param);
       }
     }
   };
