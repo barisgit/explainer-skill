@@ -1,32 +1,16 @@
 import { realpathSync } from "node:fs";
-import { basename, dirname, extname, join, relative } from "node:path";
+import { basename, dirname, extname, relative } from "node:path";
 import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
-import { KIT_DIR } from "../paths.ts";
-import { clientBundle, prerender, type Seen } from "./bundle.ts";
+import { clientBundle, prerender } from "./bundle.ts";
 import { compileMdx, type Frontmatter } from "./compile.ts";
-
-/** Kit scripts a prerendered page needs, by what its HTML holds. */
-const HTML_SCRIPTS: [selector: string, scripts: string[]][] = [
-	[".chart:not(.plot)", ["echarts.js", "charts.js"]],
-	[".plot", ["plot.js"]],
-	["[data-view], details", ["views.js"]],
-	["[data-stepper]", ["steps.js"]],
-	["[data-ref]", ["link.js"]],
-	["[data-reply]", ["reply.js"]],
-];
-/** Kit scripts a kit component needs when a client component may render it later, though the first render does not. */
-const COMPONENT_SCRIPTS: Record<string, string[]> = {
-	"chart.tsx": ["echarts.js", "charts.js"],
-	"plot.tsx": ["plot.js"],
-	"stepper.tsx": ["steps.js"],
-};
-/**
- * The order the kit scripts run in. Libraries the client components call (Charts.make, Plot.make) load before the islands
- * hydrate; scripts that read and wire the page's DOM (views, steps, link, reply) load after, so they reach the markup Preact owns.
- */
-const BEFORE_ISLANDS = ["echarts.js", "charts.js", "plot.js"];
-const AFTER_ISLANDS = ["views.js", "steps.js", "link.js", "reply.js"];
+import {
+	AFTER_ISLANDS,
+	BEFORE_ISLANDS,
+	type KitScript,
+	scriptsInCode,
+	scriptsInHtml,
+} from "./kit-scripts.ts";
 
 /** Island markers, and the element a rendered View is wrapped in (VIEW_MARKER in kit/components/view.tsx) so pack can move it. */
 const VIEW = /<!--island:\d+-->|<!--\/island-->|<explainer-view>|<\/explainer-view>/g;
@@ -67,51 +51,44 @@ const escapeHtml = (text: string) =>
 /** JSON for an inline script: `<` escaped, so no `</script>` or `<!--` can occur in it. */
 const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 
-/** The kit scripts the page needs: what its prerendered HTML holds, the kit components its client code can render, and reply: true. */
-async function kitScripts(html: string, client: Seen, front: Frontmatter): Promise<Set<string>> {
-	const needed = new Set<string>(front.reply ? ["reply.js"] : []);
-	let rewriter = new HTMLRewriter();
-	for (const [selector, scripts] of HTML_SCRIPTS) {
-		rewriter = rewriter.on(selector, {
-			element() {
-				for (const script of scripts) {
-					needed.add(script);
-				}
-			},
-		});
-	}
-	await rewriter.transform(new Response(html)).text();
-	const components = join(KIT_DIR, "components");
-	for (const module of client.modules) {
-		if (dirname(module) === components) {
-			for (const script of COMPONENT_SCRIPTS[basename(module)] ?? []) {
-				needed.add(script);
-			}
-		}
-	}
-	return needed;
+/** The kit scripts the page needs: for the markup its HTML holds, the markup its client code can write later, and reply: true. */
+async function kitScripts(
+	html: string,
+	bundle: string,
+	front: Frontmatter,
+): Promise<Set<KitScript>> {
+	return new Set([
+		...(await scriptsInHtml(html)),
+		...scriptsInCode(bundle),
+		...(front.reply ? (["reply.js"] as const) : []),
+	]);
 }
 
 /**
- * The HTML page an .mdx file becomes, ready for pack's HTML pass (Mermaid, inlining, load checks): the MDX is compiled and
- * prerendered with Preact, then written into the page shell with the stylesheets its modules import, the islands' props and
- * client bundle, kitLabels and the kit scripts it needs. Every error the author can fix is a PackError.
+ * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
+ * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
+ * into the page shell with the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
+ * scripts it needs. Every error the author can fix is a PackError.
  */
-export async function mdxPage(file: string): Promise<string> {
+export async function mdxPage(
+	file: string,
+	drawDiagrams: (html: string) => Promise<string>,
+): Promise<string> {
 	// The bundler loads modules by their real path (/tmp is /private/tmp on macOS), and the page is recognised by it.
 	const path = realpathSync(file);
 	const page = await compileMdx(path, true);
 	const compiled = { path, js: page.js };
-	const server: Seen = { css: new Set(), modules: new Set() };
-	const client: Seen = { css: new Set(), modules: new Set() };
-	const { html, islands } = await prerender(compiled, server);
+	const css = new Set<string>();
+	const prerendered = await prerender(compiled, css);
+	const html = await drawDiagrams(prerendered.html);
+	const islands = prerendered.islands;
 	const modules = [...new Set(islands.map((island) => island.module))];
-	const bundle = islands.length ? await clientBundle(compiled, modules, client) : "";
-	const needed = await kitScripts(html, client, page.front);
-	const kit = (names: string[]) =>
+	const bundle = islands.length ? await clientBundle(compiled, modules, css) : "";
+	const needed = await kitScripts(html, bundle, page.front);
+	const kit = (names: KitScript[]) =>
 		names.filter((name) => needed.has(name)).map((name) => `<script src="kit:${name}"></script>`);
 	const dir = dirname(path);
-	const css = [...new Set([...server.css, ...client.css])].map(
+	const links = [...css].map(
 		(file) => `<link rel="stylesheet" href="${escapeHtml(relative(dir, file))}">`,
 	);
 	const islandData = islands.map(({ module, name, props }) => ({
@@ -127,7 +104,7 @@ export async function mdxPage(file: string): Promise<string> {
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
 		`<title>${escapeHtml(page.title ?? basename(path, extname(path)))}</title>`,
 		'<link rel="stylesheet" href="kit:theme.css">',
-		...css,
+		...links,
 		"</head>",
 		"<body>",
 		`<main class="page">${hoistViews(html, relative(process.cwd(), path) || path)}</main>`,

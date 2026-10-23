@@ -377,3 +377,96 @@ describe("keeping inside an island", () => {
 		expect(state.cleared).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2"));
 	}, 30_000);
 });
+
+/** The kit scripts a packed page includes, found by the documentation comment pack puts in front of each. */
+const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "reply"];
+const scriptsIn = (html: string) => KIT_SCRIPTS.filter((name) => html.includes(`/* ${name}: `));
+
+/** A client component that renders `jsx` (kit components from `imports`) only after #reveal is clicked. */
+const revealing = (imports: string, jsx: string) => `"use client";
+import { useState } from "preact/hooks";
+import { ${imports} } from "kit";
+
+export function Reveal() {
+	const [open, setOpen] = useState(false);
+	return (
+		<div>
+			<button type="button" class="btn" id="reveal" onClick={() => setOpen(true)}>Show</button>
+			{open && ${jsx}}
+		</div>
+	);
+}
+`;
+
+/** One use of each kit component, written so it needs every script the component can need (Tree: folds and refs). */
+const COMPONENT_USES: Record<string, string> = {
+	Chart: `<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />`,
+	Plot: `<Plot label="Bars" option={{ categories: ["a"], series: [{ type: "bar", data: [1] }] }} />`,
+	Question: `<Question name="pick" legend="Pick one" options={["yes", "no"]} />`,
+	Stepper: `<Stepper captions={["One", "Two"]}><p data-step="1">One</p><p data-step="2">Two</p></Stepper>`,
+	Tree: `<Tree items={[{ label: "Plan", ref: "plan", items: [{ label: "Task", ref: "plan", text: "Do it" }] }]} />`,
+};
+
+describe("kit scripts", () => {
+	test("a Question a client component reveals after a click brings reply.js, and its answer is kept", async () => {
+		dir.write(
+			"ask.tsx",
+			revealing(
+				"Question",
+				`<Question name="pick" legend="Pick one" options={{ yes: "Yes", no: "No" }} />`,
+			),
+		);
+		const output = await pack(
+			"ask",
+			'import { Reveal } from "./ask.tsx";\n\n# Ask\n\n<Reveal />\n',
+		);
+		expect(scriptsIn(readFileSync(output, "utf8"))).toContain("reply");
+		const kept = await inPage(output, async (cdp) => {
+			const reveal = `document.getElementById("reveal").click()`;
+			await act(cdp, reveal, "0");
+			await act(cdp, `document.getElementById("pick-no").click()`, "0");
+			await load(cdp);
+			return act(cdp, reveal, `document.getElementById("pick-no").checked`);
+		});
+		expect(kept).toBe(true);
+	}, 30_000);
+
+	test("two Mermaid diagrams sharing a node id bring link.js, and the parts light together", async () => {
+		const fence = (to: string) => `\`\`\`mermaid\nflowchart LR\n  A --> ${to}\n\`\`\`\n`;
+		const output = await pack("shared", `# Shared\n\n${fence("B")}\n${fence("C")}`);
+		expect(scriptsIn(readFileSync(output, "utf8"))).toContain("link");
+		const lit = await inPage(output, (cdp) =>
+			act(
+				cdp,
+				`document.querySelector('.mermaid [data-ref="A"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))`,
+				`[...document.querySelectorAll(".mermaid")].map((d) => d.querySelectorAll('.is-lit[data-ref="A"]').length > 0)`,
+			),
+		);
+		expect(lit).toEqual([true, true]);
+	}, 30_000);
+
+	test("every kit component a client component renders later brings the scripts it brings when the page renders it", async () => {
+		const exported = new Bun.Transpiler({ loader: "ts" }).scan(
+			readFileSync(new URL("../skills/explainer/kit/components/index.ts", import.meta.url), "utf8"),
+		).exports;
+		// A View inside a client component fails the pack, so it is the one component without a later use.
+		expect([...Object.keys(COMPONENT_USES), "View"].sort()).toEqual(exported.sort());
+		const found = await Promise.all(
+			Object.entries(COMPONENT_USES).map(async ([name, use]) => {
+				dir.write(`later-${name}.tsx`, revealing(name, use));
+				const [now, later] = await Promise.all([
+					pack(`now-${name}`, `import { ${name} } from "kit";\n\n# Now\n\n${use}\n`),
+					pack(
+						`later-${name}`,
+						`import { Reveal } from "./later-${name}.tsx";\n\n# Later\n\n<Reveal />\n`,
+					),
+				]);
+				const [before, after] = [now, later].map((file) => scriptsIn(readFileSync(file, "utf8")));
+				return [name, before?.filter((script) => !after?.includes(script))] as const;
+			}),
+		);
+		expect(Object.fromEntries(found)).toEqual(
+			Object.fromEntries(Object.keys(COMPONENT_USES).map((name) => [name, []])),
+		);
+	}, 60_000);
+});

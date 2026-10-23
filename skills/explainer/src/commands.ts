@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
 import { kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
 import { report } from "./report.ts";
@@ -65,15 +66,12 @@ function components(): { name: string; file: string; summary: string }[] {
 		});
 }
 
-/** The kit scripts a page using each component carries, for the sizes `kit` lists; pack decides inclusion on its own. */
-const COMPONENT_SCRIPTS: Record<string, string[]> = {
-	Chart: ["echarts.js", "charts.js"],
-	Plot: ["plot.js"],
-	Question: ["reply.js"],
-	Stepper: ["steps.js"],
-	Tree: ["views.js"],
-	View: ["views.js"],
-};
+/** The kit scripts a page using a component carries, for the sizes `kit` lists: those its compiled code can need, as pack decides. */
+const componentScripts = (file: string): string[] => [
+	...scriptsInCode(
+		new Bun.Transpiler({ loader: "tsx" }).transformSync(readFileSync(kitPath(file), "utf8")),
+	),
+];
 
 /** The size of kit files as a page carries them, e.g. "16 KB". */
 const kitSize = (files: string[]) =>
@@ -92,8 +90,7 @@ const pageDoc = () => kitHeader("components/index.ts").split("\n").slice(1).join
 /** What `kit` prints: everything an .mdx page can use, with where each one's documentation is. */
 function kitListing(): string {
 	const list = components().map(
-		(c) =>
-			`${c.name.padEnd(9)} ${kitSize(COMPONENT_SCRIPTS[c.name] ?? []).padStart(7)}  ${c.summary}`,
+		(c) => `${c.name.padEnd(9)} ${kitSize(componentScripts(c.file)).padStart(7)}  ${c.summary}`,
 	);
 	return `An .mdx page imports the kit's components; pack renders the page, adds the stylesheet and inlines the kit scripts its parts use:
   import { Chart, View } from "kit"

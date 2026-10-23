@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, relative, resolve } from "node:path";
-import type { BuildConfig, BuildMetafile, BunPlugin, JavaScriptLoader } from "bun";
+import { dirname, extname, join, relative } from "node:path";
+import type { BuildConfig, BunPlugin, JavaScriptLoader } from "bun";
 import type { Island, renderPage } from "../../kit/islands/server.ts";
 import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT } from "../paths.ts";
@@ -30,32 +30,6 @@ const SCRIPT = /\.m?[jt]sx?$/;
 const USE_CLIENT = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(["'])use client\1/;
 const SOURCE = "island-source:";
 
-/**
- * What the builds of one page saw besides their output: the stylesheets its modules import, and the script modules in it (in the
- * client build, only those with code in the bundle, so an unused re-export of kit/components/index.ts does not count).
- */
-export interface Seen {
-	css: Set<string>;
-	modules: Set<string>;
-}
-
-/** Drops from `seen.modules` the modules the build loaded but left no code of in its output: re-exports nothing imports. */
-function keepBundled(seen: Seen, meta: BuildMetafile): void {
-	// The metafile's paths are relative to the working directory, the loaded ones absolute.
-	const bundled = new Set(
-		Object.values(meta.outputs).flatMap((output) =>
-			Object.entries(output.inputs)
-				.filter(([, input]) => input.bytesInOutput > 0)
-				.map(([path]) => resolve(path)),
-		),
-	);
-	for (const module of seen.modules) {
-		if (!bundled.has(module)) {
-			seen.modules.delete(module);
-		}
-	}
-}
-
 const loaderOf = (path: string): JavaScriptLoader => LOADERS[extname(path)] ?? "js";
 
 /**
@@ -83,13 +57,13 @@ export interface CompiledPage {
 }
 
 /**
- * Resolution and loading for a page build: bare imports to the skill's files, `.mdx` through the MDX compiler, CSS recorded for
- * the page's `<link>`s instead of bundled, and, for the prerender, client modules swapped for their island wrappers.
+ * Resolution and loading for a page build: bare imports to the skill's files, `.mdx` through the MDX compiler, CSS recorded in
+ * `css` for the page's `<link>`s instead of bundled, and, for the prerender, client modules swapped for their island wrappers.
  */
 function pagePlugin(
 	page: CompiledPage,
 	entry: { path: string; code: string },
-	seen: Seen,
+	css: Set<string>,
 	prerender: boolean,
 ): BunPlugin {
 	return {
@@ -103,7 +77,7 @@ function pagePlugin(
 				},
 			);
 			build.onLoad({ filter: /\.css$/ }, ({ path }) => {
-				seen.css.add(path);
+				css.add(path);
 				return { contents: "", loader: "js" };
 			});
 			build.onLoad({ filter: /\.mdx$/ }, async ({ path }) => ({
@@ -114,7 +88,6 @@ function pagePlugin(
 				if (path === entry.path) {
 					return { contents: entry.code, loader: "js" };
 				}
-				seen.modules.add(path);
 				const source = readFileSync(path, "utf8");
 				return prerender && USE_CLIENT.test(source)
 					? { contents: islandModule(path, source), loader: "js" }
@@ -148,7 +121,7 @@ function located(log: BuildMessage | ResolveMessage): string {
 async function buildEntry(
 	page: CompiledPage,
 	entry: { path: string; code: string },
-	seen: Seen,
+	css: Set<string>,
 	options: Pick<BuildConfig, "target" | "format" | "minify">,
 	prerender: boolean,
 ): Promise<string> {
@@ -159,8 +132,7 @@ async function buildEntry(
 			entrypoints: [entry.path],
 			// The entry exists only here; `files` lets Bun resolve it, and the plugin's loader returns it.
 			files: { [entry.path]: entry.code },
-			plugins: [pagePlugin(page, entry, seen, prerender)],
-			metafile: !prerender,
+			plugins: [pagePlugin(page, entry, css, prerender)],
 			jsx: { runtime: "automatic", importSource: "preact", development: false },
 			throw: true,
 		});
@@ -176,9 +148,6 @@ async function buildEntry(
 				)
 				.join("\n"),
 		);
-	}
-	if (built.metafile) {
-		keepBundled(seen, built.metafile);
 	}
 	const [output] = built.outputs;
 	if (!output) {
@@ -196,11 +165,12 @@ interface Prerender {
 /**
  * Renders the page to static HTML in this process: the page, its imports and Preact are bundled into one module (so they share
  * one Preact), which is imported from a temporary file and run once. Returns the HTML (islands between comment markers) and
- * the islands. An error the author can fix (kit/islands/server.ts's IslandError) or any error the page throws is a PackError.
+ * the islands, and adds the stylesheets the page's modules import to `css`. An error the author can fix (kit/islands/server.ts's
+ * IslandError) or any error the page throws is a PackError.
  */
 export async function prerender(
 	page: CompiledPage,
-	seen: Seen,
+	css: Set<string>,
 ): Promise<{ html: string; islands: Island[] }> {
 	const code = `import Content from ${JSON.stringify(page.path)};
 export { Content };
@@ -208,7 +178,7 @@ export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`;
 	const js = await buildEntry(
 		page,
 		{ path: join(dirname(page.path), "explainer-prerender.ts"), code },
-		seen,
+		css,
 		{ target: "bun", format: "esm" },
 		true,
 	);
@@ -235,9 +205,14 @@ export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`;
 
 /**
  * The one classic script that hydrates the islands: Preact, the client modules as written (not wrapped) and
- * kit/islands/client.ts, minified. `modules` are numbered in the order given, as the islands' JSON names them.
+ * kit/islands/client.ts, minified. `modules` are numbered in the order given, as the islands' JSON names them. Tree shaking
+ * leaves out the kit components the client modules do not use, so the bundle holds only markup they can write.
  */
-export function clientBundle(page: CompiledPage, modules: string[], seen: Seen): Promise<string> {
+export function clientBundle(
+	page: CompiledPage,
+	modules: string[],
+	css: Set<string>,
+): Promise<string> {
 	const code = [
 		`import { hydrateIslands } from ${JSON.stringify(join(ISLANDS, "client.ts"))};`,
 		...modules.map((path, i) => `import * as m${i} from ${JSON.stringify(path)};`),
@@ -246,7 +221,7 @@ export function clientBundle(page: CompiledPage, modules: string[], seen: Seen):
 	return buildEntry(
 		page,
 		{ path: join(dirname(page.path), "explainer-islands.ts"), code },
-		seen,
+		css,
 		{ target: "browser", format: "iife", minify: true },
 		false,
 	);

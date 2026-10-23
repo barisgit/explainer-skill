@@ -298,11 +298,13 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	const baseDir = dirname(resolve(inputPath));
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
-	const original =
-		extname(inputPath).toLowerCase() === ".mdx"
-			? await mdxPage(resolve(inputPath))
-			: readFileSync(inputPath, "utf8");
-	const source = await renderMermaidBlocks(original, problems, diagramRefs);
+	const drawDiagrams = (html: string) => renderMermaidBlocks(html, problems, diagramRefs);
+	// An .mdx page draws its diagrams before it chooses its kit scripts, so diagram parts bring link.js.
+	const mdx = extname(inputPath).toLowerCase() === ".mdx";
+	const original = mdx
+		? await mdxPage(resolve(inputPath), drawDiagrams)
+		: readFileSync(inputPath, "utf8");
+	const source = mdx ? original : await drawDiagrams(original);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);
 	// The inliner names the loads it sees as written; findLoads also finds the escaped ones, so the same load can come twice.
