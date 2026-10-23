@@ -202,9 +202,18 @@
 	.toc-toggle {
 		display: none;
 	}
-	/* .wide reaches into both margins of a centred column; beside the rail it stays in the column. */
+	/* .wide reaches into both margins of a centred column. Beside the rail its start stays with the column, and it reaches into the
+	   right margin up to the window's gutter, by at most 22rem: up to 88rem in all, as without the rail. The margin is that of the
+	   page box above, so 100vw stands for its 100%; a classic scrollbar's width, which 100vw also counts, stays within the gutter.
+	   Expand all over a .wide block ends with it. */
 	.has-toc .wide {
-		margin-inline: 0;
+		margin-inline-start: 0;
+	}
+	.has-toc :is(.wide, .fold-all:has(+ .wide)) {
+		margin-inline-end: calc(
+			-1 *
+			clamp(0px, (100vw - min(100vw - 2 * var(--gutter), 81rem)) / 2 - var(--gutter), 22rem)
+		);
 	}
 }
 
@@ -215,6 +224,10 @@
 }
 .expand.fold-all::after {
 	content: none;
+}
+/* Over a .wide block it ends where the block does: the end margin of .wide in the layout part. */
+.fold-all:has(+ .wide) {
+	margin-inline-end: calc(50% - min(44rem, 50vw - var(--gutter)));
 }
 
 @media print {

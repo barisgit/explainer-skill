@@ -211,6 +211,29 @@ test("a page with one kind of view has no rail", async () => {
 	expect(await packAndRun(dir, "single", page)).toEqual([]);
 }, 30_000);
 
+test(".wide beside the rail reaches into the right margin with its Expand all, prose keeps its column, nothing scrolls sideways", async () => {
+	const page = `${HEAD}<main class="page"><div data-overview><h1>Records</h1>
+<section><h2>People</h2><p id="prose">${"Words in the reading column. ".repeat(20)}</p><a href="#p/a">A</a></section>
+<section id="records"><h2>Items</h2><div class="wide" id="wide"><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div><a href="#i/1">One</a></section></div>
+<section class="view" data-view="p"><a class="back" href="#">Home</a><h1>Person</h1></section>
+<section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section></main>
+<script src="kit:views.js"></script>
+<script>
+const box = (id) => document.getElementById(id).getBoundingClientRect();
+const column = () => document.getElementById("records").getBoundingClientRect();
+const railShown = () => document.querySelector(".toc").getBoundingClientRect().right < column().left;
+${pageContract({
+	"the rail shows beside the column on a wide screen": `innerWidth < 1024 || railShown()`,
+	".wide starts with the column": `Math.abs(box("wide").left - column().left) < 1`,
+	"beside the rail, .wide reaches past the column into the right margin, short of the window's 2rem gutter": `innerWidth < 1400 || (box("wide").right > column().right + 30 && box("wide").right <= innerWidth - 31)`,
+	"on a phone, .wide is the column": `innerWidth >= 1024 || Math.abs(box("wide").right - column().right) < 1`,
+	"Expand all over .wide ends with it": `Math.abs(document.querySelector(".fold-all").getBoundingClientRect().right - box("wide").right) < 1`,
+	"prose keeps its column": `box("prose").right <= column().right + 1`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+	expect(await packAndRun(dir, "wide", page)).toEqual([]);
+}, 30_000);
+
 test("a section with two folds gets Expand all, which follows the folds the reader toggles", async () => {
 	const page = `${HEAD}<main class="page"><div data-overview><h1>Folds</h1>
 <section id="two"><h2>Two</h2><div><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div></section>
