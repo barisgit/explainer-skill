@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { pageAssertion, runCli, scratch } from "./support.ts";
+import { packAndRun, pageAssertion, pageContract, runCli, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -430,6 +430,97 @@ ${onLoad(2, "Clear is offered for answers that wait for their panel", `!clearBut
 
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
+}, 60_000);
+
+/** Rows of a table filling the column, so a control in a corner of the window would sit on them. */
+const ROWS = Array.from(
+	{ length: 12 },
+	(_, i) =>
+		`<tr><th>Option ${i + 1}</th><td style="text-align: right">${(i + 1) * 125} ms</td></tr>`,
+).join("");
+const PROSE = Array.from(
+	{ length: 8 },
+	(_, i) =>
+		`<p>Paragraph ${i + 1} runs the full measure of the column, so it reaches the right edge on a phone and on a desktop.</p>`,
+).join("");
+
+/**
+ * Geometry of the reply bar, in page script. `ownsRow`: every point across the bar's middle row hits the bar, so content can pass only
+ * under all of it, as under the window's edge, never beside a control that hides part of it. `coversNothing`: no content box meets it.
+ */
+const BAR_GEOMETRY = `
+const bar = () => document.querySelector(".reply-bar");
+const box = () => bar().getBoundingClientRect();
+const at = (top) => (scrollTo({ top, behavior: "instant" }), true);
+const inView = () => box().top >= 0 && box().bottom <= innerHeight + 0.5 && box().height > 0;
+const opaque = () => /^rgb\\(/.test(getComputedStyle(bar()).backgroundColor);
+const ownsRow = () => {
+	const y = (box().top + box().bottom) / 2;
+	for (let x = 1; x < document.documentElement.clientWidth; x += 8) {
+		if (!bar().contains(document.elementFromPoint(x, y))) return false;
+	}
+	return true;
+};
+const meets = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const coversNothing = () => [...document.querySelectorAll("main *")].every((el) => !meets(el.getBoundingClientRect(), box()));
+const end = () => document.documentElement.scrollHeight - innerHeight;`;
+
+/** A tall page whose first box is a full-width table; `question` adds a data-reply question, so the Reply button shows from the start. */
+const BAR_PAGE = (question: boolean, script: string) =>
+	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main><table class="compare">${ROWS}</table><h1>Bar</h1>${PROSE}
+${question ? `<fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" checked> A</label> <label><input type="radio" name="p" value="b" id="b"> B</label></fieldset>` : ""}
+<input id="late" aria-label="Late">${PROSE}<table class="compare">${ROWS}</table></main>
+<script src="kit:reply.js"></script><script>${BAR_GEOMETRY}
+${script}</script></body></html>`;
+
+test("the reply bar never covers content: at the top nothing is under it, and scrolled it stays in view with the count and content passes only under all of it", async () => {
+	const contract = pageContract({
+		"an answer shows the count and Clear": `(document.getElementById("b").click(), bar().textContent.includes("Reply (1)") && bar().querySelectorAll(".btn:not([hidden])").length === 2)`,
+		"at the top the bar is in view, opaque and covers nothing":
+			"at(0) && inView() && opaque() && ownsRow() && coversNothing()",
+		"half way down the bar is in view and owns its row": "at(end() / 2) && inView() && ownsRow()",
+		"a control focused under the bar scrolls clear of it": `(() => {
+			const late = document.getElementById("late");
+			at(late.getBoundingClientRect().top + scrollY - box().top - 4);
+			late.focus();
+			return late.getBoundingClientRect().top >= box().bottom;
+		})()`,
+		"at the end the bar is in view and owns its row": "at(end()) && inView() && ownsRow()",
+	});
+	expect(await packAndRun(dir, "bar", BAR_PAGE(true, contract))).toEqual([]);
+}, 60_000);
+
+test("a reply bar that long kitLabels wrap onto two rows still covers nothing at the top, and focus clears it", async () => {
+	const labels = `var kitLabels = { reply: "Antworten", clear: "Antworten und Notizen löschen" };`;
+	const contract = `${labels}
+${SETTLED}
+var contract = settled.then(async () => {
+	document.getElementById("b").click();
+	await new Promise(requestAnimationFrame);
+	await new Promise(requestAnimationFrame);
+	const late = document.getElementById("late");
+	const top = at(0) && coversNothing();
+	at(late.getBoundingClientRect().top + scrollY - box().bottom + 4);
+	late.focus();
+	return [top ? "" : "the wrapped bar covers content at the top", late.getBoundingClientRect().top >= box().bottom ? "" : "a control focused under the wrapped bar stays under it"].filter(Boolean);
+});`;
+	expect(await packAndRun(dir, "bar-long", BAR_PAGE(true, contract))).toEqual([]);
+}, 60_000);
+
+test("the reply bar appearing on a reader's first input does not move the page under the reader", async () => {
+	const contract = `${SETTLED}
+var contract = settled.then(async () => {
+	const late = document.getElementById("late");
+	const before = late.getBoundingClientRect().top;
+	const hidden = bar().hidden;
+	late.value = "typed";
+	late.dispatchEvent(new Event("input", { bubbles: true }));
+	await new Promise((tick) => setTimeout(tick));
+	await new Promise(requestAnimationFrame);
+	return hidden && !bar().hidden && late.getBoundingClientRect().top === before ? [] : ["the page moved as the bar appeared"];
+});`;
+	expect(await packAndRun(dir, "bar-keep", BAR_PAGE(false, contract))).toEqual([]);
 }, 60_000);
 
 test("a field the page rebuilds under the same id as a different field does not receive the old field's answer", async () => {
