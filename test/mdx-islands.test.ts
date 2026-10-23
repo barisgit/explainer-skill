@@ -470,3 +470,50 @@ describe("kit scripts", () => {
 		);
 	}, 60_000);
 });
+
+describe("Question", () => {
+	test("options whose values differ only in case keep their own answer across a reload, and the reply holds it", async () => {
+		const output = await pack(
+			"case",
+			'import { Question } from "kit";\n\n# Case\n\n<Question name="pick" legend="Which one?" options={{ A: "Upper", a: "Lower" }} />\n',
+		);
+		const state = await inPage(output, async (cdp) => {
+			await act(cdp, `document.querySelector('input[value="a"]').click()`, "0");
+			await load(cdp);
+			return act(
+				cdp,
+				`document.querySelector(".reply-bar .primary").click()`,
+				`[[...document.querySelectorAll("input[name=pick]")].map((i) => i.checked).join(), document.querySelector(".reply-md").textContent.split("\\n").find((line) => line.includes("Which one?"))]`,
+			);
+		});
+		expect(state).toEqual(["false,true", expect.stringContaining("Lower")]);
+	}, 30_000);
+
+	test("a value twice in one Question, or two Questions writing one id, fails the pack, saying what to change", async () => {
+		const question = (name: string, options: string) =>
+			`<Question name="${name}" legend="Which?" options={${options}} />`;
+		const failed = async (name: string, body: string) => {
+			const source = `import { Question } from "kit";\n\n# Ids\n\n${body}\n`;
+			const result = await runCli([
+				"pack",
+				dir.write(`${name}.mdx`, source),
+				"-o",
+				dir.path(`${name}.out.html`),
+			]);
+			return [result.code, result.stderr.trim()];
+		};
+		expect(await failed("twice", question("pick", '["Yes", "No", "Yes"]'))).toEqual([
+			1,
+			expect.stringContaining('<Question name="pick"> has the option value "Yes" twice'),
+		]);
+		expect(
+			await failed(
+				"shared",
+				`${question("pick", '["Yes"]')}\n\n${question("pick", '["Yes", "No"]')}`,
+			),
+		).toEqual([1, expect.stringContaining('the id "pick-Yes" is on 2 controls')]);
+		expect(
+			await failed("grouped", `${question("pick", '["Yes"]')}\n\n${question("pick", '["No"]')}`),
+		).toEqual([1, expect.stringContaining('2 questions use the name "pick"')]);
+	}, 30_000);
+});

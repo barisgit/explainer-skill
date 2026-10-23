@@ -51,6 +51,47 @@ const escapeHtml = (text: string) =>
 /** JSON for an inline script: `<` escaped, so no `</script>` or `<!--` can occur in it. */
 const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 
+/**
+ * Problems that would mix up the reader's answers: a control id on two controls (reply.js keeps an answer by id, so it would
+ * restore neither), or one option name in two data-reply fieldsets (their radios would form one group). A Question's ids are
+ * its name and values, so two Questions meet when they share a name. Controls a client component renders later are not seen.
+ */
+async function answerClashes(html: string): Promise<string[]> {
+	const ids = new Map<string, number>();
+	const groups = new Map<string, Set<number>>();
+	let fieldsets = 0;
+	await new HTMLRewriter()
+		.on("input[id], select[id], textarea[id]", {
+			element(el) {
+				const id = el.getAttribute("id") ?? "";
+				ids.set(id, (ids.get(id) ?? 0) + 1);
+			},
+		})
+		.on("fieldset[data-reply]", { element: () => void fieldsets++ })
+		.on("fieldset[data-reply] input[name]", {
+			element(el) {
+				const name = el.getAttribute("name") ?? "";
+				groups.set(name, (groups.get(name) ?? new Set()).add(fieldsets));
+			},
+		})
+		.transform(new Response(html))
+		.text();
+	return [
+		...[...groups]
+			.filter(([, inside]) => inside.size > 1)
+			.map(
+				([name, inside]) =>
+					`${inside.size} questions use the name "${name}", so their options would form one group: give each Question its own name`,
+			),
+		...[...ids]
+			.filter(([, count]) => count > 1)
+			.map(
+				([id, count]) =>
+					`the id "${id}" is on ${count} controls, and the reader's answers are kept by id: a Question's ids are its name and option values, so give each Question its own name and other controls ids of their own`,
+			),
+	];
+}
+
 /** The kit scripts the page needs: for the markup its HTML holds, the markup its client code can write later, and reply: true. */
 async function kitScripts(
 	html: string,
@@ -80,6 +121,11 @@ export async function mdxPage(
 	const compiled = { path, js: page.js };
 	const css = new Set<string>();
 	const prerendered = await prerender(compiled, css);
+	const clashes = await answerClashes(prerendered.html);
+	if (clashes.length) {
+		const where = relative(process.cwd(), path) || path;
+		throw new PackError(clashes.map((clash) => `${where}: ${clash}`).join("\n"));
+	}
 	const html = await drawDiagrams(prerendered.html);
 	const islands = prerendered.islands;
 	const modules = [...new Set(islands.map((island) => island.module))];
