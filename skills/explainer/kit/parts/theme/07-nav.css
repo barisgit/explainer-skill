@@ -220,7 +220,8 @@
 /* Expand all: right-aligned just above the section's first fold, without .expand's +/- suffix. */
 .fold-all {
 	display: block;
-	margin: 1.25rem 0 -1rem auto;
+	margin-block: 1.25rem -1rem;
+	margin-inline: auto 0;
 }
 .expand.fold-all::after {
 	content: none;
@@ -231,9 +232,9 @@
 	margin: 0;
 	margin-inline-start: auto;
 }
-/* Over a .wide block it ends where the block does: the end margin of .wide in the layout part. */
+/* Over a .wide block it takes the block's margins (the layout part) but keeps to the end. */
 .fold-all:has(+ .wide) {
-	margin-inline-end: calc(50% - min(44rem, 50vw - var(--gutter)));
+	margin-inline-start: auto;
 }
 
 @media print {

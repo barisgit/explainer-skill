@@ -87,8 +87,10 @@ h3,
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
 	gap: 1rem 1.5rem;
 }
-/* Wider than the reading column on big screens, for tables and side-by-side panels; full column width on phones. */
-.wide {
+/* Wider than the reading column on big screens, for tables and side-by-side panels; full column width on phones. Expand all just
+   above a .wide block (kit:views.js) takes its margins, so it ends where the block does; the navigation part keeps its start. */
+.wide,
+.fold-all:has(+ .wide) {
 	margin-inline: calc(50% - min(44rem, 50vw - var(--gutter)));
 }
 /* Band: the one stretch where the reader acts or decides, in the sunken tone from window edge to edge. The content keeps the column;
