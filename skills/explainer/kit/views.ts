@@ -19,7 +19,7 @@
 	const handlers: Record<string, ViewHandler> = {};
 	let started = false;
 	let overviewY = 0;
-	const nav = window.ViewsNav({ views, decode });
+	const nav = window.ViewsNav({ views, decode, canonical });
 	const refreshFolds = window.ViewsFolds();
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
@@ -31,11 +31,20 @@
 		}
 	}
 
+	/**
+	 * A hash in the form location.hash reports it: spaces and non-ASCII percent-encoded, escapes already written (%2F among them)
+	 * kept. A page writes href="#kdo/blaž" and data-view="kdo/blaž" where location.hash reads "#kdo/bla%C5%BE"; hashes are
+	 * compared in this form.
+	 */
+	function canonical(hash: string) {
+		return new URL(`#${hash}`, "file:///").hash.slice(1);
+	}
+
 	/** The view claimed by the current hash: `name/param` wins over `name`; param is decoded. */
 	function route() {
-		const [name = "", ...rest] = location.hash.slice(1).split("/");
+		const [name = "", ...rest] = canonical(location.hash.slice(1)).split("/");
 		const view =
-			views.find((v) => v.dataset.view === `${name}/${rest.join("/")}`) ??
+			views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ??
 			views.find((v) => v.dataset.view === name);
 		return { name, view, param: decode(rest.join("/")) };
 	}

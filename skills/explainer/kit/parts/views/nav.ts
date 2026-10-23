@@ -15,7 +15,7 @@
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ViewsNav = ({ views, decode }) => {
+window.ViewsNav = ({ views, decode, canonical }) => {
 	/** One trail step: the view's hash, its name as the reader saw it, and the sibling hashes it walks (absent: every sibling). */
 	interface Step {
 		hash: string;
@@ -71,12 +71,7 @@ window.ViewsNav = ({ views, decode }) => {
 		);
 	}
 
-	/**
-	 * A hash in the form location.hash reports it: spaces and non-ASCII percent-encoded, escapes already written (%2F among them)
-	 * kept. A link may write "#person/Blaž" where location.hash reads "#person/Bla%C5%BE"; links, static claims, saved lists and
-	 * the current hash are all compared in this form.
-	 */
-	const canonical = (hash: string) => new URL(`#${hash}`, "file:///").hash.slice(1);
+	// Links, static claims, saved lists and the current hash are all compared in views.js's canonical form.
 	const hashOf = (a: HTMLAnchorElement) => canonical((a.getAttribute("href") ?? "").slice(1));
 	const unique = (hashes: string[]) => [...new Set(hashes)];
 	const viewDrawnFor = (hash: string) => [...drawn].find(([, h]) => h === hash)?.[0];
