@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Which password hash: Argon2id, scrypt, bcrypt or PBKDF2</title>
-<style>/* theme part: fonts, tokens, element defaults. Font urls resolve against kit/, where pack reads the theme from. */
+<style>@layer kit {
+/* theme part: fonts, tokens, element defaults. Font urls resolve against kit/, where pack reads the theme from. */
 @font-face {
 	font-family: "Geist";
 	font-weight: 100 900;
@@ -1685,6 +1686,7 @@ details > :last-child:not(summary) {
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
+   Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation, trees); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
@@ -1879,7 +1881,7 @@ dialog.reply-dialog[open] {
 	}
 }
 /* end features */
-</style>
+}</style>
 <style>
 	:root { --accent: light-dark(#0f6b5c, #5fd3bd); }
 	#budget-chart { block-size: clamp(22rem, 52vw, 27rem); }
