@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" fill="none" stroke="currentColor" stroke-width="2">
+  <title>A house with panels on its roof</title>
+  <path d="M30 80 L120 20 L210 80" />
+  <rect x="50" y="80" width="140" height="70" />
+  <rect x="105" y="110" width="30" height="40" />
+  <g stroke="var(--accent)" stroke-width="3">
+    <path d="M60 64 L104 35" />
+    <path d="M70 72 L114 43" />
+    <path d="M80 80 L124 51" />
+  </g>
+  <circle cx="200" cy="25" r="12" stroke="var(--warn)" />
+</svg>

@@ -1,0 +1,67 @@
+---
+title: Velikost hišne baterije
+lang: sl
+labels:
+  back: "Nazaj"
+  play: "Predvajaj"
+  pause: "Premor"
+  next: "Naprej"
+  stepControls: "Upravljanje korakov"
+  step: "Korak"
+  stepper: "Po korakih; uporabite puščici"
+  contents: "Vsebina"
+  breadcrumb: "Drobtine"
+  expandAll: "Razširi vse"
+  collapseAll: "Strni vse"
+  overview: "Pregled"
+  reply: "Odgovor"
+  clear: "Počisti odgovore in opombe"
+  clearConfirm: "Počistim vse?"
+  clearPrompt: "Pritisnite še enkrat, da počistite vse."
+  clearCancelled: "Čiščenje preklicano."
+  yourReply: "Vaš odgovor"
+  close: "Zapri"
+  copyReply: "Kopiraj odgovor"
+  copied: "Kopirano. Prilepite agentu."
+  copyFailed: "Kopiranje ni uspelo: označite besedilo zgoraj."
+  remove: "Odstrani"
+  note: "Opomba"
+  notePlaceholder: "Opomba za agenta"
+  addNote: "Dodaj opombo"
+  noteOn: "Opomba k"
+  part: "Del"
+  cancel: "Prekliči"
+  saveNote: "Shrani opombo"
+  figure: "slika"
+  page: "stran"
+---
+import { Question, Stepper, Tree, View } from "kit";
+import { euro, QUOTE } from "./data.ts";
+
+# Baterija s 5 kWh pokrije *80 % poletnih večerov*.
+
+Ponudba za baterijo k 6-kilovatni sončni elektrarni na strehi štiričlanske hiše.
+
+<h2 data-nav="Dan">Čez dan</h2>
+
+<Stepper start={1} captions={["Zjutraj elektrarna napaja hišo.", "Opoldne presežek polni baterijo.", "Zvečer baterija napaja hišo."]}>
+<p data-step="1">Elektrarna → hiša</p>
+<p data-step="2">Elektrarna → baterija</p>
+<p data-step="3">Baterija → hiša</p>
+</Stepper>
+
+<h2 data-nav="Cena">Ponudba: 4.200 €</h2>
+
+<Tree items={QUOTE} row={(g) => g.items ? { label: g.name, cells: [euro(g.items.reduce((sum, i) => sum + i.eur, 0))], items: g.items } : { label: g.name, cells: [euro(g.eur)], text: g.note }} />
+
+[Kako so nastale številke](#metoda)
+
+<Question name="velikost" legend="Katero velikost bi kupili?" options={["5 kWh", "10 kWh", "Še nobene"]} />
+
+<View name="metoda" back="Ponudba">
+
+# Kako so nastale številke
+
+Leto urnih odčitkov števca in preprost model polnjenja.
+
+</View>

@@ -1,0 +1,31 @@
+:root {
+	--accent: light-dark(#1f6f5c, #6fd1b5);
+}
+.flow {
+	display: block;
+	inline-size: 100%;
+	max-inline-size: 36rem;
+	margin-inline: auto;
+	color: var(--ink);
+}
+.flow rect {
+	fill: var(--surface);
+	stroke: currentColor;
+}
+.flow text {
+	font: 14px var(--font);
+	fill: currentColor;
+	text-anchor: middle;
+}
+.flow path {
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: 2;
+}
+.flow .is-now path {
+	stroke: var(--accent);
+	stroke-width: 3;
+}
+.roof {
+	max-inline-size: 18rem;
+}
