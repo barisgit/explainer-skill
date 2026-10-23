@@ -12,15 +12,29 @@
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
-   gets Expand all. */
+   gets Expand all.
+   Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
+   one object before the kit scripts: <script>var kitLabels = { contents: "Vsebina", ... }</script> in <head>. Keys here:
+   contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name), expandAll
+   "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no .back
+   link names it). A key left out stays English. */
 (() => {
 	const root = document.documentElement;
 	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
 	const handlers: Record<string, ViewHandler> = {};
 	let started = false;
 	let overviewY = 0;
-	const nav = window.ViewsNav({ views, decode, canonical });
-	const refreshFolds = window.ViewsFolds();
+	/** The English texts of the navigation parts; the page's kitLabels replace any of them. */
+	const LABELS = {
+		contents: "Contents",
+		breadcrumb: "Breadcrumb",
+		expandAll: "Expand all",
+		collapseAll: "Collapse all",
+		overview: "Overview",
+	};
+	const labels: typeof LABELS = { ...LABELS, ...window.kitLabels };
+	const nav = window.ViewsNav({ views, decode, canonical, labels });
+	const refreshFolds = window.ViewsFolds(labels);
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
 	function decode(text: string) {

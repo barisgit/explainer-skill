@@ -13,7 +13,7 @@ const PAGE = (
 	checks: string[],
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><h1>Steps</h1>
-<figure class="fig" id="s" data-stepper data-start="1" data-labels="Nazaj,Predvajaj,Premor,Naprej,,Korak">
+<figure class="fig" id="s" data-stepper data-start="1">
 <svg viewBox="0 0 90 20" width="270"><rect id="a" data-step="1" width="20" height="20"/><rect id="b" data-step="2 3" x="35" width="20" height="20"/><rect id="c" data-step="3" x="70" width="20" height="20"/></svg>
 <ol data-captions><li>one</li><li>two</li><li>three</li></ol></figure>
 <script src="kit:steps.js"></script>
@@ -31,10 +31,6 @@ const CHECKS = [
 	assertLater(
 		"on the opening step only the part listing step 1 is shown and lit",
 		`${PART_CLASSES} === "is-on is-now,,"`,
-	),
-	assertLater(
-		"data-labels renames the controls and keeps the defaults it leaves empty",
-		`document.querySelector("[data-go='1']").textContent === "Naprej" && document.querySelector("[data-play]").textContent === "Predvajaj" && document.querySelector(".player input").ariaLabel === "Korak" && document.querySelector(".player").ariaLabel === "Step controls"`,
 	),
 	assertLater(
 		"data-go buttons step: an earlier part stays shown, unlit, and a part listing steps 2 and 3 appears at 2",

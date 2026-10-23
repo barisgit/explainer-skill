@@ -8,8 +8,10 @@
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
    A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
-   Labels: data-labels="Back,Play,Pause,Next,Step controls,Step" on the stepper replaces the button texts and the two accessible names, in
-   this order; leave an entry empty to keep its default (no commas inside a label).
+   Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in one
+   object before the kit scripts: <script>var kitLabels = { back: "Nazaj", play: "Predvajaj", ... }</script> in <head>. Keys here:
+   back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
+   (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
    Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts must redraw on it;
@@ -30,8 +32,17 @@
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
 
-	// Default texts in data-labels order; the page's list may leave entries empty to keep them.
-	const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"] as const;
+	/** The English texts; the page's kitLabels replace any of them. */
+	const LABELS = {
+		back: "Back",
+		play: "Play",
+		pause: "Pause",
+		next: "Next",
+		stepControls: "Step controls",
+		step: "Step",
+		stepper: "Step-through; use the arrow keys",
+	};
+	const TEXT: typeof LABELS = { ...LABELS, ...window.kitLabels };
 
 	/** An element the stepper's own markup is known to contain. */
 	function need<T extends Element>(root: ParentNode, selector: string): T {
@@ -42,8 +53,9 @@
 		return el;
 	}
 
-	const button = (label: string, attrs: string, primary = false) =>
-		`<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
+	// Texts are set as text afterwards: a page's label is never parsed as markup.
+	const button = (attrs: string, primary = false) =>
+		`<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}></button>`;
 
 	/** One stepper: its controls, the current step and the content it steps through. */
 	class Stepper {
@@ -62,24 +74,27 @@
 		readonly range: HTMLInputElement;
 		readonly readout: HTMLOutputElement;
 		readonly watcher: MutationObserver;
-		readonly playText: string;
-		readonly pauseText: string;
 
 		constructor(root: HTMLElement) {
 			this.root = root;
-			const custom = (root.dataset.labels ?? "").split(",").map((label) => label.trim());
-			const text = (i: 0 | 1 | 2 | 3 | 4 | 5) => custom[i] || LABELS[i];
-			this.playText = text(1);
-			this.pauseText = text(2);
+			if (root.dataset.labels !== undefined) {
+				// v0.7.0 read per-stepper labels; a page written for it would otherwise turn English without a word.
+				console.warn(
+					"kit:steps.js: data-labels is no longer read; set the texts in kitLabels (kit steps.js)",
+				);
+			}
 			this.bar.className = "player";
 			this.bar.setAttribute("role", "group");
-			this.bar.setAttribute("aria-label", text(4));
-			this.bar.innerHTML = `${button(text(0), 'data-go="-1"')}${button(this.playText, "data-play", true)}${button(text(3), 'data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
+			this.bar.setAttribute("aria-label", TEXT.stepControls);
+			this.bar.innerHTML = `${button('data-go="-1"')}${button("data-play", true)}${button('data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
 			this.back = need(this.bar, "[data-go='-1']");
 			this.play = need(this.bar, "[data-play]");
 			this.next = need(this.bar, "[data-go='1']");
+			this.back.textContent = TEXT.back;
+			this.play.textContent = TEXT.play;
+			this.next.textContent = TEXT.next;
 			this.range = need(this.bar, "input");
-			this.range.setAttribute("aria-label", text(5));
+			this.range.setAttribute("aria-label", TEXT.step);
 			this.readout = need(this.bar, "output");
 			this.bindControls();
 			this.bindKeys();
@@ -122,7 +137,7 @@
 		stop() {
 			clearInterval(this.timer);
 			this.timer = undefined;
-			this.play.textContent = this.playText;
+			this.play.textContent = TEXT.play;
 		}
 
 		bindControls() {
@@ -144,7 +159,7 @@
 				if (this.step === this.total) {
 					this.show(1);
 				}
-				this.play.textContent = this.pauseText;
+				this.play.textContent = TEXT.pause;
 				this.timer = setInterval(
 					() => (this.step < this.total ? this.show(this.step + 1) : this.stop()),
 					PLAY_MS,
@@ -210,10 +225,7 @@
 			this.range.max = String(this.total);
 			root.tabIndex = 0;
 			root.setAttribute("role", "group");
-			root.setAttribute(
-				"aria-label",
-				root.getAttribute("aria-label") ?? "Step-through; use the arrow keys",
-			);
+			root.setAttribute("aria-label", root.getAttribute("aria-label") ?? TEXT.stepper);
 			root.dataset.live = "";
 		}
 

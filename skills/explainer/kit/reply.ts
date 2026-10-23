@@ -31,6 +31,14 @@
    the button or the wait cancels.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
+   Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
+   object before the kit scripts: <script>var kitLabels = { reply: "Odgovor", ... }</script> in <head>. Keys here: reply "Reply"
+   ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press again to clear
+   all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog), close "Close",
+   copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and copy it.",
+   remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note". A key left out stays
+   English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
@@ -38,6 +46,28 @@
 	const CONTROL =
 		"input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
 	const notes: ReplyNote[] = [];
+	/** The English texts; the page's kitLabels replace any of them. */
+	const LABELS = {
+		reply: "Reply",
+		clear: "Clear answers and notes",
+		clearConfirm: "Clear everything?",
+		clearPrompt: "Press again to clear all answers and notes.",
+		clearCancelled: "Clear cancelled.",
+		yourReply: "Your reply",
+		close: "Close",
+		copyReply: "Copy reply",
+		copied: "Copied. Paste it to the agent.",
+		copyFailed: "Copy failed: select the text above and copy it.",
+		remove: "Remove",
+		note: "Note",
+		notePlaceholder: "Note for the agent",
+		addNote: "Add note",
+		noteOn: "Note on",
+		part: "Part",
+		cancel: "Cancel",
+		saveNote: "Save note",
+	};
+	const TEXT: typeof LABELS = { ...LABELS, ...window.kitLabels };
 
 	const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 	/** Text that will sit inside the Markdown's own "..." quotes. */
@@ -238,14 +268,12 @@
 		if (parent !== window) {
 			parent.postMessage({ type: "explainer:reply", ...detail }, "*");
 		}
-		return (await copy(detail.markdown))
-			? "Copied. Paste it to the agent."
-			: "Copy failed: select the text above and copy it.";
+		return (await copy(detail.markdown)) ? TEXT.copied : TEXT.copyFailed;
 	}
 
 	// ---- UI ----
 	const dialog = document.body.appendChild(
-		h("dialog", { class: "reply-ui reply-dialog", "aria-label": "Your reply" }),
+		h("dialog", { class: "reply-ui reply-dialog", "aria-label": TEXT.yourReply }),
 	);
 	const button = h("button", {
 		type: "button",
@@ -255,10 +283,8 @@
 			dialog.showModal();
 		},
 	});
-	const CLEAR_LABEL = "Clear answers and notes";
-	const CONFIRM_LABEL = "Clear everything?";
 	const CONFIRM_MS = 4000;
-	const clear = h("button", { type: "button", class: "btn", onclick: onClear }, CLEAR_LABEL);
+	const clear = h("button", { type: "button", class: "btn", onclick: onClear }, TEXT.clear);
 	// A live region announces the state change: screen readers do not reliably re-read a focused button whose text changed.
 	const announce = h("span", { role: "status", class: "reply-invisible" });
 	const bar = document.body.appendChild(
@@ -281,9 +307,9 @@
 		// The longer label sets the button's width; pin it so the bar does not shift under the pointer.
 		clear.style.inlineSize = `${clear.getBoundingClientRect().width}px`;
 		clear.classList.add("is-armed");
-		clear.textContent = CONFIRM_LABEL;
-		announce.textContent = "Press again to clear all answers and notes.";
-		confirmTimer = window.setTimeout(() => disarm("Clear cancelled."), CONFIRM_MS);
+		clear.textContent = TEXT.clearConfirm;
+		announce.textContent = TEXT.clearPrompt;
+		confirmTimer = window.setTimeout(() => disarm(TEXT.clearCancelled), CONFIRM_MS);
 	}
 
 	/** Back to the idle label; `message` is announced for a cancel the reader did not make by moving on. */
@@ -291,14 +317,14 @@
 		clearTimeout(confirmTimer);
 		clear.classList.remove("is-armed");
 		clear.style.inlineSize = "";
-		clear.textContent = CLEAR_LABEL;
+		clear.textContent = TEXT.clear;
 		announce.textContent = message;
 	}
 
 	clear.addEventListener("blur", () => disarm());
 	document.addEventListener("keydown", (e) => {
 		if (e.key === "Escape" && clear.classList.contains("is-armed")) {
-			disarm("Clear cancelled.");
+			disarm(TEXT.clearCancelled);
 		}
 	});
 
@@ -317,13 +343,13 @@
 			disarm();
 		}
 		bar.hidden = button.hidden && clear.hidden;
-		button.textContent = count ? `Reply (${count})` : "Reply";
+		button.textContent = count ? `${TEXT.reply} (${count})` : TEXT.reply;
 	}
 
 	function renderDialog() {
 		const preview = h("pre", { class: "reply-md" }, markdown());
 		const rows = notes.map((n) => {
-			const text = h("textarea", { "aria-label": "Note" });
+			const text = h("textarea", { "aria-label": TEXT.note });
 			text.value = n.text;
 			text.addEventListener("input", () => {
 				n.text = text.value;
@@ -341,7 +367,7 @@
 						renderDialog();
 					},
 				},
-				"Remove",
+				TEXT.remove,
 			);
 			return h(
 				"div",
@@ -361,14 +387,14 @@
 					status.textContent = await deliver();
 				},
 			},
-			"Copy reply",
+			TEXT.copyReply,
 		);
 		dialog.replaceChildren(
 			h(
 				"header",
 				{},
-				h("h2", {}, "Your reply"),
-				h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, "Close"),
+				h("h2", {}, TEXT.yourReply),
+				h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, TEXT.close),
 			),
 			h("div", { class: "reply-body" }, ...rows, preview),
 			h("footer", {}, status, send),
@@ -381,6 +407,7 @@
 	});
 
 	window.ReplyNotes({
+		labels: TEXT,
 		h,
 		clean,
 		quoted,

@@ -76,7 +76,19 @@ interface ReplyKeepApi {
 	touched(el: ReplyControl): boolean;
 }
 
+/** The texts of the note hint and editor, from reply.js's labels. */
+interface ReplyNotesLabels {
+	note: string;
+	addNote: string;
+	noteOn: string;
+	notePlaceholder: string;
+	part: string;
+	cancel: string;
+	saveNote: string;
+}
+
 interface ReplyNotesOptions {
+	labels: ReplyNotesLabels;
 	h: <K extends keyof HTMLElementTagNameMap>(
 		tag: K,
 		props?: Record<string, string | EventListener>,
@@ -88,6 +100,12 @@ interface ReplyNotesOptions {
 	addNote: (note: ReplyNote) => void;
 	paused: () => boolean;
 }
+
+/**
+ * Set by the page, before the kit scripts: its texts for the kit's own controls, accessible names and messages, by key. Each kit
+ * script reads it once as it runs, over its English defaults; `kit <file>` lists the keys.
+ */
+declare var kitLabels: Readonly<Record<string, string>> | undefined;
 
 declare var echarts: typeof import("echarts");
 declare var Charts: {
@@ -103,7 +121,8 @@ declare var ViewsNav: (options: {
 	views: HTMLElement[];
 	decode: (text: string) => string;
 	canonical: (hash: string) => string;
+	labels: { overview: string; contents: string; breadcrumb: string };
 }) => {
 	show(view: HTMLElement | null, hash: string): void;
 };
-declare var ViewsFolds: () => () => void;
+declare var ViewsFolds: (labels: { expandAll: string; collapseAll: string }) => () => void;
