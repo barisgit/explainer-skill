@@ -491,6 +491,23 @@ test("the reply bar never covers content: at the top nothing is under it, and sc
 	expect(await packAndRun(dir, "bar", BAR_PAGE(true, contract))).toEqual([]);
 }, 60_000);
 
+test("a reply bar that long kitLabels wrap onto two rows still covers nothing at the top, and focus clears it", async () => {
+	const labels = `var kitLabels = { reply: "Antworten", clear: "Antworten und Notizen löschen" };`;
+	const contract = `${labels}
+${SETTLED}
+var contract = settled.then(async () => {
+	document.getElementById("b").click();
+	await new Promise(requestAnimationFrame);
+	await new Promise(requestAnimationFrame);
+	const late = document.getElementById("late");
+	const top = at(0) && coversNothing();
+	at(late.getBoundingClientRect().top + scrollY - box().bottom + 4);
+	late.focus();
+	return [top ? "" : "the wrapped bar covers content at the top", late.getBoundingClientRect().top >= box().bottom ? "" : "a control focused under the wrapped bar stays under it"].filter(Boolean);
+});`;
+	expect(await packAndRun(dir, "bar-long", BAR_PAGE(true, contract))).toEqual([]);
+}, 60_000);
+
 test("the reply bar appearing on a reader's first input does not move the page under the reader", async () => {
 	const contract = `${SETTLED}
 var contract = settled.then(async () => {

@@ -311,6 +311,13 @@
 	const bar = document.body.appendChild(
 		h("div", { class: "reply-ui reply-bar" }, announce, clear, button),
 	);
+	// The page keeps the strip's height free at its top (theme.css); a hidden strip keeps the room it last took, so showing it again does not move the page.
+	new ResizeObserver(() => {
+		if (!bar.hidden) {
+			const height = `${bar.getBoundingClientRect().height}px`;
+			document.documentElement.style.setProperty("--reply-bar-height", height);
+		}
+	}).observe(bar);
 	const asked = Boolean(document.querySelector("[data-reply]"));
 	let confirmTimer = 0;
 
