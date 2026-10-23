@@ -111,6 +111,62 @@ function mermaidFences(tree: HastRoot) {
 	}
 }
 
+/** The plain text of a hast node, as a cell's label. */
+const hastText = (node: HastNodes): string =>
+	node.type === "text"
+		? node.value
+		: "children" in node
+			? node.children.map(hastText).join("")
+			: "";
+
+const childElements = (node: Element, tag: string) =>
+	node.children.filter(
+		(child): child is Element => child.type === "element" && child.tagName === tag,
+	);
+
+/** Rows of a table section (`thead`, `tbody`). */
+const rowsOf = (table: Element, part: string) =>
+	childElements(table, part).flatMap((section) => childElements(section, "tr"));
+
+/** A body row as v0.8 writes it: the first cell heads the row, every other cell carries its column's name for the phone layout. */
+function labelRow(row: Element, labels: string[]) {
+	for (const [i, cell] of childElements(row, "td").entries()) {
+		const label = labels[i];
+		if (i === 0) {
+			cell.tagName = "th";
+			cell.properties = { ...cell.properties, scope: "row" };
+		} else if (label) {
+			cell.properties = { ...cell.properties, dataLabel: label };
+		}
+	}
+}
+
+/**
+ * Markdown tables become the kit's `table.compare`, as a v0.8 page writes one: each body row's first cell is its header
+ * (`<th scope="row">`), and every other cell carries its column's header as `data-label`, which the phone layout shows beside
+ * the value. A column aligned in Markdown (`---:`) keeps its alignment, as an inline style the theme's `text-align` does not
+ * override.
+ */
+function compareTables(tree: HastRoot) {
+	for (const table of elementsOf(tree)) {
+		if (table.tagName !== "table") {
+			continue;
+		}
+		table.properties = { ...table.properties, className: ["compare"] };
+		const [head] = rowsOf(table, "thead");
+		const labels = head ? childElements(head, "th").map(hastText) : [];
+		for (const row of rowsOf(table, "tbody")) {
+			labelRow(row, labels);
+		}
+		for (const cell of elementsOf(table)) {
+			const { align, ...properties } = cell.properties;
+			if (typeof align === "string") {
+				cell.properties = { ...properties, style: `text-align: ${align}` };
+			}
+		}
+	}
+}
+
 /** Every node of a Markdown tree, depth first. */
 function* nodesOf(node: Nodes): Generator<Nodes> {
 	yield node;
@@ -152,7 +208,7 @@ const isMdxMessage = (e: unknown): e is MdxMessage =>
 	e instanceof Error && "reason" in e && typeof e.reason === "string";
 
 /**
- * Compiles an .mdx file for Preact: frontmatter, GFM (tables, task lists, strikethrough, autolinks), Mermaid fences and the page
+ * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), Mermaid fences and the page
  * layout (structure.ts) when `page` is set, the page's own file; an imported .mdx file is compiled as a fragment. A syntax error
  * throws PackError with file:line:column.
  */
@@ -177,7 +233,7 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 						}
 					},
 				],
-				rehypePlugins: [() => mermaidFences],
+				rehypePlugins: [() => mermaidFences, () => compareTables],
 			},
 		);
 		return { js: String(compiled.value), front, title: front.title ?? h1 };
