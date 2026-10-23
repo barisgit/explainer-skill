@@ -62,6 +62,44 @@ test("a view opened fresh walks every view of its kind in page order", async () 
 	await packAndCheck(dir, "fresh", NESTED(script), "nav contract", ["--view", "i/4"]);
 }, 60_000);
 
+/** A page that writes its own history.state on every entry it shows, before the kit's navigation runs for that entry. */
+const OWN_STATE = (value: string) => `${HEAD}<main class="page"><div data-overview><h1>State</h1>
+<section><h2>Views</h2><a href="#v/a">A</a> <a href="#v/b">B</a></section></div>
+<section class="view" data-view="v"><a class="back" href="#">Home</a><h1>V</h1><a id="next" href="#v/b">B</a></section></main>
+<script src="kit:views.js"></script>
+<script>
+const value = ${value};
+const write = () => { if (history.state === null) history.replaceState(value, ""); };
+write();
+Views.on("v", write);
+const kept = () => typeof history.state === typeof value && Array.isArray(history.state) === Array.isArray(value) && JSON.stringify(history.state) === JSON.stringify(value);
+const expectKept = (when) => setTimeout(() => {
+	if (!kept()) throw new Error("nav contract: the page's own state survives " + when + ", read back as " + JSON.stringify(history.state));
+}, 300);
+expectKept(performance.getEntriesByType("navigation")[0]?.type === "reload" ? "a reload" : "startup");
+addEventListener("hashchange", () => expectKept("navigation"));
+</script></body></html>`;
+
+for (const [kind, value] of [
+	["a number", "7"],
+	["a string", '"page-token"'],
+	["an array", '["a", 2]'],
+	["an object", '{ "filter": "coal" }'],
+] as const) {
+	test(`a page's own history.state, ${kind}, reads back as written through startup, navigation and reload`, async () => {
+		await packAndCheck(dir, `state-${kind.split(" ")[1]}`, OWN_STATE(value), "nav contract", [
+			"--view",
+			"none",
+			"--do",
+			"click:a[href='#v/a']",
+			"--do",
+			"click:#next",
+			"--do",
+			"reload",
+		]);
+	}, 30_000);
+}
+
 test("a page with one kind of view has no rail", async () => {
 	const page = `${HEAD}<main class="page"><div data-overview><h1>One view</h1><section><h2>Fixes</h2><a href="#f/a">A</a> <a href="#f/b">B</a></section></div>
 <section class="view" data-view="f"><a class="back" href="#">All fixes</a><h1>Fix</h1></section></main>

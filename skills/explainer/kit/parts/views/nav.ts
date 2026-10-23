@@ -7,8 +7,8 @@
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
                view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
-               every sibling. Steps live in history.state next to the hash, so Back, Forward and reload keep them; a link opened
-               fresh starts a new trail.
+               every sibling. Steps live in the history entry (its Navigation API state; history.state stays the page's), so Back,
+               Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
@@ -112,14 +112,15 @@ window.ViewsNav = ({ views, decode }) => {
 
 	/* ---- Trail ---- */
 
-	/** history.state as an object, whatever the page stored there. */
-	function historyState(): Record<string, unknown> {
-		const state: unknown = history.state;
-		return state && typeof state === "object" ? (state as Record<string, unknown>) : {};
-	}
-
+	/**
+	 * The trail saved with this history entry, in its Navigation API state, which is separate from history.state: the page's own
+	 * state is never read or written. Without the API, in a frame that disables it, or after the page's own replaceState clears it,
+	 * the entry has none and the trail in memory is extended instead.
+	 */
 	function savedTrail(): Step[] | null {
-		const trail = historyState()[STATE_KEY];
+		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
+		const trail =
+			state && typeof state === "object" ? (state as Record<string, unknown>)[STATE_KEY] : null;
 		return Array.isArray(trail)
 			? trail.filter((s): s is Step => typeof s?.hash === "string")
 			: null;
@@ -151,7 +152,11 @@ window.ViewsNav = ({ views, decode }) => {
 		} else {
 			steps = hash ? extended(hash) : [];
 		}
-		history.replaceState({ ...historyState(), [STATE_KEY]: steps }, "");
+		try {
+			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps } });
+		} catch {
+			// No Navigation API, or a document whose entries it disables (a sandboxed frame): the trail stays in memory.
+		}
 	}
 
 	function crumbs(here: Step, back: Element | null) {
