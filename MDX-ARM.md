@@ -1,0 +1,33 @@
+# MDX + Preact arm: design contract
+
+Spike branch `spike/mdx`. Every lane reads this file; the main agent owns it. Background: `/Users/blaz/Programming_local/Projects/artifact-lab/arms/MDX-SPIKE.md`.
+
+## Goal and fairness
+
+An agent writes a page as MDX (Markdown prose plus components) with local data files it imports; `pack page.mdx -o index.html` compiles it at pack time, prerenders it to static HTML with Preact, and inlines only the client code and props the interactive parts need. One self-contained offline file, same `theme.css`, same `check`, same content rules as the v0.8 attribute kit. The arm must be neither weaker nor carry extra guidance than v0.8: only the authoring mechanics differ.
+
+## Architecture
+
+- **The runtime stays the attribute kit.** `kit/views.ts`, `steps.ts`, `reply.ts`, `link.ts`, `charts.ts`, `echarts.js` and `theme.css` (with their parts) are the tested v0.8 behaviour and are not rewritten. The kit's Preact components are typed markup generators over that runtime: they render the same attribute markup v0.8 pages write by hand (`section.view[data-view]`, `[data-stepper]` with `[data-captions]`, `fieldset[data-reply]`, `.tree` of nested `<details>`, `.chart`), and pack inlines the kit scripts the prerendered page needs. Re-syncing to v0.8.0 is then mostly copying kit files.
+- **Static by default.** Everything in the MDX renders once at pack time; static components may take any props (functions included) because they run only in pack.
+- **Islands.** A module whose first statement is `"use client"` is a client component: its capitalised function exports are hydrated in the browser. On the server they render to HTML between comment markers (`<!--island:N-->…<!--/island-->`, hydrated with a root fragment, no wrapper element, so the theme's child selectors still match). Props crossing from MDX into an island must be JSON; pack fails with the prop path otherwise, and tells the author to move function-holding code into their own client component. An island inside an island renders as a plain component of its parent. Children from MDX into an island are refused (pass text as a prop, or write the content inside the component). An element with an `on*` function prop rendered outside every island fails the pack, naming the element and the component that renders it. Islands hydrate before the kit scripts that read the DOM (views, steps, link, reply) run, so `reply.js` keeping (which dispatches input/change events on restore) and `steps.js` reach Preact-owned DOM; echarts and charts.js load before the islands, because client components call `Charts.make`.
+- **Kit components inside islands** wire their callbacks with effects: `Chart` calls `Charts.make` on its element and `set()` on option changes; `Stepper` listens for `stepchange` and calls `Steps.refresh` after renders. `Chart` is itself a client module, so a Chart with a JSON option works straight from MDX.
+- **Page shell** (pack writes it): `<html lang>`, `<title>`, `kit:theme.css`, the page's imported CSS, `<main class="page"><div data-overview>…</div>views…</main>`, the islands' props (`<script type="application/json" id="explainer-islands">`), `var kitLabels`, echarts and charts.js, the island bundle, then views, steps, link and reply. The overview `div` is written on every page, with or without views. Top-level `<View>`s are moved after the overview. Within the overview and each view, `#` plus the paragraphs right under it form the masthead (`header.masthead` / `.view-head`, first paragraph `.lede`, later ones `.meta`), and each `##` with what follows becomes a `<section>` unless the author already wrapped it in one.
+- **Frontmatter** (YAML): `title` (default: the h1's text, else the file name), `lang` (default `en`), `labels` (kitLabels, same keys as v0.8), `reply: true` (include reply.js for notes and keeping on a page with no question; a `data-reply` in the page includes it by itself). Any other key fails the pack.
+- **Mermaid**: a ```` ```mermaid ```` fence becomes `<pre class="mermaid">` and the existing in-process renderer draws it in the HTML pass.
+- **Kit script inclusion** follows the prerendered HTML and the client bundle: echarts+charts when a `.chart` renders or a client component can render the kit's Chart later, steps.js for `[data-stepper]`, views.js for `[data-view]` or `<details>`, link.js for `[data-ref]`, reply.js for `[data-reply]` or `reply: true`.
+- **Imports**: `preact`, `preact/hooks`, `preact/jsx-runtime` and `kit` (the components) resolve to vendored files, so the skill runs as copied with Bun and no install. Pages import `.json`/`.ts` data and `.css` like any bundler page; an imported `.mdx` file is a fragment, without the page layout.
+- **After SSR**, the HTML goes through the existing pack pipeline unchanged (Mermaid, inlining, SVG theming, load detection). `pack page.html` keeps working as before.
+
+## Rules for lanes
+
+- Work only in `.worktrees/mdx`; never edit `main` or the other worktrees (`tree`, `reply-bar`, `guide8` are read-only references for v0.8 behaviour).
+- Gates: `bun run typecheck`, `bun run lint` pass without weakening rules; `bun run test` stays green for tests that still apply. Commits follow AGENTS.md (Conventional Commits, explicit paths, never `--no-verify`); commit one worktree at a time (lint-staged stashes are shared).
+- No private data in commits. Do not touch `~/.agents/skills/explainer/`.
+- Agent-facing text (SKILL.md, guide.md, component doc comments, CLI help) stays short and soft, per AGENTS.md.
+
+## As built (core lane)
+
+- Files: `src/mdx/compile.ts` (frontmatter, MDX with GFM, Mermaid fences, layout), `src/mdx/structure.ts` (masthead, sections, views), `src/mdx/bundle.ts` (the prerender and client builds: bare imports, `.mdx`, CSS, the `"use client"` swap), `src/mdx/page.ts` (shell and kit scripts); `kit/islands/server.ts` and `client.ts` (the island runtime); `kit/components/` (`index.ts` is what `kit` resolves to; `kit components` prints its doc comment and each component's). Generated: `vendor/mdx.js`, `vendor/preact/*.js` (`bun run vendor`), licences in `kit/licenses/mdx.txt` and `preact.txt`.
+- A new kit component is a module in `kit/components/` re-exported from `index.ts`, with a leading `Name: description` comment. When it needs a kit script that its first render does not reveal through the HTML, add it to `COMPONENT_SCRIPTS` in `src/mdx/page.ts`.
+- Open: GFM tables render as a bare `<table>`, which `theme.css` does not style (v0.8 pages write `table.compare`). Decide whether the compiler adds classes (and a `.scroll` wrapper) or the theme styles a bare table.
