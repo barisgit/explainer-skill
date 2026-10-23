@@ -1,0 +1,159 @@
+import { readFileSync } from "node:fs";
+import { relative } from "node:path";
+import type { Element, Nodes as HastNodes, Root as HastRoot } from "hast";
+import type { Root } from "mdast";
+import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
+import { PackError } from "../pack-error.ts";
+import { structurePage } from "./structure.ts";
+
+/** What a page's YAML frontmatter sets; see MDX-ARM.md. */
+export interface Frontmatter {
+	title?: string;
+	lang: string;
+	/** kitLabels: the texts the kit scripts add, in the page's language. */
+	labels?: Record<string, string>;
+	/** Include reply.js (notes, keeping) on a page with no question. */
+	reply: boolean;
+}
+
+/** An .mdx file compiled to a JavaScript module whose default export is the page's content component. */
+export interface CompiledMdx {
+	js: string;
+	front: Frontmatter;
+	/** The frontmatter title, else the text of the page's first `#`. */
+	title: string | undefined;
+}
+
+const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+const KEYS = "title, lang, labels, reply";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	value !== null && typeof value === "object" && !Array.isArray(value);
+
+/** `value` as a map of texts, or undefined when it is not one. */
+function texts(value: unknown): Record<string, string> | undefined {
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	const entries = Object.entries(value);
+	const strings = entries.flatMap(([key, text]) =>
+		typeof text === "string" ? [[key, text] as const] : [],
+	);
+	return strings.length === entries.length ? Object.fromEntries(strings) : undefined;
+}
+
+/** Reads and checks the frontmatter; anything pack would ignore or misread fails with the key to fix. */
+function frontmatter(source: string, file: string): Frontmatter {
+	const yaml = FRONTMATTER.exec(source)?.[1];
+	let data: unknown;
+	try {
+		data = yaml === undefined ? {} : (Bun.YAML.parse(yaml) ?? {});
+	} catch (e) {
+		throw new PackError(`${file} frontmatter: ${e instanceof Error ? e.message : String(e)}`);
+	}
+	const fail = (what: string) => new PackError(`${file} frontmatter: ${what}`);
+	if (!isRecord(data)) {
+		throw fail(`write key: value lines (${KEYS})`);
+	}
+	const { title, lang = "en", labels, reply = false, ...rest } = data;
+	const unknown = Object.keys(rest)[0];
+	if (unknown !== undefined) {
+		throw fail(`pack does not read "${unknown}"; the keys are ${KEYS}`);
+	}
+	if (title !== undefined && typeof title !== "string") {
+		throw fail("title must be text");
+	}
+	if (typeof lang !== "string") {
+		throw fail("lang must be a language tag such as de");
+	}
+	if (typeof reply !== "boolean") {
+		throw fail("reply must be true or false");
+	}
+	const labelTexts = texts(labels);
+	if (labels !== undefined && !labelTexts) {
+		throw fail("labels must be key: text lines, the kitLabels keys of the kit files");
+	}
+	return {
+		lang,
+		reply,
+		...(title === undefined ? {} : { title }),
+		...(labelTexts ? { labels: labelTexts } : {}),
+	};
+}
+
+/** Every element of the tree, depth first. */
+function* elementsOf(node: HastNodes): Generator<Element> {
+	if (node.type === "element") {
+		yield node;
+	}
+	if ("children" in node) {
+		for (const child of node.children) {
+			yield* elementsOf(child);
+		}
+	}
+}
+
+/**
+ * ```mermaid fences (`<pre><code class="language-mermaid">`) become `<pre class="mermaid">` with the source as their text, which
+ * pack draws as one SVG in the HTML pass.
+ */
+function mermaidFences(tree: HastRoot) {
+	for (const pre of elementsOf(tree)) {
+		const [code] = pre.children;
+		if (pre.tagName !== "pre" || code?.type !== "element") {
+			continue;
+		}
+		const { className } = code.properties;
+		if (Array.isArray(className) && className.includes("language-mermaid")) {
+			pre.properties = { className: ["mermaid"] };
+			pre.children = code.children;
+		}
+	}
+}
+
+/** A message from the MDX parser: where in the file it is and what is wrong. */
+interface MdxMessage {
+	reason: string;
+	line?: number | undefined;
+	column?: number | undefined;
+}
+const isMdxMessage = (e: unknown): e is MdxMessage =>
+	e instanceof Error && "reason" in e && typeof e.reason === "string";
+
+/**
+ * Compiles an .mdx file for Preact: frontmatter, GFM (tables, task lists, strikethrough, autolinks), Mermaid fences and the page
+ * layout (structure.ts) when `page` is set, the page's own file; an imported .mdx file is compiled as a fragment. A syntax error
+ * throws PackError with file:line:column.
+ */
+export async function compileMdx(path: string, page: boolean): Promise<CompiledMdx> {
+	const file = relative(process.cwd(), path) || path;
+	const value = readFileSync(path, "utf8");
+	const front = frontmatter(value, file);
+	let h1: string | undefined;
+	try {
+		const compiled = await compile(
+			{ path, value },
+			{
+				jsxImportSource: "preact",
+				elementAttributeNameCase: "html",
+				remarkPlugins: [
+					remarkFrontmatter,
+					remarkGfm,
+					() => (tree: Root) => {
+						if (page) {
+							h1 = structurePage(tree);
+						}
+					},
+				],
+				rehypePlugins: [() => mermaidFences],
+			},
+		);
+		return { js: String(compiled.value), front, title: front.title ?? h1 };
+	} catch (e) {
+		if (!isMdxMessage(e)) {
+			throw e;
+		}
+		const at = e.line === undefined ? "" : `:${e.line}:${e.column ?? 1}`;
+		throw new PackError(`${file}${at}: ${e.reason}`);
+	}
+}

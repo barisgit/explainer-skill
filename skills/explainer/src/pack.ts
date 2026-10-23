@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
+import { safeScript } from "./escape.ts";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
 import { findLoads, type Load } from "./loads.ts";
+import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
+import { PackError } from "./pack-error.ts";
 import { themeSvgImages } from "./svg-theme.ts";
 
 const MIME: Record<string, string> = {
@@ -18,9 +21,6 @@ const MIME: Record<string, string> = {
 	".ttf": "font/ttf",
 	".otf": "font/otf",
 };
-
-/** The page cannot become an offline file; the message lists every cause (remote references, missing files, failed diagrams). */
-export class PackError extends Error {}
 
 const isRemote = (ref: string) => /^(https?:)?\/\//i.test(ref);
 const isInline = (ref: string) => /^(data:|#|about:|javascript:)/i.test(ref);
@@ -60,9 +60,6 @@ function inlineCss(css: string, baseDir: string, from: string): string {
 		return `url("${dataUri(locate(ref, baseDir))}")`;
 	});
 }
-
-/** `</script` and `<!--` inside inline script would end or alter the element. */
-const safeScript = (js: string) => js.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
 
 const unescapeHtml = (s: string) =>
 	s
@@ -292,7 +289,8 @@ function loadMessage({ origin, kind, target }: Load): string {
 }
 
 /**
- * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined.
+ * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined. An `.mdx` page is first compiled and
+ * prerendered to an HTML page (mdx/page.ts); everything after that is the same for both.
  * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
  * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render. `warnings` lists links that go nowhere.
  */
@@ -300,7 +298,10 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	const baseDir = dirname(resolve(inputPath));
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
-	const original = readFileSync(inputPath, "utf8");
+	const original =
+		extname(inputPath).toLowerCase() === ".mdx"
+			? await mdxPage(resolve(inputPath))
+			: readFileSync(inputPath, "utf8");
 	const source = await renderMermaidBlocks(original, problems, diagramRefs);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);

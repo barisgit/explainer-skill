@@ -3,9 +3,18 @@
 	"compilerOptions": {
 		"lib": ["ESNext", "DOM", "DOM.Iterable"],
 		"types": [],
+		// The components and the islands runtime are Preact modules; the kit scripts have no JSX, so this changes nothing for them.
+		"jsx": "react-jsx",
+		"jsxImportSource": "preact",
 		// Off for the kit only: element.dataset is typed with an index signature, so every dataset.ref would need dataset["ref"],
 		// which Biome's useLiteralKeys rejects. The two rules contradict each other for browser code.
 		"noPropertyAccessFromIndexSignature": false
 	},
-	"include": ["skills/explainer/kit/*.ts", "skills/explainer/kit/parts/*/*.ts", "kit-types"]
+	"include": [
+		"skills/explainer/kit/*.ts",
+		"skills/explainer/kit/parts/*/*.ts",
+		"skills/explainer/kit/components",
+		"skills/explainer/kit/islands",
+		"kit-types"
+	]
 }

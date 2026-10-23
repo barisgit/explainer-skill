@@ -1,9 +1,17 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
 import { kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
-import { PackError, pack } from "./pack.ts";
+import { pack } from "./pack.ts";
+import { PackError } from "./pack-error.ts";
 import { report } from "./report.ts";
 import { stepError } from "./steps.ts";
 
@@ -45,6 +53,14 @@ function kitHeader(file: string): string {
 		.trim();
 }
 
+/** The documentation of the kit's Preact components: the index, then each component file's header. */
+function componentsDoc(): string {
+	const files = readdirSync(kitPath("components"))
+		.filter((name) => name !== "index.ts")
+		.sort();
+	return ["index.ts", ...files].map((name) => kitHeader(`components/${name}`)).join("\n\n");
+}
+
 /** The one-line description of a kit file: the first line of its header without the leading "name: ". */
 const kitSummary = (file: string) => (kitHeader(file).split("\n")[0] ?? "").replace(/^\S+: /, "");
 
@@ -52,13 +68,17 @@ const kitSummary = (file: string) => (kitHeader(file).split("\n")[0] ?? "").repl
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List the kit files a page can reference (pack inlines only the ones it uses), or print the documentation of one file or of the mermaid blocks.",
-		usage: "kit [file | mermaid]",
+			"List the kit files a page can reference (pack inlines only the ones it uses), or print the documentation of one file, of the mermaid blocks or of the components for .mdx pages.",
+		usage: "kit [file | mermaid | components]",
 		flags: [],
-		examples: ["kit", "kit steps.js", "kit mermaid"],
+		examples: ["kit", "kit steps.js", "kit mermaid", "kit components"],
 		run: async ([file]) => {
 			if (file === "mermaid") {
 				console.log(MERMAID_DOC);
+				return 0;
+			}
+			if (file === "components") {
+				console.log(componentsDoc());
 				return 0;
 			}
 			if (file) {
@@ -77,17 +97,17 @@ export const COMMANDS: Record<string, Command> = {
 				console.log(`kit:${f.padEnd(11)} ${kb.padStart(7)}  ${kitSummary(f)}`);
 			}
 			console.log(
-				`<pre class="mermaid">...</pre>  diagram source (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-captions, data-ref, data-reply, data-keep.\nThe texts the kit scripts add (buttons, accessible names, messages) are English; a page in another language sets them in var kitLabels = { ... } at the top level of any of its scripts, with the keys each file's documentation lists.`,
+				`<pre class="mermaid">...</pre>  diagram source (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)\nimport { Chart } from "kit"     in an .mdx page: Preact components that render the markup the kit scripts read (kit components)\n\nDocumentation of one file: ${CLI} kit <file>. Fonts are inlined from theme.css. Attributes the kit scripts read: data-view, data-stepper, data-start, data-step, data-captions, data-ref, data-reply, data-keep.\nThe texts the kit scripts add (buttons, accessible names, messages) are English; a page in another language sets them in var kitLabels = { ... } at the top level of any of its scripts, with the keys each file's documentation lists.`,
 			);
 			return 0;
 		},
 	},
 	pack: {
 		summary:
-			"Inline local CSS, scripts, images, fonts and kit: files into one HTML file; render pre.mermaid diagrams; fail on any network dependency.",
-		usage: "pack <page.html> -o <artifact.html>",
+			"Inline local CSS, scripts, images, fonts and kit: files into one HTML file; render pre.mermaid diagrams; fail on any network dependency. An .mdx page is compiled and prerendered first, and only its client components ship code.",
+		usage: "pack <page.html | page.mdx> -o <artifact.html>",
 		flags: ["-o <file>  output path (required)"],
-		examples: ["pack page.html -o artifact.html"],
+		examples: ["pack page.html -o artifact.html", "pack page.mdx -o artifact.html"],
 		run: async ([input], flags) => {
 			const out = flags.get("-o")?.[0];
 			if (!input || !out) {
