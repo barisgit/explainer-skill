@@ -73,15 +73,15 @@ const SLOVENIAN: typeof ENGLISH = {
 
 /**
  * A page with a stepper, nested views (rail and trail, no .back link, so the overview's name is the label), two folds and a reply
- * question with a note part. After load its script works each component and throws "labels contract: <name>" for every text that
- * is not `expected`'s; a run that does not finish throws too.
+ * question with a note part. Its script, after the kit scripts, sets `labels` as kitLabels when given. After load it works each
+ * component and throws "labels contract: <name>" for every text that is not `expected`'s; a run that does not finish throws too.
  */
 const PAGE = (
 	lang: string,
-	head: string,
 	expected: typeof ENGLISH,
+	labels?: typeof ENGLISH,
 ) => `<!doctype html><html lang="${lang}"><head>
-<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="kit:theme.css">${head}</head><body>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="kit:theme.css"></head><body>
 <main class="page"><div data-overview><h1>Labels</h1>
 <section><h2>People</h2><p><a href="#p/a">A</a> <a href="#p/b">B</a></p>
 <details><summary>One</summary><p>1</p></details><details><summary>Two</summary><p>2</p></details></section>
@@ -93,6 +93,7 @@ const PAGE = (
 <section class="view" data-view="i"><h1>Item</h1></section></main>
 <script src="kit:steps.js"></script><script src="kit:views.js"></script><script src="kit:reply.js"></script>
 <script>
+${labels ? `var kitLabels = ${JSON.stringify(labels)};` : ""}
 const L = ${JSON.stringify(expected)};
 const $ = (selector, root = document) => root.querySelector(selector);
 const aria = (selector, root) => $(selector, root)?.getAttribute("aria-label");
@@ -169,11 +170,13 @@ addEventListener("load", () => setTimeout(async () => {
 addEventListener("load", () => setTimeout(() => expect("the run finished", done), 350));
 </script></body></html>`;
 
-test("a page's kitLabels reach every text the kit scripts add: stepper, views navigation, folds, reply and notes", async () => {
-	const head = `<script>var kitLabels = ${JSON.stringify(SLOVENIAN)};</script>`;
-	await packAndCheck(dir, "sl", PAGE("sl", head, SLOVENIAN), "labels contract", ["--view", "none"]);
+test("kitLabels set after the kit scripts reach every text they add: stepper, views navigation, folds, reply and notes", async () => {
+	await packAndCheck(dir, "sl", PAGE("sl", SLOVENIAN, SLOVENIAN), "labels contract", [
+		"--view",
+		"none",
+	]);
 }, 30_000);
 
 test("without kitLabels the kit's texts are English", async () => {
-	await packAndCheck(dir, "en", PAGE("en", "", ENGLISH), "labels contract", ["--view", "none"]);
+	await packAndCheck(dir, "en", PAGE("en", ENGLISH), "labels contract", ["--view", "none"]);
 }, 30_000);

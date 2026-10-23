@@ -14,17 +14,17 @@
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
    gets Expand all.
    Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
-   one object before the kit scripts: <script>var kitLabels = { contents: "Vsebina", ... }</script> in <head>. Keys here:
-   contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name), expandAll
-   "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no .back
-   link names it). A key left out stays English. */
+   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
+   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
+   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
+   .back link names it). A key left out stays English. */
 (() => {
 	const root = document.documentElement;
 	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
 	const handlers: Record<string, ViewHandler> = {};
 	let started = false;
 	let overviewY = 0;
-	/** The English texts of the navigation parts; the page's kitLabels replace any of them. */
+	/** The English texts of the navigation parts, by kitLabels key. */
 	const LABELS = {
 		contents: "Contents",
 		breadcrumb: "Breadcrumb",
@@ -32,9 +32,10 @@
 		collapseAll: "Collapse all",
 		overview: "Overview",
 	};
-	const labels: typeof LABELS = { ...LABELS, ...window.kitLabels };
-	const nav = window.ViewsNav({ views, decode, canonical, labels });
-	const refreshFolds = window.ViewsFolds(labels);
+	/** The page's text for `key`, else the English one. Read when the parts draw, which starts once the page's scripts have run. */
+	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
+	const nav = window.ViewsNav({ views, decode, canonical, kitText });
+	const refreshFolds = window.ViewsFolds(kitText);
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
 	function decode(text: string) {

@@ -32,8 +32,8 @@
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
    Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
-   object before the kit scripts: <script>var kitLabels = { reply: "Odgovor", ... }</script> in <head>. Keys here: reply "Reply"
-   ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press again to clear
+   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { reply: "Odgovor", ... }. Keys here:
+   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press again to clear
    all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog), close "Close",
    copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and copy it.",
    remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
@@ -46,7 +46,7 @@
 	const CONTROL =
 		"input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
 	const notes: ReplyNote[] = [];
-	/** The English texts; the page's kitLabels replace any of them. */
+	/** The English texts, by kitLabels key. */
 	const LABELS = {
 		reply: "Reply",
 		clear: "Clear answers and notes",
@@ -67,7 +67,8 @@
 		cancel: "Cancel",
 		saveNote: "Save note",
 	};
-	const TEXT: typeof LABELS = { ...LABELS, ...window.kitLabels };
+	/** The page's text for `key`, else the English one. Read at each use, so kitLabels may be set after this script. */
+	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
 
 	const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 	/** Text that will sit inside the Markdown's own "..." quotes. */
@@ -268,13 +269,11 @@
 		if (parent !== window) {
 			parent.postMessage({ type: "explainer:reply", ...detail }, "*");
 		}
-		return (await copy(detail.markdown)) ? TEXT.copied : TEXT.copyFailed;
+		return (await copy(detail.markdown)) ? kitText("copied") : kitText("copyFailed");
 	}
 
 	// ---- UI ----
-	const dialog = document.body.appendChild(
-		h("dialog", { class: "reply-ui reply-dialog", "aria-label": TEXT.yourReply }),
-	);
+	const dialog = document.body.appendChild(h("dialog", { class: "reply-ui reply-dialog" }));
 	const button = h("button", {
 		type: "button",
 		class: "btn primary",
@@ -284,7 +283,7 @@
 		},
 	});
 	const CONFIRM_MS = 4000;
-	const clear = h("button", { type: "button", class: "btn", onclick: onClear }, TEXT.clear);
+	const clear = h("button", { type: "button", class: "btn", onclick: onClear });
 	// A live region announces the state change: screen readers do not reliably re-read a focused button whose text changed.
 	const announce = h("span", { role: "status", class: "reply-invisible" });
 	const bar = document.body.appendChild(
@@ -307,9 +306,9 @@
 		// The longer label sets the button's width; pin it so the bar does not shift under the pointer.
 		clear.style.inlineSize = `${clear.getBoundingClientRect().width}px`;
 		clear.classList.add("is-armed");
-		clear.textContent = TEXT.clearConfirm;
-		announce.textContent = TEXT.clearPrompt;
-		confirmTimer = window.setTimeout(() => disarm(TEXT.clearCancelled), CONFIRM_MS);
+		clear.textContent = kitText("clearConfirm");
+		announce.textContent = kitText("clearPrompt");
+		confirmTimer = window.setTimeout(() => disarm(kitText("clearCancelled")), CONFIRM_MS);
 	}
 
 	/** Back to the idle label; `message` is announced for a cancel the reader did not make by moving on. */
@@ -317,14 +316,14 @@
 		clearTimeout(confirmTimer);
 		clear.classList.remove("is-armed");
 		clear.style.inlineSize = "";
-		clear.textContent = TEXT.clear;
+		clear.textContent = kitText("clear");
 		announce.textContent = message;
 	}
 
 	clear.addEventListener("blur", () => disarm());
 	document.addEventListener("keydown", (e) => {
 		if (e.key === "Escape" && clear.classList.contains("is-armed")) {
-			disarm(TEXT.clearCancelled);
+			disarm(kitText("clearCancelled"));
 		}
 	});
 
@@ -333,7 +332,10 @@
 		keep.clear();
 	}
 
-	/** Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls. */
+	/**
+	 * Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls. It also
+	 * runs once the page has loaded (the restore), so the buttons take kitLabels the page set after this script.
+	 */
 	function sync() {
 		const kept = keep.update();
 		const count = filledNotes().length + answers().filter((a) => a.touched).length;
@@ -343,13 +345,16 @@
 			disarm();
 		}
 		bar.hidden = button.hidden && clear.hidden;
-		button.textContent = count ? `${TEXT.reply} (${count})` : TEXT.reply;
+		if (!clear.classList.contains("is-armed")) {
+			clear.textContent = kitText("clear");
+		}
+		button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
 	}
 
 	function renderDialog() {
 		const preview = h("pre", { class: "reply-md" }, markdown());
 		const rows = notes.map((n) => {
-			const text = h("textarea", { "aria-label": TEXT.note });
+			const text = h("textarea", { "aria-label": kitText("note") });
 			text.value = n.text;
 			text.addEventListener("input", () => {
 				n.text = text.value;
@@ -367,7 +372,7 @@
 						renderDialog();
 					},
 				},
-				TEXT.remove,
+				kitText("remove"),
 			);
 			return h(
 				"div",
@@ -387,14 +392,19 @@
 					status.textContent = await deliver();
 				},
 			},
-			TEXT.copyReply,
+			kitText("copyReply"),
 		);
+		dialog.setAttribute("aria-label", kitText("yourReply"));
 		dialog.replaceChildren(
 			h(
 				"header",
 				{},
-				h("h2", {}, TEXT.yourReply),
-				h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, TEXT.close),
+				h("h2", {}, kitText("yourReply")),
+				h(
+					"button",
+					{ type: "button", class: "btn", onclick: () => dialog.close() },
+					kitText("close"),
+				),
 			),
 			h("div", { class: "reply-body" }, ...rows, preview),
 			h("footer", {}, status, send),
@@ -407,7 +417,7 @@
 	});
 
 	window.ReplyNotes({
-		labels: TEXT,
+		kitText,
 		h,
 		clean,
 		quoted,

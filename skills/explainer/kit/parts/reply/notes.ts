@@ -1,12 +1,12 @@
 /* reply notes: the note-taking half of kit:reply.js (select text or click a [data-ref] part, write a note). Not referenced from pages: pack
    joins it in front of reply.js, which calls it once with
-     labels             the texts of the hint and the editor, from reply.js's labels
+     kitText(key)       reply.js's text for a key: the hint's and the editor's texts
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
      addNote(note)      receives { quote | part, where, text } when the reader saves a note
      paused()           true while the reply dialog is open, when no hint or editor should appear */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ReplyNotes = ({ labels, h, clean, quoted, root, addNote, paused }) => {
+window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 	const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
 
 	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption. */
@@ -56,7 +56,10 @@ window.ReplyNotes = ({ labels, h, clean, quoted, root, addNote, paused }) => {
 
 	function openNote(target: Target, at: DOMRect) {
 		closePop();
-		const text = h("textarea", { "aria-label": labels.note, placeholder: labels.notePlaceholder });
+		const text = h("textarea", {
+			"aria-label": kitText("note"),
+			placeholder: kitText("notePlaceholder"),
+		});
 		const save = () => {
 			const value = text.value.trim();
 			closePop();
@@ -66,18 +69,18 @@ window.ReplyNotes = ({ labels, h, clean, quoted, root, addNote, paused }) => {
 		};
 		const popup = h(
 			"div",
-			{ class: "reply-ui reply-pop", role: "dialog", "aria-label": labels.addNote },
+			{ class: "reply-ui reply-pop", role: "dialog", "aria-label": kitText("addNote") },
 			h(
 				"p",
 				{ class: "meta" },
-				target.quote ? `“${target.quote}”` : `${labels.part}: ${target.part}`,
+				target.quote ? `“${target.quote}”` : `${kitText("part")}: ${target.part}`,
 			),
 			text,
 			h(
 				"div",
 				{ class: "reply-row" },
-				h("button", { type: "button", class: "btn", onclick: closePop }, labels.cancel),
-				h("button", { type: "button", class: "btn primary", onclick: save }, labels.saveNote),
+				h("button", { type: "button", class: "btn", onclick: closePop }, kitText("cancel")),
+				h("button", { type: "button", class: "btn primary", onclick: save }, kitText("saveNote")),
 			),
 		);
 		text.addEventListener("keydown", (e) => {
@@ -130,7 +133,7 @@ window.ReplyNotes = ({ labels, h, clean, quoted, root, addNote, paused }) => {
 			}
 			const rect = range.getBoundingClientRect();
 			showHint(
-				labels.addNote,
+				kitText("addNote"),
 				rect.left + scrollX,
 				rect.bottom + scrollY + 6,
 				{ quote, where: where(host) },
@@ -168,7 +171,7 @@ window.ReplyNotes = ({ labels, h, clean, quoted, root, addNote, paused }) => {
 			return;
 		}
 		const target = partTarget(part);
-		showHint(`${labels.noteOn} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
+		showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
 	});
 	document.addEventListener("keydown", (e) => {
 		const part = e.target instanceof Element ? e.target.closest<Part>("[data-ref]") : null;

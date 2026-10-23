@@ -9,7 +9,7 @@
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
    A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
    Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in one
-   object before the kit scripts: <script>var kitLabels = { back: "Nazaj", play: "Predvajaj", ... }</script> in <head>. Keys here:
+   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { back: "Nazaj", ... }. Keys here:
    back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
    (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
@@ -32,7 +32,7 @@
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
 
-	/** The English texts; the page's kitLabels replace any of them. */
+	/** The English texts, by kitLabels key. */
 	const LABELS = {
 		back: "Back",
 		play: "Play",
@@ -42,7 +42,8 @@
 		step: "Step",
 		stepper: "Step-through; use the arrow keys",
 	};
-	const TEXT: typeof LABELS = { ...LABELS, ...window.kitLabels };
+	/** The page's text for `key`, else the English one. Read at each use, so kitLabels may be set after this script. */
+	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
 
 	/** An element the stepper's own markup is known to contain. */
 	function need<T extends Element>(root: ParentNode, selector: string): T {
@@ -74,9 +75,12 @@
 		readonly range: HTMLInputElement;
 		readonly readout: HTMLOutputElement;
 		readonly watcher: MutationObserver;
+		/** The page named the stepper itself; the kit's name is only a fallback. */
+		readonly named: boolean;
 
 		constructor(root: HTMLElement) {
 			this.root = root;
+			this.named = root.hasAttribute("aria-label");
 			if (root.dataset.labels !== undefined) {
 				// v0.7.0 read per-stepper labels; a page written for it would otherwise turn English without a word.
 				console.warn(
@@ -85,16 +89,11 @@
 			}
 			this.bar.className = "player";
 			this.bar.setAttribute("role", "group");
-			this.bar.setAttribute("aria-label", TEXT.stepControls);
 			this.bar.innerHTML = `${button('data-go="-1"')}${button("data-play", true)}${button('data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
 			this.back = need(this.bar, "[data-go='-1']");
 			this.play = need(this.bar, "[data-play]");
 			this.next = need(this.bar, "[data-go='1']");
-			this.back.textContent = TEXT.back;
-			this.play.textContent = TEXT.play;
-			this.next.textContent = TEXT.next;
 			this.range = need(this.bar, "input");
-			this.range.setAttribute("aria-label", TEXT.step);
 			this.readout = need(this.bar, "output");
 			this.bindControls();
 			this.bindKeys();
@@ -120,6 +119,22 @@
 			}
 		}
 
+		/**
+		 * Writes the texts the stepper adds. Runs at every refresh and once more when the page's scripts have run, so labels the page
+		 * sets after this script reach a stepper drawn before them.
+		 */
+		writeTexts() {
+			this.bar.setAttribute("aria-label", kitText("stepControls"));
+			this.back.textContent = kitText("back");
+			this.play.textContent = kitText(this.timer ? "pause" : "play");
+			this.next.textContent = kitText("next");
+			this.range.setAttribute("aria-label", kitText("step"));
+			// A stepper too short to step is not a control group (refresh), so it gets no name either.
+			if (this.wired && !this.named) {
+				this.root.setAttribute("aria-label", kitText("stepper"));
+			}
+		}
+
 		/** Fires stepchange when the step or the count differs from the last announcement. */
 		announce() {
 			const state = `${this.step}/${this.total}`;
@@ -137,7 +152,7 @@
 		stop() {
 			clearInterval(this.timer);
 			this.timer = undefined;
-			this.play.textContent = TEXT.play;
+			this.play.textContent = kitText("play");
 		}
 
 		bindControls() {
@@ -159,7 +174,7 @@
 				if (this.step === this.total) {
 					this.show(1);
 				}
-				this.play.textContent = TEXT.pause;
+				this.play.textContent = kitText("pause");
 				this.timer = setInterval(
 					() => (this.step < this.total ? this.show(this.step + 1) : this.stop()),
 					PLAY_MS,
@@ -225,7 +240,6 @@
 			this.range.max = String(this.total);
 			root.tabIndex = 0;
 			root.setAttribute("role", "group");
-			root.setAttribute("aria-label", root.getAttribute("aria-label") ?? TEXT.stepper);
 			root.dataset.live = "";
 		}
 
@@ -245,6 +259,7 @@
 				return;
 			}
 			this.mount(captionList);
+			this.writeTexts();
 			// Opening (the first read, or growing back from too few steps) shows data-start, else the last step (the complete picture);
 			// later reads keep the place, and a stepper on its last step stays on it.
 			const stay = wasLast ? this.total : this.step;
@@ -264,6 +279,7 @@
 		setTimeout(() => {
 			loaded = true;
 			for (const stepper of all) {
+				stepper.writeTexts();
 				stepper.announce();
 			}
 		});

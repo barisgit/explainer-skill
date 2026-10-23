@@ -1,6 +1,6 @@
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
-   views.js, which calls it once (with its texts: labels { overview, contents, breadcrumb }) and then show(view, hash) after every
-   route change, once the view's handler has drawn it.
+   views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
+   every route change, once the view's handler has drawn it.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
                its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
@@ -16,7 +16,7 @@
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ViewsNav = ({ views, decode, canonical, labels }) => {
+window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	/** One trail step: the view's hash, its name as the reader saw it, and the sibling hashes it walks (absent: every sibling). */
 	interface Step {
 		hash: string;
@@ -31,7 +31,9 @@ window.ViewsNav = ({ views, decode, canonical, labels }) => {
 	/** The navigation this part builds: its links are never the page's own. */
 	const KIT_NAV = ".trail, .toc";
 	const overview = document.querySelector<HTMLElement>("[data-overview]");
-	const overviewName = clean(document.querySelector(".back")?.textContent) || labels.overview;
+	/** The overview as the page names it (its .back link), read when the navigation draws. */
+	const overviewName = () =>
+		clean(document.querySelector(".back")?.textContent) || kitText("overview");
 	const nameOf = (hash: string) => hash.split("/")[0] ?? "";
 	const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
 	/** The hash each view element was last drawn for: its heading and links belong to that hash. */
@@ -168,7 +170,7 @@ window.ViewsNav = ({ views, decode, canonical, labels }) => {
 
 	function crumbs(here: Step, back: Element | null) {
 		const list = make("ol", { class: "crumbs" });
-		list.append(item(back ?? make("a", { href: "#" }, overviewName)));
+		list.append(item(back ?? make("a", { href: "#" }, overviewName())));
 		for (const step of steps.slice(0, -1)) {
 			list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
 		}
@@ -207,7 +209,7 @@ window.ViewsNav = ({ views, decode, canonical, labels }) => {
 	function trailBar(view: HTMLElement) {
 		let bar = view.querySelector<HTMLElement>(".trail");
 		if (!bar) {
-			bar = make("nav", { class: "trail", "aria-label": labels.breadcrumb });
+			bar = make("nav", { class: "trail", "aria-label": kitText("breadcrumb") });
 			const back = view.querySelector(".back");
 			if (back) {
 				back.before(bar);
@@ -275,15 +277,15 @@ window.ViewsNav = ({ views, decode, canonical, labels }) => {
 		const entries = headed.map(({ section, heading }, i) =>
 			entry(section, heading, i + 1, claimed),
 		);
-		const home = make("a", { href: "#" }, overviewName);
+		const home = make("a", { href: "#" }, overviewName());
 		const list = make("ol", { id: "toc-list" });
 		list.append(item(home), ...entries.map((e) => e.li));
 
-		const nav = make("nav", { class: "toc", "aria-label": labels.contents });
+		const nav = make("nav", { class: "toc", "aria-label": kitText("contents") });
 		const toggle = make(
 			"button",
 			{ type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id },
-			labels.contents,
+			kitText("contents"),
 		);
 		const setOpen = (on: boolean) => {
 			nav.classList.toggle("is-open", on);

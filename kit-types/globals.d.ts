@@ -76,19 +76,16 @@ interface ReplyKeepApi {
 	touched(el: ReplyControl): boolean;
 }
 
-/** The texts of the note hint and editor, from reply.js's labels. */
-interface ReplyNotesLabels {
-	note: string;
-	addNote: string;
-	noteOn: string;
-	notePlaceholder: string;
-	part: string;
-	cancel: string;
-	saveNote: string;
-}
+/**
+ * A kit script's text for one of its kitLabels keys: the page's, else the English default. A part names the keys it uses, so the
+ * entry script that passes its accessor in must have a default for each.
+ */
+type KitText<Key extends string> = (key: Key) => string;
 
 interface ReplyNotesOptions {
-	labels: ReplyNotesLabels;
+	kitText: KitText<
+		"note" | "addNote" | "noteOn" | "notePlaceholder" | "part" | "cancel" | "saveNote"
+	>;
 	h: <K extends keyof HTMLElementTagNameMap>(
 		tag: K,
 		props?: Record<string, string | EventListener>,
@@ -102,8 +99,8 @@ interface ReplyNotesOptions {
 }
 
 /**
- * Set by the page, before the kit scripts: its texts for the kit's own controls, accessible names and messages, by key. Each kit
- * script reads it once as it runs, over its English defaults; `kit <file>` lists the keys.
+ * Set by the page in any of its scripts: its texts for the kit's own controls, accessible names and messages, by key; `kit <file>`
+ * lists the keys. The kit scripts read it when they draw, never caching it, so it may be set after them.
  */
 declare var kitLabels: Readonly<Record<string, string>> | undefined;
 
@@ -121,8 +118,8 @@ declare var ViewsNav: (options: {
 	views: HTMLElement[];
 	decode: (text: string) => string;
 	canonical: (hash: string) => string;
-	labels: { overview: string; contents: string; breadcrumb: string };
+	kitText: KitText<"overview" | "contents" | "breadcrumb">;
 }) => {
 	show(view: HTMLElement | null, hash: string): void;
 };
-declare var ViewsFolds: (labels: { expandAll: string; collapseAll: string }) => () => void;
+declare var ViewsFolds: (kitText: KitText<"expandAll" | "collapseAll">) => () => void;
