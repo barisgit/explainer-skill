@@ -140,8 +140,12 @@ details > :last-child:not(summary) {
 		/* biome-ignore lint/complexity/noImportantStyles: print shows every view, over the display rules of the screen layout */
 		display: block !important;
 	}
-	details > * {
-		display: block;
+	/* Every fold prints open. A closed <details> hides its content box, not its children, so the box is what is shown. */
+	details::details-content {
+		content-visibility: visible;
+	}
+	summary::before {
+		transform: rotate(45deg) translate(-0.125rem, -0.0625rem);
 	}
 	.fig {
 		break-inside: avoid;
