@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { pageAssertion, runCli, scratch } from "./support.ts";
+import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -58,48 +58,17 @@ const inside = (id) => [...document.querySelectorAll("#" + id + " text.value")].
 	return box.x >= 0 && box.y >= 0 && box.x + box.width <= view.width && box.y + box.height <= view.height;
 });
 const labels = (id) => [...document.querySelectorAll("#" + id + " text.value")].map((t) => t.textContent).join();
-${[
-	pageAssertion(
-		"plot contract",
-		"horizontal bar labels stay inside the panel",
-		'inside("h") && labels("h") === "100,50,0"',
-	),
-	pageAssertion(
-		"plot contract",
-		"vertical bar labels stay inside the panel",
-		'inside("v") && labels("v") === "100,50,0"',
-	),
-	pageAssertion(
-		"plot contract",
-		"a zero bar keeps its title",
-		'document.querySelectorAll("#h .bar title").length === 3',
-	),
-	pageAssertion(
-		"plot contract",
-		"a line with no finite point draws nothing",
+${pageContract({
+	"horizontal bar labels stay inside the panel": 'inside("h") && labels("h") === "100,50,0"',
+	"vertical bar labels stay inside the panel": 'inside("v") && labels("v") === "100,50,0"',
+	"a zero bar keeps its title": 'document.querySelectorAll("#h .bar title").length === 3',
+	"a line with no finite point draws nothing":
 		'document.querySelectorAll("#l path.line").length === 0',
-	),
-].join("\n")}
+})}
 </script></body></html>`;
 
 test("bar labels stay inside the panel and keep zero bars; a line without finite points draws nothing", async () => {
-	const input = dir.write("bars.html", BAR_PAGE);
-	const output = dir.path("bars.out.html");
-
-	const packed = await runCli(["pack", input, "-o", output]);
-	const checked = await runCli([
-		"check",
-		output,
-		"--quick",
-		"--view",
-		"none",
-		"--out",
-		dir.path("bar-shots"),
-	]);
-
-	expect(packed.code).toBe(0);
-	expect(checked.stdout).not.toContain("plot contract");
-	expect(checked.code).toBe(0);
+	expect(await packAndRun(dir, "bars", BAR_PAGE)).toEqual([]);
 }, 60_000);
 
 const UNLABELLED_PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -111,29 +80,12 @@ const UNLABELLED_PAGE = `<!doctype html><html><head><meta name="viewport" conten
 const showValues = false;
 Plot.make(document.getElementById("b"), { categories: ["A", "B"], series: [{ type: "bar", data: [1, 2], label: showValues }] });
 Plot.make(document.getElementById("s"), { series: [{ type: "stem", data: [[0, 1], [1, 2]], label: showValues }] });
-${pageAssertion(
-	"plot contract",
-	"label: false draws the marks without value text",
-	'document.querySelectorAll("#b .bar").length === 2 && document.querySelectorAll("#s .dot").length === 2 && !document.querySelector("text.value")',
-)}
+${pageContract({
+	"label: false draws the marks without value text":
+		'document.querySelectorAll("#b .bar").length === 2 && document.querySelectorAll("#s .dot").length === 2 && !document.querySelector("text.value")',
+})}
 </script></body></html>`;
 
 test("label: false draws bars and stems without value text instead of throwing", async () => {
-	const input = dir.write("unlabelled.html", UNLABELLED_PAGE);
-	const output = dir.path("unlabelled.out.html");
-
-	const packed = await runCli(["pack", input, "-o", output]);
-	const checked = await runCli([
-		"check",
-		output,
-		"--quick",
-		"--view",
-		"none",
-		"--out",
-		dir.path("unlabelled-shots"),
-	]);
-
-	expect(packed.code).toBe(0);
-	expect(checked.stdout).not.toContain("plot contract");
-	expect(checked.code).toBe(0);
+	expect(await packAndRun(dir, "unlabelled", UNLABELLED_PAGE)).toEqual([]);
 }, 60_000);

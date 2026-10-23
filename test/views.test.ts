@@ -1,5 +1,5 @@
-import { afterAll, test } from "bun:test";
-import { packAndCheck, pageAssertion, scratch } from "./support.ts";
+import { afterAll, expect, test } from "bun:test";
+import { packAndCheck, packAndRun, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -13,15 +13,13 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
 let param;
 Views.on("v", (_, p) => { param = p; });
 document.addEventListener("DOMContentLoaded", () => { location.hash = "#v/100%"; });
-${pageAssertion(
-	"views contract",
-	"a hash with a malformed escape still opens its view, with the param as written",
-	'param === "100%" && document.documentElement.classList.contains("in-view")',
-)}
+// Added after the router's own listener, so the view is shown when it runs.
+var contract = new Promise((shown) => addEventListener("hashchange", shown, { once: true })).then(() =>
+	param === "100%" && document.documentElement.classList.contains("in-view") ? [] : ["a hash with a malformed escape still opens its view, with the param as written"]);
 </script></body></html>`;
 
 test("a hash with a malformed percent escape does not break the router", async () => {
-	await packAndCheck(dir, "views", PAGE, "views contract", ["--view", "none"]);
+	expect(await packAndRun(dir, "views", PAGE)).toEqual([]);
 }, 30_000);
 
 const ANCHOR_PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -32,20 +30,22 @@ const ANCHOR_PAGE = `<!doctype html><html><head><meta name="viewport" content="w
 <script>
 // The overview is hidden when the hash changes, so the browser cannot scroll to #far then; Chrome keeps the fragment scroll pending
 // until the section has a box. The router restores the overview's old position on the same change and must not undo that.
-addEventListener("load", () => {
-	location.hash = "#v/a";
-	setTimeout(() => document.getElementById("to-far").click(), 50);
-	setTimeout(() => {
-		const far = document.getElementById("far").getBoundingClientRect().top;
-		if (document.documentElement.classList.contains("in-view") || Math.abs(far) > 2) {
-			throw new Error("views contract: a link from a view to a section's #id lands on that section (top " + far + ")");
-		}
-	}, 250);
+${SETTLED}
+const navigated = (go) => new Promise((shown) => { addEventListener("hashchange", shown, { once: true }); go(); });
+const frame = () => new Promise(requestAnimationFrame);
+var contract = settled.then(async () => {
+	await navigated(() => { location.hash = "#v/a"; });
+	await navigated(() => document.getElementById("to-far").click());
+	// The pending fragment scroll runs with the layout that gives the section its box.
+	await frame();
+	await frame();
+	const far = document.getElementById("far").getBoundingClientRect().top;
+	return document.documentElement.classList.contains("in-view") || Math.abs(far) > 2 ? ["a link from a view to a section's #id lands on that section (top " + far + ")"] : [];
 });
 </script></body></html>`;
 
 test("a link from a view to an overview section's #id scrolls to that section", async () => {
-	await packAndCheck(dir, "anchor", ANCHOR_PAGE, "views contract", ["--view", "none"]);
+	expect(await packAndRun(dir, "anchor", ANCHOR_PAGE)).toEqual([]);
 }, 30_000);
 
 /** Static views whose param has a non-ASCII letter or a space, which location.hash reports percent-encoded. */

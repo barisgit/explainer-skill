@@ -1,5 +1,5 @@
-import { afterAll, test } from "bun:test";
-import { packAndCheck, pageAssertion, scratch } from "./support.ts";
+import { afterAll, expect, test } from "bun:test";
+import { packAndCheck, packAndRun, pageAssertion, pageContract, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -191,17 +191,17 @@ test("a section id the rail adds is unique among the page's ids and view names",
 <script>
 const names = [...document.querySelectorAll("[data-view]")].map((v) => v.dataset.view);
 const unique = (s) => s.id && !names.includes(s.id) && document.querySelectorAll("#" + CSS.escape(s.id)).length === 1;
-${contract("every overview section has an id of its own", `[...document.querySelectorAll("[data-overview] > section")].every(unique)`)}
+${pageContract({ "every overview section has an id of its own": `[...document.querySelectorAll("[data-overview] > section")].every(unique)` })}
 </script></body></html>`;
-	await packAndCheck(dir, "ids", page, "nav contract", ["--view", "none"]);
+	expect(await packAndRun(dir, "ids", page)).toEqual([]);
 }, 30_000);
 
 test("a page with one kind of view has no rail", async () => {
 	const page = `${HEAD}<main class="page"><div data-overview><h1>One view</h1><section><h2>Fixes</h2><a href="#f/a">A</a> <a href="#f/b">B</a></section></div>
 <section class="view" data-view="f"><a class="back" href="#">All fixes</a><h1>Fix</h1></section></main>
 <script src="kit:views.js"></script>
-<script>${contract("no rail and no rail-side width", `!document.querySelector(".toc") && !document.documentElement.classList.contains("has-toc")`)}</script></body></html>`;
-	await packAndCheck(dir, "single", page, "nav contract", ["--view", "none"]);
+<script>${pageContract({ "no rail and no rail-side width": `!document.querySelector(".toc") && !document.documentElement.classList.contains("has-toc")` })}</script></body></html>`;
+	expect(await packAndRun(dir, "single", page)).toEqual([]);
 }, 30_000);
 
 test("a section with two folds gets Expand all, which follows the folds the reader toggles", async () => {

@@ -1,16 +1,14 @@
 import { afterAll, expect, test } from "bun:test";
-import { pageAssertion, runCli, scratch } from "./support.ts";
+import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
-
-const assertLater = (name: string, body: string) => pageAssertion("steps contract", name, body);
 
 /** The class of each SVG part a, b and c, joined: "is-on" once it has appeared, "is-now" on a step it lists. */
 const PART_CLASSES = `["a", "b", "c"].map((id) => document.getElementById(id).getAttribute("class") ?? "").join()`;
 
 const PAGE = (
-	checks: string[],
+	checks: string,
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><h1>Steps</h1>
 <figure class="fig" id="s" data-stepper data-start="1">
@@ -22,26 +20,22 @@ const PAGE = (
 const heard = [];
 document.getElementById("s").addEventListener("stepchange", (e) => heard.push(e.detail.step));
 document.addEventListener("DOMContentLoaded", () => document.getElementById("s").addEventListener("stepchange", (e) => heard.push(\`dcl\${e.detail.step}\`)));
-${checks.join("\n")}</script></body></html>`;
+${checks}</script></body></html>`;
 
-const CHECKS = [
-	assertLater(
-		"the opening step reaches listeners the page adds in its scripts or in DOMContentLoaded handlers",
+const CHECKS = pageContract({
+	"the opening step reaches listeners the page adds in its scripts or in DOMContentLoaded handlers":
 		'heard.join() === "1,dcl1"',
-	),
-	assertLater(
-		"on the opening step only the part listing step 1 is shown and lit",
-		`${PART_CLASSES} === "is-on is-now,,"`,
-	),
-	assertLater(
-		"data-go buttons step: an earlier part stays shown, unlit, and a part listing steps 2 and 3 appears at 2",
-		`(document.querySelector('[data-go="1"]').click(), heard.filter(Number).at(-1) === 2 && ${PART_CLASSES} === "is-on,is-on is-now,")`,
-	),
-];
+	"on the opening step only the part listing step 1 is shown and lit": `${PART_CLASSES} === "is-on is-now,,"`,
+	"data-go buttons step: an earlier part stays shown, unlit, and a part listing steps 2 and 3 appears at 2": `(document.querySelector('[data-go="1"]').click(), heard.filter(Number).at(-1) === 2 && ${PART_CLASSES} === "is-on,is-on is-now,")`,
+});
 
 test("a stepper over hand-built SVG parts", async () => {
-	const input = dir.write("steps.html", PAGE(CHECKS));
-	const output = dir.path("steps.out.html");
+	expect(await packAndRun(dir, "steps", PAGE(CHECKS))).toEqual([]);
+}, 30_000);
+
+test("a stepper that still has v0.7.0's data-labels hears it through check", async () => {
+	const input = dir.write("legacy.html", PAGE(""));
+	const output = dir.path("legacy.out.html");
 
 	const packed = await runCli(["pack", input, "-o", output]);
 	const checked = await runCli([
@@ -55,8 +49,6 @@ test("a stepper over hand-built SVG parts", async () => {
 	]);
 
 	expect(packed.code).toBe(0);
-	expect(checked.stdout).not.toContain("steps contract");
-	// v0.7.0's per-stepper labels are gone; a page that still has them hears it through check.
 	expect(checked.stdout).toContain("kit:steps.js: data-labels is no longer read");
 	expect(checked.code).toBe(0);
 }, 60_000);
