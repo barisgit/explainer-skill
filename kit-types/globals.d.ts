@@ -51,8 +51,14 @@ interface PlotOption {
 	legend?: boolean;
 }
 
+/** Where a note sits: in a figure (its aria-label or caption), in a section (its heading), or on the page. */
+type NotePlace = { kind: "figure" | "section"; name: string } | { kind: "page" };
+
 interface ReplyNote {
+	/** The place as the agent's Markdown names it, always English: figure "name", § heading, or page. */
 	where: string;
+	/** The place the reader's caption is built from, in the page's language. Notes saved before v0.7.1 have none. */
+	place?: NotePlace;
 	text: string;
 	/** Exactly one of quote (selected text) and part (a data-ref part) is set. */
 	quote?: string;

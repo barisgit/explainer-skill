@@ -33,12 +33,13 @@
    <details> are not kept.
    Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
    object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { reply: "Odgovor", ... }. Keys here:
-   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press again to clear
-   all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog), close "Close",
-   copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and copy it.",
-   remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
-   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note". A key left out stays
-   English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
+   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press
+   again to clear all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog),
+   close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
+   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
+   note in the dialog figure "figure" ("figure “name”") and page "page" (a note outside any figure or headed section). A key left out
+   stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
@@ -66,6 +67,8 @@
 		part: "Part",
 		cancel: "Cancel",
 		saveNote: "Save note",
+		figure: "figure",
+		page: "page",
 	};
 	/** The page's text for `key`, else the English one. Read at each use, so kitLabels may be set after this script. */
 	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
@@ -206,9 +209,27 @@
 	function restoreNotes(saved: unknown) {
 		for (const n of Array.isArray(saved) ? saved : []) {
 			if (typeof n?.text === "string" && (n.quote || n.part)) {
-				notes.push({ where: String(n.where), quote: n.quote, part: n.part, text: n.text });
+				const place = isPlace(n.place) ? { place: n.place } : {};
+				notes.push({
+					where: String(n.where),
+					...place,
+					quote: n.quote,
+					part: n.part,
+					text: n.text,
+				});
 			}
 		}
+	}
+
+	/** Storage can hold anything: a saved place is used only when it has the shape placeOf gives. */
+	function isPlace(value: unknown): value is NotePlace {
+		if (typeof value !== "object" || value === null || !("kind" in value)) {
+			return false;
+		}
+		const named = "name" in value && typeof value.name === "string";
+		return (
+			value.kind === "page" || ((value.kind === "figure" || value.kind === "section") && named)
+		);
 	}
 
 	// ---- the reply ----
@@ -351,6 +372,17 @@
 		button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
 	}
 
+	/** A note's place as its caption in the dialog shows it, in the page's language; a note saved without one shows its locator. */
+	function caption({ place, where }: ReplyNote) {
+		if (!place) {
+			return where;
+		}
+		if (place.kind === "page") {
+			return kitText("page");
+		}
+		return place.kind === "figure" ? `${kitText("figure")} “${place.name}”` : `§ ${place.name}`;
+	}
+
 	function renderDialog() {
 		const preview = h("pre", { class: "reply-md" }, markdown());
 		const rows = notes.map((n) => {
@@ -377,7 +409,7 @@
 			return h(
 				"div",
 				{ class: "reply-note" },
-				h("p", { class: "meta" }, n.quote ? `“${n.quote}” · ${n.where}` : `${n.part} · ${n.where}`),
+				h("p", { class: "meta" }, `${n.quote ? `“${n.quote}”` : n.part} · ${caption(n)}`),
 				text,
 				remove,
 			);

@@ -3,26 +3,40 @@
      kitText(key)       reply.js's text for a key: the hint's and the editor's texts
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
-     addNote(note)      receives { quote | part, where, text } when the reader saves a note
+     addNote(note)      receives { quote | part, place, where, text } when the reader saves a note
      paused()           true while the reply dialog is open, when no hint or editor should appear */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 	const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
 
-	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption. */
-	const where = (el: Element) => {
+	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption, else the page. */
+	function placeOf(el: Element): NotePlace {
 		const figure = el.closest("figure");
 		const label = figure?.getAttribute("aria-label");
 		if (label) {
-			return `figure "${quoted(label)}"`;
+			return { kind: "figure", name: quoted(label) };
 		}
 		const heading = el.closest("[data-view], section")?.querySelector("h1, h2");
 		if (heading) {
-			return `§ ${quoted(heading.textContent ?? "")}`;
+			return { kind: "section", name: quoted(heading.textContent ?? "") };
 		}
 		const caption = figure?.querySelector("figcaption");
-		return caption ? `figure "${quoted(caption.textContent ?? "").slice(0, 60)}"` : "page";
-	};
+		return caption
+			? { kind: "figure", name: quoted(caption.textContent ?? "").slice(0, 60) }
+			: { kind: "page" };
+	}
+
+	/** The note's place, and its locator in the agent's Markdown, which stays English whatever the page's labels. */
+	function located(el: Element) {
+		const place = placeOf(el);
+		const where =
+			place.kind === "page"
+				? "page"
+				: place.kind === "figure"
+					? `figure "${place.name}"`
+					: `§ ${place.name}`;
+		return { place, where };
+	}
 
 	type Target = Omit<ReplyNote, "text">;
 	let hint: HTMLButtonElement | null = null;
@@ -102,7 +116,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		part:
 			clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) ||
 			(part.dataset.ref?.split(" ")[0] ?? ""),
-		where: where(part),
+		...located(part),
 	});
 
 	let timer: number | undefined;
@@ -136,7 +150,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 				kitText("addNote"),
 				rect.left + scrollX,
 				rect.bottom + scrollY + 6,
-				{ quote, where: where(host) },
+				{ quote, ...located(host) },
 				true,
 			);
 		}, 200);

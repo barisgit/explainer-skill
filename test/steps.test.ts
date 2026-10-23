@@ -16,6 +16,7 @@ const PAGE = (
 <figure class="fig" id="s" data-stepper data-start="1">
 <svg viewBox="0 0 90 20" width="270"><rect id="a" data-step="1" width="20" height="20"/><rect id="b" data-step="2 3" x="35" width="20" height="20"/><rect id="c" data-step="3" x="70" width="20" height="20"/></svg>
 <ol data-captions><li>one</li><li>two</li><li>three</li></ol></figure>
+<figure class="fig" data-stepper data-labels="Nazaj"><p data-step="1">x</p><p data-step="2">y</p></figure>
 <script src="kit:steps.js"></script>
 <script>
 const heard = [];
@@ -55,5 +56,7 @@ test("a stepper over hand-built SVG parts", async () => {
 
 	expect(packed.code).toBe(0);
 	expect(checked.stdout).not.toContain("steps contract");
+	// v0.7.0's per-stepper labels are gone; a page that still has them hears it through check.
+	expect(checked.stdout).toContain("kit:steps.js: data-labels is no longer read");
 	expect(checked.code).toBe(0);
 }, 60_000);

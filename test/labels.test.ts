@@ -36,6 +36,8 @@ const ENGLISH = {
 	part: "Part",
 	cancel: "Cancel",
 	saveNote: "Save note",
+	figure: "figure",
+	page: "page",
 };
 
 const SLOVENIAN: typeof ENGLISH = {
@@ -69,11 +71,13 @@ const SLOVENIAN: typeof ENGLISH = {
 	part: "Del",
 	cancel: "Prekliči",
 	saveNote: "Shrani opombo",
+	figure: "slika",
+	page: "stran",
 };
 
 /**
- * A page with a stepper, nested views (rail and trail, no .back link, so the overview's name is the label), two folds and a reply
- * question with a note part. Its script, after the kit scripts, sets `labels` as kitLabels when given. After load it works each
+ * A page with a stepper, nested views (rail and trail, no .back link, so the overview's name is the label), two folds, a reply
+ * question and three note parts: in a headed section, in a named figure, and outside any section. Its script, after the kit scripts, sets `labels` as kitLabels when given. After load it works each
  * component and throws "labels contract: <name>" for every text that is not `expected`'s; a run that does not finish throws too.
  */
 const PAGE = (
@@ -83,9 +87,11 @@ const PAGE = (
 ) => `<!doctype html><html lang="${lang}"><head>
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="kit:theme.css"></head><body>
 <main class="page"><div data-overview><h1>Labels</h1>
+<p>A <span data-ref="loose">loose</span> part.</p>
 <section><h2>People</h2><p><a href="#p/a">A</a> <a href="#p/b">B</a></p>
 <details><summary>One</summary><p>1</p></details><details><summary>Two</summary><p>2</p></details></section>
 <section><h2>Items</h2><p><a href="#i/1">One</a>, and the <span data-ref="cache">cache</span>.</p>
+<figure aria-label="Scheme"><p>The <span data-ref="db">db</span>.</p></figure>
 <fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" id="pa"> A</label> <label><input type="radio" name="p" value="b" id="pb"> B</label></fieldset>
 <figure class="fig" id="s" data-stepper><svg viewBox="0 0 50 20" width="150"><rect data-step="1" width="20" height="20"/><rect data-step="2" x="30" width="20" height="20"/></svg>
 <ol data-captions><li>one</li><li>two</li></ol></figure></section></div>
@@ -145,12 +151,22 @@ function note() {
 	expect("note editor buttons", $(".btn:not(.primary)", pop).textContent === L.cancel && $(".primary", pop).textContent === L.saveNote);
 	text.value = "x";
 	$(".primary", pop).click();
+	for (const ref of ["db", "loose"]) {
+		$("[data-ref=" + ref + "]").click();
+		$(".reply-hint").click();
+		$(".reply-pop textarea").value = "x";
+		$(".reply-pop .primary").click();
+	}
 }
 
 async function dialog() {
 	$(".reply-bar .primary").click();
 	const box = $(".reply-dialog");
 	expect("dialog", aria(".reply-dialog") === L.yourReply && $("h2", box).textContent === L.yourReply && $("header .btn", box).textContent === L.close);
+	const captions = [...box.querySelectorAll(".reply-note .meta")].map((p) => p.textContent);
+	expect("note captions", captions.join("|") === ["cache · § Items", "db · " + L.figure + " \u201cScheme\u201d", "loose · " + L.page].join("|"));
+	const markdown = $(".reply-md", box).textContent;
+	expect("the reply Markdown locates notes in English", markdown.includes('(figure "Scheme")') && markdown.includes("(page)"));
 	expect("dialog note", aria(".reply-note textarea", box) === L.note && $(".reply-note .btn", box).textContent === L.remove && $("footer .primary", box).textContent === L.copyReply);
 	$("footer .primary", box).click();
 	await wait(50);
