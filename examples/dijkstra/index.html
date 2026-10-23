@@ -1931,7 +1931,7 @@ dialog.reply-dialog[open] {
 			<pre class="code" data-role="code" aria-label="The algorithm in pseudocode; the lines in use at this step are highlighted"></pre>
 			<figcaption>Arrows show the direction a road can be driven. “True” is the real shortest distance, computed separately with the Bellman–Ford algorithm; a red node was settled with a distance that is too large.</figcaption>
 		</figure>
-		<p class="caveat"><b>Inferred</b>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p>
+		<p>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p>
 	</section>
 
 	<section class="minor">
@@ -1946,12 +1946,12 @@ dialog.reply-dialog[open] {
 	</section>
 </main>
 
-<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once and
-   then the returned refresh() after every route change. A section (an overview section or a view) with two or more <details>
-   of its own (not inside a nested section or another fold) gets one button just above the block holding its first fold:
-   Expand all, or Collapse all once every fold is open, kept in step when the reader opens folds one at a time. Folds a view
-   handler draws count from its next refresh. */
-window.ViewsFolds = () => {
+<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
+   its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
+   A section (an overview section or a view) with two or more <details> of its own (not inside a nested section or another fold)
+   gets one button just above the block holding its first fold: Expand all, or Collapse all once every fold is open, kept in step
+   when the reader opens folds one at a time. Folds a view handler draws count from its next refresh. */
+window.ViewsFolds = (kitText) => {
   const buttons = new Map;
   function foldsOf(section) {
     return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section && !d.parentElement?.closest("details"));
@@ -1963,7 +1963,7 @@ window.ViewsFolds = () => {
     }
     const all = foldsOf(section).every((d) => d.open);
     button.setAttribute("aria-expanded", String(all));
-    button.textContent = all ? "Collapse all" : "Expand all";
+    button.textContent = kitText(all ? "collapseAll" : "expandAll");
   }
   function create(section) {
     const button = document.createElement("button");
@@ -2006,7 +2006,8 @@ window.ViewsFolds = () => {
 };
 
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
-   views.js, which calls it once and then show(view, hash) after every route change, once the view's handler has drawn it.
+   views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
+   every route change, once the view's handler has drawn it.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
                its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
@@ -2021,12 +2022,12 @@ window.ViewsFolds = () => {
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
-window.ViewsNav = ({ views, decode, canonical }) => {
+window.ViewsNav = ({ views, decode, canonical, kitText }) => {
   const STATE_KEY = "viewTrail";
   const RAIL_LIST_MAX = 12;
   const KIT_NAV = ".trail, .toc";
   const overview = document.querySelector("[data-overview]");
-  const overviewName = clean(document.querySelector(".back")?.textContent) || "Overview";
+  const overviewName = () => clean(document.querySelector(".back")?.textContent) || kitText("overview");
   const nameOf = (hash) => hash.split("/")[0] ?? "";
   const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
   const drawn = new Map;
@@ -2109,7 +2110,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   }
   function crumbs(here, back) {
     const list = make("ol", { class: "crumbs" });
-    list.append(item(back ?? make("a", { href: "#" }, overviewName)));
+    list.append(item(back ?? make("a", { href: "#" }, overviewName())));
     for (const step of steps.slice(0, -1)) {
       list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
     }
@@ -2139,7 +2140,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   function trailBar(view) {
     let bar = view.querySelector(".trail");
     if (!bar) {
-      bar = make("nav", { class: "trail", "aria-label": "Breadcrumb" });
+      bar = make("nav", { class: "trail", "aria-label": kitText("breadcrumb") });
       const back = view.querySelector(".back");
       if (back) {
         back.before(bar);
@@ -2178,11 +2179,11 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     });
     const claimed = new Set;
     const entries = headed.map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
-    const home = make("a", { href: "#" }, overviewName);
+    const home = make("a", { href: "#" }, overviewName());
     const list = make("ol", { id: "toc-list" });
     list.append(item(home), ...entries.map((e) => e.li));
-    const nav = make("nav", { class: "toc", "aria-label": "Contents" });
-    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, "Contents");
+    const nav = make("nav", { class: "toc", "aria-label": kitText("contents") });
+    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, kitText("contents"));
     const setOpen = (on) => {
       nav.classList.toggle("is-open", on);
       toggle.setAttribute("aria-expanded", String(on));
@@ -2289,15 +2290,28 @@ window.ViewsNav = ({ views, decode, canonical }) => {
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
-   gets Expand all. */
+   gets Expand all.
+   Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
+   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
+   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
+   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
+   .back link names it). A key left out stays English. */
 (() => {
   const root = document.documentElement;
   const views = [...document.querySelectorAll("[data-view]")];
   const handlers = {};
   let started = false;
   let overviewY = 0;
-  const nav = window.ViewsNav({ views, decode, canonical });
-  const refreshFolds = window.ViewsFolds();
+  const LABELS = {
+    contents: "Contents",
+    breadcrumb: "Breadcrumb",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    overview: "Overview"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
+  const nav = window.ViewsNav({ views, decode, canonical, kitText });
+  const refreshFolds = window.ViewsFolds(kitText);
   function decode(text) {
     try {
       return decodeURIComponent(text);
@@ -2377,8 +2391,10 @@ window.ViewsNav = ({ views, decode, canonical }) => {
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
    A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
-   Labels: data-labels="Back,Play,Pause,Next,Step controls,Step" on the stepper replaces the button texts and the two accessible names, in
-   this order; leave an entry empty to keep its default (no commas inside a label).
+   Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in one
+   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { back: "Nazaj", ... }. Keys here:
+   back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
+   (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
    Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts must redraw on it;
@@ -2396,7 +2412,16 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   const PLAY_MS = 3000;
   const steppers = new WeakMap;
   let loaded = false;
-  const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"];
+  const LABELS = {
+    back: "Back",
+    play: "Play",
+    pause: "Pause",
+    next: "Next",
+    stepControls: "Step controls",
+    step: "Step",
+    stepper: "Step-through; use the arrow keys"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
   function need(root, selector) {
     const el = root.querySelector(selector);
     if (!el) {
@@ -2404,7 +2429,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     }
     return el;
   }
-  const button = (label, attrs, primary = false) => `<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
+  const button = (attrs, primary = false) => `<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}></button>`;
 
   class Stepper {
     parts = [];
@@ -2422,23 +2447,20 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     range;
     readout;
     watcher;
-    playText;
-    pauseText;
+    named;
     constructor(root) {
       this.root = root;
-      const custom = (root.dataset.labels ?? "").split(",").map((label) => label.trim());
-      const text = (i) => custom[i] || LABELS[i];
-      this.playText = text(1);
-      this.pauseText = text(2);
+      this.named = root.hasAttribute("aria-label");
+      if (root.dataset.labels !== undefined) {
+        console.warn("kit:steps.js: data-labels is no longer read; set the texts in kitLabels (kit steps.js)");
+      }
       this.bar.className = "player";
       this.bar.setAttribute("role", "group");
-      this.bar.setAttribute("aria-label", text(4));
-      this.bar.innerHTML = `${button(text(0), 'data-go="-1"')}${button(this.playText, "data-play", true)}${button(text(3), 'data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
+      this.bar.innerHTML = `${button('data-go="-1"')}${button("data-play", true)}${button('data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
       this.back = need(this.bar, "[data-go='-1']");
       this.play = need(this.bar, "[data-play]");
       this.next = need(this.bar, "[data-go='1']");
       this.range = need(this.bar, "input");
-      this.range.setAttribute("aria-label", text(5));
       this.readout = need(this.bar, "output");
       this.bindControls();
       this.bindKeys();
@@ -2461,6 +2483,16 @@ window.ViewsNav = ({ views, decode, canonical }) => {
         this.announce();
       }
     }
+    writeTexts() {
+      this.bar.setAttribute("aria-label", kitText("stepControls"));
+      this.back.textContent = kitText("back");
+      this.play.textContent = kitText(this.timer ? "pause" : "play");
+      this.next.textContent = kitText("next");
+      this.range.setAttribute("aria-label", kitText("step"));
+      if (this.wired && !this.named) {
+        this.root.setAttribute("aria-label", kitText("stepper"));
+      }
+    }
     announce() {
       const state = `${this.step}/${this.total}`;
       if (this.step && this.announced !== state) {
@@ -2474,7 +2506,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     stop() {
       clearInterval(this.timer);
       this.timer = undefined;
-      this.play.textContent = this.playText;
+      this.play.textContent = kitText("play");
     }
     bindControls() {
       this.bar.addEventListener("click", (e) => {
@@ -2495,7 +2527,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
         if (this.step === this.total) {
           this.show(1);
         }
-        this.play.textContent = this.pauseText;
+        this.play.textContent = kitText("pause");
         this.timer = setInterval(() => this.step < this.total ? this.show(this.step + 1) : this.stop(), PLAY_MS);
       });
     }
@@ -2547,7 +2579,6 @@ window.ViewsNav = ({ views, decode, canonical }) => {
       this.range.max = String(this.total);
       root.tabIndex = 0;
       root.setAttribute("role", "group");
-      root.setAttribute("aria-label", root.getAttribute("aria-label") ?? "Step-through; use the arrow keys");
       root.dataset.live = "";
     }
     refresh(wanted) {
@@ -2564,6 +2595,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
         return;
       }
       this.mount(captionList);
+      this.writeTexts();
       const stay = wasLast ? this.total : this.step;
       this.show(wanted ?? (opening ? Number(this.root.dataset.start) || this.total : stay));
     }
@@ -2578,6 +2610,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     setTimeout(() => {
       loaded = true;
       for (const stepper of all) {
+        stepper.writeTexts();
         stepper.announce();
       }
     });

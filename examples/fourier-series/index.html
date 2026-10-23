@@ -1819,7 +1819,7 @@ dialog.reply-dialog[open] {
 
 	<section id="questions">
 		<h2>Six questions to answer before you read on</h2>
-		<p>Write what you think in the box, then open the answer. What you type stays in this browser, so you can come back to it.</p>
+		<p>Write what you think in the box, then open the answer.</p>
 		<ol class="questions">
 			<li>
 				<p>What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?</p>
@@ -1958,7 +1958,6 @@ dialog.reply-dialog[open] {
 			<li>Wikipedia, “Gibbs phenomenon” (en.wikipedia.org/wiki/Gibbs_phenomenon, CC BY-SA 4.0): the constants Si(π) = 1.851937… and 0.0894898… of the jump, which the page’s own sums reproduce.</li>
 			<li>Coefficient formulas and symmetry rules are standard; see for example Kreyszig, <i>Advanced Engineering Mathematics</i>, the chapter on Fourier series.</li>
 		</ul>
-		<p class="meta">No external data is used. Every curve is computed in this page from the formulas above.</p>
 	</section>
 </main>
 
@@ -2086,7 +2085,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
     }
     if (Array.isArray(value)) {
-      return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
+      return value.every((item) => typeof item === "number") ? value : value.map((item) => resolveColors(item, key));
     }
     if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
       return value;
@@ -2638,8 +2637,10 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
    A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
-   Labels: data-labels="Back,Play,Pause,Next,Step controls,Step" on the stepper replaces the button texts and the two accessible names, in
-   this order; leave an entry empty to keep its default (no commas inside a label).
+   Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in one
+   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { back: "Nazaj", ... }. Keys here:
+   back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
+   (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
    Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts must redraw on it;
@@ -2657,7 +2658,16 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   const PLAY_MS = 3000;
   const steppers = new WeakMap;
   let loaded = false;
-  const LABELS = ["Back", "Play", "Pause", "Next", "Step controls", "Step"];
+  const LABELS = {
+    back: "Back",
+    play: "Play",
+    pause: "Pause",
+    next: "Next",
+    stepControls: "Step controls",
+    step: "Step",
+    stepper: "Step-through; use the arrow keys"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
   function need(root, selector) {
     const el = root.querySelector(selector);
     if (!el) {
@@ -2665,7 +2675,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     }
     return el;
   }
-  const button = (label, attrs, primary = false) => `<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}>${label}</button>`;
+  const button = (attrs, primary = false) => `<button type="button" class="btn${primary ? " primary" : ""}" ${attrs}></button>`;
 
   class Stepper {
     parts = [];
@@ -2683,23 +2693,20 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     range;
     readout;
     watcher;
-    playText;
-    pauseText;
+    named;
     constructor(root) {
       this.root = root;
-      const custom = (root.dataset.labels ?? "").split(",").map((label) => label.trim());
-      const text = (i) => custom[i] || LABELS[i];
-      this.playText = text(1);
-      this.pauseText = text(2);
+      this.named = root.hasAttribute("aria-label");
+      if (root.dataset.labels !== undefined) {
+        console.warn("kit:steps.js: data-labels is no longer read; set the texts in kitLabels (kit steps.js)");
+      }
       this.bar.className = "player";
       this.bar.setAttribute("role", "group");
-      this.bar.setAttribute("aria-label", text(4));
-      this.bar.innerHTML = `${button(text(0), 'data-go="-1"')}${button(this.playText, "data-play", true)}${button(text(3), 'data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
+      this.bar.innerHTML = `${button('data-go="-1"')}${button("data-play", true)}${button('data-go="1"')}<input type="range" min="1" data-keep="off"><output></output>`;
       this.back = need(this.bar, "[data-go='-1']");
       this.play = need(this.bar, "[data-play]");
       this.next = need(this.bar, "[data-go='1']");
       this.range = need(this.bar, "input");
-      this.range.setAttribute("aria-label", text(5));
       this.readout = need(this.bar, "output");
       this.bindControls();
       this.bindKeys();
@@ -2722,6 +2729,16 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
         this.announce();
       }
     }
+    writeTexts() {
+      this.bar.setAttribute("aria-label", kitText("stepControls"));
+      this.back.textContent = kitText("back");
+      this.play.textContent = kitText(this.timer ? "pause" : "play");
+      this.next.textContent = kitText("next");
+      this.range.setAttribute("aria-label", kitText("step"));
+      if (this.wired && !this.named) {
+        this.root.setAttribute("aria-label", kitText("stepper"));
+      }
+    }
     announce() {
       const state = `${this.step}/${this.total}`;
       if (this.step && this.announced !== state) {
@@ -2735,7 +2752,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     stop() {
       clearInterval(this.timer);
       this.timer = undefined;
-      this.play.textContent = this.playText;
+      this.play.textContent = kitText("play");
     }
     bindControls() {
       this.bar.addEventListener("click", (e) => {
@@ -2756,7 +2773,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
         if (this.step === this.total) {
           this.show(1);
         }
-        this.play.textContent = this.pauseText;
+        this.play.textContent = kitText("pause");
         this.timer = setInterval(() => this.step < this.total ? this.show(this.step + 1) : this.stop(), PLAY_MS);
       });
     }
@@ -2808,7 +2825,6 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       this.range.max = String(this.total);
       root.tabIndex = 0;
       root.setAttribute("role", "group");
-      root.setAttribute("aria-label", root.getAttribute("aria-label") ?? "Step-through; use the arrow keys");
       root.dataset.live = "";
     }
     refresh(wanted) {
@@ -2825,6 +2841,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
         return;
       }
       this.mount(captionList);
+      this.writeTexts();
       const stay = wasLast ? this.total : this.step;
       this.show(wanted ?? (opening ? Number(this.root.dataset.start) || this.total : stay));
     }
@@ -2839,6 +2856,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     setTimeout(() => {
       loaded = true;
       for (const stepper of all) {
+        stepper.writeTexts();
         stepper.announce();
       }
     });
@@ -3062,25 +3080,31 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 
 /* reply notes: the note-taking half of kit:reply.js (select text or click a [data-ref] part, write a note). Not referenced from pages: pack
    joins it in front of reply.js, which calls it once with
+     kitText(key)       reply.js's text for a key: the hint's and the editor's texts
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
-     addNote(note)      receives { quote | part, where, text } when the reader saves a note
+     addNote(note)      receives { quote | part, place, where, text } when the reader saves a note
      paused()           true while the reply dialog is open, when no hint or editor should appear */
-window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
+window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
   const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
-  const where = (el) => {
+  function placeOf(el) {
     const figure = el.closest("figure");
     const label = figure?.getAttribute("aria-label");
     if (label) {
-      return `figure "${quoted(label)}"`;
+      return { kind: "figure", name: quoted(label) };
     }
     const heading = el.closest("[data-view], section")?.querySelector("h1, h2");
     if (heading) {
-      return `§ ${quoted(heading.textContent ?? "")}`;
+      return { kind: "section", name: quoted(heading.textContent ?? "") };
     }
     const caption = figure?.querySelector("figcaption");
-    return caption ? `figure "${quoted(caption.textContent ?? "").slice(0, 60)}"` : "page";
-  };
+    return caption ? { kind: "figure", name: quoted(caption.textContent ?? "").slice(0, 60) } : { kind: "page" };
+  }
+  function located(el) {
+    const place = placeOf(el);
+    const where = place.kind === "page" ? "page" : place.kind === "figure" ? `figure "${place.name}"` : `§ ${place.name}`;
+    return { place, where };
+  }
   let hint = null;
   let hintFromSelection = false;
   let pop = null;
@@ -3109,7 +3133,10 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
   }
   function openNote(target, at) {
     closePop();
-    const text = h("textarea", { "aria-label": "Note", placeholder: "Note for the agent" });
+    const text = h("textarea", {
+      "aria-label": kitText("note"),
+      placeholder: kitText("notePlaceholder")
+    });
     const save = () => {
       const value = text.value.trim();
       closePop();
@@ -3117,7 +3144,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
         addNote({ ...target, text: value });
       }
     };
-    const popup = h("div", { class: "reply-ui reply-pop", role: "dialog", "aria-label": "Add a note" }, h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `Part: ${target.part}`), text, h("div", { class: "reply-row" }, h("button", { type: "button", class: "btn", onclick: closePop }, "Cancel"), h("button", { type: "button", class: "btn primary", onclick: save }, "Save note")));
+    const popup = h("div", { class: "reply-ui reply-pop", role: "dialog", "aria-label": kitText("addNote") }, h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `${kitText("part")}: ${target.part}`), text, h("div", { class: "reply-row" }, h("button", { type: "button", class: "btn", onclick: closePop }, kitText("cancel")), h("button", { type: "button", class: "btn primary", onclick: save }, kitText("saveNote"))));
     text.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         closePop();
@@ -3134,7 +3161,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
   }
   const partTarget = (part) => ({
     part: clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) || (part.dataset.ref?.split(" ")[0] ?? ""),
-    where: where(part)
+    ...located(part)
   });
   let timer;
   document.addEventListener("selectionchange", () => {
@@ -3155,7 +3182,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
         return;
       }
       const rect = range.getBoundingClientRect();
-      showHint("Add note", rect.left + scrollX, rect.bottom + scrollY + 6, { quote, where: where(host) }, true);
+      showHint(kitText("addNote"), rect.left + scrollX, rect.bottom + scrollY + 6, { quote, ...located(host) }, true);
     }, 200);
   });
   document.addEventListener("pointerdown", (e) => {
@@ -3176,7 +3203,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
       return;
     }
     const target = partTarget(part);
-    showHint(`Note on “${target.part}”`, e.pageX, e.pageY + 14, target, false);
+    showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
   });
   document.addEventListener("keydown", (e) => {
     const part = e.target instanceof Element ? e.target.closest("[data-ref]") : null;
@@ -3220,11 +3247,43 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
    the button or the wait cancels.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
+   Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
+   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { reply: "Odgovor", ... }. Keys here:
+   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press
+   again to clear all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog),
+   close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
+   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
+   note in the dialog figure "figure" ("figure “name”") and page "page" (a note outside any figure or headed section). A key left out
+   stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 (() => {
   const root = document.querySelector("main") ?? document.body;
   const CONTROL = "input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
   const notes = [];
+  const LABELS = {
+    reply: "Reply",
+    clear: "Clear answers and notes",
+    clearConfirm: "Clear everything?",
+    clearPrompt: "Press again to clear all answers and notes.",
+    clearCancelled: "Clear cancelled.",
+    yourReply: "Your reply",
+    close: "Close",
+    copyReply: "Copy reply",
+    copied: "Copied. Paste it to the agent.",
+    copyFailed: "Copy failed: select the text above and copy it.",
+    remove: "Remove",
+    note: "Note",
+    notePlaceholder: "Note for the agent",
+    addNote: "Add note",
+    noteOn: "Note on",
+    part: "Part",
+    cancel: "Cancel",
+    saveNote: "Save note",
+    figure: "figure",
+    page: "page"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
   const clean = (s) => s.replace(/\s+/g, " ").trim();
   const quoted = (s) => clean(s).replaceAll('"', "'");
   const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
@@ -3314,9 +3373,23 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
   function restoreNotes(saved) {
     for (const n of Array.isArray(saved) ? saved : []) {
       if (typeof n?.text === "string" && (n.quote || n.part)) {
-        notes.push({ where: String(n.where), quote: n.quote, part: n.part, text: n.text });
+        const place = isPlace(n.place) ? { place: n.place } : {};
+        notes.push({
+          where: String(n.where),
+          ...place,
+          quote: n.quote,
+          part: n.part,
+          text: n.text
+        });
       }
     }
+  }
+  function isPlace(value) {
+    if (typeof value !== "object" || value === null || !("kind" in value)) {
+      return false;
+    }
+    const named = "name" in value && typeof value.name === "string";
+    return value.kind === "page" || (value.kind === "figure" || value.kind === "section") && named;
   }
   const filledNotes = () => notes.filter((n) => n.text.trim());
   const noteLine = (n) => `- On ${n.quote ? `"${n.quote}"` : `part "${n.part}"`} (${n.where}): ${n.text.trim().split(`
@@ -3368,9 +3441,9 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     if (parent !== window) {
       parent.postMessage({ type: "explainer:reply", ...detail }, "*");
     }
-    return await copy(detail.markdown) ? "Copied. Paste it to the agent." : "Copy failed: select the text above and copy it.";
+    return await copy(detail.markdown) ? kitText("copied") : kitText("copyFailed");
   }
-  const dialog = document.body.appendChild(h("dialog", { class: "reply-ui reply-dialog", "aria-label": "Your reply" }));
+  const dialog = document.body.appendChild(h("dialog", { class: "reply-ui reply-dialog" }));
   const button = h("button", {
     type: "button",
     class: "btn primary",
@@ -3379,10 +3452,8 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
       dialog.showModal();
     }
   });
-  const CLEAR_LABEL = "Clear answers and notes";
-  const CONFIRM_LABEL = "Clear everything?";
   const CONFIRM_MS = 4000;
-  const clear = h("button", { type: "button", class: "btn", onclick: onClear }, CLEAR_LABEL);
+  const clear = h("button", { type: "button", class: "btn", onclick: onClear });
   const announce = h("span", { role: "status", class: "reply-invisible" });
   const bar = document.body.appendChild(h("div", { class: "reply-ui reply-bar" }, announce, clear, button));
   const asked = Boolean(document.querySelector("[data-reply]"));
@@ -3398,21 +3469,21 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
   function arm() {
     clear.style.inlineSize = `${clear.getBoundingClientRect().width}px`;
     clear.classList.add("is-armed");
-    clear.textContent = CONFIRM_LABEL;
-    announce.textContent = "Press again to clear all answers and notes.";
-    confirmTimer = window.setTimeout(() => disarm("Clear cancelled."), CONFIRM_MS);
+    clear.textContent = kitText("clearConfirm");
+    announce.textContent = kitText("clearPrompt");
+    confirmTimer = window.setTimeout(() => disarm(kitText("clearCancelled")), CONFIRM_MS);
   }
   function disarm(message = "") {
     clearTimeout(confirmTimer);
     clear.classList.remove("is-armed");
     clear.style.inlineSize = "";
-    clear.textContent = CLEAR_LABEL;
+    clear.textContent = kitText("clear");
     announce.textContent = message;
   }
   clear.addEventListener("blur", () => disarm());
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && clear.classList.contains("is-armed")) {
-      disarm("Clear cancelled.");
+      disarm(kitText("clearCancelled"));
     }
   });
   function clearAll() {
@@ -3428,12 +3499,24 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
       disarm();
     }
     bar.hidden = button.hidden && clear.hidden;
-    button.textContent = count ? `Reply (${count})` : "Reply";
+    if (!clear.classList.contains("is-armed")) {
+      clear.textContent = kitText("clear");
+    }
+    button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
+  }
+  function caption({ place, where }) {
+    if (!place) {
+      return where;
+    }
+    if (place.kind === "page") {
+      return kitText("page");
+    }
+    return place.kind === "figure" ? `${kitText("figure")} “${place.name}”` : `§ ${place.name}`;
   }
   function renderDialog() {
     const preview = h("pre", { class: "reply-md" }, markdown());
     const rows = notes.map((n) => {
-      const text = h("textarea", { "aria-label": "Note" });
+      const text = h("textarea", { "aria-label": kitText("note") });
       text.value = n.text;
       text.addEventListener("input", () => {
         n.text = text.value;
@@ -3448,8 +3531,8 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
           sync();
           renderDialog();
         }
-      }, "Remove");
-      return h("div", { class: "reply-note" }, h("p", { class: "meta" }, n.quote ? `“${n.quote}” · ${n.where}` : `${n.part} · ${n.where}`), text, remove);
+      }, kitText("remove"));
+      return h("div", { class: "reply-note" }, h("p", { class: "meta" }, `${n.quote ? `“${n.quote}”` : n.part} · ${caption(n)}`), text, remove);
     });
     const status = h("span", { role: "status", class: "meta" });
     const send = h("button", {
@@ -3458,8 +3541,9 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
       onclick: async () => {
         status.textContent = await deliver();
       }
-    }, "Copy reply");
-    dialog.replaceChildren(h("header", {}, h("h2", {}, "Your reply"), h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, "Close")), h("div", { class: "reply-body" }, ...rows, preview), h("footer", {}, status, send));
+    }, kitText("copyReply"));
+    dialog.setAttribute("aria-label", kitText("yourReply"));
+    dialog.replaceChildren(h("header", {}, h("h2", {}, kitText("yourReply")), h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, kitText("close"))), h("div", { class: "reply-body" }, ...rows, preview), h("footer", {}, status, send));
   }
   dialog.addEventListener("click", (e) => {
     if (e.target === dialog) {
@@ -3467,6 +3551,7 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     }
   });
   window.ReplyNotes({
+    kitText,
     h,
     clean,
     quoted,

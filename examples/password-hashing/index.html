@@ -1818,10 +1818,9 @@ dialog.reply-dialog[open] {
 		<section>
 			<h2>What OWASP says about each algorithm</h2>
 			<table class="compare">
-				<thead><tr><th>Algorithm</th><th>OWASP's role for it</th><th>Minimum setting</th><th>Nominal memory</th><th>Watch out for</th></tr></thead>
+				<thead><tr><th>Algorithm</th><th>OWASP's role for it</th><th>Minimum setting</th><th>Nominal memory</th><th>FIPS-140 validated</th><th>Watch out for</th></tr></thead>
 				<tbody id="algo-rows"></tbody>
 			</table>
-			<p class="caveat"><b>Inferred</b>The role and minimum columns restate the cheat sheet. Where this page says bcrypt or PBKDF2 has no memory-cost parameter and is not memory-hard, that is a property of the algorithms, not an OWASP statement; they still use some working memory. The cheat sheet names FIPS-140 validated implementations only for PBKDF2; it does not say whether the others have any, so for them FIPS status is unknown, not no. FIPS 140 validates cryptographic modules in an approved configuration, not an algorithm name: check the certificate of the module you would use.</p>
 			<details>
 				<summary>Rules that apply whichever you pick</summary>
 				<ul class="note-list">
@@ -1955,7 +1954,7 @@ dialog.reply-dialog[open] {
 					<p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p>
 					<ol>
 						<li><span data-ref="x_idle">Some users never log in</span>, so the re-hash at login never reaches them.</li>
-						<li>After the inactivity period you choose, <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
+						<li>After an inactivity period you choose (OWASP gives none), <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
 						<li>Their next login <span data-ref="x_reset">needs a password reset</span>, which creates a hash with the new algorithm.</li>
 					</ol>
 				</div>
@@ -1986,7 +1985,7 @@ dialog.reply-dialog[open] {
 </svg></div>
 				</figure>
 			</div>
-			<p class="caveat"><b>Inferred</b>OWASP gives no inactivity period, and no migration advice that depends on the target algorithm. Existing bcrypt hashes at cost 10 or more are what OWASP calls acceptable for legacy systems, so they are not urgent to move.</p>
+			<p>OWASP calls bcrypt at cost 10 or more acceptable for legacy systems, so those hashes can wait for the re-hash at login.</p>
 		</section>
 
 		<section class="band" id="decision">
@@ -2023,7 +2022,7 @@ dialog.reply-dialog[open] {
 		<section class="sources minor">
 			<h2>Sources</h2>
 			<ul>
-				<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Cheat Sheet Series, Password Storage Cheat Sheet</a>, fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it unless marked inferred. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Settings are reproduced and rearranged here; this page is offered under the same licence.</li>
+				<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Cheat Sheet Series, Password Storage Cheat Sheet</a>, fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it; how the algorithms work, such as which are memory-hard, is standard background, and where the page reasons past the cheat sheet it says so beside the claim. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Settings are reproduced and rearranged here; this page is offered under the same licence.</li>
 				<li>The cheat sheet itself cites <a href="https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver">NIST SP 800-63B-4</a> (PBKDF2 permitted), <a href="https://www.rfc-editor.org/rfc/rfc9106.html">RFC 9106</a> (Argon2) and <a href="https://www.rfc-editor.org/rfc/rfc7914.html">RFC 7914</a> (scrypt).</li>
 			</ul>
 		</section>
@@ -2179,7 +2178,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
     }
     if (Array.isArray(value)) {
-      return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
+      return value.every((item) => typeof item === "number") ? value : value.map((item) => resolveColors(item, key));
     }
     if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
       return value;
@@ -2365,12 +2364,12 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   window.Charts = { make, color: (token) => `var(--${token})` };
 })();
 </script>
-<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once and
-   then the returned refresh() after every route change. A section (an overview section or a view) with two or more <details>
-   of its own (not inside a nested section or another fold) gets one button just above the block holding its first fold:
-   Expand all, or Collapse all once every fold is open, kept in step when the reader opens folds one at a time. Folds a view
-   handler draws count from its next refresh. */
-window.ViewsFolds = () => {
+<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
+   its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
+   A section (an overview section or a view) with two or more <details> of its own (not inside a nested section or another fold)
+   gets one button just above the block holding its first fold: Expand all, or Collapse all once every fold is open, kept in step
+   when the reader opens folds one at a time. Folds a view handler draws count from its next refresh. */
+window.ViewsFolds = (kitText) => {
   const buttons = new Map;
   function foldsOf(section) {
     return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section && !d.parentElement?.closest("details"));
@@ -2382,7 +2381,7 @@ window.ViewsFolds = () => {
     }
     const all = foldsOf(section).every((d) => d.open);
     button.setAttribute("aria-expanded", String(all));
-    button.textContent = all ? "Collapse all" : "Expand all";
+    button.textContent = kitText(all ? "collapseAll" : "expandAll");
   }
   function create(section) {
     const button = document.createElement("button");
@@ -2425,7 +2424,8 @@ window.ViewsFolds = () => {
 };
 
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
-   views.js, which calls it once and then show(view, hash) after every route change, once the view's handler has drawn it.
+   views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
+   every route change, once the view's handler has drawn it.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
                its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
@@ -2440,12 +2440,12 @@ window.ViewsFolds = () => {
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
-window.ViewsNav = ({ views, decode, canonical }) => {
+window.ViewsNav = ({ views, decode, canonical, kitText }) => {
   const STATE_KEY = "viewTrail";
   const RAIL_LIST_MAX = 12;
   const KIT_NAV = ".trail, .toc";
   const overview = document.querySelector("[data-overview]");
-  const overviewName = clean(document.querySelector(".back")?.textContent) || "Overview";
+  const overviewName = () => clean(document.querySelector(".back")?.textContent) || kitText("overview");
   const nameOf = (hash) => hash.split("/")[0] ?? "";
   const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
   const drawn = new Map;
@@ -2528,7 +2528,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   }
   function crumbs(here, back) {
     const list = make("ol", { class: "crumbs" });
-    list.append(item(back ?? make("a", { href: "#" }, overviewName)));
+    list.append(item(back ?? make("a", { href: "#" }, overviewName())));
     for (const step of steps.slice(0, -1)) {
       list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
     }
@@ -2558,7 +2558,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   function trailBar(view) {
     let bar = view.querySelector(".trail");
     if (!bar) {
-      bar = make("nav", { class: "trail", "aria-label": "Breadcrumb" });
+      bar = make("nav", { class: "trail", "aria-label": kitText("breadcrumb") });
       const back = view.querySelector(".back");
       if (back) {
         back.before(bar);
@@ -2597,11 +2597,11 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     });
     const claimed = new Set;
     const entries = headed.map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
-    const home = make("a", { href: "#" }, overviewName);
+    const home = make("a", { href: "#" }, overviewName());
     const list = make("ol", { id: "toc-list" });
     list.append(item(home), ...entries.map((e) => e.li));
-    const nav = make("nav", { class: "toc", "aria-label": "Contents" });
-    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, "Contents");
+    const nav = make("nav", { class: "toc", "aria-label": kitText("contents") });
+    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, kitText("contents"));
     const setOpen = (on) => {
       nav.classList.toggle("is-open", on);
       toggle.setAttribute("aria-expanded", String(on));
@@ -2708,15 +2708,28 @@ window.ViewsNav = ({ views, decode, canonical }) => {
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
-   gets Expand all. */
+   gets Expand all.
+   Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
+   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
+   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
+   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
+   .back link names it). A key left out stays English. */
 (() => {
   const root = document.documentElement;
   const views = [...document.querySelectorAll("[data-view]")];
   const handlers = {};
   let started = false;
   let overviewY = 0;
-  const nav = window.ViewsNav({ views, decode, canonical });
-  const refreshFolds = window.ViewsFolds();
+  const LABELS = {
+    contents: "Contents",
+    breadcrumb: "Breadcrumb",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    overview: "Overview"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
+  const nav = window.ViewsNav({ views, decode, canonical, kitText });
+  const refreshFolds = window.ViewsFolds(kitText);
   function decode(text) {
     try {
       return decodeURIComponent(text);
@@ -3061,25 +3074,31 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 
 /* reply notes: the note-taking half of kit:reply.js (select text or click a [data-ref] part, write a note). Not referenced from pages: pack
    joins it in front of reply.js, which calls it once with
+     kitText(key)       reply.js's text for a key: the hint's and the editor's texts
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
-     addNote(note)      receives { quote | part, where, text } when the reader saves a note
+     addNote(note)      receives { quote | part, place, where, text } when the reader saves a note
      paused()           true while the reply dialog is open, when no hint or editor should appear */
-window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
+window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
   const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
-  const where = (el) => {
+  function placeOf(el) {
     const figure = el.closest("figure");
     const label = figure?.getAttribute("aria-label");
     if (label) {
-      return `figure "${quoted(label)}"`;
+      return { kind: "figure", name: quoted(label) };
     }
     const heading = el.closest("[data-view], section")?.querySelector("h1, h2");
     if (heading) {
-      return `§ ${quoted(heading.textContent ?? "")}`;
+      return { kind: "section", name: quoted(heading.textContent ?? "") };
     }
     const caption = figure?.querySelector("figcaption");
-    return caption ? `figure "${quoted(caption.textContent ?? "").slice(0, 60)}"` : "page";
-  };
+    return caption ? { kind: "figure", name: quoted(caption.textContent ?? "").slice(0, 60) } : { kind: "page" };
+  }
+  function located(el) {
+    const place = placeOf(el);
+    const where = place.kind === "page" ? "page" : place.kind === "figure" ? `figure "${place.name}"` : `§ ${place.name}`;
+    return { place, where };
+  }
   let hint = null;
   let hintFromSelection = false;
   let pop = null;
@@ -3108,7 +3127,10 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
   }
   function openNote(target, at) {
     closePop();
-    const text = h("textarea", { "aria-label": "Note", placeholder: "Note for the agent" });
+    const text = h("textarea", {
+      "aria-label": kitText("note"),
+      placeholder: kitText("notePlaceholder")
+    });
     const save = () => {
       const value = text.value.trim();
       closePop();
@@ -3116,7 +3138,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
         addNote({ ...target, text: value });
       }
     };
-    const popup = h("div", { class: "reply-ui reply-pop", role: "dialog", "aria-label": "Add a note" }, h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `Part: ${target.part}`), text, h("div", { class: "reply-row" }, h("button", { type: "button", class: "btn", onclick: closePop }, "Cancel"), h("button", { type: "button", class: "btn primary", onclick: save }, "Save note")));
+    const popup = h("div", { class: "reply-ui reply-pop", role: "dialog", "aria-label": kitText("addNote") }, h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `${kitText("part")}: ${target.part}`), text, h("div", { class: "reply-row" }, h("button", { type: "button", class: "btn", onclick: closePop }, kitText("cancel")), h("button", { type: "button", class: "btn primary", onclick: save }, kitText("saveNote"))));
     text.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         closePop();
@@ -3133,7 +3155,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
   }
   const partTarget = (part) => ({
     part: clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) || (part.dataset.ref?.split(" ")[0] ?? ""),
-    where: where(part)
+    ...located(part)
   });
   let timer;
   document.addEventListener("selectionchange", () => {
@@ -3154,7 +3176,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
         return;
       }
       const rect = range.getBoundingClientRect();
-      showHint("Add note", rect.left + scrollX, rect.bottom + scrollY + 6, { quote, where: where(host) }, true);
+      showHint(kitText("addNote"), rect.left + scrollX, rect.bottom + scrollY + 6, { quote, ...located(host) }, true);
     }, 200);
   });
   document.addEventListener("pointerdown", (e) => {
@@ -3175,7 +3197,7 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
       return;
     }
     const target = partTarget(part);
-    showHint(`Note on “${target.part}”`, e.pageX, e.pageY + 14, target, false);
+    showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
   });
   document.addEventListener("keydown", (e) => {
     const part = e.target instanceof Element ? e.target.closest("[data-ref]") : null;
@@ -3219,11 +3241,43 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
    the button or the wait cancels.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
+   Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
+   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { reply: "Odgovor", ... }. Keys here:
+   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press
+   again to clear all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog),
+   close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
+   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
+   note in the dialog figure "figure" ("figure “name”") and page "page" (a note outside any figure or headed section). A key left out
+   stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 (() => {
   const root = document.querySelector("main") ?? document.body;
   const CONTROL = "input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
   const notes = [];
+  const LABELS = {
+    reply: "Reply",
+    clear: "Clear answers and notes",
+    clearConfirm: "Clear everything?",
+    clearPrompt: "Press again to clear all answers and notes.",
+    clearCancelled: "Clear cancelled.",
+    yourReply: "Your reply",
+    close: "Close",
+    copyReply: "Copy reply",
+    copied: "Copied. Paste it to the agent.",
+    copyFailed: "Copy failed: select the text above and copy it.",
+    remove: "Remove",
+    note: "Note",
+    notePlaceholder: "Note for the agent",
+    addNote: "Add note",
+    noteOn: "Note on",
+    part: "Part",
+    cancel: "Cancel",
+    saveNote: "Save note",
+    figure: "figure",
+    page: "page"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
   const clean = (s) => s.replace(/\s+/g, " ").trim();
   const quoted = (s) => clean(s).replaceAll('"', "'");
   const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
@@ -3313,9 +3367,23 @@ window.ReplyNotes = ({ h, clean, quoted, root, addNote, paused }) => {
   function restoreNotes(saved) {
     for (const n of Array.isArray(saved) ? saved : []) {
       if (typeof n?.text === "string" && (n.quote || n.part)) {
-        notes.push({ where: String(n.where), quote: n.quote, part: n.part, text: n.text });
+        const place = isPlace(n.place) ? { place: n.place } : {};
+        notes.push({
+          where: String(n.where),
+          ...place,
+          quote: n.quote,
+          part: n.part,
+          text: n.text
+        });
       }
     }
+  }
+  function isPlace(value) {
+    if (typeof value !== "object" || value === null || !("kind" in value)) {
+      return false;
+    }
+    const named = "name" in value && typeof value.name === "string";
+    return value.kind === "page" || (value.kind === "figure" || value.kind === "section") && named;
   }
   const filledNotes = () => notes.filter((n) => n.text.trim());
   const noteLine = (n) => `- On ${n.quote ? `"${n.quote}"` : `part "${n.part}"`} (${n.where}): ${n.text.trim().split(`
@@ -3367,9 +3435,9 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     if (parent !== window) {
       parent.postMessage({ type: "explainer:reply", ...detail }, "*");
     }
-    return await copy(detail.markdown) ? "Copied. Paste it to the agent." : "Copy failed: select the text above and copy it.";
+    return await copy(detail.markdown) ? kitText("copied") : kitText("copyFailed");
   }
-  const dialog = document.body.appendChild(h("dialog", { class: "reply-ui reply-dialog", "aria-label": "Your reply" }));
+  const dialog = document.body.appendChild(h("dialog", { class: "reply-ui reply-dialog" }));
   const button = h("button", {
     type: "button",
     class: "btn primary",
@@ -3378,10 +3446,8 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
       dialog.showModal();
     }
   });
-  const CLEAR_LABEL = "Clear answers and notes";
-  const CONFIRM_LABEL = "Clear everything?";
   const CONFIRM_MS = 4000;
-  const clear = h("button", { type: "button", class: "btn", onclick: onClear }, CLEAR_LABEL);
+  const clear = h("button", { type: "button", class: "btn", onclick: onClear });
   const announce = h("span", { role: "status", class: "reply-invisible" });
   const bar = document.body.appendChild(h("div", { class: "reply-ui reply-bar" }, announce, clear, button));
   const asked = Boolean(document.querySelector("[data-reply]"));
@@ -3397,21 +3463,21 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
   function arm() {
     clear.style.inlineSize = `${clear.getBoundingClientRect().width}px`;
     clear.classList.add("is-armed");
-    clear.textContent = CONFIRM_LABEL;
-    announce.textContent = "Press again to clear all answers and notes.";
-    confirmTimer = window.setTimeout(() => disarm("Clear cancelled."), CONFIRM_MS);
+    clear.textContent = kitText("clearConfirm");
+    announce.textContent = kitText("clearPrompt");
+    confirmTimer = window.setTimeout(() => disarm(kitText("clearCancelled")), CONFIRM_MS);
   }
   function disarm(message = "") {
     clearTimeout(confirmTimer);
     clear.classList.remove("is-armed");
     clear.style.inlineSize = "";
-    clear.textContent = CLEAR_LABEL;
+    clear.textContent = kitText("clear");
     announce.textContent = message;
   }
   clear.addEventListener("blur", () => disarm());
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && clear.classList.contains("is-armed")) {
-      disarm("Clear cancelled.");
+      disarm(kitText("clearCancelled"));
     }
   });
   function clearAll() {
@@ -3427,12 +3493,24 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
       disarm();
     }
     bar.hidden = button.hidden && clear.hidden;
-    button.textContent = count ? `Reply (${count})` : "Reply";
+    if (!clear.classList.contains("is-armed")) {
+      clear.textContent = kitText("clear");
+    }
+    button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
+  }
+  function caption({ place, where }) {
+    if (!place) {
+      return where;
+    }
+    if (place.kind === "page") {
+      return kitText("page");
+    }
+    return place.kind === "figure" ? `${kitText("figure")} “${place.name}”` : `§ ${place.name}`;
   }
   function renderDialog() {
     const preview = h("pre", { class: "reply-md" }, markdown());
     const rows = notes.map((n) => {
-      const text = h("textarea", { "aria-label": "Note" });
+      const text = h("textarea", { "aria-label": kitText("note") });
       text.value = n.text;
       text.addEventListener("input", () => {
         n.text = text.value;
@@ -3447,8 +3525,8 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
           sync();
           renderDialog();
         }
-      }, "Remove");
-      return h("div", { class: "reply-note" }, h("p", { class: "meta" }, n.quote ? `“${n.quote}” · ${n.where}` : `${n.part} · ${n.where}`), text, remove);
+      }, kitText("remove"));
+      return h("div", { class: "reply-note" }, h("p", { class: "meta" }, `${n.quote ? `“${n.quote}”` : n.part} · ${caption(n)}`), text, remove);
     });
     const status = h("span", { role: "status", class: "meta" });
     const send = h("button", {
@@ -3457,8 +3535,9 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
       onclick: async () => {
         status.textContent = await deliver();
       }
-    }, "Copy reply");
-    dialog.replaceChildren(h("header", {}, h("h2", {}, "Your reply"), h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, "Close")), h("div", { class: "reply-body" }, ...rows, preview), h("footer", {}, status, send));
+    }, kitText("copyReply"));
+    dialog.setAttribute("aria-label", kitText("yourReply"));
+    dialog.replaceChildren(h("header", {}, h("h2", {}, kitText("yourReply")), h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, kitText("close"))), h("div", { class: "reply-body" }, ...rows, preview), h("footer", {}, status, send));
   }
   dialog.addEventListener("click", (e) => {
     if (e.target === dialog) {
@@ -3466,6 +3545,7 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     }
   });
   window.ReplyNotes({
+    kitText,
     h,
     clean,
     quoted,
@@ -3508,9 +3588,10 @@ const OWASP_URL = "https://cheatsheetseries.owasp.org/cheatsheets/Password_Stora
 const argonLabel = (s) => `m=${s.mib} MiB, t=${s.t}, p=1`;
 const scryptLabel = (s) => `N=2^${s.logN}, r=8, p=${s.p}`;
 
+const FIPS_UNKNOWN = "Unknown: the cheat sheet does not say";
 const ALGOS = {
 	argon2id: {
-		name: "Argon2id", role: "First choice", minimum: "m=19 MiB, t=2, p=1", memory: "7 to 46 MiB", watch: "Memory-hard, so it needs memory per login; use the Argon2id variant",
+		name: "Argon2id", role: "First choice", minimum: "m=19 MiB, t=2, p=1", memory: "7 to 46 MiB", fips: FIPS_UNKNOWN, watch: "Memory-hard, so it needs memory per login; use the Argon2id variant",
 		lede: "Winner of the 2015 Password Hashing Competition. The Argon2id variant balances resistance to side-channel and GPU-based attacks.",
 		settings: ARGON.map((s) => [`m=${s.kib} KiB, t=${s.t}, p=1`, `${s.mib} MiB`, `${s.t} pass${s.t > 1 ? "es" : ""}`]),
 		chart: { x: "Memory (MiB)", y: "Passes (t)", points: ARGON.map((s) => [s.mib, s.t]), name: "Argon2id" },
@@ -3523,7 +3604,7 @@ const ALGOS = {
 		anchor: "#argon2id",
 	},
 	scrypt: {
-		name: "scrypt", role: "If Argon2id is not available", minimum: "N=2^17, r=8, p=1", memory: "8 to 128 MiB", watch: "Memory-hard; its listed settings trade parallelism against memory",
+		name: "scrypt", role: "If Argon2id is not available", minimum: "N=2^17, r=8, p=1", memory: "8 to 128 MiB", fips: FIPS_UNKNOWN, watch: "Memory-hard; its listed settings trade parallelism against memory",
 		lede: "A password-based key derivation function by Colin Percival. OWASP calls Argon2id the best choice and scrypt the one to use when Argon2id is not available.",
 		settings: SCRYPT.map((s) => [scryptLabel(s), `${s.mib} MiB`, `p=${s.p}`]),
 		chart: { x: "Memory (MiB)", y: "Parallelism (p)", points: SCRYPT.map((s) => [s.mib, s.p]), name: "scrypt" },
@@ -3535,7 +3616,7 @@ const ALGOS = {
 		anchor: "#scrypt",
 	},
 	bcrypt: {
-		name: "bcrypt", role: "Legacy systems only", minimum: "Work factor 10", memory: "No memory-cost parameter", watch: "72-byte input limit; pre-hashing is risky",
+		name: "bcrypt", role: "Legacy systems only", minimum: "Work factor 10", memory: "No memory-cost parameter", fips: FIPS_UNKNOWN, watch: "72-byte input limit; pre-hashing is risky",
 		lede: "OWASP says bcrypt should only be used where Argon2 and scrypt are not available. Make the work factor as large as the verification server allows, with a minimum of 10.",
 		settings: null, chart: null,
 		notes: [
@@ -3547,7 +3628,7 @@ const ALGOS = {
 		anchor: "#bcrypt",
 	},
 	pbkdf2: {
-		name: "PBKDF2", role: "When FIPS-140 is required", minimum: "HMAC-SHA256, 600,000 iterations", memory: "No memory-cost parameter", watch: "Long passwords can be slow in some implementations",
+		name: "PBKDF2", role: "When FIPS-140 is required", minimum: "HMAC-SHA256, 600,000 iterations", memory: "No memory-cost parameter", fips: "Validated implementations exist; check that your module's certificate covers it", watch: "Long passwords can be slow in some implementations",
 		lede: "Permitted by NIST SP 800-63B-4 and with FIPS-140 validated implementations, so OWASP prefers it when those are required. HMAC-SHA-256 is widely supported and recommended by NIST.",
 		settings: PBKDF2.map(([h, n, note]) => [`PBKDF2-${h}`, "No memory-cost parameter", `${n.toLocaleString("en-US")} iterations${note ? ` (${note})` : ""}`]),
 		chart: { bars: PBKDF2.map(([h, n, note]) => [h + (note === "legacy only" ? " (legacy)" : ""), n]) },
@@ -3650,7 +3731,7 @@ showBudget();
 $("algo-rows").innerHTML = ORDER.map((id) => {
 	const a = ALGOS[id];
 	return `<tr data-state="${id === "argon2id" ? "fit" : id === "bcrypt" ? "out" : "maybe"}"><th scope="row"><a href="#algo/${id}">${a.name}</a></th>
-		<td data-label="OWASP's role">${a.role}</td><td data-label="Minimum setting">${a.minimum}</td><td data-label="Nominal memory">${a.memory}</td><td data-label="Watch out for">${a.watch}</td></tr>`;
+		<td data-label="OWASP's role">${a.role}</td><td data-label="Minimum setting">${a.minimum}</td><td data-label="Nominal memory">${a.memory}</td><td data-label="FIPS-140 validated">${a.fips}</td><td data-label="Watch out for">${a.watch}</td></tr>`;
 }).join("");
 
 /* ---- Migration: one method shown at a time. ---- */

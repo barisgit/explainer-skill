@@ -2049,7 +2049,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
     }
     if (Array.isArray(value)) {
-      return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
+      return value.every((item) => typeof item === "number") ? value : value.map((item) => resolveColors(item, key));
     }
     if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
       return value;
@@ -2235,12 +2235,12 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   window.Charts = { make, color: (token) => `var(--${token})` };
 })();
 </script>
-<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once and
-   then the returned refresh() after every route change. A section (an overview section or a view) with two or more <details>
-   of its own (not inside a nested section or another fold) gets one button just above the block holding its first fold:
-   Expand all, or Collapse all once every fold is open, kept in step when the reader opens folds one at a time. Folds a view
-   handler draws count from its next refresh. */
-window.ViewsFolds = () => {
+<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
+   its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
+   A section (an overview section or a view) with two or more <details> of its own (not inside a nested section or another fold)
+   gets one button just above the block holding its first fold: Expand all, or Collapse all once every fold is open, kept in step
+   when the reader opens folds one at a time. Folds a view handler draws count from its next refresh. */
+window.ViewsFolds = (kitText) => {
   const buttons = new Map;
   function foldsOf(section) {
     return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section && !d.parentElement?.closest("details"));
@@ -2252,7 +2252,7 @@ window.ViewsFolds = () => {
     }
     const all = foldsOf(section).every((d) => d.open);
     button.setAttribute("aria-expanded", String(all));
-    button.textContent = all ? "Collapse all" : "Expand all";
+    button.textContent = kitText(all ? "collapseAll" : "expandAll");
   }
   function create(section) {
     const button = document.createElement("button");
@@ -2295,7 +2295,8 @@ window.ViewsFolds = () => {
 };
 
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
-   views.js, which calls it once and then show(view, hash) after every route change, once the view's handler has drawn it.
+   views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
+   every route change, once the view's handler has drawn it.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
                its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
@@ -2310,12 +2311,12 @@ window.ViewsFolds = () => {
      .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
                missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
-window.ViewsNav = ({ views, decode, canonical }) => {
+window.ViewsNav = ({ views, decode, canonical, kitText }) => {
   const STATE_KEY = "viewTrail";
   const RAIL_LIST_MAX = 12;
   const KIT_NAV = ".trail, .toc";
   const overview = document.querySelector("[data-overview]");
-  const overviewName = clean(document.querySelector(".back")?.textContent) || "Overview";
+  const overviewName = () => clean(document.querySelector(".back")?.textContent) || kitText("overview");
   const nameOf = (hash) => hash.split("/")[0] ?? "";
   const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
   const drawn = new Map;
@@ -2398,7 +2399,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   }
   function crumbs(here, back) {
     const list = make("ol", { class: "crumbs" });
-    list.append(item(back ?? make("a", { href: "#" }, overviewName)));
+    list.append(item(back ?? make("a", { href: "#" }, overviewName())));
     for (const step of steps.slice(0, -1)) {
       list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
     }
@@ -2428,7 +2429,7 @@ window.ViewsNav = ({ views, decode, canonical }) => {
   function trailBar(view) {
     let bar = view.querySelector(".trail");
     if (!bar) {
-      bar = make("nav", { class: "trail", "aria-label": "Breadcrumb" });
+      bar = make("nav", { class: "trail", "aria-label": kitText("breadcrumb") });
       const back = view.querySelector(".back");
       if (back) {
         back.before(bar);
@@ -2467,11 +2468,11 @@ window.ViewsNav = ({ views, decode, canonical }) => {
     });
     const claimed = new Set;
     const entries = headed.map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
-    const home = make("a", { href: "#" }, overviewName);
+    const home = make("a", { href: "#" }, overviewName());
     const list = make("ol", { id: "toc-list" });
     list.append(item(home), ...entries.map((e) => e.li));
-    const nav = make("nav", { class: "toc", "aria-label": "Contents" });
-    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, "Contents");
+    const nav = make("nav", { class: "toc", "aria-label": kitText("contents") });
+    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, kitText("contents"));
     const setOpen = (on) => {
       nav.classList.toggle("is-open", on);
       toggle.setAttribute("aria-expanded", String(on));
@@ -2578,15 +2579,28 @@ window.ViewsNav = ({ views, decode, canonical }) => {
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
-   gets Expand all. */
+   gets Expand all.
+   Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
+   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
+   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
+   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
+   .back link names it). A key left out stays English. */
 (() => {
   const root = document.documentElement;
   const views = [...document.querySelectorAll("[data-view]")];
   const handlers = {};
   let started = false;
   let overviewY = 0;
-  const nav = window.ViewsNav({ views, decode, canonical });
-  const refreshFolds = window.ViewsFolds();
+  const LABELS = {
+    contents: "Contents",
+    breadcrumb: "Breadcrumb",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    overview: "Overview"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
+  const nav = window.ViewsNav({ views, decode, canonical, kitText });
+  const refreshFolds = window.ViewsFolds(kitText);
   function decode(text) {
     try {
       return decodeURIComponent(text);
