@@ -171,7 +171,7 @@
 			<pre class="code" data-role="code" aria-label="The algorithm in pseudocode; the lines in use at this step are highlighted"></pre>
 			<figcaption>Arrows show the direction a road can be driven. “True” is the real shortest distance, computed separately with the Bellman–Ford algorithm; a red node was settled with a distance that is too large.</figcaption>
 		</figure>
-		<p class="caveat"><b>Inferred</b>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p>
+		<p>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p>
 	</section>
 
 	<section class="minor">

@@ -58,10 +58,9 @@
 		<section>
 			<h2>What OWASP says about each algorithm</h2>
 			<table class="compare">
-				<thead><tr><th>Algorithm</th><th>OWASP's role for it</th><th>Minimum setting</th><th>Nominal memory</th><th>Watch out for</th></tr></thead>
+				<thead><tr><th>Algorithm</th><th>OWASP's role for it</th><th>Minimum setting</th><th>Nominal memory</th><th>FIPS-140 validated</th><th>Watch out for</th></tr></thead>
 				<tbody id="algo-rows"></tbody>
 			</table>
-			<p class="caveat"><b>Inferred</b>The role and minimum columns restate the cheat sheet. Where this page says bcrypt or PBKDF2 has no memory-cost parameter and is not memory-hard, that is a property of the algorithms, not an OWASP statement; they still use some working memory. The cheat sheet names FIPS-140 validated implementations only for PBKDF2; it does not say whether the others have any, so for them FIPS status is unknown, not no. FIPS 140 validates cryptographic modules in an approved configuration, not an algorithm name: check the certificate of the module you would use.</p>
 			<details>
 				<summary>Rules that apply whichever you pick</summary>
 				<ul class="note-list">
@@ -133,7 +132,7 @@ flowchart TD
 					<p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p>
 					<ol>
 						<li><span data-ref="x_idle">Some users never log in</span>, so the re-hash at login never reaches them.</li>
-						<li>After the inactivity period you choose, <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
+						<li>After an inactivity period you choose (OWASP gives none), <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
 						<li>Their next login <span data-ref="x_reset">needs a password reset</span>, which creates a hash with the new algorithm.</li>
 					</ol>
 				</div>
@@ -145,7 +144,7 @@ flowchart TD
 </pre>
 				</figure>
 			</div>
-			<p class="caveat"><b>Inferred</b>OWASP gives no inactivity period, and no migration advice that depends on the target algorithm. Existing bcrypt hashes at cost 10 or more are what OWASP calls acceptable for legacy systems, so they are not urgent to move.</p>
+			<p>OWASP calls bcrypt at cost 10 or more acceptable for legacy systems, so those hashes can wait for the re-hash at login.</p>
 		</section>
 
 		<section class="band" id="decision">
@@ -182,7 +181,7 @@ flowchart TD
 		<section class="sources minor">
 			<h2>Sources</h2>
 			<ul>
-				<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Cheat Sheet Series, Password Storage Cheat Sheet</a>, fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it unless marked inferred. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Settings are reproduced and rearranged here; this page is offered under the same licence.</li>
+				<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Cheat Sheet Series, Password Storage Cheat Sheet</a>, fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it; how the algorithms work, such as which are memory-hard, is standard background, and where the page reasons past the cheat sheet it says so beside the claim. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Settings are reproduced and rearranged here; this page is offered under the same licence.</li>
 				<li>The cheat sheet itself cites <a href="https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver">NIST SP 800-63B-4</a> (PBKDF2 permitted), <a href="https://www.rfc-editor.org/rfc/rfc9106.html">RFC 9106</a> (Argon2) and <a href="https://www.rfc-editor.org/rfc/rfc7914.html">RFC 7914</a> (scrypt).</li>
 			</ul>
 		</section>
@@ -233,9 +232,10 @@ const OWASP_URL = "https://cheatsheetseries.owasp.org/cheatsheets/Password_Stora
 const argonLabel = (s) => `m=${s.mib} MiB, t=${s.t}, p=1`;
 const scryptLabel = (s) => `N=2^${s.logN}, r=8, p=${s.p}`;
 
+const FIPS_UNKNOWN = "Unknown: the cheat sheet does not say";
 const ALGOS = {
 	argon2id: {
-		name: "Argon2id", role: "First choice", minimum: "m=19 MiB, t=2, p=1", memory: "7 to 46 MiB", watch: "Memory-hard, so it needs memory per login; use the Argon2id variant",
+		name: "Argon2id", role: "First choice", minimum: "m=19 MiB, t=2, p=1", memory: "7 to 46 MiB", fips: FIPS_UNKNOWN, watch: "Memory-hard, so it needs memory per login; use the Argon2id variant",
 		lede: "Winner of the 2015 Password Hashing Competition. The Argon2id variant balances resistance to side-channel and GPU-based attacks.",
 		settings: ARGON.map((s) => [`m=${s.kib} KiB, t=${s.t}, p=1`, `${s.mib} MiB`, `${s.t} pass${s.t > 1 ? "es" : ""}`]),
 		chart: { x: "Memory (MiB)", y: "Passes (t)", points: ARGON.map((s) => [s.mib, s.t]), name: "Argon2id" },
@@ -248,7 +248,7 @@ const ALGOS = {
 		anchor: "#argon2id",
 	},
 	scrypt: {
-		name: "scrypt", role: "If Argon2id is not available", minimum: "N=2^17, r=8, p=1", memory: "8 to 128 MiB", watch: "Memory-hard; its listed settings trade parallelism against memory",
+		name: "scrypt", role: "If Argon2id is not available", minimum: "N=2^17, r=8, p=1", memory: "8 to 128 MiB", fips: FIPS_UNKNOWN, watch: "Memory-hard; its listed settings trade parallelism against memory",
 		lede: "A password-based key derivation function by Colin Percival. OWASP calls Argon2id the best choice and scrypt the one to use when Argon2id is not available.",
 		settings: SCRYPT.map((s) => [scryptLabel(s), `${s.mib} MiB`, `p=${s.p}`]),
 		chart: { x: "Memory (MiB)", y: "Parallelism (p)", points: SCRYPT.map((s) => [s.mib, s.p]), name: "scrypt" },
@@ -260,7 +260,7 @@ const ALGOS = {
 		anchor: "#scrypt",
 	},
 	bcrypt: {
-		name: "bcrypt", role: "Legacy systems only", minimum: "Work factor 10", memory: "No memory-cost parameter", watch: "72-byte input limit; pre-hashing is risky",
+		name: "bcrypt", role: "Legacy systems only", minimum: "Work factor 10", memory: "No memory-cost parameter", fips: FIPS_UNKNOWN, watch: "72-byte input limit; pre-hashing is risky",
 		lede: "OWASP says bcrypt should only be used where Argon2 and scrypt are not available. Make the work factor as large as the verification server allows, with a minimum of 10.",
 		settings: null, chart: null,
 		notes: [
@@ -272,7 +272,7 @@ const ALGOS = {
 		anchor: "#bcrypt",
 	},
 	pbkdf2: {
-		name: "PBKDF2", role: "When FIPS-140 is required", minimum: "HMAC-SHA256, 600,000 iterations", memory: "No memory-cost parameter", watch: "Long passwords can be slow in some implementations",
+		name: "PBKDF2", role: "When FIPS-140 is required", minimum: "HMAC-SHA256, 600,000 iterations", memory: "No memory-cost parameter", fips: "Validated implementations exist; check that your module's certificate covers it", watch: "Long passwords can be slow in some implementations",
 		lede: "Permitted by NIST SP 800-63B-4 and with FIPS-140 validated implementations, so OWASP prefers it when those are required. HMAC-SHA-256 is widely supported and recommended by NIST.",
 		settings: PBKDF2.map(([h, n, note]) => [`PBKDF2-${h}`, "No memory-cost parameter", `${n.toLocaleString("en-US")} iterations${note ? ` (${note})` : ""}`]),
 		chart: { bars: PBKDF2.map(([h, n, note]) => [h + (note === "legacy only" ? " (legacy)" : ""), n]) },
@@ -375,7 +375,7 @@ showBudget();
 $("algo-rows").innerHTML = ORDER.map((id) => {
 	const a = ALGOS[id];
 	return `<tr data-state="${id === "argon2id" ? "fit" : id === "bcrypt" ? "out" : "maybe"}"><th scope="row"><a href="#algo/${id}">${a.name}</a></th>
-		<td data-label="OWASP's role">${a.role}</td><td data-label="Minimum setting">${a.minimum}</td><td data-label="Nominal memory">${a.memory}</td><td data-label="Watch out for">${a.watch}</td></tr>`;
+		<td data-label="OWASP's role">${a.role}</td><td data-label="Minimum setting">${a.minimum}</td><td data-label="Nominal memory">${a.memory}</td><td data-label="FIPS-140 validated">${a.fips}</td><td data-label="Watch out for">${a.watch}</td></tr>`;
 }).join("");
 
 /* ---- Migration: one method shown at a time. ---- */
