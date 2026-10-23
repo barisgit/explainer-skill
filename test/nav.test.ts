@@ -181,6 +181,21 @@ for (const [kind, value] of [
 	}, 30_000);
 }
 
+test("a section id the rail adds is unique among the page's ids and view names", async () => {
+	// Neither heading gives a usable slug ("→" has none, "b" is a view name), and section-1 and section-2 are taken.
+	const page = `${HEAD}<main class="page"><div data-overview><h1>Ids</h1><p id="section-1">taken</p>
+<section><h2>→</h2><a href="#a/1">A</a></section><section><h2>b</h2><a href="#b/1">B</a></section></div>
+<section class="view" data-view="a"><h1>A</h1></section><section class="view" data-view="b"><h1>B</h1></section>
+<section class="view" data-view="section-2"><h1>S</h1></section></main>
+<script src="kit:views.js"></script>
+<script>
+const names = [...document.querySelectorAll("[data-view]")].map((v) => v.dataset.view);
+const unique = (s) => s.id && !names.includes(s.id) && document.querySelectorAll("#" + CSS.escape(s.id)).length === 1;
+${contract("every overview section has an id of its own", `[...document.querySelectorAll("[data-overview] > section")].every(unique)`)}
+</script></body></html>`;
+	await packAndCheck(dir, "ids", page, "nav contract", ["--view", "none"]);
+}, 30_000);
+
 test("a page with one kind of view has no rail", async () => {
 	const page = `${HEAD}<main class="page"><div data-overview><h1>One view</h1><section><h2>Fixes</h2><a href="#f/a">A</a> <a href="#f/b">B</a></section></div>
 <section class="view" data-view="f"><a class="back" href="#">All fixes</a><h1>Fix</h1></section></main>

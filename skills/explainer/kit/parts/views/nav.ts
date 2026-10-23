@@ -237,16 +237,21 @@ window.ViewsNav = ({ views, decode }) => {
 		entries: Entry[];
 	}
 
-	/** The section's id, given one from its heading when it has none; `n` numbers it when the heading cannot. */
+	/** An id no element has and no view name takes, so the rail's #id link scrolls to its section rather than opening a view. */
+	const freeId = (id: string) => id !== "" && !names.has(id) && !document.getElementById(id);
+
+	/** The section's id, given one from its heading when it has none, else section-n, section-n+1, ... until one is free. */
 	function sectionId(section: HTMLElement, heading: HTMLElement, n: number) {
 		if (!section.id) {
-			const slug = clean(heading.textContent)
+			let id = clean(heading.textContent)
 				.toLowerCase()
 				.replace(/[^\p{L}\p{N}]+/gu, "-")
 				.replace(/^-|-$/g, "")
 				.slice(0, 48);
-			section.id =
-				slug && !names.has(slug) && !document.getElementById(slug) ? slug : `section-${n}`;
+			for (let k = n; !freeId(id); k++) {
+				id = `section-${k}`;
+			}
+			section.id = id;
 		}
 		return section.id;
 	}
