@@ -16,7 +16,7 @@ An agent skill that turns "show me" into one interactive HTML page: charts to ex
 In order of priority:
 
 1. **The reader understands and takes in the subject.** This comes before everything else; looks and interactivity serve it. [`guide.md`](skills/explainer/guide.md) records what made generated pages better or worse for their readers, and the kit's house style keeps the eye on the content.
-2. **Agents write pages easily, and the source stays readable for the agent who edits it later.** Charts, steppers, linked highlighting, drill-down views and reader replies are a few HTML attributes each, so a page's source is mostly its content.
+2. **Agents write pages easily, and the source stays readable for the agent who edits it later.** Charts, steppers, linked highlighting, drill-down views and reader replies are a few HTML attributes each, so the agent writes the content and its data rather than the machinery.
 3. **The page is one portable file that works offline and stays small enough.** Necessary, but the least important of the three. `pack` inlines only the kit files the page references (ECharts, about 0.9 MB, only for pages that use it) and renders Mermaid diagrams to SVG, so no diagram library ships.
 
 ## Install
@@ -37,7 +37,7 @@ Several agents share one copy in `~/.agents/skills/explainer` and the others get
 caplet add github:barisgit/explainer-skill --pin main --scope user
 ```
 
-Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.7.1` instead to hold a version.
+Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.8.0` instead to hold a version.
 
 Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
@@ -103,6 +103,8 @@ A diagram whose parts light up from the text, for illustration:
 </picture>
 
 **Drill-down views.** A hash router inside the one file: a bar, row or link opens its own view, and Back returns with the scroll position kept. The page's links give each view breadcrumbs and previous and next, pages with views inside views a contents rail, and a section with several folds Expand all.
+
+**Record trees.** Nested records (phases, groups, items) as one complete list that opens level by level: a summary line per level with its numbers aligned, Expand all for every level, and links from the text that open the branch they name.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/electricity-mix-coal-ranking-dark.webp">
