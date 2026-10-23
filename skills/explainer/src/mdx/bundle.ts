@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, relative } from "node:path";
-import type { BuildConfig, BunPlugin, JavaScriptLoader } from "bun";
+import { dirname, extname, join, relative, resolve } from "node:path";
+import type { BuildConfig, BuildMetafile, BunPlugin, JavaScriptLoader } from "bun";
 import type { Island, renderPage } from "../../kit/islands/server.ts";
 import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT } from "../paths.ts";
@@ -30,10 +30,30 @@ const SCRIPT = /\.m?[jt]sx?$/;
 const USE_CLIENT = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(["'])use client\1/;
 const SOURCE = "island-source:";
 
-/** What the builds of one page saw besides their output: the stylesheets its modules import and every script module loaded. */
+/**
+ * What the builds of one page saw besides their output: the stylesheets its modules import, and the script modules in it (in the
+ * client build, only those with code in the bundle, so an unused re-export of kit/components/index.ts does not count).
+ */
 export interface Seen {
 	css: Set<string>;
 	modules: Set<string>;
+}
+
+/** Drops from `seen.modules` the modules the build loaded but left no code of in its output: re-exports nothing imports. */
+function keepBundled(seen: Seen, meta: BuildMetafile): void {
+	// The metafile's paths are relative to the working directory, the loaded ones absolute.
+	const bundled = new Set(
+		Object.values(meta.outputs).flatMap((output) =>
+			Object.entries(output.inputs)
+				.filter(([, input]) => input.bytesInOutput > 0)
+				.map(([path]) => resolve(path)),
+		),
+	);
+	for (const module of seen.modules) {
+		if (!bundled.has(module)) {
+			seen.modules.delete(module);
+		}
+	}
 }
 
 const loaderOf = (path: string): JavaScriptLoader => LOADERS[extname(path)] ?? "js";
@@ -140,6 +160,7 @@ async function buildEntry(
 			// The entry exists only here; `files` lets Bun resolve it, and the plugin's loader returns it.
 			files: { [entry.path]: entry.code },
 			plugins: [pagePlugin(page, entry, seen, prerender)],
+			metafile: !prerender,
 			jsx: { runtime: "automatic", importSource: "preact", development: false },
 			throw: true,
 		});
@@ -155,6 +176,9 @@ async function buildEntry(
 				)
 				.join("\n"),
 		);
+	}
+	if (built.metafile) {
+		keepBundled(seen, built.metafile);
 	}
 	const [output] = built.outputs;
 	if (!output) {
