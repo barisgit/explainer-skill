@@ -9,7 +9,9 @@
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back | tree
    tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an optional head: kit views.js
-   shows the markup).
+   shows the markup) | toolbar (the row over a records section: a .seg view switch, <input type="search">, selects or .field
+   filters, each named by a caption or aria-label; one compact row, two even columns on phones; Expand all joins its end. Layout
+   only: the page owns their state, and kit:reply.js keeps inputs with ids across reloads).
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
    hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.

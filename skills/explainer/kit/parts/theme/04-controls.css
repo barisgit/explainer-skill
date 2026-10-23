@@ -81,6 +81,11 @@ legend {
 		background 0.15s,
 		color 0.15s;
 }
+/* In a .toolbar (below), the switch is as tall as the inputs beside it. */
+.toolbar .seg span {
+	min-block-size: 0;
+	padding-block: 0.25rem;
+}
 .seg label:hover span {
 	color: var(--ink);
 }
@@ -238,4 +243,48 @@ output {
 }
 [role="tabpanel"] {
 	padding-block: 1rem;
+}
+
+/* Toolbar: the row over a records section on the page (a tree or table), holding its view switch (.seg), search and filters
+   (selects, .field), compact on one line with no box. On phones it is a grid of two equal columns: the switch and the search take
+   a row each, the filters pair up, so the rows wrap as whole cells, never as a ragged line. Layout only: the page owns what the
+   controls do. Unlike .controls, which heads a panel's figure, it acts on records below it that sit on the page. */
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin-block: 1.25rem 0.75rem;
+	font-size: 0.875rem;
+}
+.toolbar > input[type="search"] {
+	flex: 1 1 10rem;
+	max-inline-size: 18rem;
+}
+@media (max-width: 40rem) {
+	.toolbar {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.toolbar > * {
+		min-inline-size: 0;
+	}
+	.toolbar > :is(.seg, input[type="search"]) {
+		grid-column: 1 / -1;
+		max-inline-size: none;
+	}
+	.toolbar > .seg {
+		display: flex;
+	}
+	.toolbar > .seg label {
+		flex: 1;
+		text-align: center;
+	}
+	.toolbar > :is(select, .field) {
+		inline-size: 100%;
+	}
+	.toolbar .field > select {
+		flex: 1;
+		min-inline-size: 0;
+	}
 }

@@ -225,6 +225,12 @@
 .expand.fold-all::after {
 	content: none;
 }
+/* In a .toolbar it ends the row; on phones it takes the last column. */
+.toolbar > .fold-all {
+	grid-column: -2;
+	margin: 0;
+	margin-inline-start: auto;
+}
 /* Over a .wide block it ends where the block does: the end margin of .wide in the layout part. */
 .fold-all:has(+ .wide) {
 	margin-inline-end: calc(50% - min(44rem, 50vw - var(--gutter)));

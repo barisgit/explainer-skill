@@ -104,6 +104,28 @@ ${pageContract({
 	expect(await packAndRun(dir, "columns", page)).toEqual([]);
 }, 30_000);
 
+test("a toolbar is one row on a wide screen, whole rows on a phone, and takes the records' Expand all", async () => {
+	const page = `${HEAD}<h1>Records</h1><section id="records"><h2>Tasks</h2>
+<div class="toolbar" id="bar">
+	<div class="seg"><label><input type="radio" name="v" checked><span>Tree</span></label><label><input type="radio" name="v"><span>People</span></label></div>
+	<input type="search" aria-label="Search"><select aria-label="Owner"><option>All owners</option></select><select aria-label="Type"><option>All types</option></select>
+</div>
+${TREE}</section></main>
+<script src="kit:views.js"></script>
+<script>
+const bar = document.getElementById("bar");
+const box = (el) => el.getBoundingClientRect();
+const [seg, search, owner, type] = bar.children;
+${pageContract({
+	"Expand all ends the toolbar": `bar.lastElementChild.matches(".fold-all")`,
+	"on a wide screen every control shares one row": `innerWidth < 640 || [...bar.children].every((c) => Math.abs(box(c).top + box(c).height / 2 - box(seg).top - box(seg).height / 2) < 1)`,
+	"the switch is as tall as the inputs": `Math.round(box(seg).height) === Math.round(box(search).height)`,
+	"on a phone the switch and the search span the row and the filters pair up": `innerWidth >= 640 || ([seg, search].every((c) => Math.abs(box(c).width - box(bar).width) < 1) && box(owner).top === box(type).top && Math.abs(box(owner).width - box(type).width) < 1)`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+	expect(await packAndRun(dir, "toolbar", page)).toEqual([]);
+}, 30_000);
+
 test("a link into a branch opens it and its ancestors and scrolls to it, on the overview and in a view", async () => {
 	const script = `
 	await navigated(() => $("#to-spike").click());
