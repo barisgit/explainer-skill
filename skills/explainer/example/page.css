@@ -1,0 +1,7 @@
+/* Page-specific: everything else comes from the kit's stylesheet. */
+.stat dd.hot {
+	color: var(--accent);
+}
+#fixes {
+	block-size: clamp(20rem, 44vw, 24rem);
+}

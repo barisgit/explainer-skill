@@ -11,7 +11,8 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 
 ```text
 skills/explainer/      the installable skill, copied as-is by installers: no dotfiles, tests or node_modules inside
-  SKILL.md guide.md example.html
+  SKILL.md guide.md
+  example/             the example page: page.mdx and the model, client components and CSS it imports (typechecked with the kit)
   cli.ts               thin entry: Bun check, then imports src/main.ts (erasable syntax only, so node can run it far enough to explain)
   src/                 main.ts (dispatch, help), commands.ts (one spec per command), paths.ts, kit.ts (kit file names, TypeScript to script), pack.ts, loads.ts (what a packed page would still load, read through Bun's CSS parser), svg-theme.ts (svg files per colour scheme), check.ts, steps.ts, report.ts, mermaid.ts, chrome.ts (CDP client)
   kit/                 what pages reference as kit:<file>: theme.css, charts, plot, steps, link, views and reply as .ts sources that pages name .js, echarts.js (generated), fonts/, licenses/
@@ -51,7 +52,7 @@ The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged fi
 
 ## Decisions
 
-- One skill named `explainer`: thin `SKILL.md` and the CLI as the toolbox; no custom elements; offline single-file output; the house style lives in `kit/theme.css` (with `kit/parts/theme/`) and `example.html`, not in instructions.
+- One skill named `explainer`: thin `SKILL.md` and the CLI as the toolbox; no custom elements; offline single-file output; the house style lives in `kit/theme.css` (with `kit/parts/theme/`) and `example/`, not in instructions.
 - Runtime is Bun only. Headless Chrome (CDP over WebSocket, no Puppeteer) for `check` only.
 - Mermaid is rendered in-process by beautiful-mermaid with ELK: one SVG per diagram, drawn with the renderer's variables that `theme.css` maps to the kit tokens, so it follows light, dark and a page's overrides. The patch (`patches/beautiful-mermaid@1.1.3.patch`) lays out in reading order, sizes text with Geist's measured widths and wraps labels at Mermaid's 200 px. `pack` fails, with what to write instead, on types it cannot draw and on input the renderer would draw wrong silently. Diagrams do not step; linked highlighting walks through them.
 - Layout is the packaging layout above: Caplet imports `skills/*/SKILL.md` as a bare skill and copies every non-hidden file. Do not add an `acf.yml`; it would make Caplet emit only the files listed in `assets:`.
@@ -91,7 +92,7 @@ Trying an installer by hand: always give it a disposable HOME (installers write 
 
 ## Changing the kit
 
-Kit files are behaviour, not just code. After a change: `pack` then `check` `skills/explainer/example.html` and a few real pages (light and dark, 1440 and 390 wide are covered by `check`), open the screenshots, and compare with the previous output. Pages reference local files relative to themselves, so pack them from where they are with `-o` elsewhere.
+Kit files are behaviour, not just code. After a change: `pack` then `check` `skills/explainer/example/page.mdx` and a few real pages (light and dark, 1440 and 390 wide are covered by `check`), open the screenshots, and compare with the previous output. Pages reference local files relative to themselves, so pack them from where they are with `-o` elsewhere.
 
 ## Tracking
 

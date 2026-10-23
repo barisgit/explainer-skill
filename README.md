@@ -120,7 +120,7 @@ A diagram whose parts light up from the text, for illustration:
 
 Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time (flowchart, state, sequence, class, ER and xychart), linked highlighting between prose, table rows and diagram parts, a stylesheet that follows the system's light or dark setting, and the kit's own buttons and messages in the page's language through `kitLabels`.
 
-[`skills/explainer/example.html`](skills/explainer/example.html) is one short page that uses each feature where it helps its subject.
+[`skills/explainer/example/`](skills/explainer/example/page.mdx) (`page.mdx` and the files it imports) is one short page that uses each feature where it helps its subject.
 
 ## Development
 

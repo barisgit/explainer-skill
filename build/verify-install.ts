@@ -79,13 +79,13 @@ function verifyCli(installed: string, home: string, outDir: string): void {
 	const cli = join(installed, "cli.ts");
 	const packed = join(outDir, "artifact.html");
 	const kit = run(["bun", cli, "kit"], elsewhere, home);
-	record(kit.code === 0 && kit.out.includes("kit:theme.css"), "bun cli.ts kit", kit.out);
+	record(kit.code === 0 && kit.out.includes("theme.css"), "bun cli.ts kit", kit.out);
 	const pack = run(
-		["bun", cli, "pack", join(installed, "example.html"), "-o", packed],
+		["bun", cli, "pack", join(installed, "example", "page.mdx"), "-o", packed],
 		elsewhere,
 		home,
 	);
-	record(pack.code === 0 && existsSync(packed), "bun cli.ts pack example.html", pack.out);
+	record(pack.code === 0 && existsSync(packed), "bun cli.ts pack example/page.mdx", pack.out);
 	const check = run(["bun", cli, "check", packed, "--out", join(outDir, "shots")], elsewhere, home);
 	record(check.code === 0, "bun cli.ts check", check.out);
 	const node = run(["node", cli, "kit"], elsewhere, home);
