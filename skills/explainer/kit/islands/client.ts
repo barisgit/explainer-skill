@@ -5,6 +5,7 @@
  * with no wrapper element, so the theme's child selectors still match.
  */
 import { type ComponentType, type ContainerNode, h, hydrate } from "preact";
+import "./bare-data.ts";
 
 /** One island as pack writes it: the index of its module in hydrateIslands' list, its export name and its props. */
 interface IslandData {

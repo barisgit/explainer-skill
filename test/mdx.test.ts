@@ -126,13 +126,55 @@ describe("an .mdx page packs to one prerendered file", () => {
 		expect(state).toEqual({ before: { count: "3", bars: 3 }, after: { count: "4", bars: 4 } });
 	}, 30_000);
 
-	test("a bare data-* attribute is empty, as in HTML, so reply.js labels a question by its legend", async () => {
+	test("a bare data-* attribute is empty, as in HTML, wherever the JSX is, so reply.js labels a question by its legend", async () => {
+		dir.write(
+			"marked.tsx",
+			`"use client";
+import { useState } from "preact/hooks";
+
+export function Marked() {
+	const [late, setLate] = useState(false);
+	return (
+		<div data-early>
+			<button type="button" id="late" onClick={() => setLate(true)}>Late</button>
+			{late && <p data-late>Shown</p>}
+		</div>
+	);
+}
+`,
+		);
 		const { output } = await packMdx(
 			"bare-data",
-			'# T\n\n<fieldset data-reply><legend>Pick</legend><input type="radio" name="p" id="p" /></fieldset>\n',
+			`import { Marked } from "./marked.tsx";
+
+# T
+
+<fieldset data-reply><legend>Pick</legend><input type="radio" name="p" id="p" /></fieldset>
+
+{["q"].map((q) => <fieldset data-reply id={q}><legend>Map</legend><input type="radio" name={q} id={\`\${q}-a\`} /></fieldset>)}
+
+<Marked />
+`,
 		);
-		expect(readFileSync(output, "utf8")).toMatch(/<fieldset data-reply(="")?><legend>Pick/);
-	});
+		const html = readFileSync(output, "utf8");
+		expect(html).toMatch(/<fieldset data-reply(="")?><legend>Pick/);
+		expect(html).toMatch(/<fieldset data-reply(="")? id="q"><legend>Map/);
+		expect(html).toMatch(/<div data-early(="")?><button/);
+		const values = await withPage(async (cdp) => {
+			await cdp.send("Page.enable");
+			const loaded = cdp.once("Page.loadEventFired");
+			await cdp.send("Page.navigate", { url: `file://${output}` });
+			await loaded;
+			// The click makes new DOM after hydration; Preact renders it in a later frame.
+			return cdp.evaluate(
+				`document.getElementById("late").click(),
+				new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done))).then(() =>
+					["#q", "[data-early]", "[data-late]"].map((s) => document.querySelector(s)?.getAttribute(s === "#q" ? "data-reply" : s.slice(1, -1))))`,
+				true,
+			);
+		});
+		expect(values).toEqual(["", "", ""]);
+	}, 30_000);
 });
 
 describe("pack fails on page source that would not work in the browser", () => {

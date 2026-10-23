@@ -13,6 +13,7 @@ import {
 	type VNode,
 } from "preact";
 import { renderToString } from "preact-render-to-string";
+import "./bare-data.ts";
 
 /** One prerendered client component: the module that defines it, its export name and the JSON props it hydrates with. */
 export interface Island {
