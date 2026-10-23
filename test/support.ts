@@ -2,6 +2,7 @@ import { expect } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
 
 /** The skill directory as an installer would copy it. */
@@ -44,7 +45,8 @@ export function scratch() {
 
 /**
  * Page script that throws "<contract>: <name>" when `body` is false 300 ms after load. Each contract gets its own throw, so one
- * failure does not hide the others; check reports them as page errors.
+ * failure does not hide the others; check reports them as page errors. The wait is a fixed time, and a throw that comes after
+ * check's shot is not reported, so a page that needs no `--do` step or `--view` load uses pageContract instead (#38).
  */
 export const pageAssertion = (contract: string, name: string, body: string) =>
 	`setTimeout(() => { if (!(${body})) throw new Error("${contract}: ${name}"); }, 300);`;
@@ -66,6 +68,82 @@ export async function packAndCheck(
 	expect(packed.code).toBe(0);
 	expect(checked.stdout).not.toContain(contract);
 	expect(checked.code).toBe(0);
+}
+
+/**
+ * Page script defining `settled`, a promise of the moment a page has drawn what its load starts: after the load event, then a task
+ * queued behind the kit's own load-time tasks, the fonts (charts and plots redraw when theirs arrive), and two frames, so the first
+ * resize callbacks have run. Each step is a signal, not a time, so a slow machine only makes the wait longer.
+ */
+export const SETTLED = `const settled = new Promise((loaded) => addEventListener("load", () => setTimeout(loaded)))
+	.then(() => document.fonts.ready)
+	.then(() => new Promise(requestAnimationFrame))
+	.then(() => new Promise(requestAnimationFrame));`;
+
+/**
+ * Page script for packAndRun: once the page has `settled`, evaluates each check in order (one may act, such as a click, for the
+ * next) and resolves `contract` with the names of those that are false.
+ */
+export const pageContract = (checks: Record<string, string>) => `${SETTLED}
+var contract = settled.then(() => [${Object.entries(checks)
+	.map(([name, body]) => `(${body}) ? "" : ${JSON.stringify(name)}`)
+	.join(",\n")}].filter(Boolean));`;
+
+/** Navigates and waits for the load event. */
+async function open(cdp: Cdp, url: string) {
+	const loaded = cdp.once("Page.loadEventFired");
+	await cdp.send("Page.navigate", { url });
+	await loaded;
+}
+
+/** The widths `check` shoots, so a page run covers the same layouts. */
+const WIDTHS = [
+	{ width: 1440, height: 900, mobile: false },
+	{ width: 390, height: 844, mobile: true },
+];
+
+/**
+ * Packs `page` and opens it in headless Chrome at each width `check` uses, with reduced motion and the CPU slowed `slowdown` times
+ * (1 runs at full speed). The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
+ * the page takes: a page that never settles fails on the test's timeout, never by passing early. Returns those failures and every
+ * uncaught page error, prefixed with the width; an empty list is a pass.
+ */
+export async function packAndRun(
+	dir: ReturnType<typeof scratch>,
+	name: string,
+	page: string,
+	slowdown = 1,
+): Promise<string[]> {
+	const output = dir.path(`${name}.out.html`);
+	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
+	expect(packed.stderr).toBe("");
+	expect(packed.code).toBe(0);
+	return withPage(async (cdp) => {
+		const failures: string[] = [];
+		let width = 0;
+		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
+			failures.push(`${width}: ${(d.exception?.description ?? d.text).split("\n")[0]}`),
+		);
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setCPUThrottlingRate", { rate: slowdown });
+		await cdp.send("Emulation.setEmulatedMedia", {
+			features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+		});
+		for (const viewport of WIDTHS) {
+			width = viewport.width;
+			await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
+			// As in check: what kit:reply.js keeps from one width must not carry into the next, and the old page saves as it unloads.
+			await open(cdp, "about:blank");
+			await cdp.send("Storage.clearDataForOrigin", {
+				origin: "file://",
+				storageTypes: "local_storage",
+			});
+			await open(cdp, `file://${output}`);
+			const found = await cdp.evaluate<string[]>("contract", true);
+			failures.push(...found.map((failure) => `${width}: ${failure}`));
+		}
+		return failures;
+	});
 }
 
 /** The rendered diagram's SVG, failing the test when the source does not render. */

@@ -1,5 +1,5 @@
-import { afterAll, test } from "bun:test";
-import { packAndCheck, scratch } from "./support.ts";
+import { afterAll, expect, test } from "bun:test";
+import { packAndRun, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -77,8 +77,9 @@ const SLOVENIAN: typeof ENGLISH = {
 
 /**
  * A page with a stepper, nested views (rail and trail, no .back link, so the overview's name is the label), two folds, a reply
- * question and three note parts: in a headed section, in a named figure, and outside any section. Its script, after the kit scripts, sets `labels` as kitLabels when given. After load it works each
- * component and throws "labels contract: <name>" for every text that is not `expected`'s; a run that does not finish throws too.
+ * question and three note parts: in a headed section, in a named figure, and outside any section. Its script, after the kit
+ * scripts, sets `labels` as kitLabels when given. After load it works each component, and its `contract` resolves with the name of
+ * every text that is not `expected`'s (see packAndRun).
  */
 const PAGE = (
 	lang: string,
@@ -103,9 +104,11 @@ ${labels ? `var kitLabels = ${JSON.stringify(labels)};` : ""}
 const L = ${JSON.stringify(expected)};
 const $ = (selector, root = document) => root.querySelector(selector);
 const aria = (selector, root) => $(selector, root)?.getAttribute("aria-label");
-const expect = (name, ok) => ok || setTimeout(() => { throw new Error("labels contract: " + name); });
-const wait = (ms) => new Promise((done) => setTimeout(done, ms));
-let done = false;
+const failures = [];
+const expect = (name, ok) => ok || failures.push(name);
+// Resolves once the router has shown the new hash: its hashchange listener was added first, so it has run.
+const navigate = (hash) => new Promise((shown) => { addEventListener("hashchange", shown, { once: true }); location.hash = hash; });
+const changed = (node) => new Promise((done) => new MutationObserver((_, seen) => { seen.disconnect(); done(); }).observe(node, { childList: true, subtree: true, characterData: true }));
 
 function steps() {
 	const play = $("[data-play]");
@@ -122,11 +125,9 @@ async function views() {
 	all.click();
 	expect("collapse all", all.textContent === L.collapseAll);
 	expect("contents rail", $(".toc-toggle").textContent === L.contents && aria(".toc") === L.contents && $("#toc-list > li > a").textContent === L.overview);
-	location.hash = "#p/a";
-	await wait(50);
+	await navigate("#p/a");
 	expect("trail", aria(".view.active .trail") === L.breadcrumb && $(".view.active .crumbs a").textContent === L.overview);
-	location.hash = "";
-	await wait(50);
+	await navigate("");
 }
 
 function clearing() {
@@ -168,31 +169,29 @@ async function dialog() {
 	const markdown = $(".reply-md", box).textContent;
 	expect("the reply Markdown locates notes in English", markdown.includes('(figure "Scheme")') && markdown.includes("(page)"));
 	expect("dialog note", aria(".reply-note textarea", box) === L.note && $(".reply-note .btn", box).textContent === L.remove && $("footer .primary", box).textContent === L.copyReply);
+	const status = changed($("footer [role=status]", box));
 	$("footer .primary", box).click();
-	await wait(50);
+	await status;
 	expect("copy status", [L.copied, L.copyFailed].includes($("footer [role=status]", box).textContent));
 	box.close();
 }
 
-// After reply.js's restore, which also waits for load.
-addEventListener("load", () => setTimeout(async () => {
+${SETTLED}
+var contract = settled.then(async () => {
 	steps();
 	await views();
 	clearing();
 	note();
 	await dialog();
-	done = true;
-}, 20));
-addEventListener("load", () => setTimeout(() => expect("the run finished", done), 350));
+	return failures;
+});
 </script></body></html>`;
 
+// The run is slowed four times, so the kit's own timers and the page's work interleave as on a slow machine.
 test("kitLabels set after the kit scripts reach every text they add: stepper, views navigation, folds, reply and notes", async () => {
-	await packAndCheck(dir, "sl", PAGE("sl", SLOVENIAN, SLOVENIAN), "labels contract", [
-		"--view",
-		"none",
-	]);
-}, 30_000);
+	expect(await packAndRun(dir, "sl", PAGE("sl", SLOVENIAN, SLOVENIAN), 4)).toEqual([]);
+}, 60_000);
 
 test("without kitLabels the kit's texts are English", async () => {
-	await packAndCheck(dir, "en", PAGE("en", ENGLISH), "labels contract", ["--view", "none"]);
-}, 30_000);
+	expect(await packAndRun(dir, "en", PAGE("en", ENGLISH), 4)).toEqual([]);
+}, 60_000);
