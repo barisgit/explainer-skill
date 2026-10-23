@@ -51,7 +51,8 @@
 
 	/**
 	 * Copy of an option with every colour expression under a colour key resolved for the current scheme. Plain objects and arrays are
-	 * copied, everything else (functions, class instances, number arrays) is shared. Run at every mount so saved options stay token-based.
+	 * copied, everything else (functions, class instances, arrays of numbers only) is shared, so an item
+	 * in a data array that also holds numbers is resolved. Run at every mount so saved options stay token-based.
 	 */
 	function resolveColors<T>(value: T, key?: string): T;
 	function resolveColors(value: unknown, key = ""): unknown {
@@ -59,7 +60,9 @@
 			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
 		}
 		if (Array.isArray(value)) {
-			return typeof value[0] === "number" ? value : value.map((item) => resolveColors(item, key));
+			return value.every((item) => typeof item === "number")
+				? value
+				: value.map((item) => resolveColors(item, key));
 		}
 		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
 			return value;
