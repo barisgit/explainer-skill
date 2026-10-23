@@ -107,6 +107,42 @@ test("hashes with Unicode letters and spaces keep previous/next and the rail, fr
 	]);
 }, 60_000);
 
+/** Every link text is generic, so labels come from headings; the item handler is registered after startup and draws two folds. */
+const LATE = `${HEAD}<main class="page"><div data-overview><h1>Late</h1>
+<section><h2>People</h2><a href="#p/a">Open</a> <a href="#p/b">Open</a></section>
+<section><h2>Items</h2><a href="#i/1">Open</a> <a href="#i/2">Open</a> <a href="#i/3">Open</a></section></div>
+<section class="view" data-view="p"><div class="view-head"><a class="back" href="#">Home</a><h1></h1></div><p class="mine"></p></section>
+<section class="view" data-view="i"><div class="view-head"><a class="back" href="#">Home</a><h1></h1></div><div class="folds"></div></section></main>
+<script src="kit:views.js"></script>
+<script>
+Views.on("p", (el, p) => {
+	el.querySelector("h1").textContent = "Person " + p.toUpperCase();
+	el.querySelector(".mine").innerHTML = p === "a" ? '<a href="#i/3">Open</a> <a href="#i/1">Open</a>' : "";
+});
+addEventListener("DOMContentLoaded", () => setTimeout(() => Views.on("i", (el, p) => {
+	el.querySelector("h1").textContent = "Item " + p;
+	el.querySelector(".folds").innerHTML = "<details><summary>A</summary>a</details><details><summary>B</summary>b</details>";
+}), 50));
+const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const expandAll = () => document.querySelector(".view.active > .fold-all")?.textContent === "Expand all";
+const reloaded = () => performance.getEntriesByType("navigation")[0]?.type === "reload";
+${contract("a view whose handler registers late is named by the heading it draws and gets Expand all", `reloaded() || location.hash !== "#i/3" || (texts(".view.active .crumbs li") === "Home|Item 3" && expandAll())`)}
+${contract("after a reload with a late handler the item keeps the person's items and gets Expand all", `!reloaded() || (texts(".view.active .crumbs li") === "Home|Person A|Item 3" && document.querySelector(".view.active .sibs .count")?.textContent === "1 / 2" && expandAll())`)}
+</script></body></html>`;
+
+test("a handler registered after startup gets the navigation and Expand all, without losing the trail", async () => {
+	await packAndCheck(dir, "late", LATE, "nav contract", [
+		"--view",
+		"i/3",
+		"--do",
+		"click:a[href='#p/a']",
+		"--do",
+		"click:.view.active a[href='#i/3']",
+		"--do",
+		"reload",
+	]);
+}, 60_000);
+
 /** A page that writes its own history.state on every entry it shows, before the kit's navigation runs for that entry. */
 const OWN_STATE = (value: string) => `${HEAD}<main class="page"><div data-overview><h1>State</h1>
 <section><h2>Views</h2><a href="#v/a">A</a> <a href="#v/b">B</a></section></div>

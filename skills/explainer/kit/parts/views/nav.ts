@@ -151,11 +151,15 @@ window.ViewsNav = ({ views, decode }) => {
 		return [...before, { hash, label: label(hash), ...(list ? { list } : {}) }];
 	}
 
-	/** This history entry's trail: the saved one on Back, Forward and reload, else the previous one with this view put in. */
-	function stamp(hash: string) {
+	/**
+	 * This history entry's trail: the saved one on Back, Forward and reload, else the previous one with this view put in.
+	 * `redrawn`: the view was drawn again for the same hash, so its step keeps its sibling list and is named from what it shows now.
+	 */
+	function stamp(hash: string, redrawn: boolean) {
 		const kept = savedTrail();
-		if (kept?.at(-1)?.hash === hash) {
-			steps = kept;
+		const last = kept?.at(-1);
+		if (kept && last?.hash === hash) {
+			steps = redrawn ? [...kept.slice(0, -1), { ...last, label: label(hash) }] : kept;
 		} else {
 			steps = hash ? extended(hash) : [];
 		}
@@ -361,10 +365,14 @@ window.ViewsNav = ({ views, decode }) => {
 	// Set now, before the first paint: the page takes its rail-side width at once.
 	document.documentElement.classList.toggle("has-toc", Boolean(railHost));
 	let toc: Rail | null = null;
+	let shownHash: string | null = null;
 
 	return {
 		show(view: HTMLElement | null, routeHash: string) {
 			const hash = canonical(routeHash);
+			// Shown again with no route change in between: a handler registered late has just drawn the view.
+			const redrawn = hash === shownHash;
+			shownHash = hash;
 			// Built at the first route, which runs after the page's scripts, so the sections and links they write are listed.
 			if (railHost && !toc) {
 				toc = buildRail(railHost.page, railHost.overview);
@@ -374,7 +382,7 @@ window.ViewsNav = ({ views, decode }) => {
 				drawn.set(view, hash);
 			}
 			const current = view ? hash : "";
-			stamp(current);
+			stamp(current, redrawn);
 			const here = steps.at(-1);
 			if (view && here) {
 				// Found before the bar is redrawn: the .back link sits beside the new bar, or in the crumbs it is about to replace.

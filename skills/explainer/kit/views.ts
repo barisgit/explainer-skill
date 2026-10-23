@@ -40,7 +40,10 @@
 		return { name, view, param: decode(rest.join("/")) };
 	}
 
-	/** Runs the view's handler, then the navigation, which reads the labels and folds the handler drew. */
+	/**
+	 * Runs the view's handler, then the navigation, which reads the labels and folds the handler drew. A handler registered late
+	 * redraws the current view through here too, without the scroll and focus of a route change.
+	 */
 	function draw(name: string, view: HTMLElement | undefined, param: string) {
 		if (view) {
 			handlers[name]?.(view, param);
@@ -80,7 +83,7 @@
 			}
 			const { name: current, view, param } = route();
 			if (view && current === name) {
-				fn(view, param);
+				draw(name, view, param);
 			}
 		},
 	};
