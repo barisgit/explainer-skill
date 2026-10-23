@@ -12,7 +12,9 @@
    heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
-   its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
+   its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
+   data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
+   link texts. Names in the navigation wrap and are never cut off. A section with two or more <details>
    gets Expand all, which opens them at every level.
    Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
    in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then

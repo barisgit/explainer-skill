@@ -1,5 +1,12 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndCheck, packAndRun, pageAssertion, pageContract, scratch } from "./support.ts";
+import {
+	packAndCheck,
+	packAndRun,
+	pageAssertion,
+	pageContract,
+	SETTLED,
+	scratch,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -230,4 +237,39 @@ document.addEventListener("click", () => {
 		"--do",
 		"click:#two summary",
 	]);
+}, 30_000);
+
+test("data-nav names a section in the rail; rail entries and crumbs wrap; crumbs and previous/next keep the link texts", async () => {
+	const long =
+		"The second option costs less in the first year but more by the third, once the licence renews at the list price and the support contract that came free with the first year starts to be billed";
+	const page = `${HEAD}<main class="page"><div data-overview><h1>Rail</h1>
+<section data-nav="Price"><h2>${long}</h2><a href="#i/1">One</a> <a href="#i/2">Two, a view whose link text is long enough to need a second line</a></section>
+<section><h2>${long}</h2><a href="#p/a">Ana</a></section></div>
+<section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section>
+<section class="view" data-view="p"><a class="back" href="#">Home</a><h1>Person</h1></section></main>
+<script src="kit:views.js"></script>
+<script>
+const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const whole = (el) => el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1;
+const lines = (el) => {
+	const style = getComputedStyle(el);
+	return Math.round((el.clientHeight - parseFloat(style.paddingBlockStart) - parseFloat(style.paddingBlockEnd)) / parseFloat(style.lineHeight));
+};
+const shown = (go) => new Promise((done) => { addEventListener("hashchange", () => requestAnimationFrame(done), { once: true }); go(); });
+${SETTLED}
+var contract = settled.then(async () => {
+	const failures = [];
+	const expect = (ok, name) => { if (!ok) failures.push(name); };
+	expect(texts("#toc-list > li > a") === "Home|Price|${long}", "the rail names a section by its data-nav, else by its heading");
+	// The phone's Contents disclosure opens; on a wide screen the rail is already shown.
+	document.querySelector(".toc-toggle").click();
+	expect(lines(document.querySelectorAll("#toc-list > li > a")[2]) > 2, "a long heading wraps in the rail instead of being cut to two lines");
+	expect([...document.querySelectorAll("#toc-list a")].every((a) => a.checkVisibility() && whole(a)), "the phone disclosure lists the same entries, uncut");
+	await shown(() => { location.hash = "#i/2"; });
+	expect(texts(".view.active .crumbs li") === "Home|Two, a view whose link text is long enough to need a second line" && document.querySelector(".view.active .sibs [rel=prev]")?.textContent === "One", "crumbs and previous/next keep the link texts");
+	expect([...document.querySelectorAll(".view.active .trail :is(a, span)")].every(whole), "crumbs and previous/next wrap instead of being cut");
+	return failures;
+});
+</script></body></html>`;
+	expect(await packAndRun(dir, "data-nav", page)).toEqual([]);
 }, 30_000);

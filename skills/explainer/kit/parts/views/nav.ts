@@ -13,8 +13,8 @@
                Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
-     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
-               missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
+     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their data-nav or else their
+               h2 (ids added when missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
                past 12). The current section follows scrolling; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ViewsNav = ({ views, decode, canonical, kitText }) => {
@@ -187,9 +187,9 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const list = make("ol", { class: "crumbs" });
 		list.append(item(back ?? make("a", { href: "#" }, overviewName())));
 		for (const step of steps.slice(0, -1)) {
-			list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
+			list.append(item(make("a", { href: `#${step.hash}` }, step.label)));
 		}
-		list.append(item(make("span", { "aria-current": "page", title: here.label }, here.label)));
+		list.append(item(make("span", { "aria-current": "page" }, here.label)));
 		return list;
 	}
 
@@ -201,16 +201,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 			return [];
 		}
 		const known = linkLabels(nameOf(here.hash));
-		// The name sits in a span: an ellipsis needs a block of its own, and the link is a flex row with its arrow.
-		const link = (hash: string | undefined, rel: string) => {
-			if (!hash) {
-				return make("span");
-			}
-			const text = label(hash, known);
-			const a = make("a", { href: `#${hash}`, rel, title: text });
-			a.append(make("span", {}, text));
-			return a;
-		};
+		const link = (hash: string | undefined, rel: string) =>
+			hash ? make("a", { href: `#${hash}`, rel }, label(hash, known)) : make("span");
 		const box = make("div", { class: "sibs" });
 		box.append(
 			link(list[at - 1], "prev"),
@@ -253,10 +245,10 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	/** An id no element has and no view name takes, so the rail's #id link scrolls to its section rather than opening a view. */
 	const freeId = (id: string) => id !== "" && !names.has(id) && !document.getElementById(id);
 
-	/** The section's id, given one from its heading when it has none, else section-n, section-n+1, ... until one is free. */
-	function sectionId(section: HTMLElement, heading: HTMLElement, n: number) {
+	/** The section's id, given one from its rail label when it has none, else section-n, section-n+1, ... until one is free. */
+	function sectionId(section: HTMLElement, text: string, n: number) {
 		if (!section.id) {
-			let id = clean(heading.textContent)
+			let id = text
 				.toLowerCase()
 				.replace(/[^\p{L}\p{N}]+/gu, "-")
 				.replace(/^-|-$/g, "")
@@ -269,11 +261,13 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		return section.id;
 	}
 
-	/** A section's entry, which owns the view names it is the first to link to. */
+	/**
+	 * A section's entry, named by its data-nav (a short label for a heading that states an answer) or else its heading; it owns the
+	 * view names the section is the first to link to.
+	 */
 	function entry(section: HTMLElement, heading: HTMLElement, n: number, claimed: Set<string>) {
-		const text = clean(heading.textContent);
-		const link = make("a", { href: `#${sectionId(section, heading, n)}`, title: text });
-		link.append(make("span", {}, text));
+		const text = clean(section.dataset.nav) || clean(heading.textContent);
+		const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
 		const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
 		for (const name of owns) {
 			claimed.add(name);
@@ -330,7 +324,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const sub = make("ol");
 		for (const h of shown) {
 			const text = h === step.hash ? step.label : label(h, known);
-			const a = make("a", { href: `#${h}`, title: text }, text);
+			const a = make("a", { href: `#${h}` }, text);
 			a.classList.toggle("is-trail", h === step.hash && h !== hash);
 			if (h === hash) {
 				a.setAttribute("aria-current", "page");
