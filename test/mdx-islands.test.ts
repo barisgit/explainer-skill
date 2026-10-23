@@ -325,6 +325,36 @@ describe("lifecycle", () => {
 	}, 30_000);
 });
 
+describe("in a hidden view", () => {
+	test("a Chart and a Plot mount when the view is first shown", async () => {
+		const output = await pack(
+			"hidden",
+			`import { Chart, Plot, View } from "kit";
+
+# Detail
+
+[Detail](#detail)
+
+<View name="detail" back="Overview">
+
+# Detail
+
+<Chart id="hidden-chart" label="Bars" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "bar", data: [1, 2] }] }} />
+
+<Plot id="hidden-plot" label="Bars" option={{ categories: ["a", "b"], series: [{ type: "bar", data: [1, 2] }] }} />
+
+</View>
+`,
+		);
+		const drawn = `[Boolean(echarts.getInstanceByDom(document.getElementById("hidden-chart"))), document.querySelectorAll("#hidden-plot svg .bar").length]`;
+		const state = await inPage(output, async (cdp) => ({
+			hidden: await cdp.evaluate(drawn),
+			shown: await act(cdp, `location.hash = "#detail"`, drawn),
+		}));
+		expect(state).toEqual({ hidden: [false, 0], shown: [true, 2] });
+	}, 30_000);
+});
+
 describe("keeping inside an island", () => {
 	test("controlled controls come back after a reload with the island following them, and Clear resets them", async () => {
 		const output = await pack("kept", queuePage("title: Queues\nreply: true"));
