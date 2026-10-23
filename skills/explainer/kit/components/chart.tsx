@@ -5,6 +5,12 @@
      label   the accessible name (role="img")
      class   more classes after "chart", e.g. "tall"
      setup   (chart) => void, run after every (re)mount: chart.on("click", ...). A function, so only from your own "use client" component.
+   Colours: write "var(--accent)" or "color-mix(in srgb, var(--accent) 20%, transparent)" in any colour option (color, borderColor,
+     fill, colorStops[].color, ...); they are resolved when the chart mounts, so they follow light/dark.
+   Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
+     Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
+   A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
+   scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
    From the page a Chart takes JSON props only; to drive one from state (a slider, a click), render it in your own client component. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
@@ -36,7 +42,10 @@ function copy(value: unknown): unknown {
 	return value;
 }
 
-/** Renders `<div class="chart" role="img">` and makes the chart on it in the browser; a changed `option` is applied with set(). */
+/**
+ * Renders `<div class="chart" role="img">` and makes the chart on it in the browser; a changed `option` is applied with set(),
+ * and unmounting disposes the chart.
+ */
 export function Chart({ option, label, class: extra, id, setup }: ChartProps) {
 	const element = useRef<HTMLDivElement>(null);
 	const handle = useRef<ChartHandle | null>(null);
@@ -52,6 +61,14 @@ export function Chart({ option, label, class: extra, id, setup }: ChartProps) {
 			);
 		}
 	}, [option]);
+	// A Chart your component stops rendering takes its ECharts instance and observers with it.
+	useEffect(
+		() => () => {
+			handle.current?.dispose();
+			handle.current = null;
+		},
+		[],
+	);
 	return (
 		<div
 			ref={element}

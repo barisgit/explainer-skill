@@ -8,19 +8,24 @@ import { compileMdx, type Frontmatter } from "./compile.ts";
 
 /** Kit scripts a prerendered page needs, by what its HTML holds. */
 const HTML_SCRIPTS: [selector: string, scripts: string[]][] = [
-	[".chart", ["echarts.js", "charts.js"]],
+	[".chart:not(.plot)", ["echarts.js", "charts.js"]],
+	[".plot", ["plot.js"]],
 	["[data-view], details", ["views.js"]],
 	["[data-stepper]", ["steps.js"]],
 	["[data-ref]", ["link.js"]],
 	["[data-reply]", ["reply.js"]],
 ];
 /** Kit scripts a kit component needs when a client component may render it later, though the first render does not. */
-const COMPONENT_SCRIPTS: Record<string, string[]> = { "chart.tsx": ["echarts.js", "charts.js"] };
+const COMPONENT_SCRIPTS: Record<string, string[]> = {
+	"chart.tsx": ["echarts.js", "charts.js"],
+	"plot.tsx": ["plot.js"],
+	"stepper.tsx": ["steps.js"],
+};
 /**
- * The order the kit scripts run in. Libraries the client components call (Charts.make) load before the islands hydrate; scripts
- * that read and wire the page's DOM (views, steps, link, reply) load after, so they reach the markup Preact owns.
+ * The order the kit scripts run in. Libraries the client components call (Charts.make, Plot.make) load before the islands
+ * hydrate; scripts that read and wire the page's DOM (views, steps, link, reply) load after, so they reach the markup Preact owns.
  */
-const BEFORE_ISLANDS = ["echarts.js", "charts.js"];
+const BEFORE_ISLANDS = ["echarts.js", "charts.js", "plot.js"];
 const AFTER_ISLANDS = ["views.js", "steps.js", "link.js", "reply.js"];
 
 /** Island markers, and the element a rendered View is wrapped in (VIEW_MARKER in kit/components/view.tsx) so pack can move it. */
