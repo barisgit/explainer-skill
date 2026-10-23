@@ -66,6 +66,8 @@ test("a tree's numbers line up across rows and levels, on desktop and phone", as
 	const rows = [...document.querySelectorAll("#plan summary, #plan a")];
 	const edges = (n) => new Set(rows.map((row) => Math.round(row.children[n].getBoundingClientRect().right)));
 	expect(edges(1).size === 1 && edges(2).size === 1, "each number column has one right edge: " + [...edges(1)] + " / " + [...edges(2)]);
+	const end = (row) => Math.round(row.getBoundingClientRect().right);
+	expect(rows.every((row) => Math.round(row.children[2].getBoundingClientRect().right) === end(row)), "the last column ends at the row's end");
 	const label = (row) => row.children[0].getBoundingClientRect();
 	expect(label(rows[2]).left > label(rows[1]).left && label(rows[1]).left > label(rows[0]).left, "each level is indented");
 	expect(Math.round(label(rows[4]).left) === Math.round(label(rows[2]).left), "a link row's label starts with its sibling folds' labels");`;
