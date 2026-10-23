@@ -1,7 +1,7 @@
-/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail and Expand all.
+/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
    no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
-   on Back and reload; any other shows the overview. Either way the element is scrolled to. A static view may claim one
+   on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to. A static view may claim one
    param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for its
    param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
@@ -13,7 +13,20 @@
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones; a section with two or more <details>
-   gets Expand all.
+   gets Expand all, which opens them at every level.
+   Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
+   in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
+   its numbers, which line up in columns across rows and levels (--tree-cell on the .tree sets their width, 5rem). A leaf opens to
+   its full text. Give every row the same cells in the same order, units included; an empty <span></span> keeps a column:
+     <div class="tree">
+       <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
+         <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
+         <a href="#task/1.1.2"><span>1.1.2 Power stage</span><span>24 h</span><span>Ana</span></a>
+       </details>
+     </div>
+   A link to an id inside it (<a href="#spike">Spike boards: 4 tasks, 70 h</a>) opens that branch. A row link's label names its view
+   in the navigation. With kit:link.js, data-ref on a row lights it, and a closed fold that holds a lit row is tinted too. Trees
+   print fully open.
    Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
    one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
    Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
@@ -205,6 +218,16 @@
 	};
 	root.classList.add("js-views");
 	addEventListener("hashchange", show);
+	// A link to the current hash fires no hashchange, so the folds its element is in (closed again since) open here; the browser
+	// then scrolls to it as it does for any link to the current hash.
+	document.addEventListener("click", (e) => {
+		const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+		const hash = canonical((link?.getAttribute("href") ?? "").slice(1));
+		const target = hash === canonical(location.hash.slice(1)) && shownTarget(shown);
+		if (target) {
+			reveal(target);
+		}
+	});
 	show(); // layout only: the right view is visible before the first paint
 	const start = () => {
 		started = true;

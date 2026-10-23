@@ -1,16 +1,15 @@
 /* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
    its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
-   A section (an overview section or a view) with two or more <details> of its own (not inside a nested section or another fold)
-   gets one button just above the block holding its first fold: Expand all, or Collapse all once every fold is open, kept in step
-   when the reader opens folds one at a time. Folds a view handler draws count from its next refresh. */
+   A section (an overview section or a view) with two or more <details> of its own (at any depth, not inside a nested section)
+   gets one button just above the block holding its first fold: Expand all, which opens every level of nested folds (a .tree),
+   or Collapse all once every fold is open, which closes them all; it is kept in step when the reader opens folds one at a time.
+   Folds a view handler draws count from its next refresh. */
 window.ViewsFolds = (kitText) => {
 	const buttons = new Map<HTMLElement, HTMLButtonElement>();
 
-	/** The section's own top-level folds. */
+	/** The section's own folds, nested ones included. */
 	function foldsOf(section: HTMLElement) {
-		return [...section.querySelectorAll("details")].filter(
-			(d) => d.closest("section") === section && !d.parentElement?.closest("details"),
-		);
+		return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section);
 	}
 
 	/** Sets the section's button to what a click would do: Collapse all once every fold is open, else Expand all. */

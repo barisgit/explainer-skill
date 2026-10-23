@@ -3,8 +3,8 @@
    every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
    was left from.
    All of it is derived from markup the page already has:
-     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
-               its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
+     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text (a .tree row
+               link's first cell) names its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
                else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
@@ -93,10 +93,16 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 
 	const siblingsOf = (step: Step) => step.list ?? allSiblings(nameOf(step.hash));
 
+	/** A link's text; a link that stands as a .tree row is named by its first cell, its label, without the numbers after it. */
+	const linkText = (a: HTMLAnchorElement) => {
+		const row = a.parentElement?.matches(".tree, .tree details");
+		return clean(((row && a.firstElementChild) || a).textContent);
+	};
+
 	/** The first link text of each hash of one view name, kept only when no other hash shares it. */
 	function linkLabels(name: string): Labels {
 		const texts = new Map<string, Set<string>>();
-		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: clean(a.textContent) }));
+		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
 		for (const { hash, text } of links) {
 			texts.set(text, (texts.get(text) ?? new Set()).add(hash));
 		}
