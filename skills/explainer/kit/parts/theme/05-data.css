@@ -66,6 +66,26 @@
 .chip.info {
 	color: var(--info);
 }
+/* Category marker: a chip that starts with an empty <i> is a square in --swatch (the category's --c colour) before its word, with
+   no tint, so a column of them stays quiet. The same markup keys the categories in a .legend over the records and marks the rows. */
+.chip:has(> i:empty:first-child) {
+	padding: 0;
+	background: none;
+	font-weight: 500;
+}
+.chip > i:empty {
+	flex: none;
+	inline-size: 0.5625rem;
+	block-size: 0.5625rem;
+	border-radius: 2px;
+	background: var(--swatch, currentColor);
+}
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1rem;
+	margin-block: 0.75rem;
+}
 
 /* Ranking rows: ol.rank > li > button (aria-expanded) + .more (inline detail, hidden until opened) */
 .rank {
