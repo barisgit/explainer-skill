@@ -35,6 +35,8 @@ let depth = 0;
 let islands: Island[] = [];
 /** The component whose render is creating vnodes right now, for messages; the MDX content is the page. */
 let rendering = "the page";
+/** The components island() made: their function props are refused as not JSON, before this file's handler check would see them. */
+const wrappers = new WeakSet<ComponentType<Record<string, unknown>>>();
 
 /**
  * The value pack exports in place of a client module's export `name`: a component (a capitalised function, or the default
@@ -76,6 +78,7 @@ export function island(module: string, name: string, value: unknown): unknown {
 		return h(MARKER, { "data-island": n, dangerouslySetInnerHTML: { __html: html } });
 	}
 	Island.displayName = label;
+	wrappers.add(Island);
 	return Island;
 }
 
@@ -150,21 +153,36 @@ hooks.__r = (vnode) => {
 	previousRender?.(vnode);
 };
 
-// An element made outside every island is static HTML: a handler on it would never run, so the pack fails instead.
+/**
+ * `<tag prop>` for a vnode made outside every island that holds a handler: an element's `on*` function, or a
+ * component's `onX` function (a static component's other function props, such as Tree's `row`, run in pack and are fine).
+ */
+function staticHandler(vnode: VNode): string | undefined {
+	const { type } = vnode;
+	if (depth > 0 || (typeof type === "function" && wrappers.has(type))) {
+		return undefined;
+	}
+	const handlerName = typeof type === "string" ? /^on/ : /^on[A-Z]/;
+	const handler = Object.entries(vnode.props as Record<string, unknown>).find(
+		([key, value]) => handlerName.test(key) && typeof value === "function",
+	);
+	if (!handler) {
+		return undefined;
+	}
+	const tag = typeof type === "string" ? type : type.displayName || type.name || "a component";
+	return `<${tag} ${handler[0]}>`;
+}
+
+// What is made outside every island is static HTML: a handler on it would never run, so the pack fails instead.
 const previousVnode = options.vnode;
 options.vnode = (vnode) => {
-	if (depth === 0 && typeof vnode.type === "string") {
-		const handler = Object.entries(vnode.props as Record<string, unknown>).find(
-			([key, value]) => key.startsWith("on") && typeof value === "function",
+	const tag = staticHandler(vnode);
+	if (tag) {
+		throw new IslandError(
+			rendering === "MDXContent"
+				? `${tag} in the page is static HTML, so the handler would never run: move it into a component of your own in a .tsx module whose first line is "use client"`
+				: `${tag} in ${rendering} is static HTML, so the handler would never run: put "use client" as the first line of the module that defines ${rendering}`,
 		);
-		if (handler) {
-			const tag = `<${vnode.type} ${handler[0]}>`;
-			throw new IslandError(
-				rendering === "MDXContent"
-					? `${tag} in the page is static HTML, so the handler would never run: move it into a component of your own in a .tsx module whose first line is "use client"`
-					: `${tag} in ${rendering} is static HTML, so the handler would never run: put "use client" as the first line of the module that defines ${rendering}`,
-			);
-		}
 	}
 	previousVnode?.(vnode);
 };

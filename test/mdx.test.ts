@@ -201,6 +201,19 @@ describe("pack fails on page source that would not work in the browser", () => {
 		);
 	});
 
+	test("a handler prop on a static component fails, and other function props do not", async () => {
+		const tree =
+			'import { Tree } from "kit";\n\n<Tree items={[{ name: "a" }]} row={(r) => ({ label: r.name, text: "t" })} />\n';
+		expect((await packMdx("static-function", tree)).result.code).toBe(0);
+		const stderr = await failure(
+			"component-handler",
+			'import { Stepper } from "kit";\n\n<Stepper captions={["a", "b"]} onStep={() => 1}><svg /></Stepper>\n',
+		);
+		expect(stderr).toContain(
+			'<Stepper onStep> in the page is static HTML, so the handler would never run: move it into a component of your own in a .tsx module whose first line is "use client"',
+		);
+	});
+
 	test("children from the page into a client component are refused", async () => {
 		const stderr = await failure(
 			"children",
