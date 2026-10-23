@@ -71,16 +71,17 @@ svg.has-lit [data-ref]:not(.is-lit) {
 /* Replies: the Reply and Clear answers buttons, the Note button and editor, and the reply dialog. */
 /* The Reply and Clear buttons sit in an opaque strip across the top of the window. A page with reply.js keeps the strip's height
    free at its top, also while the strip is hidden: at the top of the page nothing is under it, and showing or hiding it never
-   moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button. */
+   moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button.
+   --reply-bar-height is the strip's last shown height, which reply.js sets: long kitLabels can wrap it onto two rows. */
 :root:has(> body > .reply-bar) {
 	--reply-bar: 3.5rem;
 }
 body:has(> .reply-bar) {
-	padding-block-start: var(--reply-bar);
+	padding-block-start: var(--reply-bar-height, var(--reply-bar));
 }
 /* Focus and in-page links scroll their target clear of the strip. */
 :root:has(> body > .reply-bar:not([hidden])) {
-	scroll-padding-block-start: var(--reply-bar);
+	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
 }
 .reply-bar {
 	position: fixed;
