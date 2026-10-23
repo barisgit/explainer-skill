@@ -8,6 +8,8 @@
 			"!**/*.md",
 			"!skills/explainer/kit/echarts.js",
 			"!skills/explainer/vendor/beautiful-mermaid.js",
+			"!skills/explainer/vendor/mdx.js",
+			"!skills/explainer/vendor/preact",
 			"!examples/*/data.js"
 		]
 	},
