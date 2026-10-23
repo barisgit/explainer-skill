@@ -13,8 +13,7 @@
    checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A control the reader never touched
    is sent as "(default)", one with nothing chosen as "no answer". Notes come from selected text and clicks on [data-ref] parts
    (kit:link.js refs, Mermaid node ids); Enter on a focused ref opens its note.
-   The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
-   cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
+   The Reply button (bottom right) opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }.
@@ -26,8 +25,8 @@
    when the page is left. Controls the page renders later (views, panels) are picked up as they appear and get their saved value
    then; one the page replaces (also in answer to a restored value) keeps its answer. Controls are matched by id (else radio form,
    group and value, else position), so give inputs ids; a saved value is dropped when the control's own label or type differs from
-   when it was saved (a regenerated page). The "Clear answers and notes" button (shown while anything is answered, a note exists,
-   or answers wait for a control not yet shown) asks first: one click turns it red ("Clear everything?"), a second
+   when it was saved (a regenerated page). The "Clear answers and notes" button (bottom right, shown while anything is answered, a
+   note exists, or answers wait for a control not yet shown) asks first: one click turns it red ("Clear everything?"), a second
    within 4 s puts every control back to its default, again with events, and drops the notes and the saved copy. Escape, leaving
    the button or the wait cancels.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open

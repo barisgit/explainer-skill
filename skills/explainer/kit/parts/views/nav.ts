@@ -2,8 +2,8 @@
    views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
    every route change, once the view's handler has drawn it.
    All of it is derived from markup the page already has:
-     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text (a .tree row
-               link's first cell) names its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
+     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
+               its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
                else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
@@ -27,8 +27,6 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	type Labels = Map<string, string>;
 
 	const STATE_KEY = "viewTrail";
-	/** The location hash the trail was saved for. A fragment navigation copies the state into its new entry, where it is not yet that entry's own. */
-	const AT_KEY = "viewTrailAt";
 	const RAIL_LIST_MAX = 12;
 	/** The navigation this part builds: its links are never the page's own. */
 	const KIT_NAV = ".trail, .toc";
@@ -92,16 +90,10 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 
 	const siblingsOf = (step: Step) => step.list ?? allSiblings(nameOf(step.hash));
 
-	/** A link's text; a link that stands as a .tree row is named by its first cell, its label, without the numbers after it. */
-	const linkText = (a: HTMLAnchorElement) => {
-		const row = a.parentElement?.matches(".tree, .tree details");
-		return clean(((row && a.firstElementChild) || a).textContent);
-	};
-
 	/** The first link text of each hash of one view name, kept only when no other hash shares it. */
 	function linkLabels(name: string): Labels {
 		const texts = new Map<string, Set<string>>();
-		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
+		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: clean(a.textContent) }));
 		for (const { hash, text } of links) {
 			texts.set(text, (texts.get(text) ?? new Set()).add(hash));
 		}
@@ -131,19 +123,13 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	 * the entry has none and the trail in memory is extended instead.
 	 */
 	function savedTrail(): Step[] | null {
-		const trail = entryState()[STATE_KEY];
+		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
+		const trail =
+			state && typeof state === "object" ? (state as Record<string, unknown>)[STATE_KEY] : null;
 		return Array.isArray(trail)
 			? trail.filter((s): s is Step => typeof s?.hash === "string")
 			: null;
 	}
-
-	function entryState(): Record<string, unknown> {
-		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
-		return state && typeof state === "object" ? (state as Record<string, unknown>) : {};
-	}
-
-	/** The location hash, canonical: the one the trail is saved for. */
-	const locationHash = () => canonical(location.hash.slice(1));
 
 	/** The list a new step walks: the replaced step's while moving within it, else the parent view's links when they reach it. */
 	function inheritedList(hash: string, parent: Step | undefined, replaced: Step | undefined) {
@@ -176,7 +162,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 			steps = hash ? extended(hash) : [];
 		}
 		try {
-			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
+			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps } });
 		} catch {
 			// No Navigation API, or a document whose entries it disables (a sandboxed frame): the trail stays in memory.
 		}
@@ -385,9 +371,6 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	let shownHash: string | null = null;
 
 	return {
-		/** The view hash this history entry showed when it was left, from the trail saved with it; null for the overview or none. */
-		savedHash: () =>
-			entryState()[AT_KEY] === locationHash() ? (savedTrail()?.at(-1)?.hash ?? null) : null,
 		show(view: HTMLElement | null, routeHash: string) {
 			const hash = canonical(routeHash);
 			// Shown again with no route change in between: a handler registered late has just drawn the view.

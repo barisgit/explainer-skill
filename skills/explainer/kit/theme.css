@@ -68,33 +68,18 @@ svg.has-lit [data-ref]:not(.is-lit) {
 }
 
 /* Replies: the Reply and Clear answers buttons, the Note button and editor, and the reply dialog. */
-/* The Reply and Clear buttons sit in an opaque strip across the top of the window. A page with reply.js keeps the strip's height
-   free at its top, also while the strip is hidden: at the top of the page nothing is under it, and showing or hiding it never
-   moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button. */
-:root:has(> body > .reply-bar) {
-	--reply-bar: 3.5rem;
-}
-body:has(> .reply-bar) {
-	padding-block-start: var(--reply-bar);
-}
-/* Focus and in-page links scroll their target clear of the strip. */
-:root:has(> body > .reply-bar:not([hidden])) {
-	scroll-padding-block-start: var(--reply-bar);
+/* The fixed bar would cover the last lines of the page, so reserve its height at the end. */
+body:has(.reply-bar) {
+	padding-block-end: 4.5rem;
 }
 .reply-bar {
-	position: fixed;
-	inset: 0 0 auto;
-	z-index: 20;
 	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: flex-end;
 	gap: 0.5rem;
-	min-block-size: var(--reply-bar);
-	padding: 0.5rem var(--gutter);
-	background: var(--bg);
-	border-block-end: 1px solid var(--rule);
+	position: fixed;
+	inset: auto var(--gutter) max(1rem, env(safe-area-inset-bottom)) auto;
+	z-index: 20;
 }
+.reply-bar .btn,
 .reply-hint {
 	box-shadow: 0 10px 24px -10px var(--lift);
 }
@@ -207,9 +192,6 @@ dialog.reply-dialog[open] {
 	.reply-ui {
 		/* biome-ignore lint/complexity/noImportantStyles: the reply controls never print, whatever display they set */
 		display: none !important;
-	}
-	body:has(> .reply-bar) {
-		padding-block-start: 0;
 	}
 }
 /* end features */
