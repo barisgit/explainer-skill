@@ -42,19 +42,21 @@
 	margin-inline: 0.375rem 0.625rem;
 	color: var(--muted);
 }
+/* Turned, a chevron's corners stand out of its box: room inside the link, which may end at the viewport's edge. */
 .sibs [rel="prev"]::before {
+	margin-inline-start: 0.125rem;
 	transform: rotate(-135deg);
 }
+.sibs [rel="next"]::after {
+	margin-inline-end: 0.125rem;
+}
+/* Names wrap; nothing in the navigation is cut off. */
 .crumbs :is(a, span),
-.sibs a,
-.sibs a > span {
-	overflow: hidden;
-	min-block-size: 2.25rem;
-	line-height: 2.25rem;
+.sibs a {
+	padding-block: 0.5rem;
 	font-weight: 500;
+	line-height: 1.35;
 	text-decoration: none;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 .crumbs :is(a, span) {
 	max-inline-size: 16rem;
@@ -113,20 +115,12 @@
 }
 .toc a {
 	display: block;
-	overflow: hidden;
 	padding: 0.3125rem 0.75rem;
 	border-inline-start: 2px solid transparent;
 	color: var(--muted);
 	font-size: 0.875rem;
 	line-height: 1.35;
 	text-decoration: none;
-}
-/* Section headings are sentences: two lines, clamped on the inner span so the link's padding shows no cut-off line. */
-.toc a > span {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
 }
 .toc a:hover,
 .toc a:is([aria-current], .is-trail) {
@@ -147,8 +141,6 @@
 	margin-inline-start: -1px;
 	padding-block: 0.25rem;
 	font-size: 0.8125rem;
-	white-space: nowrap;
-	text-overflow: ellipsis;
 }
 .toc-toggle {
 	display: flex;
@@ -221,7 +213,7 @@
 	display: block;
 	margin: 1.25rem 0 -1rem auto;
 }
-.fold-all::after {
+.expand.fold-all::after {
 	content: none;
 }
 

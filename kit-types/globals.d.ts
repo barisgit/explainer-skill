@@ -126,6 +126,8 @@ declare var ViewsNav: (options: {
 	canonical: (hash: string) => string;
 	kitText: KitText<"overview" | "contents" | "breadcrumb">;
 }) => {
+	revisited(): boolean;
+	savedHash(): string | null;
 	show(view: HTMLElement | null, hash: string): void;
 };
 declare var ViewsFolds: (kitText: KitText<"expandAll" | "collapseAll">) => () => void;

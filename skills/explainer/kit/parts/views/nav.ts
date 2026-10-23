@@ -1,10 +1,11 @@
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
    views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
-   every route change, once the view's handler has drawn it.
+   every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
+   was left from.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
-               its view; text that is empty or names two different views ("Open", "→") is passed over for the view's heading,
-               else its param.
+               its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
+               ("Open", "→") is passed over for the view's heading, else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
                view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
@@ -12,9 +13,9 @@
                Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
-     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their h2 (ids added when
-               missing), and under the section that first links to a view name, each trail step's siblings (only the step itself
-               past 12). The current section follows scrolling; 07-nav.css places the rail. */
+     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their data-nav or else
+               their h2 (ids added when missing), and under the section that first links to a view name, each trail step's
+               siblings (only the step itself past 12). The current section follows scrolling; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	/** One trail step: the view's hash, its name as the reader saw it, and the sibling hashes it walks (absent: every sibling). */
@@ -27,6 +28,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	type Labels = Map<string, string>;
 
 	const STATE_KEY = "viewTrail";
+	/** The location hash the trail was saved for: a fragment navigation copies the state into its new entry, where it is not yet its own. */
+	const AT_KEY = "viewTrailAt";
 	const RAIL_LIST_MAX = 12;
 	/** The navigation this part builds: its links are never the page's own. */
 	const KIT_NAV = ".trail, .toc";
@@ -90,10 +93,16 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 
 	const siblingsOf = (step: Step) => step.list ?? allSiblings(nameOf(step.hash));
 
+	/** A link's text; a link that stands as a .tree row is named by its first cell, its label, without the numbers after it. */
+	const linkText = (a: HTMLAnchorElement) => {
+		const row = a.parentElement?.matches(".tree, .tree details");
+		return clean(((row && a.firstElementChild) || a).textContent);
+	};
+
 	/** The first link text of each hash of one view name, kept only when no other hash shares it. */
 	function linkLabels(name: string): Labels {
 		const texts = new Map<string, Set<string>>();
-		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: clean(a.textContent) }));
+		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
 		for (const { hash, text } of links) {
 			texts.set(text, (texts.get(text) ?? new Set()).add(hash));
 		}
@@ -123,13 +132,20 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	 * the entry has none and the trail in memory is extended instead.
 	 */
 	function savedTrail(): Step[] | null {
-		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
-		const trail =
-			state && typeof state === "object" ? (state as Record<string, unknown>)[STATE_KEY] : null;
+		const trail = entryState()[STATE_KEY];
 		return Array.isArray(trail)
 			? trail.filter((s): s is Step => typeof s?.hash === "string")
 			: null;
 	}
+
+	/** This history entry's Navigation API state, {} when it has none. */
+	function entryState(): Record<string, unknown> {
+		const state: unknown = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
+		return state && typeof state === "object" ? (state as Record<string, unknown>) : {};
+	}
+
+	/** The location hash, canonical: the one the trail is saved for. */
+	const locationHash = () => canonical(location.hash.slice(1));
 
 	/** The list a new step walks: the replaced step's while moving within it, else the parent view's links when they reach it. */
 	function inheritedList(hash: string, parent: Step | undefined, replaced: Step | undefined) {
@@ -162,7 +178,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 			steps = hash ? extended(hash) : [];
 		}
 		try {
-			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps } });
+			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
 		} catch {
 			// No Navigation API, or a document whose entries it disables (a sandboxed frame): the trail stays in memory.
 		}
@@ -172,9 +188,9 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const list = make("ol", { class: "crumbs" });
 		list.append(item(back ?? make("a", { href: "#" }, overviewName())));
 		for (const step of steps.slice(0, -1)) {
-			list.append(item(make("a", { href: `#${step.hash}`, title: step.label }, step.label)));
+			list.append(item(make("a", { href: `#${step.hash}` }, step.label)));
 		}
-		list.append(item(make("span", { "aria-current": "page", title: here.label }, here.label)));
+		list.append(item(make("span", { "aria-current": "page" }, here.label)));
 		return list;
 	}
 
@@ -186,16 +202,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 			return [];
 		}
 		const known = linkLabels(nameOf(here.hash));
-		// The name sits in a span: an ellipsis needs a block of its own, and the link is a flex row with its arrow.
-		const link = (hash: string | undefined, rel: string) => {
-			if (!hash) {
-				return make("span");
-			}
-			const text = label(hash, known);
-			const a = make("a", { href: `#${hash}`, rel, title: text });
-			a.append(make("span", {}, text));
-			return a;
-		};
+		const link = (hash: string | undefined, rel: string) =>
+			hash ? make("a", { href: `#${hash}`, rel }, label(hash, known)) : make("span");
 		const box = make("div", { class: "sibs" });
 		box.append(
 			link(list[at - 1], "prev"),
@@ -238,10 +246,10 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	/** An id no element has and no view name takes, so the rail's #id link scrolls to its section rather than opening a view. */
 	const freeId = (id: string) => id !== "" && !names.has(id) && !document.getElementById(id);
 
-	/** The section's id, given one from its heading when it has none, else section-n, section-n+1, ... until one is free. */
-	function sectionId(section: HTMLElement, heading: HTMLElement, n: number) {
+	/** The section's id, given one from its rail label when it has none, else section-n, section-n+1, ... until one is free. */
+	function sectionId(section: HTMLElement, text: string, n: number) {
 		if (!section.id) {
-			let id = clean(heading.textContent)
+			let id = text
 				.toLowerCase()
 				.replace(/[^\p{L}\p{N}]+/gu, "-")
 				.replace(/^-|-$/g, "")
@@ -254,11 +262,13 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		return section.id;
 	}
 
-	/** A section's entry, which owns the view names it is the first to link to. */
+	/**
+	 * A section's entry, named by its data-nav (a short label for a heading that states an answer) or else its heading; it owns the
+	 * view names the section is the first to link to.
+	 */
 	function entry(section: HTMLElement, heading: HTMLElement, n: number, claimed: Set<string>) {
-		const text = clean(heading.textContent);
-		const link = make("a", { href: `#${sectionId(section, heading, n)}`, title: text });
-		link.append(make("span", {}, text));
+		const text = clean(section.dataset.nav) || clean(heading.textContent);
+		const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
 		const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
 		for (const name of owns) {
 			claimed.add(name);
@@ -315,7 +325,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const sub = make("ol");
 		for (const h of shown) {
 			const text = h === step.hash ? step.label : label(h, known);
-			const a = make("a", { href: `#${h}`, title: text }, text);
+			const a = make("a", { href: `#${h}` }, text);
 			a.classList.toggle("is-trail", h === step.hash && h !== hash);
 			if (h === hash) {
 				a.setAttribute("aria-current", "page");
@@ -370,7 +380,13 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 	let toc: Rail | null = null;
 	let shownHash: string | null = null;
 
+	/** Whether this history entry was shown before (Back, Forward, reload) rather than just made by following a link. */
+	const revisited = () => entryState()[AT_KEY] === locationHash();
+
 	return {
+		revisited,
+		/** The view hash this history entry showed when it was left, from the trail saved with it; null for the overview or none. */
+		savedHash: () => (revisited() ? (savedTrail()?.at(-1)?.hash ?? null) : null),
 		show(view: HTMLElement | null, routeHash: string) {
 			const hash = canonical(routeHash);
 			// Shown again with no route change in between: a handler registered late has just drawn the view.

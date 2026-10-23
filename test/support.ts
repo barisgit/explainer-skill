@@ -104,7 +104,7 @@ const WIDTHS = [
 
 /**
  * Packs `page` and opens it in headless Chrome at each width `check` uses, with reduced motion and the CPU slowed `slowdown` times
- * (1 runs at full speed). The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
+ * (1 runs at full speed), as the screen or, with `media` "print", as it prints. The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
  * the page takes: a page that never settles fails on the test's timeout, never by passing early. Returns those failures and every
  * uncaught page error, prefixed with the width; an empty list is a pass.
  */
@@ -113,6 +113,7 @@ export async function packAndRun(
 	name: string,
 	page: string,
 	slowdown = 1,
+	media: "screen" | "print" = "screen",
 ): Promise<string[]> {
 	const output = dir.path(`${name}.out.html`);
 	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
@@ -127,6 +128,7 @@ export async function packAndRun(
 		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
 		await cdp.send("Emulation.setCPUThrottlingRate", { rate: slowdown });
 		await cdp.send("Emulation.setEmulatedMedia", {
+			media,
 			features: [{ name: "prefers-reduced-motion", value: "reduce" }],
 		});
 		for (const viewport of WIDTHS) {

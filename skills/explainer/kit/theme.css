@@ -1,4 +1,4 @@
-/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views.
+/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
@@ -7,7 +7,8 @@
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
-   controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back.
+   controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back | tree
+   (hierarchical records as nested <details>, aligned number columns: kit views.js shows the markup).
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
    hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
@@ -20,7 +21,7 @@
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
-   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation); pack
+   Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation, trees); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
