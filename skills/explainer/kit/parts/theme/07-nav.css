@@ -221,7 +221,7 @@
 	display: block;
 	margin: 1.25rem 0 -1rem auto;
 }
-.fold-all::after {
+.expand.fold-all::after {
 	content: none;
 }
 
