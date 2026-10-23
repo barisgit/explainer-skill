@@ -8,7 +8,8 @@
    (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back | tree
-   (hierarchical records as nested <details>, aligned number columns: kit views.js shows the markup).
+   tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an optional head: kit views.js
+   shows the markup).
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
    hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.

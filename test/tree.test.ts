@@ -72,6 +72,38 @@ test("a tree's numbers line up across rows and levels, on desktop and phone", as
 	expect(await packAndRun(dir, "align", TREE_PAGE(script))).toEqual([]);
 }, 30_000);
 
+test("--tree-cols sizes each column, and the head names them over the cells, on desktop and phone", async () => {
+	const row = (label: string, cells: string) =>
+		`<span>${label}</span>${cells
+			.split(" ")
+			.map((cell) => `<span>${cell}</span>`)
+			.join("")}`;
+	const page = `${HEAD}<h1>Columns</h1>
+<div class="tree" id="cols" style="--tree-cols: 3rem 4.5rem 3rem 3.5rem">
+<div class="tree-head">${row("Task", "Hours Owner Low High")}</div>
+<details open><summary>${row("1 Discovery", "52h Ana 40h 70h")}</summary>
+	<details open><summary>${row("1.1 Spike boards", "52h Ana 40h 70h")}</summary>
+		<details><summary>${row("1.1.1 Schematic review", "12h Ana 10h 16h")}</summary><p>Walk the old schematic.</p></details>
+		<a href="#t">${row("1.1.2 Power stage", "40h Mia 30h 54h")}</a>
+	</details>
+</details>
+</div></main>
+<script>
+const rows = [...document.querySelectorAll("#cols summary, #cols a")];
+const head = document.querySelector(".tree-head");
+const box = (el) => el.getBoundingClientRect();
+const edges = (n) => new Set([head, ...rows].map((r) => Math.round(box(r.children[n]).right)));
+const widths = [1, 2, 3, 4].map((n) => Math.round(box(head.children[n]).width));
+${pageContract({
+	"each column has its template width": `widths.join() === [48, 72, 48, 56].join()`,
+	"each column has one right edge, the head's included": `[1, 2, 3, 4].every((n) => edges(n).size === 1)`,
+	"the head's label starts with the top level's labels": `Math.round(box(head.children[0]).left) === Math.round(box(rows[0].children[0]).left)`,
+	"on a phone the numbers take the line under the label, on a wide screen the label's line": `rows.every((r) => (box(r.children[1]).top > box(r.children[0]).bottom - 1) === (innerWidth < 640))`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+	expect(await packAndRun(dir, "columns", page)).toEqual([]);
+}, 30_000);
+
 test("a link into a branch opens it and its ancestors and scrolls to it, on the overview and in a view", async () => {
 	const script = `
 	await navigated(() => $("#to-spike").click());
