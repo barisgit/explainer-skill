@@ -11,6 +11,14 @@ An agent skill that turns "show me" into one interactive HTML page: charts to ex
 
 **Live examples**, each written by an agent following the skill: [Fourier series](https://barisgit.github.io/explainer-skill/fourier-series/) (study page), [Dijkstra's algorithm](https://barisgit.github.io/explainer-skill/dijkstra/) (step-through), [World electricity mix](https://barisgit.github.io/explainer-skill/electricity-mix/) (data explorer), [Choosing a password hash](https://barisgit.github.io/explainer-skill/password-hashing/) (decision page). Sources are in [`examples/`](examples/).
 
+## Why
+
+In order of priority:
+
+1. **The reader understands and takes in the subject.** This comes before everything else; looks and interactivity serve it. [`guide.md`](skills/explainer/guide.md) records what made generated pages better or worse for their readers, and the kit's house style keeps the eye on the content.
+2. **Agents write pages easily, and the source stays readable for the agent who edits it later.** Charts, steppers, linked highlighting, drill-down views and reader replies are a few HTML attributes each, so a page's source is mostly its content.
+3. **The page is one portable file that works offline and stays small enough.** Necessary, but the least important of the three. `pack` inlines only the kit files the page references (ECharts, about 0.9 MB, only for pages that use it) and renders Mermaid diagrams to SVG, so no diagram library ships.
+
 ## Install
 
 Both installers copy `skills/explainer/` as it is.
