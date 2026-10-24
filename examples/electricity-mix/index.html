@@ -779,12 +779,19 @@ select,
 input[type="number"],
 input[type="text"],
 input[type="search"],
-input[type="date"] {
+input[type="date"],
+textarea {
 	padding: 0.3125rem 0.5rem;
 	min-block-size: 2.25rem;
 	border: 1px solid var(--rule-strong);
 	border-radius: 0.375rem;
 	background: var(--surface);
+}
+/* A free-response field: the width of its column, taller only by the reader's hand. */
+textarea {
+	display: block;
+	inline-size: 100%;
+	resize: vertical;
 }
 /* biome-ignore lint/style/noDescendingSpecificity: the .field-scoped slider rule above outranks this default by specificity, so their order does not matter */
 input[type="range"] {
@@ -1067,7 +1074,7 @@ output {
 	padding: 0.25rem 0 1rem;
 }
 
-/* Comparison matrix. Wide: a table. On phones each row becomes a stack of label/value lines; give every td a data-label.
+/* Comparison matrix; theme.css documents the markup. Wide: a table. On phones each row becomes a stack of label/value lines.
    class="compare table" keeps a real table on phones: wrap it in .scroll so it scrolls sideways (numeric data tables). */
 .scroll {
 	overflow-x: auto;
@@ -1130,6 +1137,11 @@ output {
 }
 .compare tr.evidence > td {
 	padding-block: 0.25rem 1rem;
+}
+/* A numeric column: class="num" on its header and cells, so amounts line up by their last digit. */
+.compare .num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
 }
 .expand {
 	background: none;
@@ -1215,10 +1227,12 @@ output {
 	:where(.compare:not(.table)) tr[data-state="maybe"] {
 		border-inline-start-color: var(--info);
 	}
-	/* Cells drop their table padding, rules and state tints; this must beat the wide-layout cell rules above. */
+	/* Cells drop their table padding, rules, state tints and numeric alignment (a value reads beside its label); this must beat
+	   the wide-layout cell rules above. */
 	.compare:not(.table) tr > :is(th, td),
 	.fig .compare:not(.table) tr > :is(th, td) {
 		padding: 0.1875rem 0;
+		text-align: start;
 		border: 0;
 		box-shadow: none;
 		background: none;
@@ -1514,7 +1528,8 @@ details > :last-child:not(summary) {
 }
 
 /* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
-   its width; below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
+   its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach); below that it is a closed
+   disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
 .toc ol {
 	margin: 0;
 	padding: 0;
@@ -1591,6 +1606,14 @@ details > :last-child:not(summary) {
 	}
 }
 @media (min-width: 64rem) {
+	/* How far .wide grows to each side of the column beside the rail: the page box's margin less the window's gutter, at most
+	   11rem, so a 66rem column grows to 88rem as without the rail. The rail moves out into its margin by as much, so its gap to a
+	   .wide block stays the 2.5rem it keeps from the column, and the growth is the same on both sides: the page box is centred. The
+	   margin is that of the page box below, with 50vw for half its 100%; a classic scrollbar's width, which vw also counts, stays
+	   within the gutter. */
+	.has-toc {
+		--wide-reach: clamp(0px, 50vw - min(50vw - var(--gutter), 40.5rem) - var(--gutter), 11rem);
+	}
 	.has-toc .page {
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
 		padding-inline-start: 15rem;
@@ -1599,7 +1622,7 @@ details > :last-child:not(summary) {
 		position: fixed;
 		z-index: 1;
 		inset-block: 0;
-		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2);
+		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--wide-reach));
 		inline-size: 12.5rem;
 		padding-block: clamp(1.75rem, 5vw, 3.5rem) 2rem;
 		overflow-y: auto;
@@ -1609,18 +1632,12 @@ details > :last-child:not(summary) {
 	.toc-toggle {
 		display: none;
 	}
-	/* .wide reaches into both margins of a centred column. Beside the rail its start stays with the column, and it reaches into the
-	   right margin up to the window's gutter, by at most 22rem: up to 88rem in all, as without the rail. The margin is that of the
-	   page box above, so 100vw stands for its 100%; a classic scrollbar's width, which 100vw also counts, stays within the gutter.
-	   Expand all over a .wide block ends with it. */
+	/* .wide stays centred on the column; Expand all over it ends with it. */
 	.has-toc .wide {
-		margin-inline-start: 0;
+		margin-inline: calc(-1 * var(--wide-reach));
 	}
-	.has-toc :is(.wide, .fold-all:has(+ .wide)) {
-		margin-inline-end: calc(
-			-1 *
-			clamp(0px, (100vw - min(100vw - 2 * var(--gutter), 81rem)) / 2 - var(--gutter), 22rem)
-		);
+	.has-toc .fold-all:has(+ .wide) {
+		margin-inline-end: calc(-1 * var(--wide-reach));
 	}
 }
 
@@ -1798,7 +1815,7 @@ details > :last-child:not(summary) {
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
-   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare mark expand |
+   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head: kit views.js shows the markup) | toolbar (the row over a records section: a .seg view switch, <input
    type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
@@ -1808,12 +1825,18 @@ details > :last-child:not(summary) {
    or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
-   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
+   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens, centred on the
+   column, beside the contents rail too.
    The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child
    replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
    Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
    sections (method, sources) are set smaller with the heading in its own column.
-   Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
+   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
+   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
+   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+     <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
@@ -2033,8 +2056,6 @@ dialog.reply-dialog[open] {
 	.pick { min-inline-size: 0; max-inline-size: 100%; }
 	.table-box { max-block-size: 26rem; overflow: auto; }
 	.table-box thead th { position: sticky; inset-block-start: 0; background: var(--surface); }
-	.num { text-align: end; font-variant-numeric: tabular-nums; }
-	.compare th.num { text-align: end; }
 	.sources li { margin-block: 0.375rem; }
 	.note { min-block-size: 1.5em; margin: 0; padding: 0.625rem var(--pad); color: var(--muted); font-size: 0.875rem; }
 </style>
