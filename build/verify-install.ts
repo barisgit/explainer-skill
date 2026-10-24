@@ -90,6 +90,34 @@ function verifyCli(installed: string, home: string, outDir: string): void {
 	record(check.code === 0, "bun cli.ts check", check.out);
 	const node = run(["node", cli, "kit"], elsewhere, home);
 	record(node.code === 2 && node.out.includes("needs Bun"), "node cli.ts explains Bun", node.out);
+	verifyRecords(installed, home);
+}
+
+/** The records core runs from the installed copy on its vendored TanStack bundle, with no node_modules anywhere near it. */
+function verifyRecords(installed: string, home: string): void {
+	const core = JSON.stringify(join(installed, "kit/records/index.ts"));
+	const config = JSON.stringify({
+		id: "t",
+		idField: "id",
+		fields: {
+			id: { label: "Id", kind: "text" },
+			g: { label: "G", kind: "text" },
+			h: { label: "H", kind: "number", sum: true },
+		},
+		columns: ["id", "h"],
+		groupBy: ["g"],
+		data: [
+			{ id: "a", g: "x", h: 1 },
+			{ id: "b", g: "x", h: 2 },
+		],
+	});
+	const script = `const { createRecords } = await import(${core}); console.log("sum", createRecords(${config}).view().body.total[1].value);`;
+	const result = run(["bun", "-e", script], elsewhere, home);
+	record(
+		result.code === 0 && result.out.includes("sum 3"),
+		"records core groups and sums",
+		result.out,
+	);
 }
 
 type Scenario = {
