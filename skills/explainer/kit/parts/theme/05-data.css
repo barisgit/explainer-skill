@@ -207,6 +207,11 @@
 .compare tr.evidence > td {
 	padding-block: 0.25rem 1rem;
 }
+/* A numeric column: class="num" on its header and cells, so amounts line up by their last digit. */
+.compare .num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
 .expand {
 	background: none;
 	border: 0;
@@ -291,10 +296,12 @@
 	:where(.compare:not(.table)) tr[data-state="maybe"] {
 		border-inline-start-color: var(--info);
 	}
-	/* Cells drop their table padding, rules and state tints; this must beat the wide-layout cell rules above. */
+	/* Cells drop their table padding, rules, state tints and numeric alignment (a value reads beside its label); this must beat
+	   the wide-layout cell rules above. */
 	.compare:not(.table) tr > :is(th, td),
 	.fig .compare:not(.table) tr > :is(th, td) {
 		padding: 0.1875rem 0;
+		text-align: start;
 		border: 0;
 		box-shadow: none;
 		background: none;

@@ -7,7 +7,7 @@
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
-   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare mark expand |
+   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head: kit views.js shows the markup) | toolbar (the row over a records section: a .seg view switch, <input
    type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
@@ -24,10 +24,10 @@
    sections (method, sources) are set smaller with the heading in its own column.
    Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
    <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
-   tr data-state="fit", "maybe" or "out" gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a
-   table on phones and scrolls sideways:
-     <table class="compare"><thead><tr><th>Store</th><th>Latency</th></tr></thead>
-       <tbody><tr><th scope="row">Redis</th><td data-label="Latency">2 ms</td></tr></tbody></table>
+   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+     <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
