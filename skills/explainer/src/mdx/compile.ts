@@ -142,10 +142,19 @@ function labelRow(row: Element, labels: string[]) {
 }
 
 /**
+ * A cell's Markdown alignment as v0.8 writes it: a right-aligned column (`---:`) is a numeric one, `class="num"`, which lines its
+ * digits up on wide screens and reads beside its label on phones. Other alignments are dropped: cells align to the start as in
+ * v0.8, and on phones an aligned cell would push its label away from the value.
+ */
+function numericCell(cell: Element) {
+	const { align, ...rest } = cell.properties;
+	cell.properties = align === "right" ? { className: ["num"], ...rest } : rest;
+}
+
+/**
  * Markdown tables become the kit's `table.compare`, as a v0.8 page writes one: each body row's first cell is its header
- * (`<th scope="row">`), and every other cell carries its column's header as `data-label`, which the phone layout shows beside
- * the value. Markdown column alignment (`---:`) is dropped: cells align to the start as in v0.8, and on phones an aligned cell
- * would push its label away from the value.
+ * (`<th scope="row">`), every other cell carries its column's header as `data-label`, which the phone layout shows beside
+ * the value, and a right-aligned column is `class="num"` (numericCell).
  */
 function compareTables(tree: HastRoot) {
 	for (const table of elementsOf(tree)) {
@@ -153,15 +162,15 @@ function compareTables(tree: HastRoot) {
 			continue;
 		}
 		table.properties = { ...table.properties, className: ["compare"] };
+		for (const cell of elementsOf(table)) {
+			if (cell.tagName === "th" || cell.tagName === "td") {
+				numericCell(cell);
+			}
+		}
 		const [head] = rowsOf(table, "thead");
 		const labels = head ? childElements(head, "th").map(hastText) : [];
 		for (const row of rowsOf(table, "tbody")) {
 			labelRow(row, labels);
-		}
-		for (const cell of elementsOf(table)) {
-			cell.properties = Object.fromEntries(
-				Object.entries(cell.properties).filter(([key]) => key !== "align"),
-			);
 		}
 	}
 }

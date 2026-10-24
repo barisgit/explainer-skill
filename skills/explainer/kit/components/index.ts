@@ -3,8 +3,8 @@
    keys kit views.js, steps.js and reply.js list), reply: true (notes and kept inputs on a page without a Question or data-reply).
    The # and the paragraphs right under it are the masthead, the first one its lede. Each ## starts a section; to give one its
    short name in the contents rail, write its heading as <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
-   yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, and on
-   phones each row stacks its cells under the column names.
+   yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
+   right-aligned column (---:) is numeric (class="num"), and on phones each row stacks its cells under the column names.
    Data and styles are imported files: import plan from "./plan.json", import { rows } from "./data.ts", import "./page.css".
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its

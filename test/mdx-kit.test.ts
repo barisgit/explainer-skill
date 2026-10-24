@@ -79,10 +79,10 @@ Two phases, three people, one decision left.
 
 See [the method](#about).
 
-| Option | What it means | Cost |
-|---|---|---:|
-| A. Ship now | Spike boards go out as they are. | Rework later. |
-| B. One more spin | A second board revision first. | Two weeks. |
+| Option | What it means | Delay |
+|---|:---|---:|
+| A. Ship now | Spike boards go out as they are. | 0 weeks |
+| B. One more spin | A second board revision first. | 2 weeks |
 
 <Question name="ship" legend="Which option should we take?" options={{ a: "Ship now", b: "One more spin" }} />
 
@@ -127,9 +127,9 @@ const V08_MAIN = `<main class="page"><div data-overview>
 </details>
 </div></section>
 <section><h2>Options</h2><p>See <a href="#about">the method</a>.</p>
-<table class="compare"><thead><tr><th>Option</th><th>What it means</th><th>Cost</th></tr></thead><tbody>
-<tr><th scope="row">A. Ship now</th><td data-label="What it means">Spike boards go out as they are.</td><td data-label="Cost">Rework later.</td></tr>
-<tr><th scope="row">B. One more spin</th><td data-label="What it means">A second board revision first.</td><td data-label="Cost">Two weeks.</td></tr>
+<table class="compare"><thead><tr><th>Option</th><th>What it means</th><th class="num">Delay</th></tr></thead><tbody>
+<tr><th scope="row">A. Ship now</th><td data-label="What it means">Spike boards go out as they are.</td><td class="num" data-label="Delay">0 weeks</td></tr>
+<tr><th scope="row">B. One more spin</th><td data-label="What it means">A second board revision first.</td><td class="num" data-label="Delay">2 weeks</td></tr>
 </tbody></table>
 <fieldset data-reply=""><legend>Which option should we take?</legend><div class="seg">
 <label><input type="radio" name="ship" value="a" id="ship-a"><span>Ship now</span></label>
