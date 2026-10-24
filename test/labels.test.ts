@@ -189,9 +189,11 @@ var contract = settled.then(async () => {
 
 // The run is slowed four times, so the kit's own timers and the page's work interleave as on a slow machine.
 test("kitLabels set after the kit scripts reach every text they add: stepper, views navigation, folds, reply and notes", async () => {
-	expect(await packAndRun(dir, "sl", PAGE("sl", SLOVENIAN, SLOVENIAN), 4)).toEqual([]);
+	expect(await packAndRun(dir, "sl", PAGE("sl", SLOVENIAN, SLOVENIAN), { slowdown: 4 })).toEqual(
+		[],
+	);
 }, 60_000);
 
 test("without kitLabels the kit's texts are English", async () => {
-	expect(await packAndRun(dir, "en", PAGE("en", ENGLISH), 4)).toEqual([]);
+	expect(await packAndRun(dir, "en", PAGE("en", ENGLISH), { slowdown: 4 })).toEqual([]);
 }, 60_000);

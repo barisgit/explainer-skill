@@ -96,15 +96,32 @@ async function open(cdp: Cdp, url: string) {
 	await loaded;
 }
 
+/** A window size a page runs at; `mobile` emulates a phone (touch, mobile viewport). */
+export interface Viewport {
+	width: number;
+	height: number;
+	mobile: boolean;
+}
+
 /** The widths `check` shoots, so a page run covers the same layouts. */
-const WIDTHS = [
+const WIDTHS: Viewport[] = [
 	{ width: 1440, height: 900, mobile: false },
 	{ width: 390, height: 844, mobile: true },
 ];
 
+/** How packAndRun runs a page; every field has the default given here. */
+export interface RunOptions {
+	/** How many times the CPU is slowed; 1 runs at full speed. */
+	slowdown?: number;
+	/** "print" runs the page as it prints. */
+	media?: "screen" | "print";
+	/** The window sizes, in order; default the two `check` uses. */
+	widths?: Viewport[];
+}
+
 /**
- * Packs `page` and opens it in headless Chrome at each width `check` uses, with reduced motion and the CPU slowed `slowdown` times
- * (1 runs at full speed), as the screen or, with `media` "print", as it prints. The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
+ * Packs `page` and opens it in headless Chrome at each of `widths`, with reduced motion, the CPU slowed `slowdown` times, as the
+ * screen or as it prints. The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
  * the page takes: a page that never settles fails on the test's timeout, never by passing early. Returns those failures and every
  * uncaught page error, prefixed with the width; an empty list is a pass.
  */
@@ -112,8 +129,7 @@ export async function packAndRun(
 	dir: ReturnType<typeof scratch>,
 	name: string,
 	page: string,
-	slowdown = 1,
-	media: "screen" | "print" = "screen",
+	{ slowdown = 1, media = "screen", widths = WIDTHS }: RunOptions = {},
 ): Promise<string[]> {
 	const output = dir.path(`${name}.out.html`);
 	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
@@ -131,7 +147,7 @@ export async function packAndRun(
 			media,
 			features: [{ name: "prefers-reduced-motion", value: "reduce" }],
 		});
-		for (const viewport of WIDTHS) {
+		for (const viewport of widths) {
 			width = viewport.width;
 			await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
 			// As in check: what kit:reply.js keeps from one width must not carry into the next, and the old page saves as it unloads.

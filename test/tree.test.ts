@@ -170,5 +170,5 @@ test("closed folds print open", async () => {
 		"a closed fold's text prints": `document.getElementById("plain").checkVisibility()`,
 		"a fold inside a closed fold prints": `document.getElementById("deep").checkVisibility()`,
 	})}</script></body></html>`;
-	expect(await packAndRun(dir, "print", page, 1, "print")).toEqual([]);
+	expect(await packAndRun(dir, "print", page, { media: "print" })).toEqual([]);
 }, 30_000);
