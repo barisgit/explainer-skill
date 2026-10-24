@@ -53,15 +53,16 @@ flowchart TD
 
 <details>
 <summary>Exact values</summary>
+{/* No control changes these rows, so the page renders them, not a client component: they show before scripts run and print. */}
 <table class="compare">
-<thead><tr><th>Fix</th><th>Barista busy</th><th>Average wait</th><th>Saved</th></tr></thead>
+<thead><tr><th>Fix</th><th class="num">Barista busy</th><th class="num">Average wait</th><th class="num">Saved</th></tr></thead>
 <tbody>
 {fixList.map((f) => (
 	<tr data-state={f.id === "second" ? "fit" : f.id === "none" ? "out" : "maybe"}>
 		<th scope="row"><a href={`#fix/${f.id}`}>{f.name}</a></th>
-		<td data-label="Barista busy">{(f.busy * 100).toFixed(1)}%</td>
-		<td data-label="Average wait">{fmt(f.wait)}</td>
-		<td data-label="Saved">{Math.round((1 - f.wait / fixList[0].wait) * 100)}%</td>
+		<td class="num" data-label="Barista busy">{(f.busy * 100).toFixed(1)}%</td>
+		<td class="num" data-label="Average wait">{fmt(f.wait)}</td>
+		<td class="num" data-label="Saved">{Math.round((1 - f.wait / fixList[0].wait) * 100)}%</td>
 	</tr>
 ))}
 </tbody>
