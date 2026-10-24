@@ -52,7 +52,7 @@ Ponudba za baterijo k 6-kilovatni sončni elektrarni na strehi štiričlanske hi
 
 <h2 data-nav="Cena">Ponudba: 4.200 €</h2>
 
-<Tree items={QUOTE} row={(g) => g.items ? { label: g.name, cells: [euro(g.items.reduce((sum, i) => sum + i.eur, 0))], items: g.items } : { label: g.name, cells: [euro(g.eur)], text: g.note }} />
+<Tree head={["Postavka", "Cena"]} cols="6rem" items={QUOTE} row={(g) => g.items ? { label: g.name, cells: [euro(g.items.reduce((sum, i) => sum + i.eur, 0))], items: g.items } : { label: g.name, cells: [euro(g.eur)], text: g.note }} />
 
 [Kako so nastale številke](#metoda)
 

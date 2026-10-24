@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Home battery size</title>
-<style>/* theme part: fonts, tokens, element defaults. Font urls resolve against kit/, where pack reads the theme from. */
+<style>@layer kit {
+/* theme part: fonts, tokens, element defaults. Font urls resolve against kit/, where pack reads the theme from. */
 @font-face {
 	font-family: "Geist";
 	font-weight: 100 900;
@@ -231,8 +232,10 @@ h3,
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
 	gap: 1rem 1.5rem;
 }
-/* Wider than the reading column on big screens, for tables and side-by-side panels; full column width on phones. */
-.wide {
+/* Wider than the reading column on big screens, for tables and side-by-side panels; full column width on phones. Expand all just
+   above a .wide block (kit:views.js) takes its margins, so it ends where the block does; the navigation part keeps its start. */
+.wide,
+.fold-all:has(+ .wide) {
 	margin-inline: calc(50% - min(44rem, 50vw - var(--gutter)));
 }
 /* Band: the one stretch where the reader acts or decides, in the sunken tone from window edge to edge. The content keeps the column;
@@ -711,6 +714,11 @@ legend {
 		background 0.15s,
 		color 0.15s;
 }
+/* In a .toolbar (below), the switch is as tall as the inputs beside it. */
+.toolbar .seg span {
+	min-block-size: 0;
+	padding-block: 0.25rem;
+}
 .seg label:hover span {
 	color: var(--ink);
 }
@@ -771,12 +779,19 @@ select,
 input[type="number"],
 input[type="text"],
 input[type="search"],
-input[type="date"] {
+input[type="date"],
+textarea {
 	padding: 0.3125rem 0.5rem;
 	min-block-size: 2.25rem;
 	border: 1px solid var(--rule-strong);
 	border-radius: 0.375rem;
 	background: var(--surface);
+}
+/* A free-response field: the width of its column, taller only by the reader's hand. */
+textarea {
+	display: block;
+	inline-size: 100%;
+	resize: vertical;
 }
 /* biome-ignore lint/style/noDescendingSpecificity: the .field-scoped slider rule above outranks this default by specificity, so their order does not matter */
 input[type="range"] {
@@ -870,6 +885,50 @@ output {
 	padding-block: 1rem;
 }
 
+/* Toolbar: the row over a records section on the page (a tree or table), holding its view switch (.seg), search and filters
+   (selects, .field), compact on one line with no box. On phones it is a grid of two equal columns: the switch and the search take
+   a row each, the filters pair up, so the rows wrap as whole cells, never as a ragged line. Layout only: the page owns what the
+   controls do. Unlike .controls, which heads a panel's figure, it acts on records below it that sit on the page. */
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin-block: 1.25rem 0.75rem;
+	font-size: 0.875rem;
+}
+.toolbar > input[type="search"] {
+	flex: 1 1 10rem;
+	max-inline-size: 18rem;
+}
+@media (max-width: 40rem) {
+	.toolbar {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.toolbar > * {
+		min-inline-size: 0;
+	}
+	.toolbar > :is(.seg, input[type="search"]) {
+		grid-column: 1 / -1;
+		max-inline-size: none;
+	}
+	.toolbar > .seg {
+		display: flex;
+	}
+	.toolbar > .seg label {
+		flex: 1;
+		text-align: center;
+	}
+	.toolbar > :is(select, .field) {
+		inline-size: 100%;
+	}
+	.toolbar .field > select {
+		flex: 1;
+		min-inline-size: 0;
+	}
+}
+
 /* theme part: readouts, chips, ranking rows, comparison tables. */
 /* Readouts: plain numbers in a row, no tiles. <small> is a second line under the number. */
 .stats {
@@ -938,6 +997,26 @@ output {
 .chip.info {
 	color: var(--info);
 }
+/* Category marker: a chip that starts with an empty <i> is a square in --swatch (the category's --c colour) before its word, with
+   no tint, so a column of them stays quiet. The same markup keys the categories in a .legend over the records and marks the rows. */
+.chip:has(> i:empty:first-child) {
+	padding: 0;
+	background: none;
+	font-weight: 500;
+}
+.chip > i:empty {
+	flex: none;
+	inline-size: 0.5625rem;
+	block-size: 0.5625rem;
+	border-radius: 2px;
+	background: var(--swatch, currentColor);
+}
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1rem;
+	margin-block: 0.75rem;
+}
 
 /* Ranking rows: ol.rank > li > button (aria-expanded) + .more (inline detail, hidden until opened) */
 .rank {
@@ -995,7 +1074,7 @@ output {
 	padding: 0.25rem 0 1rem;
 }
 
-/* Comparison matrix. Wide: a table. On phones each row becomes a stack of label/value lines; give every td a data-label.
+/* Comparison matrix; theme.css documents the markup. Wide: a table. On phones each row becomes a stack of label/value lines.
    class="compare table" keeps a real table on phones: wrap it in .scroll so it scrolls sideways (numeric data tables). */
 .scroll {
 	overflow-x: auto;
@@ -1058,6 +1137,11 @@ output {
 }
 .compare tr.evidence > td {
 	padding-block: 0.25rem 1rem;
+}
+/* A numeric column: class="num" on its header and cells, so amounts line up by their last digit. */
+.compare .num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
 }
 .expand {
 	background: none;
@@ -1143,10 +1227,12 @@ output {
 	:where(.compare:not(.table)) tr[data-state="maybe"] {
 		border-inline-start-color: var(--info);
 	}
-	/* Cells drop their table padding, rules and state tints; this must beat the wide-layout cell rules above. */
+	/* Cells drop their table padding, rules, state tints and numeric alignment (a value reads beside its label); this must beat
+	   the wide-layout cell rules above. */
 	.compare:not(.table) tr > :is(th, td),
 	.fig .compare:not(.table) tr > :is(th, td) {
 		padding: 0.1875rem 0;
+		text-align: start;
 		border: 0;
 		box-shadow: none;
 		background: none;
@@ -1442,7 +1528,8 @@ details > :last-child:not(summary) {
 }
 
 /* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
-   its width; below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
+   its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach); below that it is a closed
+   disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
 .toc ol {
 	margin: 0;
 	padding: 0;
@@ -1519,6 +1606,14 @@ details > :last-child:not(summary) {
 	}
 }
 @media (min-width: 64rem) {
+	/* How far .wide grows to each side of the column beside the rail: the page box's margin less the window's gutter, at most
+	   11rem, so a 66rem column grows to 88rem as without the rail. The rail moves out into its margin by as much, so its gap to a
+	   .wide block stays the 2.5rem it keeps from the column, and the growth is the same on both sides: the page box is centred. The
+	   margin is that of the page box below, with 50vw for half its 100%; a classic scrollbar's width, which vw also counts, stays
+	   within the gutter. */
+	.has-toc {
+		--wide-reach: clamp(0px, 50vw - min(50vw - var(--gutter), 40.5rem) - var(--gutter), 11rem);
+	}
 	.has-toc .page {
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
 		padding-inline-start: 15rem;
@@ -1527,7 +1622,7 @@ details > :last-child:not(summary) {
 		position: fixed;
 		z-index: 1;
 		inset-block: 0;
-		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2);
+		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--wide-reach));
 		inline-size: 12.5rem;
 		padding-block: clamp(1.75rem, 5vw, 3.5rem) 2rem;
 		overflow-y: auto;
@@ -1537,19 +1632,33 @@ details > :last-child:not(summary) {
 	.toc-toggle {
 		display: none;
 	}
-	/* .wide reaches into both margins of a centred column; beside the rail it stays in the column. */
+	/* .wide stays centred on the column; Expand all over it ends with it. */
 	.has-toc .wide {
-		margin-inline: 0;
+		margin-inline: calc(-1 * var(--wide-reach));
+	}
+	.has-toc .fold-all:has(+ .wide) {
+		margin-inline-end: calc(-1 * var(--wide-reach));
 	}
 }
 
 /* Expand all: right-aligned just above the section's first fold, without .expand's +/- suffix. */
 .fold-all {
 	display: block;
-	margin: 1.25rem 0 -1rem auto;
+	margin-block: 1.25rem -1rem;
+	margin-inline: auto 0;
 }
 .expand.fold-all::after {
 	content: none;
+}
+/* In a .toolbar it ends the row; on phones it takes the last column. */
+.toolbar > .fold-all {
+	grid-column: -2;
+	margin: 0;
+	margin-inline-start: auto;
+}
+/* Over a .wide block it takes the block's margins (the layout part) but keeps to the end. */
+.fold-all:has(+ .wide) {
+	margin-inline-start: auto;
 }
 
 @media print {
@@ -1564,44 +1673,79 @@ details > :last-child:not(summary) {
 }
 
 /* theme part: .tree, hierarchical records as nested <details>: one row per item, its label then its numbers in aligned columns.
-   A row is a <summary> or a link that stands as a row; every child of a row is a cell, the label first. Each level is indented by
-   the chevron's width, so a child's chevron sits under its parent's label, and the columns, fixed in width and right-aligned,
-   line up across rows and levels. --tree-cell sets the column width. Rows are matched through :where(), so the rules below rise in
-   specificity in source order. */
+   A row is a <summary>, a link that stands as a row, or the .tree-head that names the columns; every child of a row is a cell, the
+   label first. A row is a grid of the chevron's column, the label's, then the number columns of --tree-cols, one width per column.
+   Each level is indented by the chevron's column and gap, so a child's chevron sits under its parent's label, and the number
+   columns, right-aligned at the row's end, line up across rows and levels. Rows are matched through :where(), so the rules below
+   rise in specificity in source order. */
 .tree {
 	margin-block: 1.25rem;
 	border-block-end: 1px solid var(--rule);
 	font-size: 0.9375rem;
 }
-.tree :where(summary, .tree > a, details > a) {
-	display: flex;
+/* Unset, --tree-cols is one column per number cell, up to six (--tree-n, counted below), each 5rem where the row has room and
+   narrower where it has not, so a deep row on a small phone shrinks its columns rather than scrolling sideways. */
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head) {
+	--tree-n: 1;
+	display: grid;
+	grid-template-columns: 0.8125rem minmax(0, 1fr) var(
+			--tree-cols,
+			repeat(var(--tree-n), minmax(0, 5rem))
+		);
 	align-items: baseline;
-	gap: 0.5rem;
+	gap: 0 0.5rem;
 	min-block-size: 2.5rem;
 	padding-block: 0.5625rem;
 	border-block-start: 1px solid var(--rule);
 	line-height: 1.35;
 }
-/* A link row: its label starts where its sibling summaries' labels do, after the chevron's place. */
-.tree :where(.tree > a, details > a) {
-	padding-inline-start: 1.3125rem;
-	font-weight: 400;
-	text-decoration: none;
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3)) {
+	--tree-n: 2;
 }
-.tree :where(summary, .tree > a, details > a) > * + * {
-	flex: none;
-	inline-size: var(--tree-cell, 5rem);
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(4)) {
+	--tree-n: 3;
+}
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(5)) {
+	--tree-n: 4;
+}
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(6)) {
+	--tree-n: 5;
+}
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(7)) {
+	--tree-n: 6;
+}
+/* A link row and the head have no chevron: their label starts in its own column, where its sibling summaries' labels do. */
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > :first-child {
+	grid-column: 2;
+	min-inline-size: 0;
+}
+/* A row of a label alone gives it the row. */
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > :only-child {
+	grid-column: 2 / -1;
+}
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > * + * {
+	min-inline-size: 0;
 	color: var(--muted);
 	font-size: 0.875rem;
 	font-variant-numeric: tabular-nums;
 	text-align: end;
+	overflow-wrap: anywhere;
 }
-.tree :where(summary, .tree > a, details > a) > :first-child {
-	flex: 1;
-	min-inline-size: 0;
+.tree :where(.tree > a, details > a) {
+	font-weight: 400;
+	text-decoration: none;
 }
 .tree :where(.tree > a, details > a):hover > :first-child {
 	text-decoration: underline;
+}
+/* The head: the columns' names over the first row, in the numbers' size. */
+.tree > .tree-head {
+	min-block-size: 0;
+	padding-block: 0 0.375rem;
+	border-block-start: 0;
+	color: var(--muted);
+	font-size: 0.875rem;
+	font-weight: 500;
 }
 .tree details {
 	margin: 0;
@@ -1609,7 +1753,7 @@ details > :last-child:not(summary) {
 }
 /* The chevron is an empty box with no baseline of its own: it is centred on the first line instead. */
 .tree summary::before {
-	align-self: flex-start;
+	align-self: start;
 	margin-block-start: 0.375rem;
 }
 /* Levels by weight: the top level and its totals strongest, a leaf (a fold with no fold inside) plain. */
@@ -1640,25 +1784,25 @@ details > :last-child:not(summary) {
 .tree details:not([open]):has(.is-lit) > summary {
 	background: var(--accent-soft);
 }
-/* Phones: the label takes the row's first line and the numbers, still right-aligned in their columns, the second; a single
-   number stays on the label's line. */
+/* Phones: a row with two or more numbers gives its label the first line and puts the numbers on the second, in the same columns
+   right-aligned; a single number stays on the label's line. The label spans every column, and the first number starts in its own
+   column, which the label holds on the first line, so the numbers go to the second. */
 @media (max-width: 40rem) {
-	.tree :where(summary, .tree > a, details > a) {
-		flex-wrap: wrap;
+	.tree :where(summary, .tree > a, details > a, .tree > .tree-head) {
 		row-gap: 0.125rem;
 	}
-	.tree :where(summary, .tree > a, details > a) > * + * {
-		inline-size: var(--tree-cell, 4rem);
+	.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > * + * {
 		font-size: 0.8125rem;
 	}
-	.tree :where(summary, .tree > a, details > a) > :nth-child(2) {
-		margin-inline-start: auto;
+	.tree
+		:where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3))
+		> :first-child {
+		grid-area: 1 / 2 / 2 / -1;
 	}
-	.tree :where(summary, .tree > a, details > a) > :first-child {
-		flex-basis: calc(100% - 1.3125rem);
-	}
-	.tree :where(summary, .tree > a, details > a):not(:has(> :nth-child(3))) > :first-child {
-		flex-basis: 0;
+	.tree
+		:where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3))
+		> :nth-child(2) {
+		grid-column-start: 3;
 	}
 }
 
@@ -1671,20 +1815,33 @@ details > :last-child:not(summary) {
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
-   controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back | tree
-   (hierarchical records as nested <details>, aligned number columns: kit views.js shows the markup).
+   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
+   view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
+   optional head: kit views.js shows the markup) | toolbar (the row over a records section: a .seg view switch, <input
+   type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
+   Expand all joins its end. Layout only: the page owns their state, and kit:reply.js keeps inputs with ids across reloads).
+   Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour
+   before its word. A <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word
+   or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
-   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
-   The inset is a default (padding-inline: var(--pad) on every direct child of .fig, specificity of one class): any padding the page
-   puts on such a child with a class of its own replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
+   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens, centred on the
+   column, beside the contents rail too.
+   The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child
+   replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
    Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
    sections (method, sources) are set smaller with the heading in its own column.
-   Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
+   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
+   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
+   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+     <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
+   Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation, trees); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
@@ -1879,7 +2036,7 @@ dialog.reply-dialog[open] {
 	}
 }
 /* end features */
-</style>
+}</style>
 <style>:root {
 	--accent: light-dark(#1f6f5c, #6fd1b5);
 }
@@ -1965,7 +2122,7 @@ dialog.reply-dialog[open] {
 <li>The <span data-ref="inverter">hybrid inverter</span> replaces the string inverter and decides where each kWh goes.</li>
 <li>The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.</li>
 <li>The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.</li>
-</ul></section><section data-nav="Cost"><h2>The 5 kWh quote is 4,200 €, two thirds of it the battery</h2><div class="tree"><details><summary><span>Hardware</span><span>3,350 €</span></summary><details><summary data-ref="battery"><span>Battery module, 5 kWh</span><span>2,600 €</span></summary><p>LFP cells, 6000 cycles to 80%.</p></details><details><summary data-ref="inverter"><span>Hybrid inverter upgrade</span><span>750 €</span></summary><p>Replaces the string inverter.</p></details></details><details><summary><span>Installation</span><span>850 €</span></summary><details><summary data-ref="inverter"><span>Electrician, 6 h</span><span>540 €</span></summary><p>Mounting, wiring, commissioning.</p></details><details><summary data-ref="grid"><span>Meter and breaker</span><span>310 €</span></summary><p>Bidirectional meter swap by the grid operator.</p></details></details></div></section><section data-nav="Options"><h2>Three sizes, one decision</h2><ul><li><a href="#size/s5">5 kWh</a>: 4,200 €, 80% of summer evenings, pays back in 10 years</li><li><a href="#size/s10">10 kWh</a>: 7,900 €, 89% of summer evenings, pays back in 17 years</li><li><a href="#size/s15">15 kWh</a>: 11,200 €, 91% of summer evenings, pays back in 23 years</li></ul></section><section class="band"><h2>Which size?</h2><fieldset data-reply><legend>Which size would you buy?</legend><div class="seg"><label><input type="radio" name="size" value="s5" id="size-s5"/><span>5 kWh</span></label><label><input type="radio" name="size" value="s10" id="size-s10"/><span>10 kWh</span></label><label><input type="radio" name="size" value="s15" id="size-s15"/><span>15 kWh</span></label><label><input type="radio" name="size" value="none" id="size-none"/><span>None yet</span></label></div></fieldset></section></div><section class="view" data-view="size/s5"><div class="view-head"><a class="back" href="#">Battery options</a><h1>5 kWh: 4,200 €</h1><p class="lede">Fills by noon on most summer days and runs the evening peak.</p></div><dl class="stats"><div class="stat"><dt>Summer evenings</dt><dd>80%</dd></div><div class="stat"><dt>Saved a year</dt><dd>410 €</dd></div><div class="stat"><dt>Payback</dt><dd>10 <small>years</small></dd></div></dl><section><h2>Share of each month's use the house covers itself</h2><!--island:3--><div class="chart plot" role="img" aria-label="Self-sufficiency by month with 5 kWh"></div><!--/island--></section></section><section class="view" data-view="size/s10"><div class="view-head"><a class="back" href="#">Battery options</a><h1>10 kWh: 7,900 €</h1><p class="lede">Rarely fills in winter; in summer it carries the house to morning.</p></div><dl class="stats"><div class="stat"><dt>Summer evenings</dt><dd>89%</dd></div><div class="stat"><dt>Saved a year</dt><dd>470 €</dd></div><div class="stat"><dt>Payback</dt><dd>17 <small>years</small></dd></div></dl><section><h2>Share of each month's use the house covers itself</h2><!--island:4--><div class="chart plot" role="img" aria-label="Self-sufficiency by month with 10 kWh"></div><!--/island--></section></section><section class="view" data-view="size/s15"><div class="view-head"><a class="back" href="#">Battery options</a><h1>15 kWh: 11,200 €</h1><p class="lede">The last 5 kWh is charged on a handful of days a year.</p></div><dl class="stats"><div class="stat"><dt>Summer evenings</dt><dd>91%</dd></div><div class="stat"><dt>Saved a year</dt><dd>490 €</dd></div><div class="stat"><dt>Payback</dt><dd>23 <small>years</small></dd></div></dl><section><h2>Share of each month's use the house covers itself</h2><!--island:5--><div class="chart plot" role="img" aria-label="Self-sufficiency by month with 15 kWh"></div><!--/island--></section></section><section class="view" data-view="method"><div class="view-head"><a class="back" href="#">Battery options</a><h1>How the numbers were made</h1><p class="lede">A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model.</p></div><section><h2>Assumptions</h2><table class="compare"><thead><tr><th>Input</th><th>Value</th></tr></thead><tbody><tr><th scope="row">Array</th><td data-label="Value">6 kW, south, 35°</td></tr><tr><th scope="row">Use</th><td data-label="Value">4,920 kWh a year</td></tr><tr><th scope="row">Bought</th><td data-label="Value">0.22 €/kWh</td></tr><tr><th scope="row">Sold</th><td data-label="Value">0.06 €/kWh</td></tr><tr><th scope="row">Battery round trip</th><td data-label="Value">90%</td></tr></tbody></table></section><section><h2>Not included</h2><p>Price changes, battery wear after year ten, and any subsidy.</p></section></section></main>
+</ul></section><section data-nav="Cost"><h2>The 5 kWh quote is 4,200 €, two thirds of it the battery</h2><div class="tree" style="--tree-cols: 6rem"><div class="tree-head"><span>Item</span><span>Price</span></div><details><summary><span>Hardware</span><span>3,350 €</span></summary><details><summary data-ref="battery"><span>Battery module, 5 kWh</span><span>2,600 €</span></summary><p>LFP cells, 6000 cycles to 80%.</p></details><details><summary data-ref="inverter"><span>Hybrid inverter upgrade</span><span>750 €</span></summary><p>Replaces the string inverter.</p></details></details><details><summary><span>Installation</span><span>850 €</span></summary><details><summary data-ref="inverter"><span>Electrician, 6 h</span><span>540 €</span></summary><p>Mounting, wiring, commissioning.</p></details><details><summary data-ref="grid"><span>Meter and breaker</span><span>310 €</span></summary><p>Bidirectional meter swap by the grid operator.</p></details></details></div></section><section data-nav="Options"><h2>Three sizes, one decision</h2><ul><li><a href="#size/s5">5 kWh</a>: 4,200 €, 80% of summer evenings, pays back in 10 years</li><li><a href="#size/s10">10 kWh</a>: 7,900 €, 89% of summer evenings, pays back in 17 years</li><li><a href="#size/s15">15 kWh</a>: 11,200 €, 91% of summer evenings, pays back in 23 years</li></ul></section><section class="band"><h2>Which size?</h2><fieldset data-reply><legend>Which size would you buy?</legend><div class="seg"><label><input type="radio" name="size" value="s5" id="size-s5"/><span>5 kWh</span></label><label><input type="radio" name="size" value="s10" id="size-s10"/><span>10 kWh</span></label><label><input type="radio" name="size" value="s15" id="size-s15"/><span>15 kWh</span></label><label><input type="radio" name="size" value="none" id="size-none"/><span>None yet</span></label></div></fieldset></section></div><section class="view" data-view="size/s5"><div class="view-head"><a class="back" href="#">Battery options</a><h1>5 kWh: 4,200 €</h1><p class="lede">Fills by noon on most summer days and runs the evening peak.</p></div><dl class="stats"><div class="stat"><dt>Summer evenings</dt><dd>80%</dd></div><div class="stat"><dt>Saved a year</dt><dd>410 €</dd></div><div class="stat"><dt>Payback</dt><dd>10 <small>years</small></dd></div></dl><section><h2>Share of each month's use the house covers itself</h2><!--island:3--><div class="chart plot" role="img" aria-label="Self-sufficiency by month with 5 kWh"></div><!--/island--></section></section><section class="view" data-view="size/s10"><div class="view-head"><a class="back" href="#">Battery options</a><h1>10 kWh: 7,900 €</h1><p class="lede">Rarely fills in winter; in summer it carries the house to morning.</p></div><dl class="stats"><div class="stat"><dt>Summer evenings</dt><dd>89%</dd></div><div class="stat"><dt>Saved a year</dt><dd>470 €</dd></div><div class="stat"><dt>Payback</dt><dd>17 <small>years</small></dd></div></dl><section><h2>Share of each month's use the house covers itself</h2><!--island:4--><div class="chart plot" role="img" aria-label="Self-sufficiency by month with 10 kWh"></div><!--/island--></section></section><section class="view" data-view="size/s15"><div class="view-head"><a class="back" href="#">Battery options</a><h1>15 kWh: 11,200 €</h1><p class="lede">The last 5 kWh is charged on a handful of days a year.</p></div><dl class="stats"><div class="stat"><dt>Summer evenings</dt><dd>91%</dd></div><div class="stat"><dt>Saved a year</dt><dd>490 €</dd></div><div class="stat"><dt>Payback</dt><dd>23 <small>years</small></dd></div></dl><section><h2>Share of each month's use the house covers itself</h2><!--island:5--><div class="chart plot" role="img" aria-label="Self-sufficiency by month with 15 kWh"></div><!--/island--></section></section><section class="view" data-view="method"><div class="view-head"><a class="back" href="#">Battery options</a><h1>How the numbers were made</h1><p class="lede">A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model.</p></div><section><h2>Assumptions</h2><table class="compare"><thead><tr><th>Input</th><th>Value</th></tr></thead><tbody><tr><th scope="row">Array</th><td data-label="Value">6 kW, south, 35°</td></tr><tr><th scope="row">Use</th><td data-label="Value">4,920 kWh a year</td></tr><tr><th scope="row">Bought</th><td data-label="Value">0.22 €/kWh</td></tr><tr><th scope="row">Sold</th><td data-label="Value">0.06 €/kWh</td></tr><tr><th scope="row">Battery round trip</th><td data-label="Value">90%</td></tr></tbody></table></section><section><h2>Not included</h2><p>Price changes, battery wear after year ten, and any subsidy.</p></section></section></main>
 <script type="application/json" id="explainer-islands">[{"m":0,"e":"Plot","p":{"label":"Years until each battery size pays for itself","option":{"categories":["5 kWh","10 kWh","15 kWh"],"horizontal":true,"series":[{"name":"Payback","type":"bar","data":[10,17,23],"label":true}],"x":{"name":"years"}}}},{"m":1,"e":"Chart","p":{"label":"Monthly production and use","option":{"grid":{"top":40,"left":8,"right":16,"bottom":8},"legend":{"top":8,"left":8},"tooltip":{"trigger":"axis"},"xAxis":{"type":"category","data":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]},"yAxis":{"type":"value","axisLabel":{"formatter":"{value} kWh"}},"series":[{"name":"Produced","type":"bar","color":"var(--accent)","data":[180,260,420,610,740,790,820,720,540,360,200,150]},{"name":"Used","type":"line","color":"var(--ink)","data":[520,470,450,400,370,350,360,370,390,430,480,530]}]}}},{"m":2,"e":"Day","p":{}},{"m":0,"e":"Plot","p":{"label":"Self-sufficiency by month with 5 kWh","option":{"categories":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"series":[{"name":"Covered","type":"bar","data":[28,40,62,78,86,90,90,87,74,55,33,24]}],"y":{"min":0,"max":100,"name":"%"}}}},{"m":0,"e":"Plot","p":{"label":"Self-sufficiency by month with 10 kWh","option":{"categories":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"series":[{"name":"Covered","type":"bar","data":[29,43,68,86,94,97,97,95,82,60,35,25]}],"y":{"min":0,"max":100,"name":"%"}}}},{"m":0,"e":"Plot","p":{"label":"Self-sufficiency by month with 15 kWh","option":{"categories":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"series":[{"name":"Covered","type":"bar","data":[29,43,69,88,96,98,98,97,84,61,35,25]}],"y":{"min":0,"max":100,"name":"%"}}}}]</script>
 <script>/* echarts: Apache ECharts 6.1.0, custom build, global echarts.
    Charts: line bar scatter pie heatmap treemap sankey sunburst radar boxplot. Components: grid polar radar calendar axisPointer tooltip legend
@@ -2650,13 +2807,14 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   window.Plot = { make };
 })();
 </script>
-<script>(()=>{var Ze=Object.defineProperty;var Ge=(e)=>e;function Ye(e,n){this[e]=Ge.bind(null,n)}var oe=(e,n)=>{for(var t in n)Ze(e,t,{get:n[t],enumerable:!0,configurable:!0,set:Ye.bind(n,t)})};var ve={};oe(ve,{Plot:()=>Ke});var ge={};oe(ge,{Chart:()=>ee});var Ce={};oe(Ce,{Day:()=>wn});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var q,p,Ee,en,E,ke,Te,Ne,ie,W,O,He,ue,le,se,nn,j={},V=[],tn=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,Q=Array.isArray;function P(e,n){for(var t in n)e[t]=n[t];return e}function ae(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function J(e,n,t){var o,i,r,s={};for(r in n)r=="key"?o=n[r]:r=="ref"?i=n[r]:s[r]=n[r];if(arguments.length>2&&(s.children=arguments.length>3?q.call(arguments,2):t),typeof e=="function"&&e.defaultProps!=null)for(r in e.defaultProps)s[r]===void 0&&(s[r]=e.defaultProps[r]);return L(e,s,o,i,null)}function L(e,n,t,o,i){var r={type:e,props:n,key:t,ref:o,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:i==null?++Ee:i,__i:-1,__u:0};return i==null&&p.vnode!=null&&p.vnode(r),r}function I(e){return e.children}function B(e,n){this.props=e,this.context=n}function N(e,n){if(n==null)return e.__?N(e.__,e.__i+1):null;for(var t;n<e.__k.length;n++)if((t=e.__k[n])!=null&&t.__e!=null)return t.__e;return typeof e.type=="function"?N(e):null}function rn(e){if(e.__P&&e.__d){var n=e.__v,t=n.__e,o=[],i=[],r=P({},n);r.__v=n.__v+1,p.vnode&&p.vnode(r),_e(e.__P,r,n,e.__n,e.__P.namespaceURI,32&n.__u?[t]:null,o,t==null?N(n):t,!!(32&n.__u),i),r.__v=n.__v,r.__.__k[r.__i]=r,$e(o,r,i),n.__e=n.__=null,r.__e!=t&&Ie(r)}}function Ie(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(n){if(n!=null&&n.__e!=null)return e.__e=e.__c.base=n.__e}),Ie(e)}function xe(e){(!e.__d&&(e.__d=!0)&&E.push(e)&&!z.__r++||ke!=p.debounceRendering)&&((ke=p.debounceRendering)||Te)(z)}function z(){try{for(var e,n=1;E.length;)E.length>n&&E.sort(Ne),e=E.shift(),n=E.length,rn(e)}finally{E.length=z.__r=0}}function Me(e,n,t,o,i,r,s,a,_,u,f){var d,l,c,v,w,b,g=o&&o.__k||V,m=n.length;for(_=on(t,n,g,_,m),d=0;d<m;d++)(c=t.__k[d])!=null&&(l=c.__i!=-1&&g[c.__i]||j,c.__i=d,b=_e(e,c,l,i,r,s,a,_,u,f),v=c.__e,c.ref&&l.ref!=c.ref&&(l.ref&&ce(l.ref,null,c),f.push(c.ref,c.__c||v,c)),w==null&&v!=null&&(w=v),4&c.__u?(_=Ae(c,_,e),l.__e&&(l.__e=null)):typeof c.type=="function"&&b!==void 0?_=b:v&&(_=v.nextSibling),c.__u&=-7);return t.__e=w,_}function on(e,n,t,o,i){var r,s,a,_,u,f=t.length,d=f,l=0;for(e.__k=Array(i),r=0;r<i;r++)(s=n[r])!=null&&typeof s!="boolean"&&typeof s!="function"?(typeof s=="string"||typeof s=="number"||typeof s=="bigint"||s.constructor==String?s=e.__k[r]=L(null,s,null,null,null):Q(s)?s=e.__k[r]=L(I,{children:s},null,null,null):s.constructor===void 0&&s.__b>0?s=e.__k[r]=L(s.type,s.props,s.key,s.ref?s.ref:null,s.__v):e.__k[r]=s,_=r+l,s.__=e,s.__b=e.__b+1,a=null,(u=s.__i=ln(s,t,_,d))!=-1&&(d--,(a=t[u])&&(a.__u|=2)),a==null||a.__v==null?(u==-1&&(i>f?l--:i<f&&l++),typeof s.type!="function"&&(s.__u|=4)):u!=_&&(u==_-1?l--:u==_+1?l++:(u>_?l--:l++,s.__u|=4))):e.__k[r]=null;if(d)for(r=0;r<f;r++)(a=t[r])!=null&&(2&a.__u)==0&&(a.__e==o&&(o=N(a)),Oe(a,a));return o}function Ae(e,n,t){var o,i;if(typeof e.type=="function"){for(o=e.__k,i=0;o&&i<o.length;i++)o[i]&&(o[i].__=e,n=Ae(o[i],n,t));return n}e.__e!=n&&(n&&e.type&&!n.parentNode&&(n=N(e)),n=t.insertBefore(e.__e,n||null));do n=n&&n.nextSibling;while(n!=null&&n.nodeType==8);return n}function ln(e,n,t,o){var i,r,s,{key:a,type:_}=e,u=n[t],f=u!=null&&(2&u.__u)==0;if(u===null&&a==null||f&&a==u.key&&_==u.type)return t;if(o>(f?1:0)){for(i=t-1,r=t+1;i>=0||r<n.length;)if((u=n[s=i>=0?i--:r++])!=null&&(2&u.__u)==0&&a==u.key&&_==u.type)return s}return-1}function Se(e,n,t){n[0]=="-"?e.setProperty(n,t==null?"":t):e[n]=t==null?"":typeof t!="number"||tn.test(n)?t:t+"px"}function F(e,n,t,o,i){var r,s;e:if(n=="style")if(typeof t=="string")e.style.cssText=t;else{if(typeof o=="string"&&(e.style.cssText=o=""),o)for(n in o)t&&n in t||Se(e.style,n,"");if(t)for(n in t)o&&t[n]==o[n]||Se(e.style,n,t[n])}else if(n[0]=="o"&&n[1]=="n")r=n!=(n=n.replace(He,"$1")),s=n.toLowerCase(),n=s in e||n=="onFocusOut"||n=="onFocusIn"?s.slice(2):n.slice(2),e.l||(e.l={}),e.l[n+r]=t,t?o?t[O]=o[O]:(t[O]=ue,e.addEventListener(n,r?se:le,r)):e.removeEventListener(n,r?se:le,r);else{if(i=="http://www.w3.org/2000/svg")n=n.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(n!="width"&&n!="height"&&n!="href"&&n!="list"&&n!="form"&&n!="tabIndex"&&n!="download"&&n!="rowSpan"&&n!="colSpan"&&n!="role"&&n!="popover"&&n in e)try{e[n]=t==null?"":t;break e}catch(a){}typeof t=="function"||(t==null||t===!1&&n[4]!="-"?e.removeAttribute(n):e.setAttribute(n,n=="popover"&&t==1?"":t))}}function Pe(e){return function(n){if(this.l){var t=this.l[n.type+e];if(n[W]==null)n[W]=ue++;else if(n[W]<t[O])return;return t(p.event?p.event(n):n)}}}function _e(e,n,t,o,i,r,s,a,_,u){var f,d,l,c,v,w,b,g,m,k,R,T,D,we,U,re,x=n.type;if(n.constructor!==void 0)return null;128&t.__u&&(_=!!(32&t.__u),r=[a=n.__e=t.__e]),(f=p.__b)&&f(n);e:if(typeof x=="function"){d=s.length;try{if(m=n.props,k=x.prototype&&x.prototype.render,R=(f=x.contextType)&&o[f.__c],T=f?R?R.props.value:f.__:o,t.__c?g=(l=n.__c=t.__c).__=l.__E:(k?n.__c=l=new x(m,T):(n.__c=l=new B(m,T),l.constructor=x,l.render=un),R&&R.sub(l),l.state||(l.state={}),l.__n=o,c=l.__d=!0,l.__h=[],l._sb=[]),k&&l.__s==null&&(l.__s=l.state),k&&x.getDerivedStateFromProps!=null&&(l.__s==l.state&&(l.__s=P({},l.__s)),P(l.__s,x.getDerivedStateFromProps(m,l.__s))),v=l.props,w=l.state,l.__v=n,c)k&&x.getDerivedStateFromProps==null&&l.componentWillMount!=null&&l.componentWillMount(),k&&l.componentDidMount!=null&&l.__h.push(l.componentDidMount);else{if(k&&x.getDerivedStateFromProps==null&&m!==v&&l.componentWillReceiveProps!=null&&l.componentWillReceiveProps(m,T),n.__v==t.__v||!l.__e&&l.shouldComponentUpdate!=null&&l.shouldComponentUpdate(m,l.__s,T)===!1){n.__v!=t.__v&&(l.props=m,l.state=l.__s,l.__d=!1),n.__e=t.__e,n.__k=t.__k,n.__k.some(function(H){H&&(H.__=n)}),V.push.apply(l.__h,l._sb),l._sb=[],l.__h.length&&s.push(l),a=N(t);break e}l.componentWillUpdate!=null&&l.componentWillUpdate(m,l.__s,T),k&&l.componentDidUpdate!=null&&l.__h.push(function(){l.componentDidUpdate(v,w,b)})}if(l.context=T,l.props=m,l.__P=e,l.__e=!1,D=p.__r,we=0,k)l.state=l.__s,l.__d=!1,D&&D(n),f=l.render(l.props,l.state,l.context),V.push.apply(l.__h,l._sb),l._sb=[];else do l.__d=!1,D&&D(n),f=l.render(l.props,l.state,l.context),l.state=l.__s;while(l.__d&&++we<25);l.state=l.__s,l.getChildContext!=null&&(o=P(P({},o),l.getChildContext())),k&&!c&&l.getSnapshotBeforeUpdate!=null&&(b=l.getSnapshotBeforeUpdate(v,w)),U=f!=null&&f.type===I&&f.key==null?De(f.props.children):f,a=Me(e,Q(U)?U:[U],n,t,o,i,r,s,a,_,u),l.base=n.__e,n.__u&=-161,l.__h.length&&s.push(l),g&&(l.__E=l.__=null)}catch(H){if(s.length=d,n.__v=null,_||r!=null){if(H.then){for(n.__u|=_?160:128;a&&a.nodeType==8&&a.nextSibling;)a=a.nextSibling;r!=null&&(r[r.indexOf(a)]=null),n.__e=a}else if(r!=null)for(re=r.length;re--;)ae(r[re])}else n.__e=t.__e;n.__k==null&&(n.__k=t.__k||[]),H.then||Re(n),p.__e(H,n,t)}}else r==null&&n.__v==t.__v?(n.__k=t.__k,n.__e=t.__e):a=n.__e=sn(t.__e,n,t,o,i,r,s,_,u);return(f=p.diffed)&&f(n),128&n.__u?void 0:a}function Re(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(Re))}function $e(e,n,t){for(var o=0;o<t.length;o++)ce(t[o],t[++o],t[++o]);p.__c&&p.__c(n,e),e.some(function(i){try{e=i.__h,i.__h=[],e.some(function(r){r.call(i)})}catch(r){p.__e(r,i.__v)}})}function De(e){return typeof e!="object"||e==null||e.__b>0?e:Q(e)?e.map(De):e.constructor!==void 0?null:P({},e)}function sn(e,n,t,o,i,r,s,a,_){var u,f,d,l,c,v,w,b=t.props||j,{props:g,type:m}=n;if(m=="svg"?i="http://www.w3.org/2000/svg":m=="math"?i="http://www.w3.org/1998/Math/MathML":i||(i="http://www.w3.org/1999/xhtml"),r!=null){for(u=0;u<r.length;u++)if((c=r[u])&&"setAttribute"in c==!!m&&(m?c.localName==m:c.nodeType==3)){e=c,r[u]=null;break}}if(e==null){if(m==null)return document.createTextNode(g);e=document.createElementNS(i,m,g.is&&g),a&&(p.__m&&p.__m(n,r),a=!1),r=null}if(m==null)b===g||a&&e.data==g||(e.data=g);else{if(r=m=="textarea"&&g.defaultValue!=null?null:r&&q.call(e.childNodes),!a&&r!=null)for(b={},u=0;u<e.attributes.length;u++)b[(c=e.attributes[u]).name]=c.value;for(u in b)c=b[u],u=="dangerouslySetInnerHTML"?d=c:u=="children"||(u in g)||u=="value"&&("defaultValue"in g)||u=="checked"&&("defaultChecked"in g)||F(e,u,null,c,i);for(u in g)c=g[u],u=="children"?l=c:u=="dangerouslySetInnerHTML"?f=c:u=="value"?v=c:u=="checked"?w=c:a&&typeof c!="function"||b[u]===c||F(e,u,c,b[u],i);if(f)a||d&&(f.__html==d.__html||f.__html==e.innerHTML)||(e.innerHTML=f.__html),n.__k=[];else if(d&&(e.innerHTML=""),Me(n.type=="template"?e.content:e,Q(l)?l:[l],n,t,o,m=="foreignObject"?"http://www.w3.org/1999/xhtml":i,r,s,r?r[0]:t.__k&&N(t,0),a,_),r!=null)for(u=r.length;u--;)ae(r[u]);a&&m!="textarea"||(u="value",m=="progress"&&v==null?e.removeAttribute("value"):v!=null&&(v!==e[u]||m=="progress"&&!v||m=="option"&&v!=b[u])&&F(e,u,v,b[u],i),u="checked",w!=null&&w!=e[u]&&F(e,u,w,b[u],i))}return e}function ce(e,n,t){try{if(typeof e=="function"){var o=typeof e.__u=="function";o&&e.__u(),o&&n==null||(e.__u=e(n))}else e.current=n}catch(i){p.__e(i,t)}}function Oe(e,n,t){var o,i;if(p.unmount&&p.unmount(e),(o=e.ref)&&(o.current&&o.current!=e.__e||ce(o,null,n)),(o=e.__c)!=null){if(o.componentWillUnmount)try{o.componentWillUnmount()}catch(r){p.__e(r,n)}o.base=o.__P=o.__n=null}if(o=e.__k)for(i=0;i<o.length;i++)o[i]&&Oe(o[i],n,t||typeof e.type!="function");t||ae(e.__e),e.__c=e.__=e.__e=void 0}function un(e,n,t){return this.constructor(e,t)}function an(e,n,t){var o,i,r,s;n==document&&(n=document.documentElement),p.__&&p.__(e,n),i=(o=typeof t=="function")?null:t&&t.__k||n.__k,r=[],s=[],_e(n,e=(!o&&t||n).__k=J(I,null,[e]),i||j,j,n.namespaceURI,!o&&t?[t]:i?null:n.firstChild?q.call(n.childNodes):null,r,!o&&t?t:i?i.__e:n.firstChild,o,s),$e(r,e,s),e.props.children=null}function fe(e,n){an(e,n,fe)}q=V.slice,p={__e:function(e,n,t,o){for(var i,r,s;n=n.__;)if((i=n.__c)&&!i.__)try{if((r=i.constructor)&&r.getDerivedStateFromError!=null&&(i.setState(r.getDerivedStateFromError(e)),s=i.__d),i.componentDidCatch!=null&&(i.componentDidCatch(e,o||{}),s=i.__d),s)return i.__E=i}catch(a){e=a}throw e}},Ee=0,en=function(e){return e!=null&&e.constructor===void 0},B.prototype.setState=function(e,n){var t;t=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=P({},this.state),typeof e=="function"&&(e=e(P({},t),this.props)),e&&P(t,e),e!=null&&this.__v&&(n&&this._sb.push(n),xe(this))},B.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),xe(this))},B.prototype.render=I,E=[],Te=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,Ne=function(e,n){return e.__v.__b-n.__v.__b},z.__r=0,ie=Math.random().toString(8),W="__d"+ie,O="__a"+ie,He=/(PointerCapture)$|Capture$/i,ue=0,le=Pe(!1),se=Pe(!0),nn=0;var _n=p.vnode;p.vnode=(e)=>{if(typeof e.type==="string"){let n=e.props;for(let t of Object.keys(n))if(t.startsWith("data-")&&n[t]===!0)n[t]=""}_n?.(e)};function cn(e,n){let t=n.parentNode;if(!t)throw Error("island marker without a parent");let o=()=>{let r=[];for(let s=e.nextSibling;s&&s!==n;s=s.nextSibling)r.push(s);return r},i=(r)=>r;return{nodeType:1,parentNode:t,get firstChild(){return o()[0]??null},get childNodes(){return o()},contains:(r)=>o().some((s)=>r!==null&&s.contains(i(r))),insertBefore:(r,s)=>t.insertBefore(i(r),s?i(s):n),appendChild:(r)=>t.insertBefore(i(r),n),removeChild:(r)=>t.removeChild(i(r))}}function fn(){let e=new Map,n=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),t;for(let o=n.nextNode();o;o=n.nextNode()){if(!(o instanceof Comment))continue;let i=/^island:(\d+)$/.exec(o.data);if(i)t={n:Number(i[1]),start:o};else if(o.data==="/island"&&t)e.set(t.n,[t.start,o]),t=void 0}return e}function Ue(e){let n=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),t=fn();for(let[o,{m:i,e:r,p:s}]of n.entries()){let a=e[i]?.[r],_=t.get(o);if(typeof a!=="function"||!_)throw Error(`island ${o} (${r}) is missing from the page`);fe(J(a,s),cn(..._))}}/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var M,y,pe,Fe,X=0,Qe=[],C=p,{__b:We,__r:Le,diffed:Be,__c:je,unmount:Ve,__:ze}=C;function Z(e,n){C.__h&&C.__h(y,e,X||n),X=0;var t=y.__H||(y.__H={__:[],__h:[]});return e>=t.__.length&&t.__.push({}),t.__[e]}function me(e){return X=1,pn(Je,e)}function pn(e,n,t){var o=Z(M++,2);if(o.t=e,!o.__c&&(o.__=[t?t(n):Je(void 0,n),function(a){var _=o.__N?o.__N[0]:o.__[0],u=o.t(_,a);_!==u&&(o.__N=[u,o.__[1]],o.__c.setState({}))}],o.__c=y,!y.__f)){var i=function(a,_,u){if(!o.__c.__H)return!0;var f=!1,d=o.__c.props!==a;if(o.__c.__H.__.some(function(c){if(c.__N){f=!0;var v=c.__[0];c.__=c.__N,c.__N=void 0,v!==c.__[0]&&(d=!0)}}),r){var l=r.call(this,a,_,u);return f?l||d:l}return!f||d};y.__f=!0;var r=y.shouldComponentUpdate,s=y.componentWillUpdate;y.componentWillUpdate=function(a,_,u){if(this.__e){var f=r;r=void 0,i(a,_,u),r=f}s&&s.call(this,a,_,u)},y.shouldComponentUpdate=i}return o.__N||o.__}function A(e,n){var t=Z(M++,3);!C.__s&&ye(t.__H,n)&&(t.__=e,t.u=n,y.__H.__h.push(t))}function he(e,n){var t=Z(M++,4);!C.__s&&ye(t.__H,n)&&(t.__=e,t.u=n,y.__h.push(t))}function S(e){return X=5,G(function(){return{current:e}},[])}function G(e,n){var t=Z(M++,7);return ye(t.__H,n)&&(t.__=e(),t.__H=n,t.__h=e),t.__}function dn(){for(var e;e=Qe.shift();){var n=e.__H;if(e.__P&&n)try{n.__h.some(K),n.__h.some(de),n.__h=[]}catch(t){n.__h=[],C.__e(t,e.__v)}}}C.__b=function(e){y=null,We&&We(e)},C.__=function(e,n){e&&n.__k&&n.__k.__m&&(e.__m=n.__k.__m),ze&&ze(e,n)},C.__r=function(e){Le&&Le(e),M=0;var n=(y=e.__c).__H;n&&(pe===y?(n.__h=[],y.__h=[],n.__.some(function(t){t.__N&&(t.__=t.__N),t.u=t.__N=void 0})):(n.__h.some(K),n.__h.some(de),n.__h=[],M=0)),pe=y},C.diffed=function(e){Be&&Be(e);var n=e.__c;n&&n.__H&&(n.__H.__h.length&&(Qe.push(n)!==1&&Fe===C.requestAnimationFrame||((Fe=C.requestAnimationFrame)||mn)(dn)),n.__H.__.some(function(t){t.u&&(t.__H=t.u,t.u=void 0)})),pe=y=null},C.__c=function(e,n){n.some(function(t){try{t.__h.some(K),t.__h=t.__h.filter(function(o){return!o.__||de(o)})}catch(o){n.some(function(i){i.__h&&(i.__h=[])}),n=[],C.__e(o,t.__v)}}),je&&je(e,n)},C.unmount=function(e){Ve&&Ve(e);var n,t=e.__c;t&&t.__H&&(t.__H.__.some(function(o){try{K(o)}catch(i){n=i}}),t.__H=void 0,n&&C.__e(n,t.__v))};var qe=typeof requestAnimationFrame=="function";function mn(e){var n,t=function(){clearTimeout(o),qe&&cancelAnimationFrame(n),setTimeout(e)},o=setTimeout(t,35);qe&&(n=requestAnimationFrame(t))}function K(e){var n=y,t=e.__c;typeof t=="function"&&(e.__c=void 0,t()),y=n}function de(e){var n=y;e.__c=e.__(),y=n}function ye(e,n){return!e||e.length!==n.length||n.some(function(t,o){return t!==e[o]})}function Je(e,n){return typeof n=="function"?n(e):n}/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var hn=0;function h(e,n,t,o,i,r){n||(n={});var s,a,_=n;if("ref"in _)for(a in _={},n)a=="ref"?s=n[a]:_[a]=n[a];var u={type:e,props:_,key:t,ref:s,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--hn,__i:-1,__u:0,__source:i,__self:r};if(typeof e=="function"&&(s=e.defaultProps))for(a in s)_[a]===void 0&&(_[a]=s[a]);return p.vnode&&p.vnode(u),u}function Ke({option:e,label:n,class:t,id:o}){let i=S(null),r=S(null);return A(()=>{if(r.current)r.current.set(e);else if(i.current)r.current=window.Plot.make(i.current,e)},[e]),A(()=>()=>{r.current?.dispose(),r.current=null},[]),h("div",{ref:i,class:t?`chart plot ${t}`:"chart plot",id:o,role:"img","aria-label":n})}function Y(e){if(Array.isArray(e))return e.map(Y);if(e!==null&&typeof e==="object"&&Object.getPrototypeOf(e)===Object.prototype)return Object.fromEntries(Object.entries(e).map(([n,t])=>[n,Y(t)]));return e}function ee({option:e,label:n,class:t,id:o,setup:i}){let r=S(null),s=S(null),a=S(i);return a.current=i,A(()=>{if(s.current)s.current.set(Y(e),["series"]);else if(r.current)s.current=Charts.make(r.current,Y(e),(_)=>a.current?.(_))},[e]),A(()=>()=>{s.current?.dispose(),s.current=null},[]),h("div",{ref:r,class:t?`chart ${t}`:"chart",id:o,role:"img","aria-label":n})}var yn=(e)=>e instanceof CustomEvent&&typeof e.detail?.step==="number";function be({children:e,captions:n,start:t,label:o,class:i="fig",id:r,onStep:s}){let a=S(null),_=S(s);return _.current=s,he(()=>{let u=a.current,f=(d)=>{if(yn(d)&&d.target===u)_.current?.(d.detail.step,d.detail.steps)};return u?.addEventListener("stepchange",f),()=>u?.removeEventListener("stepchange",f)},[]),he(()=>{if(a.current&&typeof Steps<"u")Steps.refresh(a.current)}),h("figure",{ref:a,class:i,id:r,"data-stepper":"","data-start":t,"aria-label":o,children:[e,n&&h("ol",{"data-captions":"",children:n.map((u)=>h("li",{children:u}))})]})}var Xe=Array.from({length:24},(e,n)=>n),vn=(e)=>Math.max(0,4.800000000000001*Math.sin(Math.PI*(e-6)/14)),gn=(e)=>0.35+(e===7||e===8?0.8:0)+(e>=18&&e<=21?1.2:0);function bn(e){let n=e*0.2;return Xe.map((t)=>{let o=vn(t)-gn(t),i=o>0?Math.min(o,e-n):-Math.min(-o,n);return n+=i,{h:t,charge:n,bought:o<0?-o+i:0}})}var ne=[{name:"Morning",end:10},{name:"Midday",end:15},{name:"Evening",end:22},{name:"Night",end:24}],Cn=[0,5,10],te=(e)=>`${e.toFixed(1)} kWh`;function wn(){let[e,n]=me(5),[t,o]=me(ne.length),i=G(()=>bn(e),[e]),r=ne[t-1]?.end??24,s=i.slice(0,r),a=s.reduce((u,f)=>u+f.bought,0),_=G(()=>({grid:{top:40,left:8,right:16,bottom:8},legend:{top:8,left:8},xAxis:{type:"category",data:Xe.map((u)=>`${u}:00`)},yAxis:{type:"value",max:10,axisLabel:{formatter:"{value} kWh"}},series:[{name:"In the battery",type:"line",areaStyle:{opacity:0.25},showSymbol:!1,color:"var(--accent)",data:s.map((u)=>+u.charge.toFixed(2))},{name:"Bought",type:"bar",color:"var(--bad)",data:s.map((u)=>+u.bought.toFixed(2))}]}),[s]);return h(be,{id:"day",label:"A summer day, phase by phase",onStep:o,captions:ne.map((u,f)=>`${u.name}, to ${u.end}:00: ${te(i[u.end-1]?.charge??0)} in the battery, ${te(i.slice(ne[f-1]?.end??0,u.end).reduce((d,l)=>d+l.bought,0))} bought.`),children:[h("div",{class:"controls",children:h("div",{class:"seg",role:"radiogroup","aria-label":"Battery size",children:Cn.map((u)=>h("label",{children:[h("input",{type:"radio",name:"day-size",id:`day-size-${u}`,value:u,checked:u===e,onChange:()=>n(u)}),h("span",{children:u?`${u} kWh`:"None"})]}))})}),h("dl",{class:"stats",children:[h("div",{class:"stat",children:[h("dt",{children:"Bought so far"}),h("dd",{children:te(a)})]}),h("div",{class:"stat",children:[h("dt",{children:"In the battery"}),h("dd",{children:te(s.at(-1)?.charge??0)})]})]}),h(ee,{label:"Battery charge and grid purchases by hour",option:_})]})}Ue([ve,ge,Ce]);})();
+<script>(()=>{var Ze=Object.defineProperty;var Ge=(e)=>e;function Ye(e,n){this[e]=Ge.bind(null,n)}var oe=(e,n)=>{for(var t in n)Ze(e,t,{get:n[t],enumerable:!0,configurable:!0,set:Ye.bind(n,t)})};var ye={};oe(ye,{Plot:()=>Ke});var ge={};oe(ge,{Chart:()=>ee});var Ce={};oe(Ce,{Day:()=>wn});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var q,p,Ee,en,E,ke,Te,Ne,ie,W,O,He,ue,le,se,nn,j={},V=[],tn=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,Q=Array.isArray;function P(e,n){for(var t in n)e[t]=n[t];return e}function ae(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function J(e,n,t){var o,i,r,s={};for(r in n)r=="key"?o=n[r]:r=="ref"?i=n[r]:s[r]=n[r];if(arguments.length>2&&(s.children=arguments.length>3?q.call(arguments,2):t),typeof e=="function"&&e.defaultProps!=null)for(r in e.defaultProps)s[r]===void 0&&(s[r]=e.defaultProps[r]);return L(e,s,o,i,null)}function L(e,n,t,o,i){var r={type:e,props:n,key:t,ref:o,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:i==null?++Ee:i,__i:-1,__u:0};return i==null&&p.vnode!=null&&p.vnode(r),r}function I(e){return e.children}function B(e,n){this.props=e,this.context=n}function N(e,n){if(n==null)return e.__?N(e.__,e.__i+1):null;for(var t;n<e.__k.length;n++)if((t=e.__k[n])!=null&&t.__e!=null)return t.__e;return typeof e.type=="function"?N(e):null}function rn(e){if(e.__P&&e.__d){var n=e.__v,t=n.__e,o=[],i=[],r=P({},n);r.__v=n.__v+1,p.vnode&&p.vnode(r),_e(e.__P,r,n,e.__n,e.__P.namespaceURI,32&n.__u?[t]:null,o,t==null?N(n):t,!!(32&n.__u),i),r.__v=n.__v,r.__.__k[r.__i]=r,Re(o,r,i),n.__e=n.__=null,r.__e!=t&&Ie(r)}}function Ie(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(n){if(n!=null&&n.__e!=null)return e.__e=e.__c.base=n.__e}),Ie(e)}function xe(e){(!e.__d&&(e.__d=!0)&&E.push(e)&&!z.__r++||ke!=p.debounceRendering)&&((ke=p.debounceRendering)||Te)(z)}function z(){try{for(var e,n=1;E.length;)E.length>n&&E.sort(Ne),e=E.shift(),n=E.length,rn(e)}finally{E.length=z.__r=0}}function Me(e,n,t,o,i,r,s,a,_,u,f){var d,l,c,y,w,b,g=o&&o.__k||V,m=n.length;for(_=on(t,n,g,_,m),d=0;d<m;d++)(c=t.__k[d])!=null&&(l=c.__i!=-1&&g[c.__i]||j,c.__i=d,b=_e(e,c,l,i,r,s,a,_,u,f),y=c.__e,c.ref&&l.ref!=c.ref&&(l.ref&&ce(l.ref,null,c),f.push(c.ref,c.__c||y,c)),w==null&&y!=null&&(w=y),4&c.__u?(_=Ae(c,_,e),l.__e&&(l.__e=null)):typeof c.type=="function"&&b!==void 0?_=b:y&&(_=y.nextSibling),c.__u&=-7);return t.__e=w,_}function on(e,n,t,o,i){var r,s,a,_,u,f=t.length,d=f,l=0;for(e.__k=Array(i),r=0;r<i;r++)(s=n[r])!=null&&typeof s!="boolean"&&typeof s!="function"?(typeof s=="string"||typeof s=="number"||typeof s=="bigint"||s.constructor==String?s=e.__k[r]=L(null,s,null,null,null):Q(s)?s=e.__k[r]=L(I,{children:s},null,null,null):s.constructor===void 0&&s.__b>0?s=e.__k[r]=L(s.type,s.props,s.key,s.ref?s.ref:null,s.__v):e.__k[r]=s,_=r+l,s.__=e,s.__b=e.__b+1,a=null,(u=s.__i=ln(s,t,_,d))!=-1&&(d--,(a=t[u])&&(a.__u|=2)),a==null||a.__v==null?(u==-1&&(i>f?l--:i<f&&l++),typeof s.type!="function"&&(s.__u|=4)):u!=_&&(u==_-1?l--:u==_+1?l++:(u>_?l--:l++,s.__u|=4))):e.__k[r]=null;if(d)for(r=0;r<f;r++)(a=t[r])!=null&&(2&a.__u)==0&&(a.__e==o&&(o=N(a)),Oe(a,a));return o}function Ae(e,n,t){var o,i;if(typeof e.type=="function"){for(o=e.__k,i=0;o&&i<o.length;i++)o[i]&&(o[i].__=e,n=Ae(o[i],n,t));return n}e.__e!=n&&(n&&e.type&&!n.parentNode&&(n=N(e)),n=t.insertBefore(e.__e,n||null));do n=n&&n.nextSibling;while(n!=null&&n.nodeType==8);return n}function ln(e,n,t,o){var i,r,s,{key:a,type:_}=e,u=n[t],f=u!=null&&(2&u.__u)==0;if(u===null&&a==null||f&&a==u.key&&_==u.type)return t;if(o>(f?1:0)){for(i=t-1,r=t+1;i>=0||r<n.length;)if((u=n[s=i>=0?i--:r++])!=null&&(2&u.__u)==0&&a==u.key&&_==u.type)return s}return-1}function Se(e,n,t){n[0]=="-"?e.setProperty(n,t==null?"":t):e[n]=t==null?"":typeof t!="number"||tn.test(n)?t:t+"px"}function F(e,n,t,o,i){var r,s;e:if(n=="style")if(typeof t=="string")e.style.cssText=t;else{if(typeof o=="string"&&(e.style.cssText=o=""),o)for(n in o)t&&n in t||Se(e.style,n,"");if(t)for(n in t)o&&t[n]==o[n]||Se(e.style,n,t[n])}else if(n[0]=="o"&&n[1]=="n")r=n!=(n=n.replace(He,"$1")),s=n.toLowerCase(),n=s in e||n=="onFocusOut"||n=="onFocusIn"?s.slice(2):n.slice(2),e.l||(e.l={}),e.l[n+r]=t,t?o?t[O]=o[O]:(t[O]=ue,e.addEventListener(n,r?se:le,r)):e.removeEventListener(n,r?se:le,r);else{if(i=="http://www.w3.org/2000/svg")n=n.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(n!="width"&&n!="height"&&n!="href"&&n!="list"&&n!="form"&&n!="tabIndex"&&n!="download"&&n!="rowSpan"&&n!="colSpan"&&n!="role"&&n!="popover"&&n in e)try{e[n]=t==null?"":t;break e}catch(a){}typeof t=="function"||(t==null||t===!1&&n[4]!="-"?e.removeAttribute(n):e.setAttribute(n,n=="popover"&&t==1?"":t))}}function Pe(e){return function(n){if(this.l){var t=this.l[n.type+e];if(n[W]==null)n[W]=ue++;else if(n[W]<t[O])return;return t(p.event?p.event(n):n)}}}function _e(e,n,t,o,i,r,s,a,_,u){var f,d,l,c,y,w,b,g,m,k,R,T,D,we,U,re,x=n.type;if(n.constructor!==void 0)return null;128&t.__u&&(_=!!(32&t.__u),r=[a=n.__e=t.__e]),(f=p.__b)&&f(n);e:if(typeof x=="function"){d=s.length;try{if(m=n.props,k=x.prototype&&x.prototype.render,R=(f=x.contextType)&&o[f.__c],T=f?R?R.props.value:f.__:o,t.__c?g=(l=n.__c=t.__c).__=l.__E:(k?n.__c=l=new x(m,T):(n.__c=l=new B(m,T),l.constructor=x,l.render=un),R&&R.sub(l),l.state||(l.state={}),l.__n=o,c=l.__d=!0,l.__h=[],l._sb=[]),k&&l.__s==null&&(l.__s=l.state),k&&x.getDerivedStateFromProps!=null&&(l.__s==l.state&&(l.__s=P({},l.__s)),P(l.__s,x.getDerivedStateFromProps(m,l.__s))),y=l.props,w=l.state,l.__v=n,c)k&&x.getDerivedStateFromProps==null&&l.componentWillMount!=null&&l.componentWillMount(),k&&l.componentDidMount!=null&&l.__h.push(l.componentDidMount);else{if(k&&x.getDerivedStateFromProps==null&&m!==y&&l.componentWillReceiveProps!=null&&l.componentWillReceiveProps(m,T),n.__v==t.__v||!l.__e&&l.shouldComponentUpdate!=null&&l.shouldComponentUpdate(m,l.__s,T)===!1){n.__v!=t.__v&&(l.props=m,l.state=l.__s,l.__d=!1),n.__e=t.__e,n.__k=t.__k,n.__k.some(function(H){H&&(H.__=n)}),V.push.apply(l.__h,l._sb),l._sb=[],l.__h.length&&s.push(l),a=N(t);break e}l.componentWillUpdate!=null&&l.componentWillUpdate(m,l.__s,T),k&&l.componentDidUpdate!=null&&l.__h.push(function(){l.componentDidUpdate(y,w,b)})}if(l.context=T,l.props=m,l.__P=e,l.__e=!1,D=p.__r,we=0,k)l.state=l.__s,l.__d=!1,D&&D(n),f=l.render(l.props,l.state,l.context),V.push.apply(l.__h,l._sb),l._sb=[];else do l.__d=!1,D&&D(n),f=l.render(l.props,l.state,l.context),l.state=l.__s;while(l.__d&&++we<25);l.state=l.__s,l.getChildContext!=null&&(o=P(P({},o),l.getChildContext())),k&&!c&&l.getSnapshotBeforeUpdate!=null&&(b=l.getSnapshotBeforeUpdate(y,w)),U=f!=null&&f.type===I&&f.key==null?De(f.props.children):f,a=Me(e,Q(U)?U:[U],n,t,o,i,r,s,a,_,u),l.base=n.__e,n.__u&=-161,l.__h.length&&s.push(l),g&&(l.__E=l.__=null)}catch(H){if(s.length=d,n.__v=null,_||r!=null){if(H.then){for(n.__u|=_?160:128;a&&a.nodeType==8&&a.nextSibling;)a=a.nextSibling;r!=null&&(r[r.indexOf(a)]=null),n.__e=a}else if(r!=null)for(re=r.length;re--;)ae(r[re])}else n.__e=t.__e;n.__k==null&&(n.__k=t.__k||[]),H.then||$e(n),p.__e(H,n,t)}}else r==null&&n.__v==t.__v?(n.__k=t.__k,n.__e=t.__e):a=n.__e=sn(t.__e,n,t,o,i,r,s,_,u);return(f=p.diffed)&&f(n),128&n.__u?void 0:a}function $e(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some($e))}function Re(e,n,t){for(var o=0;o<t.length;o++)ce(t[o],t[++o],t[++o]);p.__c&&p.__c(n,e),e.some(function(i){try{e=i.__h,i.__h=[],e.some(function(r){r.call(i)})}catch(r){p.__e(r,i.__v)}})}function De(e){return typeof e!="object"||e==null||e.__b>0?e:Q(e)?e.map(De):e.constructor!==void 0?null:P({},e)}function sn(e,n,t,o,i,r,s,a,_){var u,f,d,l,c,y,w,b=t.props||j,{props:g,type:m}=n;if(m=="svg"?i="http://www.w3.org/2000/svg":m=="math"?i="http://www.w3.org/1998/Math/MathML":i||(i="http://www.w3.org/1999/xhtml"),r!=null){for(u=0;u<r.length;u++)if((c=r[u])&&"setAttribute"in c==!!m&&(m?c.localName==m:c.nodeType==3)){e=c,r[u]=null;break}}if(e==null){if(m==null)return document.createTextNode(g);e=document.createElementNS(i,m,g.is&&g),a&&(p.__m&&p.__m(n,r),a=!1),r=null}if(m==null)b===g||a&&e.data==g||(e.data=g);else{if(r=m=="textarea"&&g.defaultValue!=null?null:r&&q.call(e.childNodes),!a&&r!=null)for(b={},u=0;u<e.attributes.length;u++)b[(c=e.attributes[u]).name]=c.value;for(u in b)c=b[u],u=="dangerouslySetInnerHTML"?d=c:u=="children"||(u in g)||u=="value"&&("defaultValue"in g)||u=="checked"&&("defaultChecked"in g)||F(e,u,null,c,i);for(u in g)c=g[u],u=="children"?l=c:u=="dangerouslySetInnerHTML"?f=c:u=="value"?y=c:u=="checked"?w=c:a&&typeof c!="function"||b[u]===c||F(e,u,c,b[u],i);if(f)a||d&&(f.__html==d.__html||f.__html==e.innerHTML)||(e.innerHTML=f.__html),n.__k=[];else if(d&&(e.innerHTML=""),Me(n.type=="template"?e.content:e,Q(l)?l:[l],n,t,o,m=="foreignObject"?"http://www.w3.org/1999/xhtml":i,r,s,r?r[0]:t.__k&&N(t,0),a,_),r!=null)for(u=r.length;u--;)ae(r[u]);a&&m!="textarea"||(u="value",m=="progress"&&y==null?e.removeAttribute("value"):y!=null&&(y!==e[u]||m=="progress"&&!y||m=="option"&&y!=b[u])&&F(e,u,y,b[u],i),u="checked",w!=null&&w!=e[u]&&F(e,u,w,b[u],i))}return e}function ce(e,n,t){try{if(typeof e=="function"){var o=typeof e.__u=="function";o&&e.__u(),o&&n==null||(e.__u=e(n))}else e.current=n}catch(i){p.__e(i,t)}}function Oe(e,n,t){var o,i;if(p.unmount&&p.unmount(e),(o=e.ref)&&(o.current&&o.current!=e.__e||ce(o,null,n)),(o=e.__c)!=null){if(o.componentWillUnmount)try{o.componentWillUnmount()}catch(r){p.__e(r,n)}o.base=o.__P=o.__n=null}if(o=e.__k)for(i=0;i<o.length;i++)o[i]&&Oe(o[i],n,t||typeof e.type!="function");t||ae(e.__e),e.__c=e.__=e.__e=void 0}function un(e,n,t){return this.constructor(e,t)}function an(e,n,t){var o,i,r,s;n==document&&(n=document.documentElement),p.__&&p.__(e,n),i=(o=typeof t=="function")?null:t&&t.__k||n.__k,r=[],s=[],_e(n,e=(!o&&t||n).__k=J(I,null,[e]),i||j,j,n.namespaceURI,!o&&t?[t]:i?null:n.firstChild?q.call(n.childNodes):null,r,!o&&t?t:i?i.__e:n.firstChild,o,s),Re(r,e,s),e.props.children=null}function fe(e,n){an(e,n,fe)}q=V.slice,p={__e:function(e,n,t,o){for(var i,r,s;n=n.__;)if((i=n.__c)&&!i.__)try{if((r=i.constructor)&&r.getDerivedStateFromError!=null&&(i.setState(r.getDerivedStateFromError(e)),s=i.__d),i.componentDidCatch!=null&&(i.componentDidCatch(e,o||{}),s=i.__d),s)return i.__E=i}catch(a){e=a}throw e}},Ee=0,en=function(e){return e!=null&&e.constructor===void 0},B.prototype.setState=function(e,n){var t;t=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=P({},this.state),typeof e=="function"&&(e=e(P({},t),this.props)),e&&P(t,e),e!=null&&this.__v&&(n&&this._sb.push(n),xe(this))},B.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),xe(this))},B.prototype.render=I,E=[],Te=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,Ne=function(e,n){return e.__v.__b-n.__v.__b},z.__r=0,ie=Math.random().toString(8),W="__d"+ie,O="__a"+ie,He=/(PointerCapture)$|Capture$/i,ue=0,le=Pe(!1),se=Pe(!0),nn=0;var _n=p.vnode;p.vnode=(e)=>{if(typeof e.type==="string"){let n=e.props;for(let t of Object.keys(n))if(t.startsWith("data-")&&n[t]===!0)n[t]=""}_n?.(e)};function cn(e,n){let t=n.parentNode;if(!t)throw Error("island marker without a parent");let o=()=>{let r=[];for(let s=e.nextSibling;s&&s!==n;s=s.nextSibling)r.push(s);return r},i=(r)=>r;return{nodeType:1,parentNode:t,get firstChild(){return o()[0]??null},get childNodes(){return o()},contains:(r)=>o().some((s)=>r!==null&&s.contains(i(r))),insertBefore:(r,s)=>t.insertBefore(i(r),s?i(s):n),appendChild:(r)=>t.insertBefore(i(r),n),removeChild:(r)=>t.removeChild(i(r))}}function fn(){let e=new Map,n=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),t;for(let o=n.nextNode();o;o=n.nextNode()){if(!(o instanceof Comment))continue;let i=/^island:(\d+)$/.exec(o.data);if(i)t={n:Number(i[1]),start:o};else if(o.data==="/island"&&t)e.set(t.n,[t.start,o]),t=void 0}return e}function Ue(e){let n=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),t=fn();for(let[o,{m:i,e:r,p:s}]of n.entries()){let a=e[i]?.[r],_=t.get(o);if(typeof a!=="function"||!_)throw Error(`island ${o} (${r}) is missing from the page`);fe(J(a,s),cn(..._))}}/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var M,v,pe,Fe,X=0,Qe=[],C=p,{__b:We,__r:Le,diffed:Be,__c:je,unmount:Ve,__:ze}=C;function Z(e,n){C.__h&&C.__h(v,e,X||n),X=0;var t=v.__H||(v.__H={__:[],__h:[]});return e>=t.__.length&&t.__.push({}),t.__[e]}function me(e){return X=1,pn(Je,e)}function pn(e,n,t){var o=Z(M++,2);if(o.t=e,!o.__c&&(o.__=[t?t(n):Je(void 0,n),function(a){var _=o.__N?o.__N[0]:o.__[0],u=o.t(_,a);_!==u&&(o.__N=[u,o.__[1]],o.__c.setState({}))}],o.__c=v,!v.__f)){var i=function(a,_,u){if(!o.__c.__H)return!0;var f=!1,d=o.__c.props!==a;if(o.__c.__H.__.some(function(c){if(c.__N){f=!0;var y=c.__[0];c.__=c.__N,c.__N=void 0,y!==c.__[0]&&(d=!0)}}),r){var l=r.call(this,a,_,u);return f?l||d:l}return!f||d};v.__f=!0;var r=v.shouldComponentUpdate,s=v.componentWillUpdate;v.componentWillUpdate=function(a,_,u){if(this.__e){var f=r;r=void 0,i(a,_,u),r=f}s&&s.call(this,a,_,u)},v.shouldComponentUpdate=i}return o.__N||o.__}function A(e,n){var t=Z(M++,3);!C.__s&&ve(t.__H,n)&&(t.__=e,t.u=n,v.__H.__h.push(t))}function he(e,n){var t=Z(M++,4);!C.__s&&ve(t.__H,n)&&(t.__=e,t.u=n,v.__h.push(t))}function S(e){return X=5,G(function(){return{current:e}},[])}function G(e,n){var t=Z(M++,7);return ve(t.__H,n)&&(t.__=e(),t.__H=n,t.__h=e),t.__}function dn(){for(var e;e=Qe.shift();){var n=e.__H;if(e.__P&&n)try{n.__h.some(K),n.__h.some(de),n.__h=[]}catch(t){n.__h=[],C.__e(t,e.__v)}}}C.__b=function(e){v=null,We&&We(e)},C.__=function(e,n){e&&n.__k&&n.__k.__m&&(e.__m=n.__k.__m),ze&&ze(e,n)},C.__r=function(e){Le&&Le(e),M=0;var n=(v=e.__c).__H;n&&(pe===v?(n.__h=[],v.__h=[],n.__.some(function(t){t.__N&&(t.__=t.__N),t.u=t.__N=void 0})):(n.__h.some(K),n.__h.some(de),n.__h=[],M=0)),pe=v},C.diffed=function(e){Be&&Be(e);var n=e.__c;n&&n.__H&&(n.__H.__h.length&&(Qe.push(n)!==1&&Fe===C.requestAnimationFrame||((Fe=C.requestAnimationFrame)||mn)(dn)),n.__H.__.some(function(t){t.u&&(t.__H=t.u,t.u=void 0)})),pe=v=null},C.__c=function(e,n){n.some(function(t){try{t.__h.some(K),t.__h=t.__h.filter(function(o){return!o.__||de(o)})}catch(o){n.some(function(i){i.__h&&(i.__h=[])}),n=[],C.__e(o,t.__v)}}),je&&je(e,n)},C.unmount=function(e){Ve&&Ve(e);var n,t=e.__c;t&&t.__H&&(t.__H.__.some(function(o){try{K(o)}catch(i){n=i}}),t.__H=void 0,n&&C.__e(n,t.__v))};var qe=typeof requestAnimationFrame=="function";function mn(e){var n,t=function(){clearTimeout(o),qe&&cancelAnimationFrame(n),setTimeout(e)},o=setTimeout(t,35);qe&&(n=requestAnimationFrame(t))}function K(e){var n=v,t=e.__c;typeof t=="function"&&(e.__c=void 0,t()),v=n}function de(e){var n=v;e.__c=e.__(),v=n}function ve(e,n){return!e||e.length!==n.length||n.some(function(t,o){return t!==e[o]})}function Je(e,n){return typeof n=="function"?n(e):n}/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var hn=0;function h(e,n,t,o,i,r){n||(n={});var s,a,_=n;if("ref"in _)for(a in _={},n)a=="ref"?s=n[a]:_[a]=n[a];var u={type:e,props:_,key:t,ref:s,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--hn,__i:-1,__u:0,__source:i,__self:r};if(typeof e=="function"&&(s=e.defaultProps))for(a in s)_[a]===void 0&&(_[a]=s[a]);return p.vnode&&p.vnode(u),u}function Ke({option:e,label:n,class:t,id:o}){let i=S(null),r=S(null);return A(()=>{if(r.current)r.current.set(e);else if(i.current)r.current=window.Plot.make(i.current,e)},[e]),A(()=>()=>{r.current?.dispose(),r.current=null},[]),h("div",{ref:i,class:t?`chart plot ${t}`:"chart plot",id:o,role:"img","aria-label":n})}function Y(e){if(Array.isArray(e))return e.map(Y);if(e!==null&&typeof e==="object"&&Object.getPrototypeOf(e)===Object.prototype)return Object.fromEntries(Object.entries(e).map(([n,t])=>[n,Y(t)]));return e}function ee({option:e,label:n,class:t,id:o,setup:i}){let r=S(null),s=S(null),a=S(i);return a.current=i,A(()=>{if(s.current)s.current.set(Y(e),["series"]);else if(r.current)s.current=Charts.make(r.current,Y(e),(_)=>a.current?.(_))},[e]),A(()=>()=>{s.current?.dispose(),s.current=null},[]),h("div",{ref:r,class:t?`chart ${t}`:"chart",id:o,role:"img","aria-label":n})}var vn=(e)=>e instanceof CustomEvent&&typeof e.detail?.step==="number";function be({children:e,captions:n,start:t,label:o,class:i="fig",id:r,onStep:s}){let a=S(null),_=S(s);return _.current=s,he(()=>{let u=a.current,f=(d)=>{if(vn(d)&&d.target===u)_.current?.(d.detail.step,d.detail.steps)};return u?.addEventListener("stepchange",f),()=>u?.removeEventListener("stepchange",f)},[]),he(()=>{if(a.current&&typeof Steps<"u")Steps.refresh(a.current)}),h("figure",{ref:a,class:i,id:r,"data-stepper":"","data-start":t,"aria-label":o,children:[e,n&&h("ol",{"data-captions":"",children:n.map((u)=>h("li",{children:u}))})]})}var Xe=Array.from({length:24},(e,n)=>n),yn=(e)=>Math.max(0,4.800000000000001*Math.sin(Math.PI*(e-6)/14)),gn=(e)=>0.35+(e===7||e===8?0.8:0)+(e>=18&&e<=21?1.2:0);function bn(e){let n=e*0.2;return Xe.map((t)=>{let o=yn(t)-gn(t),i=o>0?Math.min(o,e-n):-Math.min(-o,n);return n+=i,{h:t,charge:n,bought:o<0?-o+i:0}})}var ne=[{name:"Morning",end:10},{name:"Midday",end:15},{name:"Evening",end:22},{name:"Night",end:24}],Cn=[0,5,10],te=(e)=>`${e.toFixed(1)} kWh`;function wn(){let[e,n]=me(5),[t,o]=me(ne.length),i=G(()=>bn(e),[e]),r=ne[t-1]?.end??24,s=i.slice(0,r),a=s.reduce((u,f)=>u+f.bought,0),_=G(()=>({grid:{top:40,left:8,right:16,bottom:8},legend:{top:8,left:8},xAxis:{type:"category",data:Xe.map((u)=>`${u}:00`)},yAxis:{type:"value",max:10,axisLabel:{formatter:"{value} kWh"}},series:[{name:"In the battery",type:"line",areaStyle:{opacity:0.25},showSymbol:!1,color:"var(--accent)",data:s.map((u)=>+u.charge.toFixed(2))},{name:"Bought",type:"bar",color:"var(--bad)",data:s.map((u)=>+u.bought.toFixed(2))}]}),[s]);return h(be,{id:"day",label:"A summer day, phase by phase",onStep:o,captions:ne.map((u,f)=>`${u.name}, to ${u.end}:00: ${te(i[u.end-1]?.charge??0)} in the battery, ${te(i.slice(ne[f-1]?.end??0,u.end).reduce((d,l)=>d+l.bought,0))} bought.`),children:[h("div",{class:"controls",children:h("div",{class:"seg",role:"radiogroup","aria-label":"Battery size",children:Cn.map((u)=>h("label",{children:[h("input",{type:"radio",name:"day-size",id:`day-size-${u}`,value:u,checked:u===e,onChange:()=>n(u)}),h("span",{children:u?`${u} kWh`:"None"})]}))})}),h("dl",{class:"stats",children:[h("div",{class:"stat",children:[h("dt",{children:"Bought so far"}),h("dd",{children:te(a)})]}),h("div",{class:"stat",children:[h("dt",{children:"In the battery"}),h("dd",{children:te(s.at(-1)?.charge??0)})]})]}),h(ee,{label:"Battery charge and grid purchases by hour",option:_})]})}Ue([ye,ge,Ce]);})();
 </script>
 <script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
    its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
    A section (an overview section or a view) with two or more <details> of its own (at any depth, not inside a nested section)
-   gets one button just above the block holding its first fold: Expand all, which opens every level of nested folds (a .tree),
-   or Collapse all once every fold is open, which closes them all; it is kept in step when the reader opens folds one at a time.
+   gets one button just above the block holding its first fold, or at the end of the section's .toolbar when one comes before
+   that fold: Expand all, which opens every level of nested folds (a .tree), or Collapse all once every fold is open, which closes
+   them all; it is kept in step when the reader opens folds one at a time.
    Folds a view handler draws count from its next refresh. */
 window.ViewsFolds = (kitText) => {
   const buttons = new Map;
@@ -2688,6 +2846,22 @@ window.ViewsFolds = (kitText) => {
     buttons.set(section, button);
     return button;
   }
+  function toolbarBefore(fold, section) {
+    return [...section.querySelectorAll(".toolbar")].find((bar) => bar.closest("section") === section && Boolean(bar.compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING));
+  }
+  function place(button, fold, section) {
+    const toolbar = toolbarBefore(fold, section);
+    if (toolbar) {
+      if (toolbar.lastElementChild !== button) {
+        toolbar.append(button);
+      }
+      return;
+    }
+    const block = blockOf(fold, section);
+    if (button.nextElementSibling !== block) {
+      block.before(button);
+    }
+  }
   function blockOf(el, section) {
     let block = el;
     while (block.parentElement && block.parentElement !== section) {
@@ -2702,11 +2876,7 @@ window.ViewsFolds = (kitText) => {
         buttons.get(section)?.remove();
         continue;
       }
-      const button = buttons.get(section) ?? create(section);
-      const block = blockOf(first, section);
-      if (button.nextElementSibling !== block) {
-        block.before(button);
-      }
+      place(buttons.get(section) ?? create(section), first, section);
       sync(section);
     }
   };
@@ -3004,13 +3174,17 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
    its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
    data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
    link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
-   opens them at every level.
+   opens them at every level, at the end of the section's .toolbar when one comes before them.
    Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
    in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
-   its numbers, which line up in columns across rows and levels (--tree-cell on the .tree sets their width: 5rem, 4rem on
-   phones). A leaf opens to its full text. Give every row the same cells in the same order, units included; an empty
-   <span></span> keeps a column:
-     <div class="tree">
+   its numbers, which line up in columns across rows and levels. --tree-cols on the .tree gives one width per number column
+   (unset, each is 5rem, narrower where a deep row on a phone has no room); a .tree-head first in the tree names the label and
+   each column over the rows. On phones a row with two or more numbers puts them on a line under its label, in the same columns:
+   at the third level a 360-pixel phone leaves about 16rem for them and their 0.5rem gaps, and a width written as minmax(0, 4rem)
+   gives way where they do not fit. A leaf opens to its full text. Give every row the same cells in the same order, units
+   included; an empty <span></span> keeps a column:
+     <div class="tree" style="--tree-cols: 4rem 4rem">
+       <div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
        <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
          <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
          <a href="#task/1.1.2"><span>1.1.2 Power stage</span><span>24 h</span><span>Ana</span></a>
