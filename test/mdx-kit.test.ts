@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { ENGLISH, labelsScript, SLOVENIAN } from "./labels-contract.ts";
-import { pageAssertion, runCli, runPacked, SETTLED, scratch } from "./support.ts";
+import { pageAssertion, pageContract, runCli, runPacked, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -281,6 +281,43 @@ test("an .mdx page with lang and labels in its frontmatter shows every kit text 
 	expect(readFileSync(output, "utf8")).toContain('<html lang="sl">');
 	expect(await runPacked(output, { slowdown: 4 })).toEqual([]);
 }, 60_000);
+
+test("MDX records keep JSX category markers, a plain toolbar's Expand all, and numeric table alignment at 390px", async () => {
+	const source = `import { Tree } from "kit";
+
+# Records
+
+## Tasks
+
+<div class="toolbar"><input type="search" aria-label="Search" /><select aria-label="Owner"><option>All owners</option></select></div>
+
+<p class="legend"><span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span></p>
+
+<Tree cols="minmax(0, 4rem) minmax(0, 5rem)" head={["Task", "Hours", "Type"]} items={[
+  { label: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span>, cells: [70, null], items: [
+    { label: "Clocks", cells: [12, <span class="chip" style="--swatch: var(--c2)"><i></i>FW</span>], text: "Bring up the clocks." }
+  ] }
+]} />
+
+| Task | Hours |
+|---|---:|
+| Clocks | 12 |
+
+<script src="records.js"></script>
+`;
+	const script = pageContract({
+		"Expand all joins the plain toolbar": `document.querySelector(".toolbar").lastElementChild.matches(".fold-all")`,
+		"Expand all opens every row": `(document.querySelector(".fold-all").click(), [...document.querySelectorAll(".tree details")].every((d) => d.open))`,
+		"labels and cells keep their category words": `[...document.querySelectorAll(".tree .chip")].map((c) => c.textContent).join() === "Firmware,FW"`,
+		"the legend and the rows use the same swatch": `new Set([...document.querySelectorAll(".chip i")].map((i) => getComputedStyle(i).backgroundColor)).size === 1`,
+		"only the right-aligned column is numeric": `document.querySelectorAll(".compare .num").length === 2 && document.querySelector(".compare th.num") && document.querySelector(".compare td.num[data-label=Hours]")`,
+		"numeric alignment follows the kit on phones": `getComputedStyle(document.querySelector(".compare td.num")).textAlign === (innerWidth < 640 ? "start" : "end")`,
+		"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+	});
+	const { result, output } = await packMdx("records", source, { "records.js": script });
+	expect(result.code).toBe(0);
+	expect(await runPacked(output)).toEqual([]);
+}, 30_000);
 
 /** The study pattern of guide.md as an author writes it in MDX: an explanation in a textarea, the answer in a <details> after it. */
 const STUDY_PAGE = `import { Question } from "kit";

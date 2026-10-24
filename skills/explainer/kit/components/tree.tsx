@@ -14,6 +14,9 @@
               ref    data-ref on the row: with kit:link.js the row lights, and a closed fold that holds a lit row is tinted too
      cols   one width per number column (--tree-cols). Unset, each is 5rem, narrower where a deep row on a phone has no room
      head   the names of the label and of each column, over the rows
+   Labels and cells take JSX: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> marks a category; a
+   <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word or a short form:
+   colour alone does not tell the categories apart for every reader.
    The tree starts collapsed to its top level, and the deepest rows open in place to their text. On phones a row with two or more
    numbers puts them on a line under its label, in the same columns: at the third level a 360-pixel phone leaves about 16rem for
    them and their 0.5rem gaps, and a width written as minmax(0, 4rem) gives way where they do not fit. A section with the tree gets
