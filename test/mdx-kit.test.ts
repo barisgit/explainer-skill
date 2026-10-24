@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { ENGLISH, labelsScript, SLOVENIAN } from "./labels-contract.ts";
-import { runCli, runPacked, SETTLED, scratch } from "./support.ts";
+import { pageAssertion, runCli, runPacked, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -280,4 +280,58 @@ test("an .mdx page with lang and labels in its frontmatter shows every kit text 
 	expect(result.stderr).toBe("");
 	expect(readFileSync(output, "utf8")).toContain('<html lang="sl">');
 	expect(await runPacked(output, { slowdown: 4 })).toEqual([]);
+}, 60_000);
+
+/** The study pattern of guide.md as an author writes it in MDX: an explanation in a textarea, the answer in a <details> after it. */
+const STUDY_PAGE = `import { Question } from "kit";
+
+# Study
+
+## Why does the queue grow?
+
+<Question name="q1" legend="Which load makes the wait explode?" options={{ half: "50%", most: "90%" }} />
+
+<fieldset data-reply>
+<legend>Explain in one sentence why.</legend>
+<textarea id="q1-why" aria-label="Why"></textarea>
+</fieldset>
+
+<details>
+<summary>Answer</summary>
+
+At **90%** load the wait is *nine* service times.
+
+- one idle slot absorbs a burst
+
+</details>
+
+<script src="study.js"></script>
+`;
+
+test("the study pattern works as written in MDX: the reply holds the explanation, a reload keeps it, the answer's Markdown renders", async () => {
+	const probe = (name: string, body: string) =>
+		pageAssertion("study contract", name, `sessionStorage.loads !== "2" || (${body})`);
+	const script = `sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
+const why = () => document.getElementById("q1-why");
+${probe("the reload restores the explanation", 'why().value === "q"')}
+${probe("the reply holds the explanation", '(document.querySelector(".reply-bar .primary").click(), document.querySelector(".reply-md").textContent.includes("q"))')}
+${probe("the answer's Markdown renders", 'document.querySelector("details strong")?.textContent === "90%" && document.querySelector("details em") && document.querySelector("details li")')}`;
+	const { result, output } = await packMdx("study", STUDY_PAGE, { "study.js": script });
+	expect(result.code).toBe(0);
+	const html = readFileSync(output, "utf8");
+	expect(html).toContain(
+		'<fieldset data-reply><legend>Explain in one sentence why.</legend><textarea id="q1-why"',
+	);
+	const checked = await runCli([
+		"check",
+		output,
+		"--quick",
+		"--view",
+		"none",
+		"--out",
+		dir.path("study-shots"),
+		...["focus:#q1-why", "key:q", "reload"].flatMap((step) => ["--do", step]),
+	]);
+	expect(checked.stdout).not.toContain("study contract");
+	expect(checked.code).toBe(0);
 }, 60_000);
