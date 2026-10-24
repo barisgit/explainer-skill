@@ -22,7 +22,12 @@
    replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
    Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
    sections (method, sources) are set smaller with the heading in its own column.
-   Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
+   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
+   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
+   tr data-state="fit", "maybe" or "out" gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a
+   table on phones and scrolls sideways:
+     <table class="compare"><thead><tr><th>Store</th><th>Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td data-label="Latency">2 ms</td></tr></tbody></table>
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.

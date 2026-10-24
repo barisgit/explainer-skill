@@ -143,7 +143,7 @@
 	padding: 0.25rem 0 1rem;
 }
 
-/* Comparison matrix. Wide: a table. On phones each row becomes a stack of label/value lines; give every td a data-label.
+/* Comparison matrix; theme.css documents the markup. Wide: a table. On phones each row becomes a stack of label/value lines.
    class="compare table" keeps a real table on phones: wrap it in .scroll so it scrolls sideways (numeric data tables). */
 .scroll {
 	overflow-x: auto;
