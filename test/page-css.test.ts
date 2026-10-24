@@ -43,6 +43,37 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 		expect(warnings[0]).toContain("parts/theme/08-tree.css");
 	});
 
+	test("in the CSS an .mdx page imports, and not for the markup of the kit's components", async () => {
+		dir.write("own-mdx.css", `${OWN_TREE} .mine { color: red; }`);
+		const input = dir.write(
+			"collide.mdx",
+			`import "./own-mdx.css";
+import { Question, Tree, View } from "kit";
+
+# Own tree
+
+<ul class="tree"><li>a</li></ul>
+
+<Tree head={["Task", "Hours"]} items={[{ label: "One", cells: ["1 h"], text: "a" }]} />
+
+<Question name="q" legend="Pick" options={{ a: "A", b: "B" }} />
+
+<View name="v">
+
+# V
+
+</View>
+`,
+		);
+
+		const result = await runCli(["pack", input, "-o", dir.path("collide-mdx.out.html")]);
+
+		expect(result.code).toBe(0);
+		const warnings = result.stdout.split("\n").filter((line) => line.startsWith("warning:"));
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('"ul.tree" (own-mdx.css)');
+	});
+
 	test("not for a page that uses kit classes in markup and styles only its own classes, variants, parts and children of kit ones", async () => {
 		const input = dir.write(
 			"no-collide.html",
