@@ -17,7 +17,8 @@ skills/explainer/      the installable skill, copied as-is by installers: no dot
   kit/                 what pages reference as kit:<file>: theme.css, charts, plot, steps, link, views and reply as .ts sources that pages name .js, echarts.js (generated), fonts/, licenses/
     parts/<name>/      pieces of a kit file too long for one file (a script, or theme.css by concern); pack puts them in front of kit/<name> in file name order, so a page still includes one file
   vendor/beautiful-mermaid.js  generated (beautiful-mermaid, patched, with ELK); used by pack to render diagrams in-process, never inlined; its .d.ts beside it
-build/                 vendor.ts regenerates kit/echarts.js, vendor/beautiful-mermaid.js and the licence texts from the pinned devDependencies; geist-widths.ts measures the Geist advances the patch sizes diagram text with; verify-install.ts is the release check for the installers; media.ts (with media/) renders the README and gallery media
+  vendor/table-core.js generated (the TanStack Table parts kit/records uses, listed in build/table-core-entry.ts), one ES module; its .d.ts beside it
+build/                 vendor.ts regenerates kit/echarts.js, vendor/beautiful-mermaid.js, vendor/table-core.js and the licence texts from the pinned devDependencies; geist-widths.ts measures the Geist advances the patch sizes diagram text with; verify-install.ts is the release check for the installers; media.ts (with media/) renders the README and gallery media
 test/                  contract tests, outside the skill so installs do not ship them
 kit-types/             globals.d.ts: the window globals the kit scripts define (and echarts), for the kit typecheck only; outside the skill so installs do not ship it
 examples/              the public gallery, published as it is committed by .github/workflows/pages.yml (push to main)
@@ -42,7 +43,7 @@ Showcase assets stay in `examples/`, never in `skills/explainer/`, because insta
 | `bun run ci` | typecheck, lint, test: the gate; the same command runs in GitHub Actions |
 | `bun run verify:install` | Release check, not in `ci` (needs network and Chrome): installs from a clone of HEAD with `npx skills` and Caplet into a temp HOME, then runs `kit`, `pack`, `check` from each copy |
 | `bun run media [--keep] [example ...]` | Regenerates `examples/media/` (gallery thumbnails, hero collage, animated WebP clips) in light and dark from the packed `examples/<name>/index.html` pages; a full run replaces the directory. Scenes are data at the top of `build/media.ts`. Needs Chrome and ffmpeg with libwebp_anim; about two minutes |
-| `bun run vendor` | Regenerates the ECharts bundle, the beautiful-mermaid bundle and the licence texts (dev only) |
+| `bun run vendor` | Regenerates the ECharts bundle, the beautiful-mermaid bundle, the TanStack Table bundle and the licence texts (dev only) |
 | `bun skills/explainer/cli.ts kit \| pack \| check` | The skill's CLI; `--help` on any command |
 
 The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged files, then the typecheck; about 2 s, no Chrome. It keeps partially staged hunks. lint-staged backs up through `git stash`, which worktrees share, so run commits of different worktrees one at a time. Never use `--no-verify`.
@@ -58,7 +59,7 @@ The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged fi
 - Agent-facing text (SKILL.md, guide.md, kit file headers, CLI help) stays short and soft. A kit file's leading comment is its documentation: `kit <file>` prints it, and its first line (`name: description`) is the listing.
 - The kit's CSS ships in `@layer kit` (`readKitText` wraps it, internal order kept), so a page's own unlayered CSS always wins and one plain rule overrides the kit. The kit's `!important` rules (`[hidden]`, reduced motion, print, the other copy of an SVG file) therefore also beat a page's `!important`. The kit's other properties still reach a page element that carries a kit class, so `pack` warns when a page rule styles an element by a class the kit styles on its own (`collisions.ts` states the rule); the documented classes are no exception, since `.tree` was one when a page's own `.tree` was restyled (#51).
 - `pack` themes an SVG file in `<img>` without reading it as markup: the file stays an image (no script, network or page styling reaches it), packed twice as `img.light` and `img.dark` with a first `:where(:root)` rule that sets `color-scheme`, `color: var(--ink)` and the colour tokens copied from `theme.css`, and `theme.css` shows the copy for the scheme. A page's own token overrides do not reach the file; parts that must link or respond need inline SVG.
-- Credits stay: visual-explainer (MIT, Nico Bailon), ECharts (Apache-2.0), beautiful-mermaid (MIT, Craft Docs) with elkjs (EPL-2.0) and entities (BSD-2-Clause), Geist fonts (OFL); their licence texts ship in `kit/licenses/`. EPL-2.0 needs the source statement in `elkjs.txt` and the notice in the bundle header, both written by `build/vendor.ts`.
+- Credits stay: visual-explainer (MIT, Nico Bailon), ECharts (Apache-2.0), beautiful-mermaid (MIT, Craft Docs) with elkjs (EPL-2.0) and entities (BSD-2-Clause), TanStack Table with TanStack Store (MIT, Tanner Linsley), Geist fonts (OFL); their licence texts ship in `kit/licenses/`. EPL-2.0 needs the source statement in `elkjs.txt` and the notice in the bundle header, both written by `build/vendor.ts`.
 - No local-only dependencies at runtime: nothing but `kit/` and `vendor/` is needed after install, and Chrome for `check`.
 
 ## Limits
@@ -68,7 +69,7 @@ Biome (pinned 2.6.2) enforces the quality baseline at error: cognitive complexit
 - `kit/**/*.ts`: each file is one IIFE (a part is one function that hangs on `window` for its entry) that keeps its names out of the page's global scope, so the function-length rule sees one long function. The code inside is split into small functions.
 - `kit/theme.css` and `kit/parts/theme/*.css`: deliberate `!important` overrides (`[hidden]`, reduced motion, print) and selector orders whose properties are disjoint. Biome compares specificity only within one file, so the order across parts is checked by eye: the parts keep the cascade order of one stylesheet, and `theme.css` comes last.
 
-Excluded by path: `kit/echarts.js`, `vendor/beautiful-mermaid.js` (generated), HTML and Markdown.
+Excluded by path: `kit/echarts.js`, `vendor/beautiful-mermaid.js`, `vendor/table-core.js` (generated), HTML and Markdown.
 
 TypeScript uses `erasableSyntaxOnly`: no parameter properties, enums or namespaces, so node can strip types in `cli.ts` and Bun's transpiler can strip them from the kit.
 

@@ -138,6 +138,7 @@ Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are pub
 - [visual-explainer](https://github.com/nicobailon/visual-explainer) by Nico Bailon (MIT): the look and the reply flow.
 - [Apache ECharts](https://echarts.apache.org) (Apache-2.0), bundled in the kit.
 - [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) by Craft Docs (MIT), patched, with [ELK](https://github.com/kieler/elkjs) (EPL-2.0) and [entities](https://github.com/fb55/entities) (BSD-2-Clause): the Mermaid renderer `pack` uses, not shipped in pages.
+- [TanStack Table](https://tanstack.com/table) by Tanner Linsley (MIT), with TanStack Store (MIT): the sorting, filtering, grouping and facets of the records core.
 - [Geist and Geist Mono](https://vercel.com/font) by Vercel (SIL OFL 1.1).
 
 Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data).
