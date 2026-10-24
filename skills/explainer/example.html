@@ -100,9 +100,16 @@ flowchart TD
 			</figure>
 			<details>
 				<summary>Exact values</summary>
+				<!-- No control changes these rows, so they are written here: they show before scripts run and print. -->
 				<table class="compare">
-					<thead><tr><th>Fix</th><th>Barista busy</th><th>Average wait</th><th>Saved</th></tr></thead>
-					<tbody id="fix-rows"></tbody>
+					<thead><tr><th>Fix</th><th class="num">Barista busy</th><th class="num">Average wait</th><th class="num">Saved</th></tr></thead>
+					<tbody>
+						<tr data-state="out"><th scope="row"><a href="#fix/none">Change nothing</a></th><td class="num" data-label="Barista busy">90.0%</td><td class="num" data-label="Average wait">18.0 min</td><td class="num" data-label="Saved">0%</td></tr>
+						<tr data-state="maybe"><th scope="row"><a href="#fix/faster">Orders 10% quicker</a></th><td class="num" data-label="Barista busy">81.0%</td><td class="num" data-label="Average wait">7.7 min</td><td class="num" data-label="Saved">57%</td></tr>
+						<tr data-state="maybe"><th scope="row"><a href="#fix/steady">Every order exactly 2 min</a></th><td class="num" data-label="Barista busy">90.0%</td><td class="num" data-label="Average wait">9.0 min</td><td class="num" data-label="Saved">50%</td></tr>
+						<tr data-state="maybe"><th scope="row"><a href="#fix/fewer">10% fewer customers</a></th><td class="num" data-label="Barista busy">81.0%</td><td class="num" data-label="Average wait">8.5 min</td><td class="num" data-label="Saved">53%</td></tr>
+						<tr data-state="fit"><th scope="row"><a href="#fix/second">Second barista</a></th><td class="num" data-label="Barista busy">45.0%</td><td class="num" data-label="Average wait">30 s</td><td class="num" data-label="Saved">97%</td></tr>
+					</tbody>
 				</table>
 			</details>
 			<p class="caveat"><b>Inferred</b>Fixes are modelled, not observed. A real second barista shares one espresso machine, so expect less than the formula promises.</p>
@@ -284,9 +291,6 @@ const fixes = Charts.make(document.getElementById("fixes"), { tooltip: { show: f
 const redrawFixes = () => fixes.set(fixOption());
 document.getElementById("hide-none").addEventListener("change", redrawFixes);
 document.querySelectorAll('input[name="fview"]').forEach((r) => r.addEventListener("change", redrawFixes));
-document.getElementById("fix-rows").innerHTML = fixList.map((f) => `<tr data-state="${f.id === "second" ? "fit" : f.id === "none" ? "out" : "maybe"}">
-	<th scope="row"><a href="#fix/${f.id}">${f.name}</a></th><td data-label="Barista busy">${(f.busy * 100).toFixed(1)}%</td>
-	<td data-label="Average wait">${fmt(f.wait)}</td><td data-label="Saved">${Math.round((1 - f.wait / fixList[0].wait) * 100)}%</td></tr>`).join("");
 
 /* ---- Drill-down view: a pure function of the URL, so reload and Back work. ---- */
 Views.on("fix", (el, id) => {
