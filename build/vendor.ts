@@ -8,6 +8,8 @@
  *   vendor/preact/*.js            Preact, its hooks and JSX runtime, and preact-render-to-string, as ES modules that import "preact";
  *                                 pack bundles them into a page's prerender and its client components
  *   vendor/types/                Preact, ECharts and kit declarations for author typechecking
+ *   vendor/table-core.js          the TanStack Table parts the records core uses (build/table-core-entry.ts), one ES module,
+ *                                 with vendor/table-core.d.ts naming the same exports
  *   kit/licenses/*.txt            licence texts the bundles must carry
  *   vendor/math.js                remark-math and Temml, one ES module; used by `pack` to render $...$ to MathML, never inlined
  *   kit/parts/math/temml.css      Temml's stylesheet for system math fonts, and kit/fonts/temml.woff2, the font it names;
@@ -142,6 +144,23 @@ for (const file of declarations) {
 }
 copyFileSync(join(root, "kit-types/globals.d.ts"), join(skill, "vendor/types/globals.d.ts"));
 
+const [table, store] = await Promise.all(
+	["@tanstack/table-core", "@tanstack/store"].map(versionOf),
+);
+const tableEntry = join(import.meta.dir, "table-core-entry.ts");
+const tableHeader = `/*! @tanstack/table-core ${table} (MIT, Copyright (c) 2016 Tanner Linsley) with @tanstack/store ${store} (MIT, Copyright (c) 2021
+   Tanner Linsley): sorting, filtering, global filtering, grouping, aggregation and faceting, for the records core (kit/records).
+   Texts: kit/licenses/tanstack.txt. Rebuild with: bun run vendor */\n`;
+writeFileSync(
+	join(skill, "vendor/table-core.js"),
+	tableHeader + (await bundle(tableEntry, "browser", "esm")),
+);
+// The entry is the list of exports; as a declaration file it re-exports their types from the same pinned package.
+writeFileSync(
+	join(skill, "vendor/table-core.d.ts"),
+	`/** Types for vendor/table-core.js, written by build/vendor.ts from build/table-core-entry.ts. */\n${(await Bun.file(tableEntry).text()).replace(/^\/\*\*[\s\S]*?\*\/\n/, "")}`,
+);
+
 mkdirSync(join(skill, "kit/licenses"), { recursive: true });
 const licences: Record<string, Promise<string>[]> = {
 	"echarts.txt": [text("echarts", "LICENSE"), text("echarts", "NOTICE")],
@@ -165,6 +184,12 @@ const licences: Record<string, Promise<string>[]> = {
 			(licence) => `preact-render-to-string ${renderVersion}\n\n${licence.trim()}`,
 		),
 	],
+	"tanstack.txt": [
+		Promise.resolve(`@tanstack/table-core ${table}`),
+		text("@tanstack/table-core", "LICENSE"),
+		Promise.resolve(`@tanstack/store ${store}`),
+		text("@tanstack/store", "LICENSE"),
+	],
 };
 for (const [file, parts] of Object.entries(licences)) {
 	writeFileSync(join(skill, "kit/licenses", file), (await Promise.all(parts)).join("\n\n"));
@@ -173,6 +198,7 @@ for (const [file, parts] of Object.entries(licences)) {
 for (const f of [
 	"kit/echarts.js",
 	"vendor/beautiful-mermaid.js",
+	"vendor/table-core.js",
 	"vendor/mdx.js",
 	...Object.keys(preactModules).map((file) => `vendor/preact/${file}`),
 ]) {

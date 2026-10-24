@@ -13,6 +13,7 @@
 			"!skills/explainer/kit/parts/math/temml.css",
 			"!skills/explainer/vendor/preact",
 			"!skills/explainer/vendor/types",
+			"!skills/explainer/vendor/table-core.js",
 			"!examples/*/data.json"
 		]
 	},
