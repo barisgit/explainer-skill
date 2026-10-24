@@ -1,0 +1,10 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		// The records core runs in pack (Bun), in a page and in an MDX component's prerender, so it may use the language and Intl
+		// only: no DOM, no Bun. This check makes reaching for either a type error.
+		"lib": ["ESNext"],
+		"types": []
+	},
+	"include": ["skills/explainer/kit/records"]
+}

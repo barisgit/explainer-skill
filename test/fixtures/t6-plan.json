@@ -1,0 +1,1331 @@
+{
+	"id": "plan",
+	"idField": "id",
+	"fields": {
+		"id": {
+			"label": "Item",
+			"kind": "text"
+		},
+		"title": {
+			"label": "Work",
+			"kind": "text"
+		},
+		"phase": {
+			"label": "Phase",
+			"kind": "category",
+			"values": [
+				{
+					"value": "1",
+					"label": "Phase 1: rev A hardware and firmware core",
+					"color": "var(--c1)"
+				},
+				{
+					"value": "2",
+					"label": "Phase 2: connected roasting",
+					"color": "var(--c2)"
+				},
+				{
+					"value": "3",
+					"label": "Phase 3: certify, pilot, hand over",
+					"color": "var(--c3)"
+				}
+			]
+		},
+		"package": {
+			"label": "Work package",
+			"kind": "category",
+			"values": [
+				{
+					"value": "WP0",
+					"label": "WP0 Project management"
+				},
+				{
+					"value": "WP1",
+					"label": "WP1 Controller board rev A"
+				},
+				{
+					"value": "WP2",
+					"label": "WP2 Safety interlock chain"
+				},
+				{
+					"value": "WP3",
+					"label": "WP3 Firmware platform"
+				},
+				{
+					"value": "WP4",
+					"label": "WP4 Roast control firmware"
+				},
+				{
+					"value": "WP5",
+					"label": "WP5 Touchscreen HMI"
+				},
+				{
+					"value": "WP6",
+					"label": "WP6 Cloud backend"
+				},
+				{
+					"value": "WP7",
+					"label": "WP7 RC Studio"
+				},
+				{
+					"value": "WP8",
+					"label": "WP8 OTA and connected operation"
+				},
+				{
+					"value": "WP9",
+					"label": "WP9 Rev B hardware and manufacturing"
+				},
+				{
+					"value": "WP10",
+					"label": "WP10 Compliance"
+				},
+				{
+					"value": "WP11",
+					"label": "WP11 Pilot at three roasteries"
+				},
+				{
+					"value": "WP12",
+					"label": "WP12 Documentation and handover"
+				}
+			]
+		},
+		"owner": {
+			"label": "Owner",
+			"kind": "category",
+			"values": [
+				{
+					"value": "HO",
+					"label": "Hana Okafor-Lind"
+				},
+				{
+					"value": "JV",
+					"label": "Jonas Vireo"
+				},
+				{
+					"value": "PS",
+					"label": "Petra Saldana"
+				},
+				{
+					"value": "RC",
+					"label": "Rui Castellane"
+				},
+				{
+					"value": "EM",
+					"label": "Edda Morrow"
+				}
+			]
+		},
+		"likely": {
+			"label": "Likely",
+			"kind": "number",
+			"unit": "h",
+			"sum": true
+		},
+		"high": {
+			"label": "High",
+			"kind": "number",
+			"unit": "h",
+			"sum": true
+		},
+		"labour": {
+			"label": "Labour",
+			"kind": "currency",
+			"currency": "EUR",
+			"digits": 0,
+			"sum": true
+		},
+		"analogue": {
+			"label": "RC-1 analogue",
+			"kind": "category",
+			"values": [
+				{
+					"value": "measured",
+					"label": "Measured on RC-1"
+				},
+				{
+					"value": "none",
+					"label": "No analogue",
+					"color": "var(--warn)"
+				}
+			]
+		},
+		"rationale": {
+			"label": "Basis",
+			"kind": "text"
+		}
+	},
+	"columns": ["id", "title", "phase", "package", "owner", "analogue", "likely", "high", "labour"],
+	"groupBy": ["phase", "package"],
+	"groups": [
+		{
+			"path": ["1"],
+			"description": "11 January to 16 April 2027. Ends with rev A boards running the new firmware on the test roaster, with the safety chain verified."
+		},
+		{
+			"path": ["2"],
+			"description": "19 April to 9 July 2027. Ends with RC-2 rev A units roasting on the touchscreen, sending roasts to the cloud, syncing profiles with Studio and updating over the air."
+		},
+		{
+			"path": ["3"],
+			"description": "12 July to 1 October 2027. Ends with rev B in hand, CE paperwork complete, three pilot roasteries running RC-2, and Ostler ready for series production."
+		}
+	],
+	"views": ["tree", "table", "board"],
+	"search": ["id", "title", "rationale"],
+	"facets": ["owner", "analogue"],
+	"link": "item",
+	"data": [
+		{
+			"id": "WP0-01",
+			"phase": "1",
+			"package": "WP0",
+			"title": "Kick-off, phase plan and risk register",
+			"owner": "HO",
+			"likely": 32,
+			"high": 44,
+			"labour": 3072,
+			"analogue": "measured",
+			"rationale": "RC-1 kick-off took 30 h with the same customer and team; the new risk register format adds a little."
+		},
+		{
+			"id": "WP0-02",
+			"phase": "1",
+			"package": "WP0",
+			"title": "RC-2 requirements baseline",
+			"owner": "HO",
+			"likely": 48,
+			"high": 72,
+			"labour": 4608,
+			"analogue": "measured",
+			"rationale": "RC-1 spec took 62 h with two review rounds. About a third carries over unchanged; connectivity and the touchscreen are new."
+		},
+		{
+			"id": "WP0-03",
+			"phase": "1",
+			"package": "WP0",
+			"title": "Supplier and long-lead component management",
+			"owner": "HO",
+			"likely": 20,
+			"high": 40,
+			"labour": 1920,
+			"analogue": "measured",
+			"rationale": "41 h on RC-1 against 8 estimated because of the MCU shortage. Allocation is calmer now; high keeps that case."
+		},
+		{
+			"id": "WP0-04",
+			"phase": "1",
+			"package": "WP0",
+			"title": "Phase 1 steering, reporting and change control",
+			"owner": "HO",
+			"likely": 44,
+			"high": 60,
+			"labour": 4224,
+			"analogue": "measured",
+			"rationale": "RC-1 ran at about 12 h a month (176 h over 15 months). 14 weeks plus the phase gate review."
+		},
+		{
+			"id": "WP0-05",
+			"phase": "2",
+			"package": "WP0",
+			"title": "Phase 2 steering and reporting",
+			"owner": "HO",
+			"likely": 36,
+			"high": 52,
+			"labour": 3456,
+			"analogue": "measured",
+			"rationale": "Same monthly rate as RC-1 (176 h over 15 months) for 12 weeks; no gate review inside the phase."
+		},
+		{
+			"id": "WP0-06",
+			"phase": "3",
+			"package": "WP0",
+			"title": "Phase 3 steering, reporting and close-out",
+			"owner": "HO",
+			"likely": 48,
+			"high": 68,
+			"labour": 4608,
+			"analogue": "measured",
+			"rationale": "Monthly rate from RC-1 (176 h over 15 months) plus the close-out report and final acceptance meeting."
+		},
+		{
+			"id": "WP1-01",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Hardware architecture and board partitioning",
+			"owner": "JV",
+			"likely": 28,
+			"high": 40,
+			"labour": 2520,
+			"analogue": "measured",
+			"rationale": "RC-1 architecture took 26 h for a single board; the split into main and I/O board adds an interface to define."
+		},
+		{
+			"id": "WP1-02",
+			"phase": "1",
+			"package": "WP1",
+			"title": "MCU, wireless module and core schematic",
+			"owner": "JV",
+			"likely": 44,
+			"high": 64,
+			"labour": 3960,
+			"analogue": "measured",
+			"rationale": "38 h on RC-1 for the MCU core alone. The wireless module adds antenna keep-out and RF supply work."
+		},
+		{
+			"id": "WP1-03",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Thermocouple front-end, four channels",
+			"owner": "JV",
+			"likely": 50,
+			"high": 72,
+			"labour": 4500,
+			"analogue": "measured",
+			"rationale": "RC-1 two-channel front-end took 38 h. Channels three and four reuse the amplifier and cold-junction design, so about 1.3 times, not double."
+		},
+		{
+			"id": "WP1-04",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Analog outputs: gas valve 4-20 mA and fan 0-10 V",
+			"owner": "JV",
+			"likely": 32,
+			"high": 48,
+			"labour": 2880,
+			"analogue": "measured",
+			"rationale": "RC-1 had the 4-20 mA output only (22 h); the 0-10 V fan output is a second, simpler channel."
+		},
+		{
+			"id": "WP1-05",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Relay drivers and digital inputs",
+			"owner": "JV",
+			"likely": 26,
+			"high": 36,
+			"labour": 2340,
+			"analogue": "measured",
+			"rationale": "24 h on RC-1; two more inputs (hopper and cooling tray) on the same pattern."
+		},
+		{
+			"id": "WP1-06",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Power supply and input protection",
+			"owner": "JV",
+			"likely": 30,
+			"high": 44,
+			"labour": 2700,
+			"analogue": "measured",
+			"rationale": "RC-1 supply took 27 h; more load from the display backlight and the radio."
+		},
+		{
+			"id": "WP1-07",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Display and touch interface",
+			"owner": "JV",
+			"likely": 28,
+			"high": 52,
+			"labour": 2520,
+			"analogue": "none",
+			"rationale": "No comparable RC-1 work: RC-1 had a character LCD on a ribbon cable. Likely is from the display vendor's reference design; high allows for a backlight EMC problem."
+		},
+		{
+			"id": "WP1-08",
+			"phase": "1",
+			"package": "WP1",
+			"title": "PCB layout rev A",
+			"owner": "JV",
+			"likely": 104,
+			"high": 150,
+			"labour": 9360,
+			"analogue": "measured",
+			"rationale": "RC-1 layout took 92 h. Two boards and more nets, but a smaller analog section per board; about an eighth more."
+		},
+		{
+			"id": "WP1-09",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Rev A build and bring-up",
+			"owner": "JV",
+			"likely": 56,
+			"high": 88,
+			"labour": 5040,
+			"analogue": "measured",
+			"rationale": "71 h on RC-1, of which about 18 h was rework for a footprint error. Without it about 53 h; two boards to bring up, so 56."
+		},
+		{
+			"id": "WP1-10",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Rev A characterisation",
+			"owner": "EM",
+			"likely": 40,
+			"high": 60,
+			"labour": 2960,
+			"analogue": "measured",
+			"rationale": "RC-1 took 30 h for two channels and one output. Four channels and two outputs, and Edda is new to the bench."
+		},
+		{
+			"id": "WP1-11",
+			"phase": "1",
+			"package": "WP1",
+			"title": "Enclosure adaptation and display mounting",
+			"owner": "JV",
+			"likely": 24,
+			"high": 36,
+			"labour": 2160,
+			"analogue": "measured",
+			"rationale": "RC-1 took 14 h for the enclosure alone. The touchscreen needs a front-panel cut-out, a bezel and a sourced cable."
+		},
+		{
+			"id": "WP2-01",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Hazard analysis update",
+			"owner": "HO",
+			"likely": 28,
+			"high": 44,
+			"labour": 2688,
+			"analogue": "measured",
+			"rationale": "RC-1 hazard analysis took 36 h from scratch. RC-2 updates it for the supervisor MCU, remote access and OTA."
+		},
+		{
+			"id": "WP2-02",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Interlock chain schematic",
+			"owner": "JV",
+			"likely": 28,
+			"high": 40,
+			"labour": 2520,
+			"analogue": "measured",
+			"rationale": "28 h on RC-1. The chain is unchanged; the supervisor MCU tap-off points are new."
+		},
+		{
+			"id": "WP2-03",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Supervisor MCU firmware",
+			"owner": "PS",
+			"likely": 44,
+			"high": 68,
+			"labour": 3872,
+			"analogue": "measured",
+			"rationale": "RC-1 watchdog took 30 h on the main MCU. A separate MCU adds its own build, the heartbeat protocol and safe-state tests."
+		},
+		{
+			"id": "WP2-04",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Flame sensing and ignition sequence",
+			"owner": "PS",
+			"likely": 28,
+			"high": 40,
+			"labour": 2464,
+			"analogue": "measured",
+			"rationale": "RC-1 took 30 h; the logic is reused and moves to the supervisor."
+		},
+		{
+			"id": "WP2-05",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Fault injection test rig",
+			"owner": "EM",
+			"likely": 36,
+			"high": 60,
+			"labour": 2664,
+			"analogue": "measured",
+			"rationale": "RC-1 had only a manual procedure (20 h, contractor). A rig with switchable faults is new hardware; weak analogue, wide range."
+		},
+		{
+			"id": "WP2-06",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Interlock verification on the test roaster",
+			"owner": "EM",
+			"likely": 28,
+			"high": 40,
+			"labour": 2072,
+			"analogue": "measured",
+			"rationale": "24 h on RC-1. The rig makes repeats cheaper, but there are more cases (supervisor faults)."
+		},
+		{
+			"id": "WP2-07",
+			"phase": "1",
+			"package": "WP2",
+			"title": "Test plan and requirements traceability",
+			"owner": "EM",
+			"likely": 28,
+			"high": 40,
+			"labour": 2072,
+			"analogue": "measured",
+			"rationale": "RC-1 test plan took 24 h; more requirements and the connected features."
+		},
+		{
+			"id": "WP3-01",
+			"phase": "1",
+			"package": "WP3",
+			"title": "MCU port: board support and drivers",
+			"owner": "PS",
+			"likely": 56,
+			"high": 80,
+			"labour": 4928,
+			"analogue": "measured",
+			"rationale": "RC-1 bring-up took 48 h. New MCU family, so more than RC-1 even though the driver layer design is reused."
+		},
+		{
+			"id": "WP3-02",
+			"phase": "1",
+			"package": "WP3",
+			"title": "RTOS task structure and messaging",
+			"owner": "PS",
+			"likely": 30,
+			"high": 48,
+			"labour": 2640,
+			"analogue": "measured",
+			"rationale": "RC-1 used a cooperative scheduler (18 h). An RTOS is new for this codebase."
+		},
+		{
+			"id": "WP3-03",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Temperature acquisition, filtering and rate of rise",
+			"owner": "PS",
+			"likely": 34,
+			"high": 48,
+			"labour": 2992,
+			"analogue": "measured",
+			"rationale": "21 h for two channels on RC-1, plus 12 h for rate of rise (RC1-041). Filter and calibration code reused; four channels and a selectable rate-of-rise window."
+		},
+		{
+			"id": "WP3-04",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Drum VFD driver over Modbus RTU",
+			"owner": "PS",
+			"likely": 48,
+			"high": 90,
+			"labour": 4224,
+			"analogue": "measured",
+			"rationale": "RC-1 took 118 h against 40 estimated because of the VFD firmware bug. Same VFD family and the workaround is documented, so 48; high keeps a new bug in mind."
+		},
+		{
+			"id": "WP3-05",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Versioned settings storage with migration",
+			"owner": "PS",
+			"likely": 24,
+			"high": 36,
+			"labour": 2112,
+			"analogue": "measured",
+			"rationale": "RC-1 took 20 h without migration; RC-2 must read RC-1 settings and migrate on update."
+		},
+		{
+			"id": "WP3-06",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Event and fault log",
+			"owner": "PS",
+			"likely": 20,
+			"high": 30,
+			"labour": 1760,
+			"analogue": "measured",
+			"rationale": "14 h on RC-1; adds upload flags for the cloud."
+		},
+		{
+			"id": "WP3-07",
+			"phase": "1",
+			"package": "WP3",
+			"title": "USB-C service port and recovery mode",
+			"owner": "RC",
+			"likely": 28,
+			"high": 44,
+			"labour": 2352,
+			"analogue": "measured",
+			"rationale": "RC-1 USB log export took 24 h; recovery mode is new. Rui takes it because he wrote the host side."
+		},
+		{
+			"id": "WP3-08",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Wireless module driver and connection manager",
+			"owner": "RC",
+			"likely": 44,
+			"high": 80,
+			"labour": 3696,
+			"analogue": "none",
+			"rationale": "Nothing comparable in RC-1, which had no radio. From the module vendor's host driver example plus reconnect handling; high is a buggy vendor driver."
+		},
+		{
+			"id": "WP3-09",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Firmware unit tests and CI",
+			"owner": "RC",
+			"likely": 24,
+			"high": 36,
+			"labour": 2016,
+			"analogue": "measured",
+			"rationale": "RC-1 set-up took 20 h; adds a hardware-in-the-loop runner for the supervisor."
+		},
+		{
+			"id": "WP3-10",
+			"phase": "1",
+			"package": "WP3",
+			"title": "Dual-bank bootloader with rollback",
+			"owner": "PS",
+			"likely": 36,
+			"high": 56,
+			"labour": 3168,
+			"analogue": "measured",
+			"rationale": "RC-1 USB bootloader took 22 h. Dual-bank with rollback is more logic; the image format is reused."
+		},
+		{
+			"id": "WP4-01",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Burner PID control port",
+			"owner": "PS",
+			"likely": 22,
+			"high": 32,
+			"labour": 1936,
+			"analogue": "measured",
+			"rationale": "RC-1 PID took 34 h as a new design; this is a port with the same structure."
+		},
+		{
+			"id": "WP4-03",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Profile follower",
+			"owner": "PS",
+			"likely": 44,
+			"high": 64,
+			"labour": 3872,
+			"analogue": "measured",
+			"rationale": "RC-1 follower took 40 h for one setpoint curve. RC-2 also follows airflow and drum speed events and must handle a late charge."
+		},
+		{
+			"id": "WP4-04",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Airflow and drum speed scheduling",
+			"owner": "PS",
+			"likely": 22,
+			"high": 36,
+			"labour": 1936,
+			"analogue": "measured",
+			"rationale": "RC-1 had three relay steps for airflow (10 h); continuous airflow and drum speed are new outputs."
+		},
+		{
+			"id": "WP4-05",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Roast phase state machine",
+			"owner": "PS",
+			"likely": 26,
+			"high": 36,
+			"labour": 2288,
+			"analogue": "measured",
+			"rationale": "22 h on RC-1; same phases plus a preheat hold and the cooling handover."
+		},
+		{
+			"id": "WP4-06",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Charge and drop detection",
+			"owner": "HO",
+			"likely": 24,
+			"high": 40,
+			"labour": 2304,
+			"analogue": "measured",
+			"rationale": "RC-1 turning-point detection took 18 h. Charge and drop detection need a recorded data set from three drum sizes."
+		},
+		{
+			"id": "WP4-07",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Control tuning on three drum sizes",
+			"owner": "HO",
+			"likely": 44,
+			"high": 72,
+			"labour": 4224,
+			"analogue": "measured",
+			"rationale": "RC-1 tuning on the 5 kg drum took 24 h. Three sizes, most of the method carries over; high if the 15 kg drum needs gain scheduling."
+		},
+		{
+			"id": "WP4-08",
+			"phase": "1",
+			"package": "WP4",
+			"title": "Cooling and chaff cyclone control",
+			"owner": "PS",
+			"likely": 12,
+			"high": 18,
+			"labour": 1056,
+			"analogue": "measured",
+			"rationale": "9 h on RC-1; adds the cooling tray stirrer timeout."
+		},
+		{
+			"id": "WP5-01",
+			"phase": "2",
+			"package": "WP5",
+			"title": "HMI flows and screen designs",
+			"owner": "HO",
+			"likely": 32,
+			"high": 48,
+			"labour": 3072,
+			"analogue": "measured",
+			"rationale": "RC-1 menu design took 12 h for a four-line display. Touch needs real screen designs, reviewed twice with Ostler."
+		},
+		{
+			"id": "WP5-02",
+			"phase": "2",
+			"package": "WP5",
+			"title": "Graphics library integration and display driver",
+			"owner": "PS",
+			"likely": 44,
+			"high": 72,
+			"labour": 3872,
+			"analogue": "measured",
+			"rationale": "RC-1 LCD driver and menus took 14 h. A graphics stack is a much bigger job; this analogue only anchors the menu engine part."
+		},
+		{
+			"id": "WP5-03",
+			"phase": "2",
+			"package": "WP5",
+			"title": "Live roast screen",
+			"owner": "PS",
+			"likely": 40,
+			"high": 60,
+			"labour": 3520,
+			"analogue": "measured",
+			"rationale": "The RC Logger live curve view took 38 h on desktop. Less library help on the MCU, but the curve logic ports."
+		},
+		{
+			"id": "WP5-04",
+			"phase": "2",
+			"package": "WP5",
+			"title": "Profile selection and manual override screens",
+			"owner": "PS",
+			"likely": 28,
+			"high": 40,
+			"labour": 2464,
+			"analogue": "measured",
+			"rationale": "16 h on RC-1 as a menu; touch screens with a profile preview take longer."
+		},
+		{
+			"id": "WP5-05",
+			"phase": "2",
+			"package": "WP5",
+			"title": "Settings, service and diagnostics screens",
+			"owner": "PS",
+			"likely": 26,
+			"high": 40,
+			"labour": 2288,
+			"analogue": "measured",
+			"rationale": "RC-1 menus took 18 h; similar content on more screens."
+		},
+		{
+			"id": "WP5-06",
+			"phase": "2",
+			"package": "WP5",
+			"title": "Alarm display and acknowledgement",
+			"owner": "PS",
+			"likely": 14,
+			"high": 22,
+			"labour": 1232,
+			"analogue": "measured",
+			"rationale": "8 h on RC-1; adds the alarm history list."
+		},
+		{
+			"id": "WP5-07",
+			"phase": "2",
+			"package": "WP5",
+			"title": "Touch usability test with three roasters",
+			"owner": "EM",
+			"likely": 16,
+			"high": 24,
+			"labour": 1184,
+			"analogue": "measured",
+			"rationale": "RC-1 session with two roasters took 14 h; three roasters and a short report."
+		},
+		{
+			"id": "WP6-01",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Cloud architecture and hosting cost model",
+			"owner": "RC",
+			"likely": 24,
+			"high": 36,
+			"labour": 2016,
+			"analogue": "measured",
+			"rationale": "RC-1 licence server set-up took 14 h. This is a bigger decision, with a written cost model for Ostler."
+		},
+		{
+			"id": "WP6-02",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Device provisioning and certificates",
+			"owner": "RC",
+			"likely": 36,
+			"high": 56,
+			"labour": 3024,
+			"analogue": "measured",
+			"rationale": "RC-1 licence activation took 30 h; per-device certificates add a factory step."
+		},
+		{
+			"id": "WP6-03",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Telemetry ingest pipeline",
+			"owner": "RC",
+			"likely": 44,
+			"high": 80,
+			"labour": 3696,
+			"analogue": "none",
+			"rationale": "Nothing comparable in RC-1. Based on Rui's 6 h spike in October 2026 that took one roaster's telemetry end to end."
+		},
+		{
+			"id": "WP6-04",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Roast log storage and query API",
+			"owner": "RC",
+			"likely": 40,
+			"high": 60,
+			"labour": 3360,
+			"analogue": "measured",
+			"rationale": "The RC Logger local database took 34 h (partly reconstructed hours). Server-side storage and an API on top."
+		},
+		{
+			"id": "WP6-05",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Profile library sync",
+			"owner": "RC",
+			"likely": 48,
+			"high": 80,
+			"labour": 4032,
+			"analogue": "measured",
+			"rationale": "RC-1 file import/export took 20 h. Two-way sync with conflict handling is the riskiest backend item."
+		},
+		{
+			"id": "WP6-06",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Accounts, organisations and roles",
+			"owner": "RC",
+			"likely": 32,
+			"high": 48,
+			"labour": 2688,
+			"analogue": "measured",
+			"rationale": "RC-1 portal login took 16 h; organisations and three roles are new."
+		},
+		{
+			"id": "WP6-07",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Service technician web console",
+			"owner": "RC",
+			"likely": 44,
+			"high": 64,
+			"labour": 3696,
+			"analogue": "measured",
+			"rationale": "RC-1 portal admin took 26 h. The console shows live status and logs per roaster, not just downloads."
+		},
+		{
+			"id": "WP6-08",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Backend monitoring, backups and alerting",
+			"owner": "RC",
+			"likely": 16,
+			"high": 28,
+			"labour": 1344,
+			"analogue": "measured",
+			"rationale": "10 h on RC-1 for one small server."
+		},
+		{
+			"id": "WP6-09",
+			"phase": "2",
+			"package": "WP6",
+			"title": "Security review and fixes",
+			"owner": "EM",
+			"likely": 24,
+			"high": 40,
+			"labour": 1776,
+			"analogue": "measured",
+			"rationale": "RC-1 review of the licence service took 16 h; much larger attack surface now. Edda leads it, Rui fixes."
+		},
+		{
+			"id": "WP7-01",
+			"phase": "2",
+			"package": "WP7",
+			"title": "Studio on the RC Logger codebase",
+			"owner": "RC",
+			"likely": 28,
+			"high": 40,
+			"labour": 2352,
+			"analogue": "measured",
+			"rationale": "The RC Logger skeleton took 28 h; we refactor rather than rewrite."
+		},
+		{
+			"id": "WP7-02",
+			"phase": "2",
+			"package": "WP7",
+			"title": "Live view over the network",
+			"owner": "RC",
+			"likely": 40,
+			"high": 64,
+			"labour": 3360,
+			"analogue": "measured",
+			"rationale": "RC-1 USB live connection took 30 h; network discovery and the cloud relay path are added."
+		},
+		{
+			"id": "WP7-03",
+			"phase": "2",
+			"package": "WP7",
+			"title": "Profile editor",
+			"owner": "RC",
+			"likely": 52,
+			"high": 80,
+			"labour": 4368,
+			"analogue": "measured",
+			"rationale": "RC-1 point editor took 44 h. Adds airflow and drum speed lanes and validation against roaster limits."
+		},
+		{
+			"id": "WP7-04",
+			"phase": "2",
+			"package": "WP7",
+			"title": "Roast comparison and overlay",
+			"owner": "RC",
+			"likely": 20,
+			"high": 32,
+			"labour": 1680,
+			"analogue": "measured",
+			"rationale": "18 h on RC-1; reads cloud logs instead of local files."
+		},
+		{
+			"id": "WP7-05",
+			"phase": "2",
+			"package": "WP7",
+			"title": "Installers, code signing and auto-update",
+			"owner": "RC",
+			"likely": 22,
+			"high": 36,
+			"labour": 1848,
+			"analogue": "measured",
+			"rationale": "RC-1 took 22 h including two days lost to macOS notarisation, which we now know; auto-update is new."
+		},
+		{
+			"id": "WP8-01",
+			"phase": "2",
+			"package": "WP8",
+			"title": "OTA client in firmware",
+			"owner": "PS",
+			"likely": 36,
+			"high": 56,
+			"labour": 3168,
+			"analogue": "measured",
+			"rationale": "The RC-1 bootloader (22 h) is the closest work. Download, signature check and swap sit on top of the WP3-10 bootloader."
+		},
+		{
+			"id": "WP8-02",
+			"phase": "2",
+			"package": "WP8",
+			"title": "OTA release service and staged rollout",
+			"owner": "RC",
+			"likely": 32,
+			"high": 52,
+			"labour": 2688,
+			"analogue": "measured",
+			"rationale": "RC-1 firmware download portal took 24 h; staged rollout and rollback reports are added."
+		},
+		{
+			"id": "WP8-03",
+			"phase": "2",
+			"package": "WP8",
+			"title": "Image signing and key management",
+			"owner": "HO",
+			"likely": 20,
+			"high": 40,
+			"labour": 1920,
+			"analogue": "none",
+			"rationale": "No RC-1 equivalent; RC-1 images were unsigned. Includes the key ceremony and the procedure for Ostler's production line."
+		},
+		{
+			"id": "WP8-04",
+			"phase": "2",
+			"package": "WP8",
+			"title": "Telemetry client with offline buffering",
+			"owner": "PS",
+			"likely": 32,
+			"high": 48,
+			"labour": 2816,
+			"analogue": "measured",
+			"rationale": "RC-1 USB stick export took 22 h; buffering and resume after a dropout are most of the work."
+		},
+		{
+			"id": "WP8-05",
+			"phase": "2",
+			"package": "WP8",
+			"title": "Wi-Fi setup over Bluetooth from a phone",
+			"owner": "PS",
+			"likely": 28,
+			"high": 48,
+			"labour": 2464,
+			"analogue": "measured",
+			"rationale": "The cancelled RC-1 Bluetooth display reached 14 h, so BLE stack bring-up is partly known. Weak analogue."
+		},
+		{
+			"id": "WP8-06",
+			"phase": "2",
+			"package": "WP8",
+			"title": "End-to-end connected test",
+			"owner": "EM",
+			"likely": 32,
+			"high": 48,
+			"labour": 2368,
+			"analogue": "measured",
+			"rationale": "RC-1 system test took 40 h for 12 roasts; RC-2 runs 20 roasts with dropout scenarios."
+		},
+		{
+			"id": "WP8-07",
+			"phase": "2",
+			"package": "WP8",
+			"title": "OTA failure-mode tests",
+			"owner": "EM",
+			"likely": 24,
+			"high": 40,
+			"labour": 1776,
+			"analogue": "measured",
+			"rationale": "Comparable to the RC-1 interlock verification (24 h): a fixed list of cases (power loss, bad image, dropout) repeated on the bench."
+		},
+		{
+			"id": "WP9-02",
+			"phase": "3",
+			"package": "WP9",
+			"title": "Rev B change list, schematic and layout",
+			"owner": "JV",
+			"likely": 64,
+			"high": 104,
+			"labour": 5760,
+			"analogue": "measured",
+			"rationale": "RC-1 rev B took 64 h because an interlock relay was added late, plus 10 h for the findings list (RC1-080). We expect fewer changes, but two boards."
+		},
+		{
+			"id": "WP9-03",
+			"phase": "3",
+			"package": "WP9",
+			"title": "Manufacturability review with the contract manufacturer",
+			"owner": "JV",
+			"likely": 14,
+			"high": 20,
+			"labour": 1260,
+			"analogue": "measured",
+			"rationale": "12 h on RC-1."
+		},
+		{
+			"id": "WP9-04",
+			"phase": "3",
+			"package": "WP9",
+			"title": "Rev B build of 20 units and bring-up",
+			"owner": "JV",
+			"likely": 44,
+			"high": 64,
+			"labour": 3960,
+			"analogue": "measured",
+			"rationale": "RC-1 rev B build of 12 units took 34 h; 20 units, but known boards."
+		},
+		{
+			"id": "WP9-05",
+			"phase": "3",
+			"package": "WP9",
+			"title": "Production test fixture",
+			"owner": "JV",
+			"likely": 64,
+			"high": 100,
+			"labour": 5760,
+			"analogue": "measured",
+			"rationale": "RC-1 fixture took 58 h for one board; two boards share one fixture with swappable plates."
+		},
+		{
+			"id": "WP9-06",
+			"phase": "3",
+			"package": "WP9",
+			"title": "BOM cost-down and second sources",
+			"owner": "JV",
+			"likely": 24,
+			"high": 40,
+			"labour": 2160,
+			"analogue": "measured",
+			"rationale": "20 h on RC-1. Since the 2024 shortage Ostler wants a second source for every active part."
+		},
+		{
+			"id": "WP9-07",
+			"phase": "3",
+			"package": "WP9",
+			"title": "Production test firmware and factory provisioning",
+			"owner": "PS",
+			"likely": 28,
+			"high": 44,
+			"labour": 2464,
+			"analogue": "measured",
+			"rationale": "Petra's share of the RC-1 fixture was 6 of 58 h; loading device certificates at the factory (WP6-02) is new."
+		},
+		{
+			"id": "WP10-01",
+			"phase": "3",
+			"package": "WP10",
+			"title": "Compliance plan and standards list",
+			"owner": "EM",
+			"likely": 16,
+			"high": 24,
+			"labour": 1184,
+			"analogue": "measured",
+			"rationale": "RC-1 took 16 h; radio and cybersecurity rules join the list."
+		},
+		{
+			"id": "WP10-02",
+			"phase": "3",
+			"package": "WP10",
+			"title": "EMC pre-compliance and fixes",
+			"owner": "EM",
+			"likely": 44,
+			"high": 72,
+			"labour": 3256,
+			"analogue": "measured",
+			"rationale": "RC-1 took 52 h with one failed lab visit. Radio and display make a first-time pass less likely, so high stays wide."
+		},
+		{
+			"id": "WP10-03",
+			"phase": "3",
+			"package": "WP10",
+			"title": "Formal EMC and electrical safety test support",
+			"owner": "EM",
+			"likely": 32,
+			"high": 48,
+			"labour": 2368,
+			"analogue": "measured",
+			"rationale": "30 h on RC-1; one more test day for the radio."
+		},
+		{
+			"id": "WP10-04",
+			"phase": "3",
+			"package": "WP10",
+			"title": "Radio conformity for the wireless module",
+			"owner": "EM",
+			"likely": 20,
+			"high": 40,
+			"labour": 1480,
+			"analogue": "none",
+			"rationale": "RC-1 had no radio. The pre-certified module limits the work to integration tests and documentation if we follow its antenna rules."
+		},
+		{
+			"id": "WP10-05",
+			"phase": "3",
+			"package": "WP10",
+			"title": "Technical file and declaration of conformity",
+			"owner": "EM",
+			"likely": 28,
+			"high": 40,
+			"labour": 2072,
+			"analogue": "measured",
+			"rationale": "RC-1 took 26 h; more standards to reference."
+		},
+		{
+			"id": "WP10-06",
+			"phase": "3",
+			"package": "WP10",
+			"title": "Cybersecurity requirements for connected products",
+			"owner": "EM",
+			"likely": 24,
+			"high": 40,
+			"labour": 1776,
+			"analogue": "measured",
+			"rationale": "Closest RC-1 work is the licence service review (16 h). New to the team, though Edda has done it at her previous employer."
+		},
+		{
+			"id": "WP10-07",
+			"phase": "3",
+			"package": "WP10",
+			"title": "Firmware changes from EMC and radio findings",
+			"owner": "PS",
+			"likely": 20,
+			"high": 40,
+			"labour": 1760,
+			"analogue": "measured",
+			"rationale": "Part of the 52 h RC-1 pre-compliance work was firmware (clock spreading, edge rates); kept as its own item this time."
+		},
+		{
+			"id": "WP11-01",
+			"phase": "3",
+			"package": "WP11",
+			"title": "Pilot plan, site selection and agreements",
+			"owner": "HO",
+			"likely": 16,
+			"high": 24,
+			"labour": 1536,
+			"analogue": "measured",
+			"rationale": "RC-1 pilot plan for two sites took 12 h."
+		},
+		{
+			"id": "WP11-02",
+			"phase": "3",
+			"package": "WP11",
+			"title": "Pilot kit preparation, three kits",
+			"owner": "JV",
+			"likely": 22,
+			"high": 32,
+			"labour": 1980,
+			"analogue": "measured",
+			"rationale": "16 h for two kits on RC-1."
+		},
+		{
+			"id": "WP11-03",
+			"phase": "3",
+			"package": "WP11",
+			"title": "On-site installation and commissioning, three sites",
+			"owner": "JV",
+			"likely": 44,
+			"high": 64,
+			"labour": 3960,
+			"analogue": "measured",
+			"rationale": "RC-1 installs took 30 h for two sites including travel, about 15 h a site."
+		},
+		{
+			"id": "WP11-04",
+			"phase": "3",
+			"package": "WP11",
+			"title": "Pilot support and remote monitoring, six weeks",
+			"owner": "RC",
+			"likely": 40,
+			"high": 60,
+			"labour": 3360,
+			"analogue": "measured",
+			"rationale": "RC-1 support took 28 h over four weeks without remote access. Remote monitoring makes each issue cheaper; more sites and weeks."
+		},
+		{
+			"id": "WP11-05",
+			"phase": "3",
+			"package": "WP11",
+			"title": "Pilot feedback analysis and fix list",
+			"owner": "HO",
+			"likely": 14,
+			"high": 20,
+			"labour": 1344,
+			"analogue": "measured",
+			"rationale": "10 h on RC-1 for two sites."
+		},
+		{
+			"id": "WP11-06",
+			"phase": "3",
+			"package": "WP11",
+			"title": "Pilot fixes in firmware",
+			"owner": "PS",
+			"likely": 36,
+			"high": 64,
+			"labour": 3168,
+			"analogue": "measured",
+			"rationale": "RC-1 pilot fixes took 38 h for firmware and Logger together; the firmware share was 30 h. More features this time."
+		},
+		{
+			"id": "WP11-07",
+			"phase": "3",
+			"package": "WP11",
+			"title": "Pilot fixes in Studio and cloud",
+			"owner": "RC",
+			"likely": 24,
+			"high": 48,
+			"labour": 2016,
+			"analogue": "measured",
+			"rationale": "Rui's share of the RC-1 pilot fixes (38 h total) was 8 h; the cloud and Studio are much more surface."
+		},
+		{
+			"id": "WP12-01",
+			"phase": "3",
+			"package": "WP12",
+			"title": "Installation and wiring manual",
+			"owner": "EM",
+			"likely": 28,
+			"high": 40,
+			"labour": 2072,
+			"analogue": "measured",
+			"rationale": "RC-1 took 22 h (contractor); two boards and network set-up to add."
+		},
+		{
+			"id": "WP12-02",
+			"phase": "3",
+			"package": "WP12",
+			"title": "User manual for the touchscreen and Studio",
+			"owner": "EM",
+			"likely": 32,
+			"high": 48,
+			"labour": 2368,
+			"analogue": "measured",
+			"rationale": "RC-1 user manual took 24 h; two user interfaces now."
+		},
+		{
+			"id": "WP12-03",
+			"phase": "3",
+			"package": "WP12",
+			"title": "Service manual and troubleshooting guide",
+			"owner": "EM",
+			"likely": 24,
+			"high": 36,
+			"labour": 1776,
+			"analogue": "measured",
+			"rationale": "16 h on RC-1; adds remote diagnostics."
+		},
+		{
+			"id": "WP12-04",
+			"phase": "3",
+			"package": "WP12",
+			"title": "Manufacturing release package",
+			"owner": "JV",
+			"likely": 16,
+			"high": 24,
+			"labour": 1440,
+			"analogue": "measured",
+			"rationale": "14 h on RC-1."
+		},
+		{
+			"id": "WP12-05",
+			"phase": "3",
+			"package": "WP12",
+			"title": "Release 1.0 of firmware, Studio and cloud",
+			"owner": "PS",
+			"likely": 16,
+			"high": 24,
+			"labour": 1408,
+			"analogue": "measured",
+			"rationale": "RC-1 release took 14 h for firmware and Logger; three deliverables now."
+		},
+		{
+			"id": "WP12-06",
+			"phase": "3",
+			"package": "WP12",
+			"title": "Training for the Ostler service team",
+			"owner": "HO",
+			"likely": 20,
+			"high": 28,
+			"labour": 1920,
+			"analogue": "measured",
+			"rationale": "RC-1 training was one day (10 h with preparation); RC-2 is two days."
+		},
+		{
+			"id": "WP12-07",
+			"phase": "3",
+			"package": "WP12",
+			"title": "Production cloud environment, load test and runbook",
+			"owner": "RC",
+			"likely": 40,
+			"high": 64,
+			"labour": 3360,
+			"analogue": "measured",
+			"rationale": "RC-1 server set-up took 14 h. Production separate from staging, a 200-roaster load test and the operations runbook for Ostler's IT."
+		}
+	]
+}
