@@ -1,7 +1,6 @@
 import { statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { SCALE } from "./page.ts";
-import type { Frame, Rect } from "./types.ts";
+import type { Frame } from "./types.ts";
 
 /** Runs ffmpeg quietly and throws with its message when it fails. */
 async function ffmpeg(args: string[]) {
@@ -69,10 +68,9 @@ async function encodeWebp(png: string, quality: number, out: string, filter?: st
 	]);
 }
 
-/** Writes the `crop` (CSS pixels of a capture at `SCALE`) of `png` as a WebP `width` pixels wide: a gallery thumbnail. */
-export async function encodeThumb(png: string, crop: Rect, width: number, out: string) {
-	const [w, h, x, y] = [crop.width, crop.height, crop.x, crop.y].map((n) => n * SCALE);
-	await encodeWebp(png, 85, out, `crop=${w}:${h}:${x}:${y},scale=${width}:-1:flags=lanczos`);
+/** Writes `png` as a WebP `width` pixels wide: a gallery thumbnail. */
+export async function encodeThumb(png: string, width: number, out: string) {
+	await encodeWebp(png, 85, out, `scale=${width}:-1:flags=lanczos`);
 }
 
 /** Writes the hero collage `png` as a WebP, keeping its transparent background. */

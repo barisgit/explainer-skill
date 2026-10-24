@@ -7,20 +7,33 @@
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
-   controls seg toggle field player btn reset | stats chip caveat detail details tabs | rank compare mark expand | view view-head back | tree
-   (hierarchical records as nested <details>, aligned number columns: kit views.js shows the markup).
+   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
+   view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
+   optional head: kit views.js shows the markup) | toolbar (the row over a records section: a .seg view switch, <input
+   type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
+   Expand all joins its end. Layout only: the page owns their state, and kit:reply.js keeps inputs with ids across reloads).
+   Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour
+   before its word. A <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word
+   or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
-   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
-   The inset is a default (padding-inline: var(--pad) on every direct child of .fig, specificity of one class): any padding the page
-   puts on such a child with a class of its own replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
+   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens, centred on the
+   column, beside the contents rail too.
+   The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child
+   replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
    Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
    sections (method, sources) are set smaller with the heading in its own column.
-   Tables: .compare turns each row into label/value lines on phones; .compare.table inside .scroll stays a table and scrolls sideways.
+   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
+   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
+   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+     <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
+   Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation, trees); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 

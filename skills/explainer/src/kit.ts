@@ -33,12 +33,14 @@ const transpiler = new Bun.Transpiler({ loader: "ts" });
 const script = (source: string): string =>
 	`${leadingComment(source).trim()}\n${transpiler.transformSync(source)}`;
 
+/** Whether a resolved path is one of the kit's files (a part included) rather than a page's own. */
+export const isKitFile = (path: string): boolean => path.startsWith(KIT_DIR + sep);
+
 /**
- * A text file as a page receives it. A kit file split by concern (a script, or theme.css) keeps its parts in `kit/parts/<name>/`;
- * they come first, in file name order, and the kit file itself last, so a page still includes one file.
- * Kit `.ts` sources become classic scripts; any other file, a page's own included, is read as written.
+ * The files a text file is made of. A kit file split by concern (a script, or theme.css) keeps its parts in `kit/parts/<name>/`;
+ * they come first, in file name order, and the kit file itself last, so a page still includes one file. Any other file is itself.
  */
-export function readKitText(path: string): string {
+export function sourceFiles(path: string): string[] {
 	const partsDir = join(KIT_DIR, "parts", basename(path, extname(path)));
 	const parts =
 		dirname(path) === KIT_DIR && existsSync(partsDir)
@@ -46,11 +48,21 @@ export function readKitText(path: string): string {
 					.sort()
 					.map((part) => join(partsDir, part))
 			: [];
-	return [...parts, path]
+	return [...parts, path];
+}
+
+/**
+ * A text file as a page receives it: its `sourceFiles` joined. Kit `.ts` sources become classic scripts, and the kit's CSS goes
+ * into one `@layer kit`, its internal order kept, so any unlayered page rule wins over it whatever its specificity or place.
+ * Any other file, a page's own included, is read as written.
+ */
+export function readKitText(path: string): string {
+	const inKit = isKitFile(path);
+	const text = sourceFiles(path)
 		.map((file) => {
-			const text = readFileSync(file, "utf8");
-			// Only kit sources are TypeScript; a page's own scripts are served as written.
-			return file.startsWith(KIT_DIR + sep) && file.endsWith(".ts") ? script(text) : text;
+			const source = readFileSync(file, "utf8");
+			return inKit && file.endsWith(".ts") ? script(source) : source;
 		})
 		.join("\n");
+	return inKit && path.endsWith(".css") ? `@layer kit {\n${text.trimEnd()}\n}` : text;
 }

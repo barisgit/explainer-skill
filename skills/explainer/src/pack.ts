@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
+import { classCollisions } from "./collisions.ts";
 import { safeScript } from "./escape.ts";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
 import { findLoads, type Load } from "./loads.ts";
@@ -25,11 +26,13 @@ const MIME: Record<string, string> = {
 const isRemote = (ref: string) => /^(https?:)?\/\//i.test(ref);
 const isInline = (ref: string) => /^(data:|#|about:|javascript:)/i.test(ref);
 
-/** Resolves a reference to a file: `kit:name` points into the CLI's kit/, anything else is relative to `baseDir`. */
+/** The path a local reference names: `kit:name` points into the CLI's kit/, anything else is relative to `baseDir`. */
+const refPath = (ref: string, baseDir: string): string =>
+	ref.startsWith("kit:") ? kitPath(ref.slice(4)) : resolve(baseDir, ref.split(/[?#]/)[0] ?? ref);
+
+/** Resolves a local reference to an existing file, or throws a PackError naming it. */
 function locate(ref: string, baseDir: string): string {
-	const path = ref.startsWith("kit:")
-		? kitPath(ref.slice(4))
-		: resolve(baseDir, ref.split(/[?#]/)[0] ?? ref);
+	const path = refPath(ref, baseDir);
 	if (!existsSync(path)) {
 		const hint = ref.startsWith("kit:") ? ` (kit has: ${kitFiles().join(", ")})` : "";
 		throw new PackError(`missing file: ${ref}${hint}`);
@@ -188,7 +191,7 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 				const path = attempt(() => locate(href, baseDir), "");
 				if (path) {
 					el.replace(
-						// readKitText puts kit:theme.css's parts in front of it; a page's own stylesheet is read as it is.
+						// readKitText puts kit:theme.css's parts in front of it, all in @layer kit; a page's own stylesheet is read as it is.
 						`<style>${inlineCss(readKitText(path), dirname(path), href)}</style>`,
 						{ html: true },
 					);
@@ -292,7 +295,8 @@ function loadMessage({ origin, kind, target }: Load): string {
  * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined. An `.mdx` page is first compiled and
  * prerendered to an HTML page (mdx/page.ts); everything after that is the same for both.
  * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
- * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render. `warnings` lists links that go nowhere.
+ * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render.
+ * `warnings` lists links that go nowhere and page classes the kit styles too (see classCollisions).
  */
 export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
 	const baseDir = dirname(resolve(inputPath));
@@ -315,8 +319,14 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and reference them relatively, or use kit: files." : ""}`,
 		);
 	}
-	const warnings = loneRefs(original, diagramRefs).map(
-		(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
-	);
+	const warnings = [
+		...loneRefs(original, diagramRefs).map(
+			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
+		),
+		...(await classCollisions(original, (href) => {
+			const path = isRemote(href) ? "" : refPath(href, baseDir);
+			return path && existsSync(path) ? path : undefined;
+		})),
+	];
 	return { html, warnings };
 }

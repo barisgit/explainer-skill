@@ -66,10 +66,66 @@ test("a tree's numbers line up across rows and levels, on desktop and phone", as
 	const rows = [...document.querySelectorAll("#plan summary, #plan a")];
 	const edges = (n) => new Set(rows.map((row) => Math.round(row.children[n].getBoundingClientRect().right)));
 	expect(edges(1).size === 1 && edges(2).size === 1, "each number column has one right edge: " + [...edges(1)] + " / " + [...edges(2)]);
+	const end = (row) => Math.round(row.getBoundingClientRect().right);
+	expect(rows.every((row) => Math.round(row.children[2].getBoundingClientRect().right) === end(row)), "the last column ends at the row's end");
 	const label = (row) => row.children[0].getBoundingClientRect();
 	expect(label(rows[2]).left > label(rows[1]).left && label(rows[1]).left > label(rows[0]).left, "each level is indented");
 	expect(Math.round(label(rows[4]).left) === Math.round(label(rows[2]).left), "a link row's label starts with its sibling folds' labels");`;
 	expect(await packAndRun(dir, "align", TREE_PAGE(script))).toEqual([]);
+}, 30_000);
+
+test("--tree-cols sizes each column, and the head names them over the cells, on desktop and phone", async () => {
+	const row = (label: string, cells: string) =>
+		`<span>${label}</span>${cells
+			.split(" ")
+			.map((cell) => `<span>${cell}</span>`)
+			.join("")}`;
+	const page = `${HEAD}<h1>Columns</h1>
+<div class="tree" id="cols" style="--tree-cols: 3rem 4.5rem 3rem 3.5rem">
+<div class="tree-head">${row("Task", "Hours Owner Low High")}</div>
+<details open><summary>${row("1 Discovery", "52h Ana 40h 70h")}</summary>
+	<details open><summary>${row("1.1 Spike boards", "52h Ana 40h 70h")}</summary>
+		<details><summary>${row("1.1.1 Schematic review", "12h Ana 10h 16h")}</summary><p>Walk the old schematic.</p></details>
+		<a href="#t">${row("1.1.2 Power stage", "40h Mia 30h 54h")}</a>
+	</details>
+</details>
+</div></main>
+<script>
+const rows = [...document.querySelectorAll("#cols summary, #cols a")];
+const head = document.querySelector(".tree-head");
+const box = (el) => el.getBoundingClientRect();
+const edges = (n) => new Set([head, ...rows].map((r) => Math.round(box(r.children[n]).right)));
+const widths = [1, 2, 3, 4].map((n) => Math.round(box(head.children[n]).width));
+${pageContract({
+	"each column has its template width": `widths.join() === [48, 72, 48, 56].join()`,
+	"each column has one right edge, the head's included": `[1, 2, 3, 4].every((n) => edges(n).size === 1)`,
+	"the head's label starts with the top level's labels": `Math.round(box(head.children[0]).left) === Math.round(box(rows[0].children[0]).left)`,
+	"on a phone the numbers take the line under the label, on a wide screen the label's line": `rows.every((r) => (box(r.children[1]).top > box(r.children[0]).bottom - 1) === (innerWidth < 640))`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+	expect(await packAndRun(dir, "columns", page)).toEqual([]);
+}, 30_000);
+
+test("a toolbar is one row on a wide screen, whole rows on a phone, and takes the records' Expand all", async () => {
+	const page = `${HEAD}<h1>Records</h1><section id="records"><h2>Tasks</h2>
+<div class="toolbar" id="bar">
+	<div class="seg"><label><input type="radio" name="v" checked><span>Tree</span></label><label><input type="radio" name="v"><span>People</span></label></div>
+	<input type="search" aria-label="Search"><select aria-label="Owner"><option>All owners</option></select><select aria-label="Type"><option>All types</option></select>
+</div>
+${TREE}</section></main>
+<script src="kit:views.js"></script>
+<script>
+const bar = document.getElementById("bar");
+const box = (el) => el.getBoundingClientRect();
+const [seg, search, owner, type] = bar.children;
+${pageContract({
+	"Expand all ends the toolbar": `bar.lastElementChild.matches(".fold-all")`,
+	"on a wide screen every control shares one row": `innerWidth < 640 || [...bar.children].every((c) => Math.abs(box(c).top + box(c).height / 2 - box(seg).top - box(seg).height / 2) < 1)`,
+	"the switch is as tall as the inputs": `Math.round(box(seg).height) === Math.round(box(search).height)`,
+	"on a phone the switch and the search span the row and the filters pair up": `innerWidth >= 640 || ([seg, search].every((c) => Math.abs(box(c).width - box(bar).width) < 1) && box(owner).top === box(type).top && Math.abs(box(owner).width - box(type).width) < 1)`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+	expect(await packAndRun(dir, "toolbar", page)).toEqual([]);
 }, 30_000);
 
 test("a link into a branch opens it and its ancestors and scrolls to it, on the overview and in a view", async () => {
@@ -114,5 +170,5 @@ test("closed folds print open", async () => {
 		"a closed fold's text prints": `document.getElementById("plain").checkVisibility()`,
 		"a fold inside a closed fold prints": `document.getElementById("deep").checkVisibility()`,
 	})}</script></body></html>`;
-	expect(await packAndRun(dir, "print", page, 1, "print")).toEqual([]);
+	expect(await packAndRun(dir, "print", page, { media: "print" })).toEqual([]);
 }, 30_000);

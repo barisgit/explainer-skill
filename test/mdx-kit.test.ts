@@ -278,5 +278,5 @@ test("an .mdx page with lang and labels in its frontmatter shows every kit text 
 	});
 	expect(result.stderr).toBe("");
 	expect(readFileSync(output, "utf8")).toContain('<html lang="sl">');
-	expect(await runPacked(output, 4)).toEqual([]);
+	expect(await runPacked(output, { slowdown: 4 })).toEqual([]);
 }, 60_000);

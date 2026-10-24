@@ -211,6 +211,47 @@ test("a page with one kind of view has no rail", async () => {
 	expect(await packAndRun(dir, "single", page)).toEqual([]);
 }, 30_000);
 
+/** 1024 leaves the page box no margin beside the rail, 1440 a little, 1920 room for 88rem; then a phone. */
+const RAIL_WIDTHS = [1024, 1440, 1920, 390].map((width) => ({
+	width,
+	height: 900,
+	mobile: width < 600,
+}));
+
+for (const direction of ["ltr", "rtl"]) {
+	test(`.wide beside the rail grows equally to both sides of the column, clear of the rail, with its Expand all (${direction})`, async () => {
+		const page = `${HEAD.replace("<html>", `<html dir="${direction}">`)}<main class="page"><div data-overview><h1>Records</h1>
+<section><h2>People</h2><p id="prose">${"Words in the reading column. ".repeat(20)}</p><a href="#p/a">A</a></section>
+<section id="records"><h2>Items</h2><div class="wide" id="wide"><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div><a href="#i/1">One</a></section></div>
+<section class="view" data-view="p"><a class="back" href="#">Home</a><h1>Person</h1></section>
+<section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section></main>
+<script src="kit:views.js"></script>
+<script>
+const rtl = document.dir === "rtl";
+const box = (id) => document.getElementById(id).getBoundingClientRect();
+const column = () => document.getElementById("records").getBoundingClientRect();
+const rail = () => document.querySelector(".toc").getBoundingClientRect();
+const railShown = () => (rtl ? rail().left > column().right : rail().right < column().left);
+// How far .wide reaches past the column on its left and on its right, and its distance from the rail.
+const growth = () => [column().left - box("wide").left, box("wide").right - column().right];
+const railGap = () => Math.max(box("wide").left - rail().right, rail().left - box("wide").right);
+const end = (el) => (rtl ? -el.getBoundingClientRect().left : el.getBoundingClientRect().right);
+${pageContract({
+	"the rail shows beside the column on a wide screen": `innerWidth < 1024 || railShown()`,
+	".wide grows as far to one side of the column as to the other": `Math.abs(growth()[0] - growth()[1]) < 1`,
+	"where the page box has a margin, .wide grows into it": `innerWidth < 1440 || growth()[0] > 39`,
+	"with room on both sides, .wide is 88rem": `innerWidth < 1900 || Math.abs(box("wide").width - 88 * 16) < 1`,
+	"short of that, .wide stops at the rail's 2.5rem gap and never comes closer": `innerWidth < 1024 || (railGap() > 39 && (innerWidth >= 1900 || railGap() < 41))`,
+	".wide stays inside the window's 2rem gutter": `innerWidth < 1024 || (box("wide").left >= 31 && box("wide").right <= innerWidth - 31)`,
+	"on a phone, .wide is the column": `innerWidth >= 1024 || Math.abs(growth()[0]) + Math.abs(growth()[1]) < 1`,
+	"Expand all over .wide ends with it": `Math.abs(end(document.querySelector(".fold-all")) - end(document.getElementById("wide"))) < 1`,
+	"prose keeps its column": `box("prose").left >= column().left - 1 && box("prose").right <= column().right + 1`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+		expect(await packAndRun(dir, `wide-${direction}`, page, { widths: RAIL_WIDTHS })).toEqual([]);
+	}, 30_000);
+}
+
 test("a section with two folds gets Expand all, which follows the folds the reader toggles", async () => {
 	const page = `${HEAD}<main class="page"><div data-overview><h1>Folds</h1>
 <section id="two"><h2>Two</h2><div><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div></section>

@@ -15,13 +15,17 @@
    its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
    data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
    link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
-   opens them at every level.
+   opens them at every level, at the end of the section's .toolbar when one comes before them.
    Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
    in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
-   its numbers, which line up in columns across rows and levels (--tree-cell on the .tree sets their width: 5rem, 4rem on
-   phones). A leaf opens to its full text. Give every row the same cells in the same order, units included; an empty
-   <span></span> keeps a column:
-     <div class="tree">
+   its numbers, which line up in columns across rows and levels. --tree-cols on the .tree gives one width per number column
+   (unset, each is 5rem, narrower where a deep row on a phone has no room); a .tree-head first in the tree names the label and
+   each column over the rows. On phones a row with two or more numbers puts them on a line under its label, in the same columns:
+   at the third level a 360-pixel phone leaves about 16rem for them and their 0.5rem gaps, and a width written as minmax(0, 4rem)
+   gives way where they do not fit. A leaf opens to its full text. Give every row the same cells in the same order, units
+   included; an empty <span></span> keeps a column:
+     <div class="tree" style="--tree-cols: 4rem 4rem">
+       <div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
        <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
          <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
          <a href="#task/1.1.2"><span>1.1.2 Power stage</span><span>24 h</span><span>Ana</span></a>
