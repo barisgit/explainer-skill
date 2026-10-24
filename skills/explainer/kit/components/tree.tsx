@@ -1,5 +1,6 @@
 /* Tree: one complete list of hierarchical records (phases > groups > items), opened level by level, numbers in aligned columns.
-   <Tree items={plan.phases} row={(r) => ({ label: r.name, cells: [`${r.hours} h`, r.owner], items: r.tasks, text: r.note })} />
+   <Tree items={plan.phases} cols="4rem 4rem" head={["Task", "Hours", "Owner"]}
+     row={(r) => ({ label: r.name, cells: [`${r.hours} h`, r.owner], items: r.tasks, text: r.note })} />
      items  the top-level records
      row    (record) => its row; leave it out when the records already have this shape:
               label  the row's name
@@ -11,8 +12,11 @@
                      in the navigation
               id     lets a link elsewhere open that branch: <a href="#spike">Spike boards: 4 tasks, 70 h</a>
               ref    data-ref on the row: with kit:link.js the row lights, and a closed fold that holds a lit row is tinted too
-     cell   the width of a number column (--tree-cell: 5rem, 4rem on phones)
-   The tree starts collapsed to its top level, and the deepest rows open in place to their text. A section with the tree gets
+     cols   one width per number column (--tree-cols). Unset, each is 5rem, narrower where a deep row on a phone has no room
+     head   the names of the label and of each column, over the rows
+   The tree starts collapsed to its top level, and the deepest rows open in place to their text. On phones a row with two or more
+   numbers puts them on a line under its label, in the same columns: at the third level a 360-pixel phone leaves about 16rem for
+   them and their 0.5rem gaps, and a width written as minmax(0, 4rem) gives way where they do not fit. A section with the tree gets
    Expand all, which opens every level. Trees print fully open. */
 import type { ComponentChildren, JSX } from "preact";
 
@@ -32,7 +36,10 @@ export interface TreeItem extends TreeRow<TreeItem> {}
 
 interface Common {
 	id?: string;
-	cell?: string;
+	/** --tree-cols: one width per number column. */
+	cols?: string;
+	/** The label's name, then each column's. */
+	head?: ComponentChildren[];
 }
 export type TreeProps<Item> = Common &
 	(
@@ -60,11 +67,15 @@ const columnsOf = (rows: Built[]): number =>
 	);
 
 /** The row's cells as views.js and the theme read them: the label, then `columns` number cells, empty ones kept. */
-function cellsOf(row: TreeRow<unknown>, columns: number): JSX.Element[] {
-	const cells = Array.from({ length: columns }, (_, i) => row.cells?.[i] ?? null);
+function cellsOf(
+	label: ComponentChildren,
+	cells: ComponentChildren[] | undefined,
+	columns: number,
+): JSX.Element[] {
+	const padded = Array.from({ length: columns }, (_, i) => cells?.[i] ?? null);
 	return [
-		<span key="label">{row.label}</span>,
-		...cells.map((cell, i) => <span key={i}>{cell}</span>),
+		<span key="label">{label}</span>,
+		...padded.map((cell, i) => <span key={i}>{cell}</span>),
 	];
 }
 
@@ -80,7 +91,7 @@ function Row({ built, columns }: { built: Built; columns: number }) {
 		}
 		return (
 			<a href={row.href} id={row.id} data-ref={row.ref}>
-				{cellsOf(row, columns)}
+				{cellsOf(row.label, row.cells, columns)}
 			</a>
 		);
 	}
@@ -91,7 +102,7 @@ function Row({ built, columns }: { built: Built; columns: number }) {
 	}
 	return (
 		<details id={row.id}>
-			<summary data-ref={row.ref}>{cellsOf(row, columns)}</summary>
+			<summary data-ref={row.ref}>{cellsOf(row.label, row.cells, columns)}</summary>
 			{typeof row.text === "string" ? <p>{row.text}</p> : row.text}
 			{children.map((child, i) => (
 				<Row key={i} built={child} columns={columns} />
@@ -100,12 +111,14 @@ function Row({ built, columns }: { built: Built; columns: number }) {
 	);
 }
 
-/** Renders `<div class="tree">` of nested `<details>`, one per record, all closed. */
+/** Renders `<div class="tree">` of nested `<details>`, one per record, all closed, under a `.tree-head` when `head` is given. */
 export function Tree<Item>(props: TreeProps<Item>) {
 	const rows = props.row ? build(props.items, props.row) : build(props.items, (item) => item);
-	const columns = columnsOf(rows);
+	const [label, ...names] = props.head ?? [];
+	const columns = Math.max(columnsOf(rows), names.length);
 	return (
-		<div class="tree" id={props.id} style={props.cell ? `--tree-cell: ${props.cell}` : undefined}>
+		<div class="tree" id={props.id} style={props.cols ? `--tree-cols: ${props.cols}` : undefined}>
+			{props.head && <div class="tree-head">{cellsOf(label, names, columns)}</div>}
 			{rows.map((built, i) => (
 				<Row key={i} built={built} columns={columns} />
 			))}

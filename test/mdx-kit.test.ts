@@ -73,7 +73,7 @@ Two phases, three people, one decision left.
 
 <h2 data-nav="Plan">The plan has two phases and 72 hours</h2>
 
-<Tree items={plan.phases} row={(r) => ({ label: r.name, cells: [\`\${r.hours} h\`, r.owner], items: r.tasks, text: r.note, href: r.view && \`#person/\${r.view}\`, id: r.id, ref: r.ref })} />
+<Tree cols="4rem 4rem" head={["Task", "Hours", "Owner"]} items={plan.phases} row={(r) => ({ label: r.name, cells: [\`\${r.hours} h\`, r.owner], items: r.tasks, text: r.note, href: r.view && \`#person/\${r.view}\`, id: r.id, ref: r.ref })} />
 
 ## Options
 
@@ -113,7 +113,8 @@ const V08_MAIN = `<main class="page"><div data-overview>
 <section data-nav="People"><h2>Three people share the work, <em>Ana</em> most of it</h2>
 <ul><li><a href="#person/ana">Ana Novak</a>: 52 h, <span data-ref="ana">ana</span></li><li><a href="#person/luka">Luka Kos</a>: 34 h, <span data-ref="luka">luka</span></li><li><a href="#person/mia">Mia Zupan</a>: 20 h, <span data-ref="mia">mia</span></li></ul></section>
 <section data-nav="Plan"><h2>The plan has two phases and 72 hours</h2>
-<div class="tree">
+<div class="tree" style="--tree-cols: 4rem 4rem">
+<div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
 <details id="p1"><summary><span>1 Discovery</span><span>52 h</span><span></span></summary>
 	<details id="spike"><summary><span>1.1 Spike boards</span><span>52 h</span><span></span></summary>
 		<details><summary data-ref="ana"><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Walk the old schematic.</p></details>
