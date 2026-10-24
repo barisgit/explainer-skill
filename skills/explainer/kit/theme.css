@@ -17,7 +17,8 @@
    or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
    are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
-   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens.
+   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens, centred on the
+   column, beside the contents rail too.
    The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child
    replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
    Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
