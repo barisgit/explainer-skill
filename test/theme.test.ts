@@ -25,3 +25,16 @@ ${pageContract({
 
 	expect(await packAndRun(dir, "num", page)).toEqual([]);
 }, 30_000);
+
+test("a page's textarea is drawn like the kit's text inputs", async () => {
+	const page = `${HEAD}<input type="text" id="line" aria-label="Line"><textarea id="free" aria-label="Free"></textarea></main>
+<script>
+const same = (property) => getComputedStyle(document.getElementById("free"))[property] === getComputedStyle(document.getElementById("line"))[property];
+${pageContract({
+	"its border": `same("borderTopColor") && same("borderTopWidth") && same("borderTopStyle") && same("borderTopLeftRadius")`,
+	"its background": `same("backgroundColor")`,
+	"its padding": `same("paddingLeft")`,
+})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "textarea", page)).toEqual([]);
+}, 30_000);
