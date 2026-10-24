@@ -49,6 +49,7 @@ An agent writes a page as MDX (Markdown prose plus components) with local data f
 
 ## As built (author surface)
 
+- `kit types` prints a tsconfig for the author's page directory: `kit` resolves to the component sources, Preact and ECharts to their vendored declarations, and the kit's globals are included. `bun check` needs no install. `build/vendor.ts` copies the library declarations and `kit-types/globals.d.ts` alongside the bundles.
 - `kit` lists what an `.mdx` page uses: the six components (each line is the first line of its doc comment), the Mermaid fence, `theme.css`, the attributes that stay attributes, and the page conventions, which live in the header of `kit/components/index.ts` (`kit components` prints it with every component). `kit <Component>` is case-insensitive; the v0.8 kit-file docs (`kit views.js`, ...) stay reachable.
 - The example is `skills/explainer/example/` (`page.mdx`, `figures.tsx`, `cafe.ts`, `page.css`); `examples/mdx-all/` (not shipped) uses every component and convention and is the acceptance page.
 - Re-syncing to a new kit release: copy `kit/*.ts`, `kit/parts/`, `theme.css` and their tests from the release (keep the additive `Steps.refresh` registration and the `dispose()` handles), apply the release's SKILL.md and guide.md diff (this arm changes only step 1-3 of SKILL.md and three mechanics phrases in guide.md), and carry any new kit-file doc text into the matching component doc comment.

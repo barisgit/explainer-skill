@@ -1,6 +1,6 @@
 /**
  * The window globals the kit scripts define for pages, and the ECharts global that kit:echarts.js defines. The scripts are plain
- * browser scripts, so this is the one place their public API is typed; it is not part of the skill.
+ * browser scripts, so this is the one place their public API is typed; vendor copies it for authors' typechecking.
  */
 
 /** A page part that can carry data-* attributes: HTML or SVG. */

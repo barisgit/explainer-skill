@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
-import { kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { authorTsconfig, kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
@@ -114,10 +114,10 @@ The texts the kit adds (buttons, accessible names, messages) are English; a page
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List what an .mdx page can use (the kit's components, Mermaid fences, the stylesheet, the attributes the kit reads, the page conventions), or print the documentation of one component, kit file, the mermaid fences or every component.",
-		usage: "kit [Component | file | mermaid | components]",
+			"List what an .mdx page can use (the kit's components, Mermaid fences, the stylesheet, the attributes the kit reads, the page conventions), or print the documentation of one component, kit file, the mermaid fences or every component; types prints a tsconfig for author typechecking.",
+		usage: "kit [Component | file | mermaid | components | types]",
 		flags: [],
-		examples: ["kit", "kit Stepper", "kit theme.css", "kit mermaid", "kit components"],
+		examples: ["kit", "kit Stepper", "kit theme.css", "kit mermaid", "kit components", "kit types"],
 		run: async ([topic]) => {
 			if (!topic) {
 				console.log(kitListing());
@@ -125,6 +125,10 @@ export const COMMANDS: Record<string, Command> = {
 			}
 			if (topic === "mermaid") {
 				console.log(MERMAID_DOC);
+				return 0;
+			}
+			if (topic === "types") {
+				console.log(authorTsconfig());
 				return 0;
 			}
 			if (topic === "components") {

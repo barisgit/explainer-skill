@@ -20,7 +20,7 @@ skills/explainer/      the installable skill, copied as-is by installers: no dot
   vendor/beautiful-mermaid.js  generated (beautiful-mermaid, patched, with ELK); used by pack to render diagrams in-process, never inlined; its .d.ts beside it
 build/                 vendor.ts regenerates kit/echarts.js, vendor/beautiful-mermaid.js and the licence texts from the pinned devDependencies; geist-widths.ts measures the Geist advances the patch sizes diagram text with; verify-install.ts is the release check for the installers; media.ts (with media/) renders the README and gallery media
 test/                  contract tests, outside the skill so installs do not ship them
-kit-types/             globals.d.ts: the window globals the kit scripts define (and echarts), for the kit typecheck only; outside the skill so installs do not ship it
+kit-types/             globals.d.ts: the window globals the kit scripts define (and echarts); vendor copies it into vendor/types/ for author typechecking
 examples/              the public gallery, published as it is committed by .github/workflows/pages.yml (push to main)
   page.html index.html the gallery page and its packed output
   <name>/              one showcase page: page.html (written by an agent following SKILL.md), index.html (packed), its local data
@@ -77,7 +77,7 @@ TypeScript uses `erasableSyntaxOnly`: no parameter properties, enums or namespac
 
 The kit scripts are TypeScript sources, but pages reference them as `kit:<name>.js`. `src/kit.ts` maps the name to the `.ts` file and `pack` strips the types with `Bun.Transpiler` as it inlines it: the output is a plain classic script (no imports, exports or module wrapper), with the file's leading `/* ... */` documentation comment put back in front, because the transpiler drops every comment. `kit <file>` prints that comment from the source. Keep a kit file a script: no top-level `import` or `export`, no generated `.js` next to the source. Bun's transpiler is not a pure type eraser: it drops a `"use strict"` directive, rewrites top-level `this`, and adds an import for decorators, so the kit uses none of these and wraps its code in a function or assigns to `window`.
 
-`tsconfig.kit.json` checks them with the DOM lib, no Bun types and the same strict options as the rest, except `noPropertyAccessFromIndexSignature`: `element.dataset` has an index signature, so the option would turn every `dataset.ref` into `dataset["ref"]`, which Biome's `useLiteralKeys` rejects. The window globals the scripts define (`Charts`, `Plot`, `Steps`, `Views`, `ReplyKeep`, `ReplyNotes`) and `echarts` are declared once in `kit-types/globals.d.ts`, with the option and callback types of their public API. Pages that agents write are not checked.
+`tsconfig.kit.json` checks them with the DOM lib, no Bun types and the same strict options as the rest, except `noPropertyAccessFromIndexSignature`: `element.dataset` has an index signature, so the option would turn every `dataset.ref` into `dataset["ref"]`, which Biome's `useLiteralKeys` rejects. The window globals the scripts define (`Charts`, `Plot`, `Steps`, `Views`, `ReplyKeep`, `ReplyNotes`) and `echarts` are declared once in `kit-types/globals.d.ts`, with the option and callback types of their public API. Authors can typecheck their own `.tsx` with `kit types > tsconfig.json` then `bun check`; the generated config resolves the components and the vendored Preact, ECharts and kit declarations without an install.
 
 ## Installing
 

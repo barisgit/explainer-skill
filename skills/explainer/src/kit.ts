@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, sep } from "node:path";
-import { KIT_DIR } from "./paths.ts";
+import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
 
 /**
  * Kit scripts are TypeScript sources (erasable syntax only) that pages name with a `.js` extension: `kit:steps.js` is `kit/steps.ts`
@@ -20,6 +20,38 @@ export const kitFiles = (): string[] =>
 		.filter((e) => e.isFile())
 		.map((e) => (e.name.endsWith(".ts") ? `${e.name.slice(0, -3)}.js` : e.name))
 		.sort();
+
+/** A tsconfig for the author's current page directory, pointing at this skill's components and vendored declarations. */
+export function authorTsconfig(): string {
+	const types = join(SKILL_ROOT, "vendor/types");
+	return JSON.stringify(
+		{
+			compilerOptions: {
+				target: "ESNext",
+				module: "ESNext",
+				moduleResolution: "bundler",
+				lib: ["ESNext", "DOM", "DOM.Iterable"],
+				jsx: "react-jsx",
+				jsxImportSource: "preact",
+				strict: true,
+				noEmit: true,
+				allowImportingTsExtensions: true,
+				types: [],
+				paths: {
+					kit: [join(KIT_DIR, "components/index.ts")],
+					preact: [join(types, "preact/src/index.d.ts")],
+					"preact/*": [join(types, "preact/*/src/index.d.ts")],
+					echarts: [join(types, "echarts/types/dist/echarts.d.ts")],
+				},
+			},
+			files: [join(types, "globals.d.ts")],
+			include: ["**/*.ts", "**/*.tsx"],
+			exclude: [SKILL_ROOT],
+		},
+		null,
+		2,
+	);
+}
 
 /** The first block comment of a source file, markers included: a kit script's documentation. */
 export const leadingComment = (source: string): string =>

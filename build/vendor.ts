@@ -7,9 +7,10 @@
  *   vendor/mdx.js                 the MDX compiler with remark-gfm and remark-frontmatter, one ES module; used by `pack` for .mdx pages, never inlined
  *   vendor/preact/*.js            Preact, its hooks and JSX runtime, and preact-render-to-string, as ES modules that import "preact";
  *                                 pack bundles them into a page's prerender and its client components
+ *   vendor/types/                Preact, ECharts and kit declarations for author typechecking
  *   kit/licenses/*.txt            licence texts the bundles must carry
  */
-import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -120,6 +121,22 @@ for (const [file, [name, entry]] of Object.entries(preactModules)) {
 		`/*! ${name}, MIT licence: kit/licenses/preact.txt */\n${await bundle(nm(entry), "browser", "esm", ["preact"])}`,
 	);
 }
+
+// Author typechecking uses the same public types as the kit, with the libraries' own declarations, without node_modules.
+const declarations = [
+	"preact/src/index.d.ts",
+	"preact/src/jsx.d.ts",
+	"preact/src/dom.d.ts",
+	"preact/hooks/src/index.d.ts",
+	"preact/jsx-runtime/src/index.d.ts",
+	"echarts/types/dist/echarts.d.ts",
+];
+for (const file of declarations) {
+	const out = join(skill, "vendor/types", file);
+	mkdirSync(join(out, ".."), { recursive: true });
+	copyFileSync(nm(file), out);
+}
+copyFileSync(join(root, "kit-types/globals.d.ts"), join(skill, "vendor/types/globals.d.ts"));
 
 mkdirSync(join(skill, "kit/licenses"), { recursive: true });
 const licences: Record<string, Promise<string>[]> = {
