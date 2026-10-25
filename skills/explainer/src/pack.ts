@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { classCollisions } from "./collisions.ts";
-import { safeScript } from "./escape.ts";
+import { safeScript, unescapeHtml } from "./escape.ts";
 import { repeatedIdProblems } from "./ids.ts";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
 import { findLoads, type Load } from "./loads.ts";
@@ -71,14 +71,6 @@ function inlineCss(css: string, baseDir: string, from: string): string {
 		return `url("${dataUri(locate(ref, baseDir))}")`;
 	});
 }
-
-const unescapeHtml = (s: string) =>
-	s
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&amp;/g, "&");
 
 const DATA_REF = /\bdata-ref="([^"]*)"/g;
 const refsIn = (markup: string) =>

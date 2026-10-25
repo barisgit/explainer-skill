@@ -4,20 +4,13 @@
  * one is. Ids pack writes itself stay unique: Mermaid diagrams prefix theirs per diagram, and the dark copy of a themed SVG
  * image drops its id.
  */
+import { unescapeHtml } from "./escape.ts";
 
 /** One element carrying a repeated id: its start tag, reduced to what tells it apart, and the heading it comes after. */
 interface IdUse {
 	tag: string;
 	under: string | undefined;
 }
-
-const decode = (text: string) =>
-	text
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&amp;/g, "&");
 
 /** `<input type="radio" name="pick" value="a">`: the tag with the attributes that tell such elements apart. */
 function describe(el: HTMLRewriterTypes.Element): string {
@@ -39,7 +32,7 @@ async function repeatedIds(html: string): Promise<Map<string, IdUse[]>> {
 				const parts: string[] = [];
 				text = parts;
 				el.onEndTag(() => {
-					heading = decode(parts.join("")).replace(/\s+/g, " ").trim() || heading;
+					heading = unescapeHtml(parts.join("")).replace(/\s+/g, " ").trim() || heading;
 				});
 			},
 			// Text inside the heading's child elements arrives here too.
@@ -49,7 +42,7 @@ async function repeatedIds(html: string): Promise<Map<string, IdUse[]>> {
 		})
 		.on("[id]", {
 			element(el) {
-				const id = decode(el.getAttribute("id") ?? "");
+				const id = unescapeHtml(el.getAttribute("id") ?? "");
 				if (id) {
 					uses.set(id, [...(uses.get(id) ?? []), { tag: describe(el), under: heading }]);
 				}
