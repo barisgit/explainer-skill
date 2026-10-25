@@ -161,6 +161,10 @@ function runScenario(scenario: Scenario, expected: string[]): void {
 	for (const dir of scenario.installed) {
 		console.log(` ${dir}`);
 		const installed = join(root, dir);
+		if (!existsSync(installed)) {
+			record(false, "installed", `${installed} does not exist`);
+			continue;
+		}
 		verifyFiles(installed, expected);
 		verifyCli(installed, home, join(root, "out", dir.replaceAll("/", "_")));
 	}
