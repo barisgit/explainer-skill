@@ -364,7 +364,7 @@ test("MDX records keep JSX category markers, a plain toolbar's Expand all, and n
 	expect(await runPacked(output)).toEqual([]);
 }, 30_000);
 
-/** The study pattern of guide.md as an author writes it in MDX: an explanation in a textarea, the answer in a <details> after it. */
+/** v0.8.2's hand-written study pattern in MDX, which still works beside Question: an explanation in a reply textarea, the answer in a <details> after it. */
 const STUDY_PAGE = `import { Question } from "kit";
 
 # Study
