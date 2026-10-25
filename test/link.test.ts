@@ -175,3 +175,23 @@ test("on a page with kit:reply.js alone its note targets are reachable and marke
 	expect(lit() === "", "without kit:link.js nothing lights");`;
 	expect(await packAndRun(dir, "reply-only", PAGE(script, body, ["reply"]))).toEqual([]);
 }, 30_000);
+
+test.each([
+	["link", "linked part stops linking"],
+	["reply", "note target stops taking notes"],
+])(
+	"with kit:%s.js the kit removes only the tabindex it set when a %s",
+	async (kit) => {
+		const body = `<p><span id="a" data-ref="pair">one</span> and <span id="b" data-ref="pair">two</span>.</p>`;
+		const script = `
+	const tab = (id) => $("#" + id).getAttribute("tabindex");
+	expect(tab("a") === "0" && tab("b") === "0", "the kit makes the parts focusable");
+	$("#a").tabIndex = -1;
+	for (const id of ["a", "b"]) $("#" + id).removeAttribute("data-ref");
+	await Promise.resolve();
+	expect(tab("a") === "-1", "a tabindex the page wrote over the kit's stays");
+	expect(tab("b") === null, "the tabindex the kit set goes");`;
+		expect(await packAndRun(dir, `tabindex-${kit}`, PAGE(script, body, [kit]))).toEqual([]);
+	},
+	30_000,
+);

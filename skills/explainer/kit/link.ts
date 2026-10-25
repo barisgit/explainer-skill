@@ -70,7 +70,8 @@
 
 	/**
 	 * Makes a part keyboard-reachable while it is linked or a kit:reply.js note target (is-annotatable), and undoes only what the
-	 * kit set (data-kit-focusable), so the author's tabindex stays. reply.js keeps the same rule; reading both classes makes the
+	 * kit set (data-kit-focusable, while the tabindex is still its 0), so a tabindex the author or a page script wrote stays.
+	 * reply.js keeps the same rule, which cannot be shared: each kit file is a script of its own. Reading both classes makes the
 	 * result the same whichever script runs first. Diagram parts are not made reachable: a diagram has dozens, and prose links to
 	 * the same refs.
 	 */
@@ -81,7 +82,10 @@
 			el.tabIndex = 0;
 			el.dataset.kitFocusable = "";
 		} else if (!wanted && el.dataset.kitFocusable !== undefined) {
-			el.removeAttribute("tabindex");
+			// The marker says the kit set a tabindex once; a page script may have written its own since (views.js writes -1).
+			if (el.getAttribute("tabindex") === "0") {
+				el.removeAttribute("tabindex");
+			}
 			delete el.dataset.kitFocusable;
 		}
 	}
