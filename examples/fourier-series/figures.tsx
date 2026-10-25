@@ -1,11 +1,10 @@
 "use client";
-/* The page's interactive parts. Each section whose heading follows its controls renders that heading too, then its intro from
-   the page (children); everything else on the page is rendered once when it packs (page.mdx). */
-import { Chart, Plot, Stepper } from "kit";
+/* The page's interactive parts: the first screen's Explore frame, and the two sections whose headings follow their controls, which
+   render that heading, then their intro from the page (children). Everything else is rendered once when the page packs. */
+import { Chart, Plot } from "kit";
 import type { ComponentChildren } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { Seg, Slider, Toggle } from "./controls.tsx";
-import { DERIVATIONS } from "./derivations.tsx";
 import {
 	coefficient,
 	fixed,
@@ -26,7 +25,6 @@ import {
 } from "./fourier.ts";
 
 const PI = Math.PI;
-const WAVE_NAMES = { square: "Square wave", saw: "Sawtooth" } as const;
 /** What an axis pointer label formatter receives. */
 type Pointer = { value: number };
 
@@ -96,148 +94,35 @@ function heroOption(wave: Wave, k: number, withParts: boolean): ChartOption {
 	};
 }
 
-/** The first screen's figure: pick a wave and a number of terms, see the sum, its peak, and optionally each sine. */
-export function Hero() {
-	const [name, setName] = useState<WaveName>("square");
-	const [k, setK] = useState(3);
-	const [withParts, setWithParts] = useState(false);
+/** The first screen's figure, Explore's frame for the wave, the number of terms and whether each sine shows: the sum, its peak,
+ *  and optionally each sine. */
+export function hero(name: WaveName, k: number, withParts: boolean) {
 	const wave = WAVES[name];
-	const option = useMemo(() => heroOption(wave, k, withParts), [wave, k, withParts]);
 	const best = peak(wave, k);
 	const above = (best - wave.top) / wave.jump;
 	const partsNote = withParts
 		? `Thin lines: the first ${Math.min(k, PARTS_SHOWN)} sines of the sum, each at its own amplitude. `
 		: "";
-	return (
-		<figure class="fig">
-			<div class="controls">
-				<Seg
-					name="wave"
-					label="Signal to build"
-					options={WAVE_NAMES}
-					value={name}
-					onChange={setName}
-				/>
-				<Slider id="terms" label="Terms in the sum" max={40} value={k} onInput={setK} />
-				<Toggle id="parts" label="Show each sine" on={withParts} onChange={setWithParts} />
-			</div>
-			<dl class="stats" aria-live="polite">
-				<div class="stat">
-					<dt>Highest frequency used</dt>
-					<dd>
-						{wave.harmonic(k)}× <small>base frequency</small>
-					</dd>
-				</div>
-				<div class="stat">
-					<dt>Highest point of the sum</dt>
-					<dd>
-						{fixed(best, 3)} <small>target {fixed(wave.top, name === "saw" ? 2 : 0)}</small>
-					</dd>
-				</div>
-				<div class="stat">
-					<dt>Highest point vs target, share of the jump</dt>
-					<dd>
-						{above < 0 ? MINUS : "+"}
-						{pct(Math.abs(above))}
-					</dd>
-				</div>
-			</dl>
-			<Chart
-				id="hero-chart"
-				label="A square wave or sawtooth and the sum of its first sines, over two periods"
-				option={option}
-			/>
-			<figcaption>
-				Dashed: the {wave.name.toLowerCase()} to build. Solid: the sum. {partsNote}Horizontal axis
-				in radians, one period is 2π. Scroll or pinch to zoom.
-			</figcaption>
-		</figure>
-	);
-}
-
-/* ---- 2. Coefficients: a derivation to step through, with the resulting b_n ---- */
-
-/** The value printed on a stem: (x, y) => text. */
-const stemLabel = (_: number, y = 0) => (y === 0 ? "0" : fixed(y));
-
-function coefOption(name: WaveName): PlotOption {
-	const wave = WAVES[name];
-	const data = Array.from({ length: 12 }, (_, i): [number, number] => {
-		const n = i + 1;
-		return [n, name === "saw" || n % 2 === 1 ? wave.coef(n) : 0];
-	});
 	return {
-		series: [
-			{
-				name: "b",
-				type: "stem",
-				data,
-				color: "var(--accent)",
-				label: stemLabel,
-			},
-		],
-		x: { min: 0, max: 13, step: 1, name: "harmonic n" },
-		y: name === "square" ? { min: 0, max: 1.6 } : { min: -1.4, max: 2.4 },
-		legend: false,
+		chart: heroOption(wave, k, withParts),
+		stats: {
+			"Highest frequency used": (
+				<>
+					{wave.harmonic(k)}× <small>base frequency</small>
+				</>
+			),
+			"Highest point of the sum": (
+				<>
+					{fixed(best, 3)} <small>target {fixed(wave.top, name === "saw" ? 2 : 0)}</small>
+				</>
+			),
+			"Highest point vs target, share of the jump": `${above < 0 ? MINUS : "+"}${pct(Math.abs(above))}`,
+		},
+		caption: `Dashed: the ${wave.name.toLowerCase()} to build. Solid: the sum. ${partsNote}Horizontal axis in radians, one period is 2π. Scroll or pinch to zoom.`,
 	};
 }
 
-/** The coefficients section: its heading, the intro, the derivation stepper for the chosen wave, and the b_n it ends with. */
-export function Coefficients({ children }: { children?: ComponentChildren }) {
-	const [name, setName] = useState<WaveName>("square");
-	const steps = DERIVATIONS[name];
-	const option = useMemo(() => coefOption(name), [name]);
-	return (
-		<>
-			<h2>
-				{name === "square"
-					? "Square wave: only odd harmonics, amplitudes 4/(nπ)"
-					: "Sawtooth: every harmonic, amplitudes 2/n with alternating sign"}
-			</h2>
-			{children}
-			<Stepper
-				id="deriv-fig"
-				start={1}
-				restartOn={name}
-				label="Derivation of the Fourier coefficients, step by step"
-			>
-				<div class="controls">
-					<Seg
-						name="coef"
-						label="Wave to derive"
-						options={WAVE_NAMES}
-						value={name}
-						onChange={setName}
-					/>
-				</div>
-				{/* The captions sit between the switch and the maths, so steps.js puts the player there. */}
-				<ol data-captions="">
-					{steps.map((s) => (
-						<li>{s.caption}</li>
-					))}
-				</ol>
-				<div class="eqs">
-					{steps.map((s, i) => (
-						<p class="eq" data-step={i + 1}>
-							{s.eq}
-						</p>
-					))}
-				</div>
-				<Plot id="coef-plot" label="The sine coefficients b-n for n from 1 to 12" option={option} />
-				<figcaption>
-					The sine coefficients <i>b</i>
-					<sub>
-						<i>n</i>
-					</sub>
-					, first twelve. Square wave: ±1 jumps at 0 and ±π. Sawtooth: <i>f</i>(<i>x</i>) = <i>x</i>{" "}
-					on (−π, π), repeating, with jumps at ±π.
-				</figcaption>
-			</Stepper>
-		</>
-	);
-}
-
-/* ---- 3. Gibbs: the bump keeps its height ---- */
+/* ---- 2. Gibbs: the bump keeps its height ---- */
 const square = WAVES.square;
 const gGrid = linspace(-1.6, 1.6, 2400);
 const peakData = Array.from({ length: 200 }, (_, i) => [i + 1, peak(square, i + 1)]);
@@ -420,7 +305,10 @@ export function Gibbs({ children }: { children?: ComponentChildren }) {
 	);
 }
 
-/* ---- 4. Symmetry: which coefficients survive ---- */
+/* ---- 3. Symmetry: which coefficients survive ---- */
+
+/** The value printed on a stem: (x, y) => text. */
+const stemLabel = (_: number, y = 0) => (y === 0 ? "0" : fixed(y));
 const SYM_NAMES = {
 	even: "Even: triangle",
 	odd: "Odd: square wave",
