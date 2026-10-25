@@ -9,6 +9,7 @@
        link    the key, or (record) => href, that makes each value a link
        note    the key, or (record) => text, of a muted line under the value
      state   (record) => "fit", "maybe" or "out": fit and maybe rows get a coloured edge, out rows are muted
+     class   more classes after "compare": "table" keeps a wide table whole on phones, scrolling sideways in a <div class="scroll">
    Rendered when the page packs, so it shows before scripts run and prints. */
 import type { ComponentChildren } from "preact";
 import { numberText } from "./parts/format.ts";
@@ -29,6 +30,7 @@ export interface TableProps<Row> {
 	rows: readonly Row[];
 	cols: readonly TableColumn<Row>[];
 	state?: (row: Row) => "fit" | "maybe" | "out" | undefined;
+	class?: string;
 	id?: string;
 }
 
@@ -65,11 +67,11 @@ function columnCells<Row>(rows: readonly Row[], col: TableColumn<Row>) {
  * Renders `table.compare` as a Markdown table does (src/mdx/compile.ts): each row's first cell is `<th scope="row">`, every
  * other cell carries its column's head as `data-label`, and a numeric column is `class="num"` on its header and cells.
  */
-export function Table<Row>({ rows, cols, state, id }: TableProps<Row>) {
+export function Table<Row>({ rows, cols, state, class: classes, id }: TableProps<Row>) {
 	const columns = cols.map((col) => ({ head: col.head, ...columnCells(rows, col) }));
 	const num = (column: { num: boolean }) => (column.num ? "num" : undefined);
 	return (
-		<table class="compare" id={id}>
+		<table class={classes ? `compare ${classes}` : "compare"} id={id}>
 			<thead>
 				<tr>
 					{columns.map((column) => (

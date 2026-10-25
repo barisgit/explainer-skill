@@ -1,8 +1,6 @@
 "use client";
-/* The drill-down view at #place/<slug>, filled from the URL: page.mdx writes one View whose heading, lede and figure are these
-   components. Each reads the place from the address, so the three agree without sharing state, and the view is a pure function
-   of the URL (Back, reload and a shared link show the same place). */
-import { useLayoutEffect, useState } from "preact/hooks";
+/* The drill-down view at #place/<slug>: page.mdx fills one View from PLACE_RECORDS, and the kit draws the open place with
+   PlaceView, so the page carries the data once instead of 223 views' markup. */
 import { MixFigure } from "./figures.tsx";
 import {
 	COAL,
@@ -19,34 +17,6 @@ import {
 	twh,
 	YEARS,
 } from "./model.ts";
-
-/**
- * The slug of the last #place/<slug> the reader opened, kept while they are elsewhere so a hidden view does not redraw on the
- * way back; null until they open one. It is read once the island hydrates, as the page renders it at pack time with no address.
- * A layout effect, so the hashchange listener is added while the island hydrates, before views.js adds its own: Preact redraws
- * the heading between the two listeners, and the breadcrumbs name a view no link names by that heading ("Europe").
- */
-function usePlaceSlug() {
-	const [slug, setSlug] = useState<string | null>(null);
-	useLayoutEffect(() => {
-		const read = () => {
-			const [name, ...param] = location.hash.slice(1).split("/");
-			if (name === "place") {
-				setSlug(decodeURIComponent(param.join("/")));
-			}
-		};
-		read();
-		addEventListener("hashchange", read);
-		return () => removeEventListener("hashchange", read);
-	}, []);
-	return slug;
-}
-
-/** The view's heading: the place's name. */
-export function PlaceName() {
-	const slug = usePlaceSlug();
-	return <>{slug === null ? "" : (placeOf(slug)?.name ?? "No such place")}</>;
-}
 
 /** The sentence about coal, checked against every year rather than the two endpoints. */
 function coalSentence(place: Place, a: number, b: number) {
@@ -89,17 +59,9 @@ function lede(place: Place) {
 	return `${place.name} generated ${cell(total(place, b), fmtT)} TWh of electricity in ${b}; ${biggest.name.toLowerCase()} was the largest source at ${pc(share(place, biggest, b))}.${coalSentence(place, a, b)}${partialNote}`;
 }
 
-/** The view's lede. */
-export function PlaceLede() {
-	const slug = usePlaceSlug();
-	const place = slug === null ? undefined : placeOf(slug);
-	return <>{slug === null ? "" : place ? lede(place) : "This place is not in the dataset."}</>;
-}
-
-/** The view's numbers and its stacked mix; nothing for a place the dataset does not have. */
-export function PlaceFigure() {
-	const slug = usePlaceSlug();
-	const place = slug === null ? undefined : placeOf(slug);
+/** One place's view: its name, the lede, its numbers and its stacked mix. */
+export function PlaceView({ record }: { record: { id: string } }) {
+	const place = placeOf(record.id);
 	if (!place) {
 		return null;
 	}
@@ -108,6 +70,8 @@ export function PlaceFigure() {
 		`${pc(sumShare(place, ids, a), digits)} → ${pc(sumShare(place, ids, b), digits)}`;
 	return (
 		<>
+			<h1>{place.name}</h1>
+			<p>{lede(place)}</p>
 			<dl class="stats" aria-live="polite">
 				<div class="stat">
 					<dt>Generation in {b}</dt>

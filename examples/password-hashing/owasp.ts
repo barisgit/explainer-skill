@@ -48,6 +48,13 @@ const count = (n: number) => n.toLocaleString("en-US");
 
 const FIPS_UNKNOWN = "Unknown: the cheat sheet does not say";
 
+/** One line of an algorithm's settings table. */
+export interface Setting {
+	setting: string;
+	memory: string;
+	tradeOff: string;
+}
+
 /** What the overview's comparison table and each algorithm's view say about it. */
 export interface Algo {
 	name: string;
@@ -58,8 +65,8 @@ export interface Algo {
 	memory: string;
 	fips: string;
 	watch: string;
-	/** Every OWASP setting: name, nominal memory, what it trades. */
-	settings: [setting: string, memory: string, tradeOff: string][];
+	/** Every OWASP setting: its parameters, nominal memory, and what it trades. */
+	settings: Setting[];
 }
 
 export const ALGOS = {
@@ -71,11 +78,11 @@ export const ALGOS = {
 		memory: "7 to 46 MiB",
 		fips: FIPS_UNKNOWN,
 		watch: "Memory-hard, so it needs memory per login; use the Argon2id variant",
-		settings: ARGON.map((s) => [
-			`m=${s.kib} KiB, t=${s.t}, p=1`,
-			`${s.mib} MiB`,
-			`${s.t} pass${s.t > 1 ? "es" : ""}`,
-		]),
+		settings: ARGON.map((s) => ({
+			setting: `m=${s.kib} KiB, t=${s.t}, p=1`,
+			memory: `${s.mib} MiB`,
+			tradeOff: `${s.t} pass${s.t > 1 ? "es" : ""}`,
+		})),
 	},
 	scrypt: {
 		name: "scrypt",
@@ -85,7 +92,11 @@ export const ALGOS = {
 		memory: "8 to 128 MiB",
 		fips: FIPS_UNKNOWN,
 		watch: "Memory-hard; its listed settings trade parallelism against memory",
-		settings: SCRYPT.map((s) => [scryptLabel(s), `${s.mib} MiB`, `p=${s.p}`]),
+		settings: SCRYPT.map((s) => ({
+			setting: scryptLabel(s),
+			memory: `${s.mib} MiB`,
+			tradeOff: `p=${s.p}`,
+		})),
 	},
 	bcrypt: {
 		name: "bcrypt",
@@ -105,15 +116,18 @@ export const ALGOS = {
 		memory: "No memory-cost parameter",
 		fips: "Validated implementations exist; check that your module's certificate covers it",
 		watch: "Long passwords can be slow in some implementations",
-		settings: PBKDF2.map((s) => [
-			`PBKDF2-${s.hash}`,
-			"No memory-cost parameter",
-			`${count(s.iterations)} iterations${s.note ? ` (${s.note})` : ""}`,
-		]),
+		settings: PBKDF2.map((s) => ({
+			setting: `PBKDF2-${s.hash}`,
+			memory: "No memory-cost parameter",
+			tradeOff: `${count(s.iterations)} iterations${s.note ? ` (${s.note})` : ""}`,
+		})),
 	},
 } satisfies Record<string, Algo>;
 
 export type AlgoId = keyof typeof ALGOS;
+
+/** The algorithms as rows of the overview's comparison, each with the id of its view. */
+export const ALGO_ROWS = Object.entries(ALGOS).map(([id, a]) => ({ id, ...a }));
 
 /**
  * The chart of an algorithm's settings, as JSON so the page can hand it straight to a Chart: memory against passes or

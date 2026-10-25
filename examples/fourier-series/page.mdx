@@ -1,16 +1,25 @@
 ---
 title: "Fourier series: building signals from sines"
 ---
-import { Question } from "kit";
-import { Coefficients, Gibbs, Hero, Symmetry } from "./figures.tsx";
-import { A0, An, Bn, Dx, F, Frac, Int, Nx, Period, Series, Sum, SumN } from "./math.tsx";
+import { Explore, Plot, Question, Stepper } from "kit";
+import { Gibbs, hero, Symmetry } from "./figures.tsx";
+import { coefficientPlot } from "./fourier.ts";
 import "./page.css";
 
 # A square wave is a sum of sines, and the bump at its jump never goes away
 
 Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.
 
-<Hero />
+<Explore
+	class="hero"
+	label="A square wave or sawtooth and the sum of its first sines, over two periods"
+	controls={[
+		{ id: "wave", label: "Signal to build", choice: { square: "Square wave", saw: "Sawtooth" } },
+		{ id: "terms", label: "Terms in the sum", range: [1, 40, 1], value: 3 },
+		{ id: "parts", label: "Show each sine", toggle: true },
+	]}
+	frame={hero}
+/>
 
 ## Six questions to answer before you read on
 
@@ -28,19 +37,19 @@ No finite sum of smooth waves has a corner, but each extra harmonic fixes more o
 
 <Question name="a2" legend="For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?">
 
-Only sines with odd n: *b*<sub>*n*</sub> = 4/(*nπ*) for odd n, and zero for even n and for every cosine. The amplitudes fall like 1/n, so 4/π, 4/(3π), 4/(5π), …
+Only sines with odd $n$: $b_n = 4/(n\pi)$ for odd $n$, and zero for even $n$ and for every cosine. The amplitudes fall like $1/n$, so $4/\pi$, $4/(3\pi)$, $4/(5\pi)$, …
 
 </Question>
 
 <Question name="a3" legend={<>The sawtooth <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?</>}>
 
-*b*<sub>*n*</sub> = 2(−1)<sup>*n*+1</sup>/*n*. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.
+$b_n = 2(-1)^{n+1}/n$. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.
 
 </Question>
 
 <Question name="a4" legend="You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?">
 
-It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at *x* = π/(2k) for k terms. The section on the bump lets you check.
+It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at $x = \pi/(2k)$ for $k$ terms. The section on the bump lets you check.
 
 </Question>
 
@@ -52,7 +61,7 @@ At every point away from a jump the sum converges to the signal, because the bum
 
 <Question name="a6" legend={<>Without integrating: which coefficients are zero for <i>x</i>², for <i>x</i>³, and for <i>x</i>² + <i>x</i> on (−π, π)?</>}>
 
-*x*² is even: all *b*<sub>*n*</sub> are zero, only cosines (and *a*<sub>0</sub>) remain. *x*³ is odd: *a*<sub>0</sub> and all *a*<sub>*n*</sub> are zero, only sines remain. *x*² + *x* is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from *x*² and its sines from *x*.
+$x^2$ is even: all $b_n$ are zero, only cosines (and $a_0$) remain. $x^3$ is odd: $a_0$ and all $a_n$ are zero, only sines remain. $x^2 + x$ is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from $x^2$ and its sines from $x$.
 
 </Question>
 
@@ -62,29 +71,152 @@ At every point away from a jump the sum converges to the signal, because the bum
 
 Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:
 
-<div class="eq"><Series /></div>
+$$
+f(x) = \frac{a_0}{2} + \sum_{n=1}^{\infty} \left(a_n \cos nx + b_n \sin nx\right)
+$$
 
 Two facts make this work. First, every term repeats after 2π, so any sum of them does too. Second, the terms are **orthogonal**: over one period, the integral of the product of two different terms is zero, and for positive whole numbers the product of a sine or cosine with itself integrates to π. The constant term is its own case: its square integrates to 2π. Multiply the signal by one term and integrate, and every other term drops out. That leaves one number, the amount of that term in the signal. It is the formula for the coefficients used below.
 
 The figure above is the series in action. With one term the square wave is a single sine of amplitude 4/π. Each added sine puts back detail the previous sum lacked, and the corners get steeper.
 
-{/* These three sections' headings follow their controls, so each component renders its section's heading, then the intro written here, then its figure. */}
+{/* The switch shows one wave's derivation and coefficients through page.css alone; print shows both. Each stepper's captions are
+   written as its list (ol data-captions), so they can hold maths. */}
 
-<section>
-<Coefficients>
+## The square wave keeps only odd harmonics, at 4/(nπ); the sawtooth keeps every one, at 2/n with alternating sign
+
 Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.
-</Coefficients>
-</section>
+
+<figure class="fig" id="coef">
+<div class="controls">
+<div class="seg" role="radiogroup" aria-label="Wave to derive">
+<label><input type="radio" name="coef" id="coef-square" value="square" checked /><span>Square wave</span></label>
+<label><input type="radio" name="coef" id="coef-saw" value="saw" /><span>Sawtooth</span></label>
+</div>
+</div>
+<div data-wave="square">
+<Stepper id="deriv-square" class="deriv" start={1} label="Derivation of the square wave's coefficients, step by step">
+<ol data-captions="">
+<li>Cosine coefficients first. The square wave is odd and $\cos nx$ is even, so the integrand is odd and its integral over a symmetric interval is zero. The same argument gives $a_0 = 0$.</li>
+<li>The sine coefficient uses the same recipe with $\sin nx$. Here $f = -1$ on the left half of the period and $+1$ on the right half.</li>
+<li>$f$ and $\sin nx$ are both odd, so their product is even: integrate over half the period and double. On $(0, \pi)$ the square wave is 1.</li>
+<li>Integrate $\sin nx$ and put in the limits. $\cos 0 = 1$ supplies the 1.</li>
+<li>$\cos n\pi$ is $-1$ or $+1$ as $n$ is odd or even. Even harmonics cancel; odd ones keep $4/(n\pi)$.</li>
+<li>Put the coefficients back into the series. This is the sum being built at the top of the page.</li>
+</ol>
+<div data-step="1">
+
+$$
+a_n = \frac{1}{\pi} \int_{-\pi}^{\pi} f(x) \cos nx \, dx = 0
+$$
+
+</div>
+<div data-step="2">
+
+$$
+b_n = \frac{1}{\pi} \int_{-\pi}^{\pi} f(x) \sin nx \, dx
+$$
+
+</div>
+<div data-step="3">
+
+$$
+= \frac{2}{\pi} \int_{0}^{\pi} \sin nx \, dx
+$$
+
+</div>
+<div data-step="4">
+
+$$
+= \frac{2}{\pi} \left[ -\frac{\cos nx}{n} \right]_0^{\pi} = \frac{2}{n\pi} \left(1 - \cos n\pi\right)
+$$
+
+</div>
+<div data-step="5">
+
+$$
+= \frac{2}{n\pi} \left(1 - (-1)^n\right) = \frac{4}{n\pi} \text{ for odd } n \text{, and 0 for even } n
+$$
+
+</div>
+<div data-step="6">
+
+$$
+f(x) = \frac{4}{\pi} \left( \sin x + \frac{1}{3} \sin 3x + \frac{1}{5} \sin 5x + \dots \right)
+$$
+
+</div>
+</Stepper>
+<Plot label="The sine coefficients b-n of the square wave for n from 1 to 12" option={coefficientPlot("square")} />
+</div>
+<div data-wave="saw">
+<Stepper id="deriv-saw" class="deriv" start={1} label="Derivation of the sawtooth's coefficients, step by step">
+<ol data-captions="">
+<li>Cosine coefficients first. $x$ is odd and $\cos nx$ is even, so the integrand is odd and integrates to zero over $(-\pi, \pi)$. So does $a_0$.</li>
+<li>The sine coefficient with $f(x) = x$ on one period.</li>
+<li>$x$ and $\sin nx$ are both odd, so the product is even: integrate over $(0, \pi)$ and double.</li>
+<li>Integration by parts. At both limits $\sin nx$ is 0, and the $x \cos nx$ term is 0 at $x = 0$, so only $-\pi \cos n\pi / n$ remains.</li>
+<li>With $\cos n\pi = (-1)^n$: $+2/n$ for odd $n$ and $-2/n$ for even $n$. Every harmonic is present, with alternating signs.</li>
+<li>Put the coefficients back into the series. This is the sawtooth being built at the top of the page.</li>
+</ol>
+<div data-step="1">
+
+$$
+a_n = \frac{1}{\pi} \int_{-\pi}^{\pi} x \cos nx \, dx = 0
+$$
+
+</div>
+<div data-step="2">
+
+$$
+b_n = \frac{1}{\pi} \int_{-\pi}^{\pi} x \sin nx \, dx
+$$
+
+</div>
+<div data-step="3">
+
+$$
+= \frac{2}{\pi} \int_{0}^{\pi} x \sin nx \, dx
+$$
+
+</div>
+<div data-step="4">
+
+$$
+= \frac{2}{\pi} \left[ -\frac{x \cos nx}{n} + \frac{\sin nx}{n^2} \right]_0^{\pi} = \frac{2}{\pi} \cdot \left( -\frac{\pi \cos n\pi}{n} \right)
+$$
+
+</div>
+<div data-step="5">
+
+$$
+= -\frac{2(-1)^n}{n} = \frac{2(-1)^{n+1}}{n}
+$$
+
+</div>
+<div data-step="6">
+
+$$
+f(x) = 2 \left( \sin x - \frac{1}{2} \sin 2x + \frac{1}{3} \sin 3x - \dots \right)
+$$
+
+</div>
+</Stepper>
+<Plot label="The sine coefficients b-n of the sawtooth for n from 1 to 12" option={coefficientPlot("saw")} />
+</div>
+<figcaption>The sine coefficients $b_n$, first twelve. Square wave: $\pm 1$ jumps at 0 and $\pm\pi$. Sawtooth: $f(x) = x$ on $(-\pi, \pi)$, repeating, with jumps at $\pm\pi$.</figcaption>
+</figure>
+
+{/* These two sections' headings follow their controls, so each component renders its section's heading, then the intro written here, then its figure. */}
 
 <section>
 <Gibbs>
-Here is the square wave from the top, close to its jump at *x* = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.
+Here is the square wave from the top, close to its jump at $x = 0$. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.
 </Gibbs>
 </section>
 
 <section>
 <Symmetry>
-An even function (*f*(−*x*) = *f*(*x*)) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.
+An even function ($f(-x) = f(x)$) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.
 </Symmetry>
 
 Spotting the symmetry first halves the work, and saves a mistake: a stray cosine term in an odd function's answer is wrong. The half ramp is the sum of its even part, a triangle, and its odd part, a straight line, so it has both kinds of term.
@@ -93,61 +225,29 @@ Spotting the symmetry first halves the work, and saves a mistake: a stray cosine
 
 ## Everything above on one table
 
-<dl class="sheet">
-<div>
-<dt>Series, period 2π</dt>
-<dd><Series /></dd>
-</div>
-<div>
-<dt>Coefficients</dt>
-<dd><An /> = <Frac top="1" bottom="π" /> <Period /> <F /> cos <Nx /><Dx /> &emsp; (*n* ≥ 0)</dd>
-<dd><Bn /> = <Frac top="1" bottom="π" /> <Period /> <F /> sin <Nx /><Dx /> &emsp; (*n* ≥ 1)</dd>
-</div>
-<div>
-<dt>Period T, ω = 2π/T</dt>
-<dd>*f*(*t*) = <Frac top={<A0 />} bottom="2" /> + <SumN /> (<An /> cos *nωt* + <Bn /> sin *nωt*)</dd>
-<dd><An /> = <Frac top="2" bottom={<i>T</i>} /> <Int from="0" to={<i>T</i>} /> *f*(*t*) cos *nωt* d*t*, &emsp; <Bn /> = <Frac top="2" bottom={<i>T</i>} /> <Int from="0" to={<i>T</i>} /> *f*(*t*) sin *nωt* d*t*</dd>
-</div>
-<div>
-<dt>Orthogonality</dt>
-<dd><Period /> sin *mx* sin <Nx /><Dx /> = <Period /> cos *mx* cos <Nx /><Dx /> = π if *m* = *n*, else 0 &emsp; (*m*, *n* = 1, 2, 3, …)</dd>
-<dd><Period /> sin *mx* cos <Nx /><Dx /> = 0 for all *m*, *n* &emsp; <Period /> cos <Nx /><Dx /> = 0 (*n* ≥ 1) &emsp; <Period /> 1<Dx /> = 2π</dd>
-</div>
-<div>
-<dt>Even *f*</dt>
-<dd><Bn /> = 0, &emsp; <An /> = <Frac top="2" bottom="π" /> <Int from="0" to="π" /> <F /> cos <Nx /><Dx /></dd>
-</div>
-<div>
-<dt>Odd *f*</dt>
-<dd><A0 /> = <An /> = 0, &emsp; <Bn /> = <Frac top="2" bottom="π" /> <Int from="0" to="π" /> <F /> sin <Nx /><Dx /></dd>
-</div>
-<div>
-<dt>Square wave, ±1, odd</dt>
-<dd><Bn /> = <Frac top="4" bottom={<><i>n</i>π</>} /> for odd *n*, 0 for even *n*</dd>
-<dd><F /> = <Frac top="4" bottom="π" /> <Sum from={<><i>n</i> odd</>} /> <Frac top={<>sin <Nx /></>} bottom={<i>n</i>} /></dd>
-</div>
-<div>
-<dt>Sawtooth, *f* = *x* on (−π, π)</dt>
-<dd><Bn /> = <Frac top={<>2(−1)<sup><i>n</i>+1</sup></>} bottom={<i>n</i>} /></dd>
-<dd><F /> = 2 ( sin *x* − <Frac top={<>sin 2<i>x</i></>} bottom="2" /> + <Frac top={<>sin 3<i>x</i></>} bottom="3" /> − … )</dd>
-</div>
-<div>
-<dt>At a jump</dt>
-<dd>The series gives the midpoint of the two one-sided limits: <Frac top={<><i>f</i>(<i>x</i><sup>+</sup>) + <i>f</i>(<i>x</i><sup>−</sup>)</>} bottom="2" /></dd>
-</div>
-<div>
-<dt>Gibbs overshoot</dt>
-<dd>Square wave ±1: the *k*-term sum peaks at *x* = <Frac top="π" bottom={<>2<i>k</i></>} />, and the peak tends to <Frac top="2" bottom="π" /> Si(π) ≈ 1.179</dd>
-<dd>Overshoot → 0.0895 × the jump, where Si(π) = <Int from="0" to="π" /> <Frac top={<>sin <i>t</i></>} bottom={<i>t</i>} /> d*t* ≈ 1.852</dd>
-</div>
-<div>
-<dt>Parseval</dt>
-<dd><Frac top="1" bottom="π" /> <Period /> <F /><sup>2</sup><Dx /> = <Frac top={<><i>a</i><sub>0</sub><sup>2</sup></>} bottom="2" /> + <SumN /> (<An /><sup>2</sup> + <Bn /><sup>2</sup>)</dd>
-<dd>After *N* terms the mean-square error is half the sum of the squared omitted coefficients.</dd>
-</div>
-</dl>
+| Rule | Formula | Where |
+|---|---|---|
+| Series, period $2\pi$ | $\displaystyle f(x) = \frac{a_0}{2} + \sum_{n=1}^{\infty} \left(a_n \cos nx + b_n \sin nx\right)$ | |
+| Cosine coefficients | $\displaystyle a_n = \frac{1}{\pi} \int_{-\pi}^{\pi} f(x) \cos nx \, dx$ | $n \ge 0$ |
+| Sine coefficients | $\displaystyle b_n = \frac{1}{\pi} \int_{-\pi}^{\pi} f(x) \sin nx \, dx$ | $n \ge 1$ |
+| Series, period $T$ | $\displaystyle f(t) = \frac{a_0}{2} + \sum_{n=1}^{\infty} \left(a_n \cos n\omega t + b_n \sin n\omega t\right)$ | $\omega = 2\pi/T$ |
+| Coefficients, period $T$ | $\displaystyle a_n = \frac{2}{T} \int_{0}^{T} f(t) \cos n\omega t \, dt$ | |
+| | $\displaystyle b_n = \frac{2}{T} \int_{0}^{T} f(t) \sin n\omega t \, dt$ | |
+| Orthogonality | $\displaystyle \int_{-\pi}^{\pi} \sin mx \sin nx \, dx = \int_{-\pi}^{\pi} \cos mx \cos nx \, dx = 0$ | $m \ne n$; both are $\pi$ when $m = n \ge 1$ |
+| | $\displaystyle \int_{-\pi}^{\pi} \sin mx \cos nx \, dx = 0$ | all $m$, $n$ |
+| | $\displaystyle \int_{-\pi}^{\pi} \cos nx \, dx = 0, \quad \int_{-\pi}^{\pi} 1 \, dx = 2\pi$ | $n \ge 1$ |
+| Even $f$ | $\displaystyle b_n = 0, \quad a_n = \frac{2}{\pi} \int_{0}^{\pi} f(x) \cos nx \, dx$ | $f(-x) = f(x)$ |
+| Odd $f$ | $\displaystyle a_0 = a_n = 0, \quad b_n = \frac{2}{\pi} \int_{0}^{\pi} f(x) \sin nx \, dx$ | $f(-x) = -f(x)$ |
+| Square wave | $\displaystyle b_n = \frac{4}{n\pi}$ | odd $n$; 0 for even $n$; the wave is $\pm 1$ and odd |
+| | $\displaystyle f(x) = \frac{4}{\pi} \sum_{n \text{ odd}} \frac{\sin nx}{n}$ | |
+| Sawtooth | $\displaystyle b_n = \frac{2(-1)^{n+1}}{n}$ | $f(x) = x$ on $(-\pi, \pi)$ |
+| | $\displaystyle f(x) = 2 \left( \sin x - \frac{\sin 2x}{2} + \frac{\sin 3x}{3} - \dots \right)$ | |
+| At a jump | $\displaystyle \frac{f(x^+) + f(x^-)}{2}$ | the midpoint of the two one-sided limits |
+| Gibbs overshoot | $\displaystyle \max \to \frac{2}{\pi} \operatorname{Si}(\pi) \approx 1.179$ | square wave $\pm 1$: the $k$-term sum peaks at $x = \pi/(2k)$, an overshoot of $0.0895 \times$ the jump |
+| | $\displaystyle \operatorname{Si}(\pi) = \int_{0}^{\pi} \frac{\sin t}{t} \, dt \approx 1.852$ | |
+| Parseval | $\displaystyle \frac{1}{\pi} \int_{-\pi}^{\pi} f(x)^2 \, dx = \frac{a_0^2}{2} + \sum_{n=1}^{\infty} \left(a_n^2 + b_n^2\right)$ | after $N$ terms the mean-square error is half the sum of the squared omitted coefficients |
 
-<p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is *a*<sub>0</sub>/2, which makes the same *a*<sub>*n*</sub> formula work for *n* = 0. Books that write plain *a*<sub>0</sub> use the average, *a*<sub>0</sub> = (1/2π)∫*f* d*x*.</p>
+<p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is $a_0/2$, which makes the same $a_n$ formula work for $n = 0$. Books that write plain $a_0$ use the average, $a_0 = (1/2\pi) \int f \, dx$.</p>
 
 <section class="minor">
 

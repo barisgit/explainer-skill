@@ -133,3 +133,26 @@ export function survivors(name: string, list: [number, number][]): string {
 	}
 	return kept.length > 6 ? `${kept.slice(0, 5).join(", ")}, …` : kept.join(", ");
 }
+
+/** The sine coefficients b₁ to b₁₂ of a wave as a stem plot, each stem labelled with its value: JSON, so the page draws it. */
+export function coefficientPlot(name: WaveName): PlotOption {
+	const wave = WAVES[name];
+	const data = Array.from({ length: 12 }, (_, i): [number, number] => {
+		const n = i + 1;
+		return [n, name === "saw" || n % 2 === 1 ? wave.coef(n) : 0];
+	});
+	return {
+		series: [
+			{
+				name: "b",
+				type: "stem",
+				data,
+				color: "var(--accent)",
+				label: data.map(([, y]) => (y === 0 ? "0" : fixed(y))),
+			},
+		],
+		x: { min: 0, max: 13, step: 1, name: "harmonic n" },
+		y: name === "square" ? { min: 0, max: 1.6 } : { min: -1.4, max: 2.4 },
+		legend: false,
+	};
+}

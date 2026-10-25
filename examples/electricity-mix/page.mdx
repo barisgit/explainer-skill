@@ -1,11 +1,11 @@
 ---
 title: How the world's electricity mix changed since 2000
 ---
-import { View } from "kit";
+import { Table, View } from "kit";
 import { CoalRanking } from "./coal.tsx";
 import { ChangeExplorer, WorldMix } from "./figures.tsx";
-import { cell, fmtT, raw, SOURCES, total, WORLD, YEARS } from "./model.ts";
-import { PlaceFigure, PlaceLede, PlaceName } from "./place.tsx";
+import { PLACES, raw, SOURCES, total, WORLD, YEARS } from "./model.ts";
+import { PlaceView } from "./place.tsx";
 import "./page.css";
 
 # The world generates twice the electricity it did in 2000. Wind and solar grew from 0.2% of it to 15%, but *coal still supplies about a third*.
@@ -14,23 +14,18 @@ Explore any country or region, and see who left coal fastest.
 
 <WorldMix />
 
-{/* No control changes these values, so the page renders them when it packs. */}
-
 <details>
 <summary>Values, world, every year (TWh, rounded)</summary>
 <div class="scroll table-box">
-<table class="compare table">
-<thead><tr><th>Year</th>{SOURCES.map((s) => <th class="num">{s.name}</th>)}<th class="num">Total</th></tr></thead>
-<tbody>
-{YEARS.map((y) => (
-	<tr>
-		<th scope="row">{y}</th>
-		{SOURCES.map((s) => <td class="num">{cell(raw(WORLD, s, y), fmtT)}</td>)}
-		<td class="num">{cell(total(WORLD, y), fmtT)}</td>
-	</tr>
-))}
-</tbody>
-</table>
+<Table
+	class="table"
+	rows={YEARS}
+	cols={[
+		{ head: "Year", value: String },
+		...SOURCES.map((s) => ({ head: s.name, value: (y) => raw(WORLD, s, y), format: { digits: 0 } })),
+		{ head: "Total", value: (y) => total(WORLD, y), format: { digits: 0 } },
+	]}
+/>
 </div>
 </details>
 
@@ -64,14 +59,6 @@ Every country with data for both years, ranked. Change the period or the size cu
 
 </section>
 
-{/* One view for every place: its heading, lede and figure read the place from the address (#place/china). */}
+{/* One view for every place, drawn when the reader opens it (#place/china): the page carries the data once, not 223 views. */}
 
-<View name="place" back="All places">
-
-# <PlaceName />
-
-<p><PlaceLede /></p>
-
-<PlaceFigure />
-
-</View>
+<View name="place" records={PLACES.map((p) => ({ id: p.slug }))} render={PlaceView} back="All places" />

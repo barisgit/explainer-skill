@@ -1,11 +1,17 @@
 ---
 title: "Which password hash: Argon2id, scrypt, bcrypt or PBKDF2"
 ---
-import { Chart, Question, View } from "kit";
-import { AlgoStats, AlgoTable, Settings } from "./algorithms.tsx";
+import { Chart, Question, Table, View } from "kit";
+import { AlgoStats } from "./algorithms.tsx";
 import { Budget } from "./budget.tsx";
-import { iterationsChart, settingsChart } from "./owasp.ts";
+import { ALGO_ROWS, ALGOS, iterationsChart, settingsChart } from "./owasp.ts";
 import "./page.css";
+
+export const SETTING_COLS = [
+	{ head: "Setting", value: "setting" },
+	{ head: "Nominal memory", value: "memory" },
+	{ head: "Trade-off", value: "tradeOff" },
+];
 
 # Use *Argon2id*, unless a FIPS-140 requirement makes it *PBKDF2*. Memory per login decides the rest.
 
@@ -15,7 +21,18 @@ OWASP ranks the four: Argon2id first, scrypt when Argon2id is unavailable, PBKDF
 
 ## What OWASP says about each algorithm
 
-<AlgoTable />
+<Table
+	rows={ALGO_ROWS}
+	state={(a) => a.state}
+	cols={[
+		{ head: "Algorithm", value: "name", link: (a) => `#algo/${a.id}` },
+		{ head: "OWASP's role", value: "role" },
+		{ head: "Minimum setting", value: "minimum" },
+		{ head: "Nominal memory", value: "memory" },
+		{ head: "FIPS-140 validated", value: "fips" },
+		{ head: "Watch out for", value: "watch" },
+	]}
+/>
 
 <details>
 <summary>Rules that apply whichever you pick</summary>
@@ -177,7 +194,7 @@ Winner of the 2015 Password Hashing Competition. The Argon2id variant balances r
 
 ## Every OWASP setting
 
-<Settings algo="argon2id" />
+<Table rows={ALGOS.argon2id.settings} cols={SETTING_COLS} />
 
 ## Notes from OWASP
 
@@ -205,7 +222,7 @@ A password-based key derivation function by Colin Percival. OWASP calls Argon2id
 
 ## Every OWASP setting
 
-<Settings algo="scrypt" />
+<Table rows={ALGOS.scrypt.settings} cols={SETTING_COLS} />
 
 ## Notes from OWASP
 
@@ -251,7 +268,7 @@ Permitted by NIST SP 800-63B-4 and with FIPS-140 validated implementations, so O
 
 ## Every OWASP setting
 
-<Settings algo="pbkdf2" />
+<Table rows={ALGOS.pbkdf2.settings} cols={SETTING_COLS} />
 
 ## Notes from OWASP
 

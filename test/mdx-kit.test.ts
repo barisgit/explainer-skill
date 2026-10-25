@@ -225,7 +225,7 @@ import { Table } from "kit";
 
 <Table rows={[{ name: "Second barista", busy: 0.45, wait: 0.5, cost: 12345 }, { name: "Change nothing", busy: 0.9, wait: 18, cost: "none" }]} cols={[{ head: "Fix", value: "name" }, { head: "Busy", value: "busy", format: { percent: true, digits: 1 } }, { head: "Wait", value: (f) => f.wait, format: { digits: 1 } }, { head: "Cost", value: (f) => typeof f.cost === "number" ? \`\${f.cost.toLocaleString("sl")}\u00a0€\` : f.cost }]} />
 
-<Table id="linked" rows={[{ id: "second", name: "Second barista", why: "Halves the load", wait: 0.5 }, { id: "none", name: "Change nothing", why: "", wait: 18 }]} state={(f) => (f.id === "none" ? "out" : "fit")} cols={[{ head: "Fix", value: "name", link: (f) => \`#fix/\${f.id}\`, note: "why" }, { head: "Wait", value: "wait", format: { unit: "min" } }]} />
+<Table id="linked" class="table" rows={[{ id: "second", name: "Second barista", why: "Halves the load", wait: 0.5 }, { id: "none", name: "Change nothing", why: "", wait: 18 }]} state={(f) => (f.id === "none" ? "out" : "fit")} cols={[{ head: "Fix", value: "name", link: (f) => \`#fix/\${f.id}\`, note: "why" }, { head: "Wait", value: "wait", format: { unit: "min" } }]} />
 `,
 		);
 		expect(result.stderr).toBe("");
@@ -234,7 +234,7 @@ import { Table } from "kit";
 		) ?? [""];
 		expect(table).toBe(markdown);
 		expect(`<main>${linked}</main>`).toBe(
-			mainOf(`<main><table class="compare" id="linked"><thead><tr><th>Fix</th><th class="num">Wait</th></tr></thead><tbody>
+			mainOf(`<main><table class="compare table" id="linked"><thead><tr><th>Fix</th><th class="num">Wait</th></tr></thead><tbody>
 <tr data-state="fit"><th scope="row"><a href="#fix/second">Second barista</a><span class="why">Halves the load</span></th><td class="num" data-label="Wait">0,5\u00a0min</td></tr>
 <tr data-state="out"><th scope="row"><a href="#fix/none">Change nothing</a></th><td class="num" data-label="Wait">18\u00a0min</td></tr>
 </tbody></table></main>`),

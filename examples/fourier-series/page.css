@@ -2,7 +2,7 @@
 :root {
 	--accent: light-dark(#1f5fbf, #7fb0ff);
 }
-#hero-chart {
+.chart.hero {
 	block-size: clamp(20rem, 40vw, 26rem);
 }
 #gibbs-chart,
@@ -11,40 +11,26 @@
 	block-size: clamp(16rem, 34vw, 21rem);
 }
 
-/* Maths set in plain HTML (math.tsx): italic variables, stacked fractions, limits above and below a symbol. */
-.eq {
-	margin: 0.35rem 0;
-	line-height: 2.1;
+/* The coefficients figure: the switch shows one wave's derivation and plot; print shows both. A derivation's lines align left. */
+@media screen {
+	#coef:has(#coef-saw:checked) [data-wave="square"],
+	#coef:not(:has(#coef-saw:checked)) [data-wave="saw"] {
+		display: none;
+	}
 }
-.eqs {
-	padding-block: 0.5rem;
+.deriv {
+	margin: 0;
 }
-.frac {
-	display: inline-flex;
-	flex-direction: column;
-	vertical-align: middle;
-	text-align: center;
-	line-height: 1.25;
-	margin-inline: 0.15em;
+.deriv [data-step] {
+	inline-size: max-content;
+	max-inline-size: 100%;
+	margin-block: 0.125rem;
 }
-.frac > :first-child {
-	border-bottom: 1px solid currentcolor;
-	padding-inline: 0.2em;
+.deriv [data-step] > * {
+	margin-block: 0.25rem;
 }
-.lim {
-	display: inline-flex;
-	flex-direction: column;
-	vertical-align: middle;
-	align-items: center;
-	line-height: 1.05;
-	margin-inline: 0.15em;
-}
-.lim > :first-child,
-.lim > :last-child {
-	font-size: 0.7em;
-}
-.lim > .sym {
-	font-size: 1.5em;
+.deriv math {
+	inline-size: max-content;
 }
 
 /* The written-answer questions, numbered in the accent. */
@@ -58,40 +44,4 @@
 	content: counter(q) ". ";
 	color: var(--accent);
 	font-weight: 700;
-}
-
-/* The formula sheet: a name, then its formulas, one per line; stacked on phones. */
-.sheet {
-	margin: 0;
-	border-top: 1px solid var(--rule-strong);
-}
-.sheet > div {
-	display: grid;
-	grid-template-columns: minmax(9rem, 13rem) 1fr;
-	column-gap: 1.5rem;
-	padding-block: 0.6rem;
-	border-bottom: 1px solid var(--rule);
-}
-.sheet dt {
-	font-weight: 600;
-	font-size: 0.95rem;
-	letter-spacing: -0.01em;
-	line-height: 2.1;
-}
-.sheet dd {
-	grid-column: 2;
-	margin: 0;
-	line-height: 2.2;
-}
-@media (max-width: 40rem) {
-	.sheet > div {
-		grid-template-columns: 1fr;
-	}
-	.sheet dt {
-		margin-block-end: 0.25rem;
-		line-height: 1.4;
-	}
-	.sheet dd {
-		grid-column: 1;
-	}
 }
