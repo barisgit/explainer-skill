@@ -3,6 +3,7 @@ import { relative } from "node:path";
 import type { Element, Nodes as HastNodes, Root as HastRoot } from "hast";
 import type { Root } from "mdast";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
+import { kitLabels } from "../kit.ts";
 import { PackError } from "../pack-error.ts";
 import { structurePage } from "./structure.ts";
 
@@ -30,16 +31,32 @@ const KEYS = "title, lang, labels, reply";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
 
-/** `value` as a map of texts, or undefined when it is not one. */
-function texts(value: unknown): Record<string, string> | undefined {
-	if (!isRecord(value)) {
+/**
+ * The frontmatter `labels` (undefined when absent) as kitLabels: texts by the keys the kit scripts read, as `kit labels` prints
+ * them. Anything else throws `fail` with what to fix: a key no kit script reads would otherwise stay English without a word.
+ */
+function labelTexts(
+	value: unknown,
+	fail: (what: string) => PackError,
+): Record<string, string> | undefined {
+	if (value === undefined) {
 		return undefined;
 	}
-	const entries = Object.entries(value);
+	const entries = isRecord(value) ? Object.entries(value) : [];
 	const strings = entries.flatMap(([key, text]) =>
 		typeof text === "string" ? [[key, text] as const] : [],
 	);
-	return strings.length === entries.length ? Object.fromEntries(strings) : undefined;
+	if (!isRecord(value) || strings.length < entries.length) {
+		throw fail("labels must be key: text lines; kit labels prints them all");
+	}
+	const known = new Set(kitLabels().flatMap((script) => Object.keys(script.labels)));
+	const stray = strings.find(([key]) => !known.has(key))?.[0];
+	if (stray !== undefined) {
+		throw fail(
+			`the kit has no label "${stray}"; kit labels prints every key with its English text`,
+		);
+	}
+	return Object.fromEntries(strings);
 }
 
 /** Reads and checks the frontmatter; anything pack would ignore or misread fails with the key to fix. */
@@ -69,15 +86,12 @@ function frontmatter(source: string, file: string): Frontmatter {
 	if (typeof reply !== "boolean") {
 		throw fail("reply must be true or false");
 	}
-	const labelTexts = texts(labels);
-	if (labels !== undefined && !labelTexts) {
-		throw fail("labels must be key: text lines, the kitLabels keys of the kit files");
-	}
+	const kitTexts = labelTexts(labels, fail);
 	return {
 		lang,
 		reply,
 		...(title === undefined ? {} : { title }),
-		...(labelTexts ? { labels: labelTexts } : {}),
+		...(kitTexts ? { labels: kitTexts } : {}),
 	};
 }
 
