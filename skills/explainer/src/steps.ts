@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { type Cdp, settle } from "./chrome.ts";
+import { SHOWN_JS } from "./page-js.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
 const KEYS: Record<string, [number, string]> = {
@@ -329,13 +330,13 @@ interface Box {
 	inView: boolean;
 }
 
-/** Page-side expression (with `el`): true when the element has a box of some size. */
-const HAS_BOX_JS = `((r) => r.width > 0 && r.height > 0)(el.getBoundingClientRect())`;
+/** Page-side expression (with `el`): true when the element is shown (SHOWN_JS) with a box of some size. */
+const HAS_BOX_JS = `((r) => r.width > 0 && r.height > 0)(el.getBoundingClientRect()) && (${SHOWN_JS})(el)`;
 /** Page-side expression (with `el`): true when the element lies wholly in the viewport. */
 const IN_VIEW_JS = `((r) => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth)(el.getBoundingClientRect())`;
 
 /**
- * Page-side body (with `el`): "hidden" when the element has no box, "scrolled" when it was not wholly in view and has been
+ * Page-side body (with `el`): "hidden" when the reader cannot see the element, "scrolled" when it was not wholly in view and has been
  * scrolled to (centred if it fits the viewport, else its top), "" when it is in view already and is left where it is, so a hover
  * tooltip stays.
  */
@@ -354,7 +355,7 @@ const BOX_JS = `
 
 /**
  * The box of the `index`-th match once it is in view and what scrolling to it set off (scroll handlers, observers that load or
- * resize content) has settled, so the geometry is the one the capture sees; null when the match has no box.
+ * resize content) has settled, so the geometry is the one the capture sees; null when the reader cannot see the match.
  */
 async function settledBox(cdp: Cdp, target: Target, index: number): Promise<Box | null> {
 	const brought = await valueOnNth<string>(cdp, target.selector, index, BRING_INTO_VIEW_JS);
@@ -369,7 +370,7 @@ async function settledBox(cdp: Cdp, target: Target, index: number): Promise<Box 
 
 /**
  * Saves a PNG of each targeted element's box as the page is now. One wholly in the viewport is captured from the screen as it is;
- * any other beyond the viewport, which relays the page out as the full-page shots do. Matches without a box are a note.
+ * any other beyond the viewport, which relays the page out as the full-page shots do. Matches the reader cannot see are a note.
  */
 async function shotStep(
 	cdp: Cdp,

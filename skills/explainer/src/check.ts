@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./chrome.ts";
 import { settle, withPage } from "./chrome.ts";
+import { ELEMENT_NAME_JS, SHOWN_JS } from "./page-js.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
@@ -81,19 +82,6 @@ export async function kitReferences(html: string): Promise<string[]> {
 	return [...refs];
 }
 
-/** Page-side function naming an element in reports: `div#panel.card` (tag, id, first class). */
-const ELEMENT_NAME_JS = `(el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")`;
-/**
- * Page-side function: true for an element laid out for the reader. Chrome still returns layout boxes for the descendants of a closed
- * `<details>`, so a box alone does not mean visible; only the `<summary>` of a closed disclosure is.
- */
-const SHOWN_JS = `(el) => {
-	if (el.getClientRects().length === 0) return false;
-	for (let child = el, p = el.parentElement; p; child = p, p = p.parentElement) {
-		if (p.tagName === "DETAILS" && !p.open && child.tagName !== "SUMMARY") return false;
-	}
-	return true;
-}`;
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
 
