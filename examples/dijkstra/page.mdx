@@ -1,0 +1,39 @@
+---
+title: Dijkstra's algorithm, step by step
+---
+
+import { NegativeEdge, RoadMap } from "./explorers.tsx";
+import "./page.css";
+
+# Dijkstra settles the *nearest* node first, and non-negative edges are what make that safe.
+
+Press Next. Each round the queue gives up its smallest entry, and the caption says why that node is final.
+
+<RoadMap />
+
+## The nearest queued node cannot be beaten
+
+A queue entry is an upper bound: a route with that length exists, though a shorter one might not have been found yet. Take the smallest entry, say **X** at *d*. Suppose a route to X shorter than *d* existed, and let **Y** be the first node on it that is not settled (possibly X itself). Y's predecessor on the route is settled, and settling it relaxed the road into Y, so Y's entry is at most the route's cost up to Y. X was the smallest entry, so Y's entry is at least *d*. The rest of the route adds roads of length zero or more, so the whole route costs at least *d*, a contradiction. X is final.
+
+Two things follow. Each reachable node is settled exactly once, which is why the algorithm is fast. And the argument leans on one fact: **roads never shorten a route**, which is what lets the last step conclude. The next section removes that fact.
+
+{/* The explorer writes this section's heading, which follows its weight slider. */}
+<section>
+
+<NegativeEdge />
+
+Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.
+
+</section>
+
+<section class="minor">
+
+## Where the claims come from
+
+- E. W. Dijkstra, “A note on two problems in connexion with graphs”, *Numerische Mathematik* 1, 269–271 (1959): the original algorithm.
+- T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*: single-source shortest paths, with Bellman–Ford (section 24.1) and the correctness proof for Dijkstra on non-negative weights (section 24.3) in the 2nd and 3rd editions; the chapter is 22 in the 4th.
+- M. L. Fredman, R. E. Tarjan, “Fibonacci heaps and their uses in improved network optimization algorithms”, *Journal of the ACM* 34(3), 1987: running time O(E + V log V) with a Fibonacci heap; a binary heap gives O((E + V) log V).
+- [Wikipedia: Dijkstra's algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm), used to cross-check the history and the step list.
+- The maps and numbers on this page are invented for illustration. This implementation keeps one queue entry per node and lowers it when a better route is found; many programs instead push a duplicate entry and skip stale ones, which gives the same distances.
+
+</section>
