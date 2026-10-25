@@ -195,3 +195,15 @@ test.each([
 	},
 	30_000,
 );
+
+test("a note target moved out of the text loses its mark, and one moved within keeps it", async () => {
+	const body = `<p id="from"><span id="out" data-ref="out">leaves</span> <span id="stay" data-ref="stay">moves</span></p><p id="to"></p>`;
+	const script = `
+	const footer = document.body.appendChild(document.createElement("footer"));
+	footer.append($("#out"));
+	$("#to").append($("#stay"));
+	await Promise.resolve();
+	expect(!$("#out").classList.contains("is-annotatable") && !$("#out").hasAttribute("tabindex"), "a target moved outside main is plain text again");
+	expect($("#stay").classList.contains("is-annotatable") && $("#stay").tabIndex === 0, "a target moved within main stays one");`;
+	expect(await packAndRun(dir, "moved", PAGE(script, body, ["reply"]))).toEqual([]);
+}, 30_000);

@@ -153,7 +153,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 
 	/** Marks the targets now on the page, and those a page script adds or retargets later, so they take notes by keyboard too. */
 	function markTargets() {
-		// An added node and its descendants, or the element whose data-ref changed (now with it or without it).
+		// An added or removed node and its descendants, or the element whose data-ref changed (now with it or without it). Each is
+		// marked against where it ends up: a part moved within root stays a target, one moved out or removed stops being one.
 		const partsIn = (n: Node): Part[] =>
 			n instanceof HTMLElement || n instanceof SVGElement
 				? [n, ...n.querySelectorAll<Part>("[data-ref]")]
@@ -163,7 +164,9 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		}
 		new MutationObserver((records) => {
 			const changed = records.flatMap((r) =>
-				r.type === "attributes" ? partsIn(r.target) : [...r.addedNodes].flatMap(partsIn),
+				r.type === "attributes"
+					? partsIn(r.target)
+					: [...r.addedNodes, ...r.removedNodes].flatMap(partsIn),
 			);
 			for (const el of changed) {
 				markTarget(el);
