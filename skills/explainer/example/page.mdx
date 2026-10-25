@@ -1,26 +1,25 @@
----
-title: Why a 90% busy café has a 20-minute line
----
-import { Question, View } from "kit";
-import { fixList, fmt, replay } from "./cafe.ts";
-import { Fixes, FixWeek, LoadCurve, Week } from "./figures.tsx";
-import "./page.css";
+import { Explore, Plot, Question, Stepper, Table, View } from "kit";
+import { baseline, curve, fixes, fmt, loadFrame } from "./cafe.ts";
 
-{/* First screen: the answer, its numbers, and the one figure that shows it. */}
+{/* First screen: the answer, the line under it that orients, and the one figure that shows it. */}
 
-# At 90% busy, one barista means an *18-minute* wait. Add a second and it drops to 30 seconds.
+# At 90% busy, one barista means an *18-minute* wait. A second barista cuts it to 30 seconds.
 
-Waiting barely grows until the last bit of slack disappears, then it explodes.
+Waiting barely grows until the last bit of slack disappears, then it explodes. A queueing model of a café whose orders take 2 minutes on average, for deciding what to change first.
 
-Simulated sample data
+Illustrative model, not measured in a real café
 
-<LoadCurve />
+{/* frame comes from a module without "use client", so pack computes every slider position and the page carries no model code. */}
 
-<Week />
+<Explore label="Average wait against how busy the barista is" controls={[{ id: "load", label: "Barista busy", range: [50, 95, 1], value: 90, format: { unit: "%" } }]} frame={loadFrame} />
 
-## Why one clump of customers costs an hour
+<Question name="at95" legend="Before you slide to 95%: about how long is the wait with one barista?" options={["20 min", "38 min", "9 min"]} answer="38 min">
 
-<figure class="fig" id="mechanism" aria-label="How a backlog grows">
+From 90% to 95% busy the spare time halves, from one minute in ten to one in twenty, so the backlog takes twice as long to clear: $\frac{0.95}{0.05} = 19$ orders ahead, 2 minutes each.
+
+</Question>
+
+<h2 data-nav="Clumps">Why one clump of customers costs an hour</h2>
 
 ```mermaid
 flowchart TD
@@ -32,44 +31,46 @@ flowchart TD
 	stack --> backlog
 ```
 
-</figure>
-
-{/* data-ref terms light the diagram part with the same Mermaid id (kit link.js). */}
+{/* data-ref terms light the diagram part with the same Mermaid id. */}
 
 1. <span data-ref="clump">Four customers</span> walk in within the same minute. Random arrivals do this several times a day.
 2. One is served, three wait: a <span data-ref="backlog">backlog</span> of 6 minutes on top of everyone who arrives next.
 3. The backlog shrinks only in <span data-ref="spare">spare time</span>, the minutes when nobody new is ordering.
-4. At 50% busy every other minute is spare: <span data-ref="calm">the 6 minutes are gone in about 12</span>.
-5. At 90% busy one minute in ten is spare: <span data-ref="slow">the same backlog takes about an hour</span>.
-6. Within that hour <span data-ref="stack">the next clump</span> arrives and stacks on top. That is where the 18-minute average comes from.
+4. At 50% busy every other minute is spare: <span data-ref="calm">the 6 minutes are gone in about 12</span>. At 90% one minute in ten is: <span data-ref="slow">the same backlog takes about an hour</span>, and <span data-ref="stack">the next clump</span> lands on top.
 
-{/* The one band: the section where the reader compares fixes and answers. */}
+<h2 data-nav="Formula">Where the 18 minutes come from</h2>
 
-<section class="band" id="fixes-section">
+{/* A derivation is a case where the order is the point, so it steps. Study pages start at step 1. */}
 
-## Which fix buys back the most time at 90% busy?
+<Stepper start={1} label="The wait formula, one step at a time" captions={["How busy the barista is: customers per minute times minutes per order.", "A customer has to wait exactly as often as the barista is busy.", "Then they wait for the orders ahead: on average ρ/(1 − ρ) of them, 2 minutes each."]}>
+<div data-step="1">
 
-<Fixes />
+$$\rho = \lambda S = 0.45\,/\text{min} \cdot 2\,\text{min} = 0.9$$
 
-<details>
-<summary>Exact values</summary>
-{/* No control changes these rows, so the page renders them, not a client component: they show before scripts run and print. */}
-<table class="compare">
-<thead><tr><th>Fix</th><th class="num">Barista busy</th><th class="num">Average wait</th><th class="num">Saved</th></tr></thead>
-<tbody>
-{fixList.map((f) => (
-	<tr data-state={f.id === "second" ? "fit" : f.id === "none" ? "out" : "maybe"}>
-		<th scope="row"><a href={`#fix/${f.id}`}>{f.name}</a></th>
-		<td class="num" data-label="Barista busy">{(f.busy * 100).toFixed(1)}%</td>
-		<td class="num" data-label="Average wait">{fmt(f.wait)}</td>
-		<td class="num" data-label="Saved">{Math.round((1 - f.wait / fixList[0].wait) * 100)}%</td>
-	</tr>
-))}
-</tbody>
-</table>
-</details>
+</div>
+<div data-step="2">
 
-<p class="caveat"><b>Inferred</b>Fixes are modelled, not observed. A real second barista shares one espresso machine, so expect less than the formula promises.</p>
+$$P(\text{wait}) = \rho = 0.9$$
+
+</div>
+<div data-step="3">
+
+$$W = \frac{\rho}{1 - \rho}\,S = \frac{0.9}{0.1} \cdot 2\,\text{min} = 18\,\text{min}$$
+
+</div>
+</Stepper>
+
+<section class="band">
+
+<h2 data-nav="Fixes">A second barista saves 97% of the wait; every other fix saves about half</h2>
+
+<Plot label="Average wait at 90% busy for each fix" option={{ categories: fixes.map((f) => f.name), horizontal: true, series: [{ name: "Average wait", type: "bar", data: fixes.map((f) => f.wait), label: { digits: 1, unit: "min" } }], x: { format: { unit: "min" } } }} />
+
+{/* One record per row, computed from the model; each name opens that fix's view. */}
+
+<Table rows={fixes} state={(f) => (f.id === "second" ? "fit" : f.id === "none" ? "out" : "maybe")} cols={[{ head: "Fix", value: "name", link: (f) => `#fix/${f.id}` }, { head: "Barista busy", value: "busy", format: { percent: true } }, { head: "Average wait", value: "wait", format: { digits: 1, unit: "min" } }, { head: "Saved", value: "saved", format: { percent: true } }]} />
+
+<p class="caveat"><b>Inferred</b>Fixes are modelled, not observed: each view says what the model leaves out.</p>
 
 {/* The decision the page ends in, asked on the page: the reply sends the answer and any notes back as Markdown. */}
 
@@ -77,24 +78,27 @@ flowchart TD
 
 </section>
 
-{/* Drill-down: one view per fix at #fix/<id>, its numbers computed when the page packs; the chart replays the week. */}
+<section class="minor">
 
-{fixList.map((f) => {
-	const [before, after] = replay(f);
-	const was = (text) => (f.id === "none" ? "" : `was ${text}`);
-	return (
-		<View name="fix" param={f.id} back="All fixes">
-			<h1>{f.name}: the same week, replayed</h1>
-			<p>{f.id === "none" ? "The baseline week every fix is compared with." : `Average wait goes from ${fmt(before.avg)} to ${fmt(after.avg)} on the same customers.`}</p>
-			<dl class="stats">
-				<div class="stat"><dt>Average wait</dt><dd>{fmt(after.avg)} <small>{was(fmt(before.avg))}</small></dd></div>
-				<div class="stat"><dt>Longest line</dt><dd>{after.peak} <small>{was(before.peak)}</small></dd></div>
-				<div class="stat"><dt>Waited 10+ min</dt><dd>{after.long} <small>{was(`${before.long} customers`)}</small></dd></div>
-			</dl>
-			<figure class="fig">
-				<FixWeek id={f.id} />
-				<figcaption>Same customers arriving at the same moments, Monday to Friday at 90% busy. Click a legend entry to hide a line; zoom with the bar below.</figcaption>
-			</figure>
-		</View>
-	);
-})}
+## Formulas
+
+| Queue | Average wait before ordering | Symbols |
+|---|---|---|
+| One barista (M/M/1) | $W = \frac{\rho}{1 - \rho}\,S$ | $\rho = \lambda S$, the share of time busy; $\lambda$ customers per minute; $S$ = 2 min per order |
+| Every order the same (M/D/1) | $W = \frac{\rho}{2(1 - \rho)}\,S$ | as above |
+| Two baristas (M/M/2) | $W = \frac{2\rho^2}{1 + \rho} \cdot \frac{S}{2(1 - \rho)}$ | $\rho = \lambda S / 2$, each barista's share |
+
+</section>
+
+{/* A few records, so one static view each at #fix/<id>: in the page, printed, and computed when it packs. */}
+
+{fixes.map((f) => (
+	<View name="fix" param={f.id} back="All fixes">
+		<h1>{f.name}: {fmt(f.wait)} average wait at 90% busy</h1>
+		<p>{f.note}</p>
+		<section>
+			<h2>Under 10 minutes up to {f.upTo}% busy</h2>
+			<Plot label={`Average wait with ${f.name}, against changing nothing`} option={{ series: [{ name: "Change nothing", data: baseline, color: "var(--bad)" }, ...(f.id === "none" ? [] : [{ name: f.name, data: curve(f), color: "var(--ok)" }])], x: { format: { unit: "%" } }, y: { min: 0, max: 40, format: { unit: "min" } } }} />
+		</section>
+	</View>
+))}
