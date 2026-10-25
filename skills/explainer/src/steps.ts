@@ -15,7 +15,10 @@ const KEYS: Record<string, [number, string]> = {
 	End: [35, "End"],
 	Backspace: [8, "Backspace"],
 };
-const STEP = /^(click|key|hover|focus|type|set|shot):(.+)$/;
+/** The `--do` step kinds, each written `<kind>:<arg>`; `reload` is the one step without an argument. */
+const KINDS = ["click", "key", "hover", "focus", "type", "set", "shot"] as const;
+type StepKind = (typeof KINDS)[number];
+const STEP = new RegExp(`^(${KINDS.join("|")}):(.+)$`);
 const POINT = /^(\d+),(\d+)$/;
 const NTH = /@(all|\d+)$/;
 const RELOAD = "reload";
@@ -24,11 +27,10 @@ const RELOAD_SETTLE_MS = 400;
 /** The steps that write a value into a field, with the form their help shows. */
 const VALUE_FORMS = { type: "type:<css>=<text>", set: "set:<css>=<value>" } as const;
 /** The steps that act on an element and cannot take a point. */
-const SELECTOR_ONLY = new Set(["focus", "type", "set", "shot"]);
+const SELECTOR_ONLY = new Set<StepKind>(["focus", "type", "set", "shot"]);
 /** Input types that take typed text; the others (range, date, color, checkbox) are set: or click: territory. */
 const TEXT_TYPES = ["text", "search", "email", "url", "tel", "password", "number"];
 
-type StepKind = "click" | "key" | "hover" | "focus" | "type" | "set" | "shot";
 /** A parsed step: `arg` is the selector, point or key; `value` is what type: and set: write (undefined when the step has no `=`). */
 interface ParsedStep {
 	kind: StepKind;
@@ -66,8 +68,8 @@ export function stepError(step: string): string {
 	if (SELECTOR_ONLY.has(kind) && POINT.test(arg)) {
 		return `step "${step}": ${kind} takes a CSS selector, not a point; click:<x,y> presses at a point and focuses what it hits`;
 	}
-	if (parsed.kind === "key" && parsed.arg.length > 1 && !KEYS[parsed.arg]) {
-		return `unknown key "${parsed.arg}" (use ${Object.keys(KEYS).join(", ")} or one character)`;
+	if (kind === "key" && arg.length > 1 && !KEYS[arg]) {
+		return `unknown key "${arg}" (use ${Object.keys(KEYS).join(", ")} or one character)`;
 	}
 	return "";
 }
@@ -191,7 +193,7 @@ interface Target {
 	isPoint: boolean;
 }
 
-/** Finds what a click/hover/focus step acts on, or why nothing can be: invalid selector, no match, index out of range. */
+/** Finds what a step other than key: acts on, or why nothing can be: invalid selector, no match, index out of range. */
 async function resolveTarget(
 	cdp: Cdp,
 	step: string,
@@ -408,21 +410,19 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 		return resolved;
 	}
 	const { target } = resolved;
-	if (parsed.kind === "type" || parsed.kind === "set") {
-		const value = parsed.value ?? "";
-		return parsed.kind === "type"
-			? typeStep(cdp, step, target, value)
-			: setStep(cdp, step, target, value);
+	switch (parsed.kind) {
+		case "type":
+			return typeStep(cdp, step, target, parsed.value ?? "");
+		case "set":
+			return setStep(cdp, step, target, parsed.value ?? "");
+		case "shot":
+			return shotStep(cdp, step, target, shotPath);
+		case "focus":
+			await onNth(cdp, target.selector, target.indices[0] ?? 0, "el.focus()");
+			return {};
+		default:
+			return parsed.kind === "click" && !target.isPoint
+				? domClick(cdp, step, target)
+				: mouseStep(cdp, step, parsed.kind, target);
 	}
-	if (parsed.kind === "shot") {
-		return shotStep(cdp, step, target, shotPath);
-	}
-	if (parsed.kind === "focus") {
-		await onNth(cdp, target.selector, target.indices[0] ?? 0, "el.focus()");
-		return {};
-	}
-	if (parsed.kind === "click" && !target.isPoint) {
-		return domClick(cdp, step, target);
-	}
-	return mouseStep(cdp, step, parsed.kind, target);
 }
