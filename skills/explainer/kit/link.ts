@@ -5,7 +5,8 @@
      <pre class="mermaid">flowchart LR; api --> cache</pre>                   pack gives every diagram part the data-ref of its Mermaid id
    A ref links only when its elements sit in two places or more. One SVG is one place, so the parts of one diagram never link each
    other; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
-   A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer. Linked elements carry class is-linked.
+   A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
+   to a linked part around it. Linked elements carry class is-linked.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In a diagram that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
@@ -145,9 +146,11 @@
 	});
 	refresh();
 
-	/** The linked part an event happened in, if any: unlinked parts take no hover, focus or click. */
-	const partOf = (e: Event) =>
-		e.target instanceof Element ? e.target.closest<Part>(".is-linked") : null;
+	/** The part an event happened in when it is linked: an unlinked part takes no hover, focus or click, nor passes them to a linked ancestor. */
+	const partOf = (e: Event) => {
+		const part = e.target instanceof Element ? e.target.closest<Part>("[data-ref]") : null;
+		return part?.classList.contains("is-linked") ? part : null;
+	};
 	document.addEventListener("pointerover", (e) => {
 		if (e.pointerType === "touch") {
 			return;

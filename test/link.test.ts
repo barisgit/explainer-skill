@@ -4,23 +4,29 @@ import { packAndRun, SETTLED, scratch } from "./support.ts";
 const dir = scratch();
 afterAll(dir.cleanup);
 
+/** The prose term and diagram most tests use: the cache node is linked, the api node and the edge are not. */
+const DIAGRAM = `<p id="prose">The <span id="term" data-ref="cache">cache</span> answers most reads.</p>
+<pre class="mermaid">flowchart LR
+  api --> cache</pre>`;
+
 /**
- * A diagram whose cache node the prose links and whose api node and edge nothing outside the diagram shares; the page's script
- * runs after load, reports every ref event in `events`, and can add a partner later.
+ * A page of `body` with the kit `scripts`; its own `script` runs once the page has settled, with helpers to hover, click and read
+ * what is lit, and every ref event recorded in `events`.
  */
 const PAGE = (
 	script: string,
+	body = DIAGRAM,
+	scripts = ["link"],
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main>
-<p id="prose">The <span id="term" data-ref="cache">cache</span> answers most reads.</p>
-<pre class="mermaid">flowchart LR
-  api --> cache</pre></main>
-<script src="kit:link.js"></script>
+${body}</main>
+${scripts.map((name) => `<script src="kit:${name}.js"></script>`).join("\n")}
 <script>
 ${SETTLED}
 const $ = (selector) => document.querySelector(selector);
 const node = (ref) => $('svg [data-ref="' + ref + '"]');
 const hover = (el) => el.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+const click = (el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 const lit = () => [...document.querySelectorAll(".is-lit")].map((el) => el.id || el.dataset.ref).join();
 const dimmed = () => $("svg").classList.contains("has-lit");
 const inert = (el) => el.tabIndex < 0 && getComputedStyle(el).cursor !== "pointer";
@@ -40,7 +46,7 @@ test("only a ref with a partner outside its own diagram lights, dims or takes fo
 	expect(lit() === "" && !dimmed(), "hovering a node nothing else shares lights and dims nothing");
 	hover(node("L_api_cache_0"));
 	expect(lit() === "" && !dimmed(), "an edge's parts in one diagram do not link each other");
-	node("api").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	click(node("api"));
 	expect(lit() === "", "a click on an unlinked node pins nothing");
 	expect(inert(node("api")), "an unlinked node is neither focusable nor shows a pointer");
 	expect(events.every((refs) => refs === ""), "no ref event names an unlinked ref");
@@ -70,4 +76,18 @@ test("a partner a page script writes after load links its ref, and removing it u
 	hover(node("api"));
 	expect(lit() === "" && !dimmed(), "with its partner gone the node lights nothing");`;
 	expect(await packAndRun(dir, "late", PAGE(script))).toEqual([]);
+}, 30_000);
+
+test("an unlinked part inside a linked one does not activate it", async () => {
+	const body = `<p>The <span data-ref="cache">cache</span>.</p>
+<svg viewBox="0 0 100 20"><g id="g" data-ref="cache"><rect id="box" width="40" height="20"/><text id="child" data-ref="lone" x="50" y="15">lone</text></g></svg>`;
+	const script = `
+	hover($("#child"));
+	expect(lit() === "", "hovering an unlinked child lights nothing");
+	click($("#child"));
+	hover($("main"));
+	expect(lit() === "", "clicking an unlinked child pins nothing");
+	hover($("#box"));
+	expect(lit() === "cache,g", "a child with no ref of its own still activates its linked part");`;
+	expect(await packAndRun(dir, "child", PAGE(script, body))).toEqual([]);
 }, 30_000);
