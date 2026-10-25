@@ -3,7 +3,7 @@ import { basename, dirname, extname, relative } from "node:path";
 import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
 import { clientBundle, prerender } from "./bundle.ts";
-import { compileMdx, type Frontmatter } from "./compile.ts";
+import { compileMdx, type Frontmatter, frontmatterWarnings } from "./compile.ts";
 import {
 	AFTER_ISLANDS,
 	BEFORE_ISLANDS,
@@ -102,18 +102,19 @@ async function kitScripts(
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
  * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
- * scripts it needs. Every error the author can fix is a PackError.
+ * scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError;
+ * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
  */
 export async function mdxPage(
 	file: string,
 	drawDiagrams: (html: string) => Promise<string>,
-): Promise<string> {
+): Promise<{ html: string; warnings: string[] }> {
 	// The bundler loads modules by their real path (/tmp is /private/tmp on macOS), and the page is recognised by it.
 	const path = realpathSync(file);
 	const page = await compileMdx(path, true);
 	const compiled = { path, js: page.js, lang: page.front.lang };
 	const css = new Set<string>();
-	const prerendered = await prerender(compiled, css);
+	const prerendered = await prerender(compiled, css, page.front.labels);
 	const clashes = await answerClashes(prerendered.html);
 	if (clashes.length) {
 		const where = relative(process.cwd(), path) || path;
@@ -136,9 +137,10 @@ export async function mdxPage(
 		p: props,
 		...(view === undefined ? {} : { v: view }),
 	}));
-	return [
+	const scheme = page.front.scheme ? ` data-scheme="${page.front.scheme}"` : "";
+	const shell = [
 		"<!doctype html>",
-		`<html lang="${escapeHtml(page.front.lang)}">`,
+		`<html lang="${escapeHtml(page.front.lang)}"${scheme}>`,
 		"<head>",
 		'<meta charset="utf-8">',
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -163,5 +165,6 @@ export async function mdxPage(
 		"</body>",
 		"</html>",
 		"",
-	].join("\n");
+	];
+	return { html: shell.join("\n"), warnings: frontmatterWarnings(page.front) };
 }

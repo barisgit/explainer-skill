@@ -15,6 +15,8 @@ export interface Frontmatter {
 	lang: string;
 	/** kitLabels: the texts the kit scripts add, in the page's language. */
 	labels?: Record<string, string>;
+	/** The colour scheme the page is forced into (`<html data-scheme>`); unset, it follows the reader's system. */
+	scheme?: "light" | "dark";
 	/** Include reply.js (the reader's notes) on a page with no question. */
 	reply: boolean;
 }
@@ -28,7 +30,7 @@ export interface CompiledMdx {
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KEYS = "title, lang, labels, reply";
+const KEYS = "title, lang, labels, reply, scheme";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
@@ -61,20 +63,24 @@ function labelTexts(
 	return Object.fromEntries(strings);
 }
 
-/** Reads and checks the frontmatter; anything pack would ignore or misread fails with the key to fix. */
-function frontmatter(source: string, file: string): Frontmatter {
+/** The frontmatter's YAML as parsed, `{}` for none; a YAML error is a PackError naming the file. */
+function frontmatterData(source: string, file: string): unknown {
 	const yaml = FRONTMATTER.exec(source)?.[1];
-	let data: unknown;
 	try {
-		data = yaml === undefined ? {} : (Bun.YAML.parse(yaml) ?? {});
+		return yaml === undefined ? {} : (Bun.YAML.parse(yaml) ?? {});
 	} catch (e) {
 		throw new PackError(`${file} frontmatter: ${e instanceof Error ? e.message : String(e)}`);
 	}
+}
+
+/** Reads and checks the frontmatter; anything pack would ignore or misread fails with the key to fix. */
+function frontmatter(source: string, file: string): Frontmatter {
+	const data = frontmatterData(source, file);
 	const fail = (what: string) => new PackError(`${file} frontmatter: ${what}`);
 	if (!isRecord(data)) {
 		throw fail(`write key: value lines (${KEYS})`);
 	}
-	const { title, lang = "en", labels, reply = false, ...rest } = data;
+	const { title, lang = "en", labels, reply = false, scheme, ...rest } = data;
 	const unknown = Object.keys(rest)[0];
 	if (unknown !== undefined) {
 		throw fail(`pack does not read "${unknown}"; the keys are ${KEYS}`);
@@ -88,13 +94,29 @@ function frontmatter(source: string, file: string): Frontmatter {
 	if (typeof reply !== "boolean") {
 		throw fail("reply must be true or false");
 	}
+	if (scheme !== undefined && scheme !== "light" && scheme !== "dark") {
+		throw fail("scheme must be light or dark; leave it out to follow the reader's system");
+	}
 	const kitTexts = labelTexts(labels, fail);
 	return {
 		lang,
 		reply,
 		...(title === undefined ? {} : { title }),
 		...(kitTexts ? { labels: kitTexts } : {}),
+		...(scheme === undefined ? {} : { scheme }),
 	};
+}
+
+/**
+ * What pack warns about in a page's frontmatter: a language other than English without labels, whose kit texts (the stepper's
+ * buttons, the reply, Show answer) would stay English beside the page's own words.
+ */
+export function frontmatterWarnings({ lang, labels }: Frontmatter): string[] {
+	return /^en(-|$)/i.test(lang) || labels
+		? []
+		: [
+				`lang is "${lang}" but the frontmatter has no labels, so the texts the kit adds (Back, Next, Reply, Show answer) are English: run kit labels, translate the block and paste it into the frontmatter`,
+			];
 }
 
 /** Every element of the tree, depth first. */

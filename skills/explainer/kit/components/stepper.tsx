@@ -15,6 +15,8 @@
                data-step parts must redraw on it; check warns about one whose steps change only the captions.
    Inside your component, captions and parts may follow its state (a scenario switch): the stepper re-reads them after each render,
    so the step count follows. It stays on its step (clamped to the new count), or on the new last step if it was on the last.
+   To start new content from step 1 instead (another wave's derivation, a run on another map), name it: restartOn={wave}, text
+   or a number; when it changes, the stepper goes back to step 1.
    A stepper with fewer than 2 steps hides its controls and shows everything; they return when it grows.
    The controls: <button data-go="-1"> Back, <button data-go="1"> Next (check --do click:'[data-go="1"]' steps forward), Play,
    the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Their texts are the labels back, play, pause,
@@ -28,6 +30,11 @@ export interface StepperProps {
 	captions?: ComponentChildren[];
 	captionsFirst?: boolean;
 	start?: number;
+	/**
+	 * A key for the content: a new value sends the stepper back to step 1. Text or a number, so a fresh array is never new; undefined
+	 * is no key, so a wrapper can pass its own optional one through.
+	 */
+	restartOn?: string | number | undefined;
 	label?: string;
 	class?: string;
 	id?: string;
@@ -53,6 +60,7 @@ export function Stepper({
 	captions,
 	captionsFirst = false,
 	start,
+	restartOn,
 	label,
 	class: classes = "fig",
 	id,
@@ -74,10 +82,13 @@ export function Stepper({
 	}, []);
 	// After every render, before paint: re-read captions and parts and re-apply the step, since a re-rendered class attribute drops
 	// steps.js's is-on and is-now. Refresh fires stepchange only when the step or count changed, so onStep's re-render ends here.
-	// While the islands hydrate steps.js has not loaded yet; it finds the stepper itself when it does.
+	// While the islands hydrate steps.js has not loaded yet; it finds the stepper itself when it does. A new restartOn goes to step 1.
+	const shownFor = useRef(restartOn);
 	useLayoutEffect(() => {
+		const restart = shownFor.current !== restartOn;
+		shownFor.current = restartOn;
 		if (root.current && typeof Steps !== "undefined") {
-			Steps.refresh(root.current);
+			Steps.refresh(root.current, restart ? 1 : undefined);
 		}
 	});
 	// steps.js puts its controls just before this list, wherever it is.

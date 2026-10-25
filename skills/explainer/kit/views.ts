@@ -15,7 +15,8 @@
    its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
    data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
    link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
-   opens them at every level, at the end of the section's .toolbar when one comes before them.
+   opens them at every level, at the end of the section's .toolbar when one comes before them. A <details class="answer"> (a
+   question's model answer) is not counted or opened: the reader opens each answer after writing their own.
    Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
    in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
    its numbers, which line up in columns across rows and levels. --tree-cols on the .tree gives one width per number column

@@ -47,29 +47,17 @@
 	font-size: 1.5em;
 }
 
-/* The questions: numbered in the accent, each with a box to write in and its answer behind a details. */
+/* The written-answer questions, numbered in the accent. */
 .questions {
-	padding: 0;
-	margin: 0;
-	list-style: none;
 	counter-reset: q;
-	display: grid;
-	gap: 1.5rem;
 }
-.questions > li {
+.questions > fieldset {
 	counter-increment: q;
 }
-.questions > li > p:first-child::before {
+.questions legend::before {
 	content: counter(q) ". ";
 	color: var(--accent);
 	font-weight: 700;
-}
-.questions textarea {
-	min-block-size: 4.5rem;
-	margin-block: 0.4rem;
-}
-.questions details p {
-	margin-block: 0.5rem;
 }
 
 /* The formula sheet: a name, then its formulas, one per line; stacked on phones. */

@@ -160,10 +160,9 @@ async function buildEntry(
 	return output.text();
 }
 
-/** What the prerender bundle exports: kit/islands/server.ts's renderPage, the page's content component and the components' language. */
+/** What the prerender bundle exports: the page rendered by kit/islands/server.ts's renderPage with `labels` as kitLabels, and the components' language. */
 interface Prerender {
-	renderPage: typeof renderPage;
-	Content: Parameters<typeof renderPage>[0];
+	render: (labels: Record<string, string> | undefined) => ReturnType<typeof renderPage>;
 	/** kit/components/parts/format.ts's, which this file does not import: its types need the kit's globals. */
 	setPageLang: (lang: string) => void;
 }
@@ -171,17 +170,26 @@ interface Prerender {
 /**
  * Renders the page to static HTML in this process: the page, its imports and Preact are bundled into one module (so they share
  * one Preact), which is imported from a temporary file and run once. Returns the HTML (islands between comment markers) and
- * the islands, and adds the stylesheets the page's modules import to `css`. An error the author can fix (kit/islands/server.ts's
- * IslandError) or any error the page throws is a PackError.
+ * the islands, and adds the stylesheets the page's modules import to `css`. While it renders, the page's frontmatter `labels` are
+ * the global kitLabels, as in the browser, so the components that add text (Question) read the page's. An error the author can
+ * fix (kit/islands/server.ts's IslandError) or any error the page throws is a PackError.
  */
 export async function prerender(
 	page: CompiledPage,
 	css: Set<string>,
+	labels: Record<string, string> | undefined,
 ): Promise<{ html: string; islands: Island[] }> {
 	const code = `import Content from ${JSON.stringify(page.path)};
-export { Content };
-export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};
-export { setPageLang } from ${JSON.stringify(join(KIT_DIR, "components/parts/format.ts"))};`;
+export { setPageLang } from ${JSON.stringify(join(KIT_DIR, "components/parts/format.ts"))};
+import { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};
+export function render(labels) {
+	globalThis.kitLabels = labels;
+	try {
+		return renderPage(Content);
+	} finally {
+		delete globalThis.kitLabels;
+	}
+}`;
 	const js = await buildEntry(
 		page,
 		{ path: join(dirname(page.path), "explainer-prerender.ts"), code },
@@ -195,7 +203,7 @@ export { setPageLang } from ${JSON.stringify(join(KIT_DIR, "components/parts/for
 		writeFileSync(file, js);
 		const module: Prerender = await import(file);
 		module.setPageLang(page.lang);
-		return module.renderPage(module.Content);
+		return module.render(labels);
 	} catch (e) {
 		if (e instanceof PackError) {
 			throw e;

@@ -269,12 +269,18 @@ function loadMessage({ origin, kind, target }: Load): string {
 
 /**
  * Packs an .mdx page into one HTML file: it is compiled and prerendered (mdx/page.ts), then goes through `packPage`.
- * Throws PackError listing everything the author must fix.
+ * Throws PackError listing everything the author must fix; `warnings` are the frontmatter's, then the HTML pass's.
  */
-export function pack(mdxPath: string): Promise<{ html: string; warnings: string[] }> {
+export async function pack(mdxPath: string): Promise<{ html: string; warnings: string[] }> {
 	const path = resolve(mdxPath);
+	const warnings: string[] = [];
 	// The page draws its diagrams before it chooses its kit scripts, so diagram parts bring link.js.
-	return packPage(dirname(path), (drawDiagrams) => mdxPage(path, drawDiagrams));
+	const packed = await packPage(dirname(path), async (drawDiagrams) => {
+		const page = await mdxPage(path, drawDiagrams);
+		warnings.push(...page.warnings);
+		return page.html;
+	});
+	return { html: packed.html, warnings: [...warnings, ...packed.warnings] };
 }
 
 /**
