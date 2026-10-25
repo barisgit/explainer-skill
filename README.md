@@ -67,7 +67,7 @@ The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, 
 
 1. **Write** `page.html`: plain HTML that references kit files with a `kit:` prefix and adds behaviour through attributes. `kit` lists what is available and `kit <file>` documents one file.
 2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams to SVG in-process (one per diagram, following light and dark), so the result is one offline file.
-3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
+3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks, presses keys, types and sets fields first, so the screenshots can show a later state, and `--do shot:<css>` saves one element at that point.
 
 A diagram whose parts light up from the text, for illustration:
 
