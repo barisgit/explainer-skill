@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { runCli, scratch } from "./support.ts";
+import { packHtml, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -200,7 +200,7 @@ test("check warns about a stepper whose steps change only its captions, not one 
 <script src="kit:steps.js"></script></body></html>`,
 	);
 	const packed = dir.path("steppers.out.html");
-	expect((await runCli(["pack", source, "-o", packed])).code).toBe(0);
+	expect((await packHtml(source, packed)).error).toBe("");
 
 	const result = await checkQuick(packed);
 
@@ -223,7 +223,7 @@ test("check stops stepping a stepper once it changes, and says so when its time 
 <script src="kit:steps.js"></script></body></html>`,
 	);
 	const packed = dir.path("long-steppers.out.html");
-	expect((await runCli(["pack", source, "-o", packed])).code).toBe(0);
+	expect((await packHtml(source, packed)).error).toBe("");
 	const started = performance.now();
 
 	const result = await checkQuick(packed);

@@ -1,5 +1,13 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndRun, pageAssertion, pageContract, runCli, SETTLED, scratch } from "./support.ts";
+import {
+	packAndRun,
+	packHtml,
+	pageAssertion,
+	pageContract,
+	runCli,
+	SETTLED,
+	scratch,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -98,10 +106,10 @@ document.addEventListener("click", (e) => {
 	const input = dir.write("keep.html", PAGE(script));
 	const output = dir.path("keep.out.html");
 
-	const packed = await runCli(["pack", input, "-o", output]);
+	const packed = await packHtml(input, output);
 	const checked = await run(output, [...ENTER, "reload", ...CLEAR, "reload"]);
 
-	expect(packed.code).toBe(0);
+	expect(packed.error).toBe("");
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
 }, 60_000);
@@ -134,7 +142,7 @@ probe(["answering", () => answer() === "b"],
 	const input = dir.write("confirm.html", SMALL(CONFIRM_BODY, script));
 	const output = dir.path("confirm.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["click:#b", ...CLEAR]);
 
 	expect(checked.stdout).not.toContain("confirm contract");
@@ -154,7 +162,7 @@ probe(["answering", () => answer() === "b"],
 	const output = dir.path("confirm-keys.out.html");
 	const button = ".reply-bar .btn:not(.primary)";
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, [
 		"click:#b",
 		`focus:${button}`,
@@ -185,7 +193,7 @@ probe(["answering", () => answer() === "b"],
 	);
 	const output = dir.path("confirm-timeout.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["click:#b", CLEAR[0] as string, "click:h1"]);
 
 	expect(checked.stdout).not.toContain("confirm contract");
@@ -205,7 +213,7 @@ document.addEventListener("click", (e) => {
 	);
 	const output = dir.path("blocked.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["click:#pick-b", ...CLEAR]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -222,7 +230,7 @@ document.addEventListener("click", (e) => {
 	const input = dir.write("rebuilt.html", PAGE(script));
 	const output = dir.path("rebuilt.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:#name", "key:z", "click:#rebuild"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -239,7 +247,7 @@ if (sessionStorage.loads === "2") document.querySelector("main").insertAdjacentH
 	const input = dir.write("layout.html", html);
 	const output = dir.path("layout.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:[aria-label=Old]", "key:z", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -264,7 +272,7 @@ ${onLoad(2, "a value waiting for a control that has not appeared is kept", "save
 	const input = dir.write("late.html", PAGE(script));
 	const output = dir.path("late.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const added = await run(output, ["click:#add", "focus:#late", "key:z", "reload", "click:#add"]);
 	const replaced = await run(output, ["focus:#name", "key:z", "click:#carry"]);
 
@@ -281,7 +289,7 @@ ${onLoad(2, "the saved value survives a later load handler and the page's listen
 	const input = dir.write("late-init.html", PAGE(script));
 	const output = dir.path("late-init.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:#name", "key:z", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -297,7 +305,7 @@ ${later("a value saved before is back", `sessionStorage.loads !== "2" || $("name
 	const input = dir.write("started-late.html", html);
 	const output = dir.path("started-late.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:#name", "key:z", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -314,7 +322,7 @@ test("an answer equal to the default is still an answer after a reload", async (
 	const input = dir.write("explicit.html", SMALL(body, script));
 	const output = dir.path("explicit.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const preselected = await run(output, ["click:#ra", "reload"]);
 	const changedBack = await run(output, ["click:#rb", "click:#ra", "reload"]);
 
@@ -335,7 +343,7 @@ test("two forms with the same radio names are kept apart", async () => {
 	const input = dir.write("forms.html", SMALL(form("f1", ' id="b1"') + form("f2", ""), script));
 	const output = dir.path("forms.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["click:#b1", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -352,7 +360,7 @@ document.addEventListener("click", (e) => {
 	const input = dir.write("none.html", SMALL(body, script));
 	const output = dir.path("none.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["click:#q", ...CLEAR]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -371,7 +379,7 @@ ${onLoad(2, "the rebuilt city got its answer and it is still saved", `$("si").ch
 	const input = dir.write("dependent.html", SMALL(body, script));
 	const output = dir.path("dependent.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["click:#si", "focus:#city", "key:r", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -384,7 +392,7 @@ test("an input with the multiple attribute is kept like any text field", async (
 	const input = dir.write("multiple.html", SMALL(body, script));
 	const output = dir.path("multiple.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:#em", "key:a", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -400,7 +408,7 @@ ${onLoad(2, "the saved email is not put into the new Name field", `document.quer
 	const input = dir.write("contact.html", SMALL(body, script));
 	const output = dir.path("contact.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:input", "key:z", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");
@@ -418,7 +426,7 @@ ${onLoad(2, "Clear is offered for answers that wait for their panel", `!clearBut
 	const input = dir.write("waiting.html", SMALL(body, script));
 	const output = dir.path("waiting.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, [
 		"click:#add",
 		"focus:#late",
@@ -534,7 +542,7 @@ ${onLoad(2, "the postal code field starts empty and no city answer waits for it"
 	const input = dir.write("renamed.html", SMALL(body, script));
 	const output = dir.path("renamed.out.html");
 
-	await runCli(["pack", input, "-o", output]);
+	await packHtml(input, output);
 	const checked = await run(output, ["focus:#city", "key:r", "click:#si", "reload"]);
 
 	expect(checked.stdout).not.toContain("keep contract");

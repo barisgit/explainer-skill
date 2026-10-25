@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { pageAssertion, runCli, scratch } from "./support.ts";
+import { packHtml, pageAssertion, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -27,8 +27,8 @@ async function packAndCheck(
 		`<!doctype html><html${scheme ? ` data-scheme="${scheme}"` : ""}><head><link rel="stylesheet" href="kit:theme.css"></head><body>${body}<script>${script}</script></body></html>`,
 	);
 	const output = dir.path(`${name}.out.html`);
-	const packed = await runCli(["pack", input, "-o", output]);
-	expect(packed.stderr).toBe("");
+	const packed = await packHtml(input, output);
+	expect(packed.error).toBe("");
 	const checked = await runCli([
 		"check",
 		output,

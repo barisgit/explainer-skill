@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
+import { packAndRun, packHtml, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -25,7 +25,7 @@ test("a page that uses only plot.js carries no ECharts and draws without errors"
 	const input = dir.write("plots.html", PAGE);
 	const output = dir.path("plots.out.html");
 
-	const packed = await runCli(["pack", input, "-o", output]);
+	const packed = await packHtml(input, output);
 	const checked = await runCli([
 		"check",
 		output,
@@ -36,7 +36,7 @@ test("a page that uses only plot.js carries no ECharts and draws without errors"
 		dir.path("shots"),
 	]);
 
-	expect(packed.code).toBe(0);
+	expect(packed.error).toBe("");
 	expect(readFileSync(output, "utf8")).not.toContain("Apache ECharts");
 	expect(checked.code).toBe(0);
 }, 30_000);

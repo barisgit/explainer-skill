@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
+import { packAndRun, packHtml, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -33,10 +33,9 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 			`<!doctype html><html><head>${KIT}${head}</head><body><ul class="tree"><li>a</li></ul></body></html>`,
 		);
 
-		const result = await runCli(["pack", input, "-o", dir.path("collide.out.html")]);
+		const { error, warnings } = await packHtml(input, dir.path("collide.out.html"));
 
-		expect(result.code).toBe(0);
-		const warnings = result.stdout.split("\n").filter((line) => line.startsWith("warning:"));
+		expect(error).toBe("");
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0]).toContain(".tree");
 		expect(warnings[0]).toContain(`"ul.tree" (${where})`);
@@ -85,9 +84,9 @@ import { Question, Tree, View } from "kit";
 <div class="tree"><details><summary><span>a</span><span>1</span></summary></details></div></main></body></html>`,
 		);
 
-		const result = await runCli(["pack", input, "-o", dir.path("no-collide.out.html")]);
-
-		expect(result.code).toBe(0);
-		expect(result.stdout).not.toContain("warning:");
+		expect(await packHtml(input, dir.path("no-collide.out.html"))).toEqual({
+			error: "",
+			warnings: [],
+		});
 	});
 });

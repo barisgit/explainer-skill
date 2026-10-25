@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
 import { authorTsconfig, kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
@@ -150,18 +150,23 @@ export const COMMANDS: Record<string, Command> = {
 	},
 	pack: {
 		summary:
-			"Inline local CSS, scripts, images, fonts and kit: files into one HTML file; render pre.mermaid diagrams; fail on any network dependency. An .mdx page is compiled and prerendered first, and only its client components ship code.",
-		usage: "pack <page.html | page.mdx> -o <artifact.html>",
+			"Render an .mdx page into one HTML file that loads nothing: its CSS, images, fonts and the kit scripts it uses inlined, Mermaid fences drawn, code shipped only for client components. Fails on any network dependency.",
+		usage: "pack <page.mdx> -o <artifact.html>",
 		flags: ["-o <file>  output path (required)"],
-		examples: ["pack page.html -o artifact.html", "pack page.mdx -o artifact.html"],
+		examples: ["pack page.mdx -o artifact.html"],
 		run: async ([input], flags) => {
 			const out = flags.get("-o")?.[0];
 			if (!input || !out) {
-				return usage("pack needs an input and -o. Example: pack page.html -o artifact.html");
+				return usage("pack needs a page and -o. Example: pack page.mdx -o artifact.html");
+			}
+			if (extname(input).toLowerCase() !== ".mdx") {
+				return usage(
+					`pack takes an .mdx page, not "${input}": write the page as page.mdx (${CLI} kit lists what it can use)`,
+				);
 			}
 			if (!existsSync(input)) {
 				return usage(
-					`pack needs an existing page, not "${input}". Example: pack page.html -o artifact.html`,
+					`pack needs an existing page, not "${input}". Example: pack page.mdx -o artifact.html`,
 				);
 			}
 			try {
@@ -211,7 +216,7 @@ export const COMMANDS: Record<string, Command> = {
 			const unpacked = await kitReferences(readFileSync(file, "utf8"));
 			if (unpacked.length) {
 				return usage(
-					`${file} still references ${unpacked.join(", ")}: check opens packed files. Run: pack ${file} -o artifact.html, then check artifact.html`,
+					`${file} still references ${unpacked.join(", ")}: check opens packed files. Run: pack page.mdx -o artifact.html, then check artifact.html`,
 				);
 			}
 			const steps = flags.get("--do") ?? [];

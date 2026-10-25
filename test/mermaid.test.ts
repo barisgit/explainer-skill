@@ -1,28 +1,27 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
-import { failureOf, runCli, scratch, svgOf } from "./support.ts";
+import { failureOf, packHtml, runCli, scratch, svgOf } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
 
-const page = (body: string) =>
-	`<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body>${body}</body></html>`;
+/** Packs an .mdx page whose body is one Mermaid fence of `source`; returns the CLI result and the output path. */
+async function packFence(name: string, source: string) {
+	const input = dir.write(`${name}.mdx`, `# Diagram\n\n\`\`\`mermaid\n${source}\n\`\`\`\n`);
+	const output = dir.path(`${name}.out.html`);
+	return { result: await runCli(["pack", input, "-o", output]), output };
+}
 
-test("a Mermaid block renders to one SVG whose nodes and edges carry data-ref ids", async () => {
-	const input = dir.write(
-		"diagram.html",
-		page(`<pre class="mermaid">flowchart TD
-  api e1@--> cache[(Cache)]
-  cache --> db</pre>`),
+test("a Mermaid fence renders to one SVG whose nodes and edges carry data-ref ids", async () => {
+	const { result, output } = await packFence(
+		"diagram",
+		"flowchart TD\n  api e1@--> cache[(Cache)]\n  cache --> db",
 	);
-	const output = dir.path("diagram.out.html");
-
-	const result = await runCli(["pack", input, "-o", output]);
 
 	expect(result.code).toBe(0);
 	const html = readFileSync(output, "utf8");
-	expect(html).not.toContain('class="mermaid">flowchart');
+	expect(html).not.toContain("flowchart TD");
 	expect(html.match(/<svg /g)).toHaveLength(1);
 	for (const ref of ["api", "cache", "db", "e1", "L_cache_db_0"]) {
 		expect(html).toContain(`data-ref="${ref}"`);
@@ -61,46 +60,30 @@ const remotePaints = [
 test.each(remotePaints)(
 	"a remote paint URL in $name fails the pack and names it",
 	async ({ line, url }) => {
-		const input = dir.write(
-			"paint.html",
-			page(`<pre class="mermaid">flowchart LR\n  a --> b\n  ${line}</pre>`),
-		);
+		const { result } = await packFence("paint", `flowchart LR\n  a --> b\n  ${line}`);
 
-		const result = await runCli(["pack", input, "-o", dir.path("paint.out.html")]);
-
-		expect(result.code).not.toBe(0);
+		expect(result.code).toBe(1);
 		expect(result.stderr).toContain(`mermaid block 1: the diagram references ${url}`);
 	},
 );
 
 test("an unsupported diagram type fails the pack and says what to draw instead", async () => {
-	const input = dir.write("pie.html", page(`<pre class="mermaid">pie\n "a" : 1</pre>`));
+	const { result } = await packFence("pie", 'pie\n "a" : 1');
 
-	const result = await runCli(["pack", input, "-o", dir.path("pie.out.html")]);
-
-	expect(result.code).not.toBe(0);
+	expect(result.code).toBe(1);
 	expect(result.stderr).toContain('mermaid block 1: "pie" diagrams are not supported');
-	expect(result.stderr).toContain("kit:charts.js");
+	expect(result.stderr).toContain("the kit's Chart");
 });
 
-test.each([
-	'data-steps="a:1 b:2"',
-	"DATA-STEPS='a:1'",
-	'data-steps = "a:1"',
-	"data-steps",
-	"data-step=1",
-])("%s on a Mermaid block fails the pack and points to linked highlighting", async (attribute) => {
+test("data-step on a Mermaid block fails the pack and points to linked highlighting", async () => {
 	const input = dir.write(
 		"stepped.html",
-		page(
-			`<figure class="fig" data-stepper><pre class=mermaid ${attribute}>flowchart LR\n  a --> b</pre></figure>`,
-		),
+		`<!doctype html><html><body><figure class="fig" data-stepper><pre class="mermaid" data-step="1">flowchart LR\n  a --> b</pre></figure></body></html>`,
 	);
 
-	const result = await runCli(["pack", input, "-o", dir.path("stepped.out.html")]);
+	const packed = await packHtml(input, dir.path("stepped.out.html"));
 
-	expect(result.code).not.toBe(0);
-	expect(result.stderr).toContain(
+	expect(packed.error).toContain(
 		'mermaid block 1: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)',
 	);
 });
@@ -291,43 +274,18 @@ test.each([
 	},
 	{
 		type: "radar-beta",
-		instead: "a flowchart for parts and links, or a chart with kit:charts.js for numbers",
+		instead: "a flowchart for parts and links, or the kit's Chart for numbers",
 	},
 ])("an unsupported $type says what to draw instead", ({ type, instead }) => {
 	expect(failureOf(`${type}\n  a`)).toEndWith(`; draw it as ${instead}`);
 });
 
-test.each([
-	["a literal", "<br>"],
-	["a self-closing", "<br/>"],
-	["an escaped", "&lt;br&gt;"],
-])("%s <br> in a label breaks the line, as in Mermaid", async (_, br) => {
-	const input = dir.write(
-		"br.html",
-		page(`<pre class="mermaid">flowchart LR\n  a["one${br}two"] --> b</pre>`),
-	);
-	const output = dir.path("br.out.html");
-
-	const result = await runCli(["pack", input, "-o", output]);
+test("<br> in a fence label breaks the line, as in Mermaid", async () => {
+	const { result, output } = await packFence("br", 'flowchart LR\n  a["one<br>two"] --> b');
 
 	expect(result.code).toBe(0);
 	const html = readFileSync(output, "utf8");
 	expect(html).toMatch(/>one<\/tspan><tspan[^>]*>two</);
 	expect(html).not.toContain("onetwo");
 	expect(html).not.toMatch(/<br\s*\/?>/);
-});
-
-test("a Mermaid block left open at the end of the page fails, with its data-step", async () => {
-	const input = dir.write(
-		"open.html",
-		"<!doctype html><html><body><p>Before</p><pre class=mermaid data-step=1>flowchart LR\n  a --> b\n",
-	);
-
-	const result = await runCli(["pack", input, "-o", dir.path("open.out.html")]);
-
-	expect(result.code).not.toBe(0);
-	expect(result.stderr).toContain("mermaid block 1: diagrams do not step");
-	expect(result.stderr).toContain(
-		"mermaid block 1 has no end tag, so the rest of the page is its source: close it with </pre>",
-	);
 });

@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { runCli, SKILL_DIR, scratch } from "./support.ts";
+import { packHtml, runCli, SKILL_DIR, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -9,42 +9,45 @@ afterAll(dir.cleanup);
 const page = (markup: string) =>
 	`<!doctype html><html><head></head><body>${markup}<p>hi</p></body></html>`;
 
-describe("pack inlines what is local", () => {
-	test("a local stylesheet (with its url() asset), a local script and a kit: file", async () => {
-		dir.write("local.css", ".marker-css { background: url(dot.gif); }");
-		dir.write("dot.gif", "GIF89a");
-		dir.write("local.js", "window.markerScript = 1;");
-		const input = dir.write(
-			"inline.html",
-			page(
-				'<link rel="stylesheet" href="local.css"><script src="local.js"></script><script src="kit:link.js"></script>',
-			),
-		);
-		const output = dir.path("inline.out.html");
+describe("pack takes an .mdx page only", () => {
+	test("any other input is a usage error (exit 2) of one line that says to write page.mdx", async () => {
+		const input = dir.write("page.html", page(""));
 
-		const result = await runCli(["pack", input, "-o", output]);
+		const result = await runCli(["pack", input, "-o", dir.path("refused.out.html")]);
 
-		expect(result.code).toBe(0);
-		const html = readFileSync(output, "utf8");
-		expect(html).toContain(".marker-css");
-		expect(html).toContain("data:image/gif;base64,");
-		expect(html).toContain("window.markerScript = 1;");
-		const kitSource = readFileSync(join(SKILL_DIR, "kit", "link.ts"), "utf8");
-		expect(html).toContain(kitSource.slice(0, 60));
-		expect(html).not.toMatch(/(href|src)="(local\.(css|js)|kit:link\.js)"/);
+		expect(result.code).toBe(2);
+		expect(result.stderr.trim().split("\n")).toHaveLength(1);
+		expect(result.stderr).toContain("write the page as page.mdx");
+		expect(result.stderr).toContain("kit lists what it can use");
+		expect(await Bun.file(dir.path("refused.out.html")).exists()).toBe(false);
 	});
 
-	test("a page's own .ts script is inlined as written, not transpiled like the kit", async () => {
-		const source = '"use strict";\nwindow.markerTs = (x: number) => x;';
-		dir.write("own.ts", source);
-		const input = dir.write("own-ts.html", page('<script src="own.ts"></script>'));
-		const output = dir.path("own-ts.out.html");
+	test("a missing page is a usage error (exit 2), not a stack trace", async () => {
+		const result = await runCli(["pack", dir.path("absent.mdx"), "-o", dir.path("out.html")]);
 
-		const result = await runCli(["pack", input, "-o", output]);
-
-		expect(result.code).toBe(0);
-		expect(readFileSync(output, "utf8")).toContain(source);
+		expect(result.code).toBe(2);
+		expect(result.stderr).toStartWith("error: pack needs an existing page");
 	});
+});
+
+test("an .mdx page's stylesheet ships with its url() asset, and the kit's theme and scripts ship inlined", async () => {
+	dir.write("local.css", ".marker-css { background: url(dot.gif); }");
+	dir.write("dot.gif", "GIF89a");
+	const input = dir.write(
+		"inline.mdx",
+		'import "./local.css";\n\n# Inline\n\nThe <span data-ref="cache">cache</span> and the <span data-ref="cache">same cache</span>.\n',
+	);
+	const output = dir.path("inline.out.html");
+
+	const result = await runCli(["pack", input, "-o", output]);
+
+	expect(result.code).toBe(0);
+	const html = readFileSync(output, "utf8");
+	expect(html).toContain(".marker-css");
+	expect(html).toContain("data:image/gif;base64,");
+	const kitSource = readFileSync(join(SKILL_DIR, "kit", "link.ts"), "utf8");
+	expect(html).toContain(kitSource.slice(0, 60));
+	expect(html).not.toMatch(/(href|src)="(local\.css|kit:[^"]*)"/);
 });
 
 test("a kit script ships as a classic script with its documentation comment", async () => {
@@ -55,9 +58,8 @@ test("a kit script ships as a classic script with its documentation comment", as
 	);
 	const output = dir.path("kit-scripts.out.html");
 
-	const result = await runCli(["pack", input, "-o", output]);
+	expect((await packHtml(input, output)).error).toBe("");
 
-	expect(result.code).toBe(0);
 	const scripts = [...readFileSync(output, "utf8").matchAll(/<script>([\s\S]*?)<\/script>/g)];
 	expect(scripts).toHaveLength(names.length);
 	for (const [, body = ""] of scripts) {
@@ -78,9 +80,8 @@ test("kit:theme.css ships whole: its parts in name order, then theme.css, with t
 	const input = dir.write("theme.html", page('<link rel="stylesheet" href="kit:theme.css">'));
 	const output = dir.path("theme.out.html");
 
-	const result = await runCli(["pack", input, "-o", output]);
+	expect((await packHtml(input, output)).error).toBe("");
 
-	expect(result.code).toBe(0);
 	const html = readFileSync(output, "utf8");
 	// Each source opens with its own comment line, which marks where it starts in the packed stylesheet.
 	const starts = sources.map((file) =>
@@ -92,21 +93,13 @@ test("kit:theme.css ships whole: its parts in name order, then theme.css, with t
 	expect(html).toContain("data:font/woff2;base64,");
 });
 
-test("pack of a missing page is a usage error (exit 2), not a stack trace", async () => {
-	const result = await runCli(["pack", dir.path("absent.html"), "-o", dir.path("out.html")]);
-
-	expect(result.code).toBe(2);
-	expect(result.stderr).toStartWith("error: pack needs an existing page");
-});
-
 test("pack inlines a local url() in a style attribute", async () => {
 	dir.write("attr.gif", "GIF89a");
 	const input = dir.write("attr.html", page('<div style="background:url(attr.gif)"></div>'));
 	const output = dir.path("attr.out.html");
 
-	const result = await runCli(["pack", input, "-o", output]);
+	expect((await packHtml(input, output)).error).toBe("");
 
-	expect(result.code).toBe(0);
 	const html = readFileSync(output, "utf8");
 	expect(html).toContain("data:image/gif;base64,");
 	expect(html).not.toContain("attr.gif");
@@ -133,24 +126,9 @@ test.each([
 ])("$name fails the pack, since it may load something", async ({ markup, message }) => {
 	const input = dir.write("hidden-load.html", page(markup));
 
-	const result = await runCli(["pack", input, "-o", dir.path("hidden-load.out.html")]);
+	const packed = await packHtml(input, dir.path("hidden-load.out.html"));
 
-	expect(result.code).toBe(1);
-	expect(result.stderr).toContain(message);
-});
-
-test("a style element left open at the end of the page is still read for what it loads", async () => {
-	const input = dir.write(
-		"open-style.html",
-		"<!doctype html><html><body><p>hi</p><style>body{background:\\75 rl(https://example.invalid/bg.png)}",
-	);
-	const output = dir.path("open-style.out.html");
-
-	const result = await runCli(["pack", input, "-o", output]);
-
-	expect(result.code).toBe(1);
-	expect(result.stderr).toContain("remote url(https://example.invalid/bg.png) in <style>");
-	expect(await Bun.file(output).exists()).toBe(false);
+	expect(packed.error).toContain(message);
 });
 
 describe("pack rejects network dependencies", () => {
@@ -185,7 +163,7 @@ describe("pack rejects network dependencies", () => {
 		],
 		"@import written with CSS escapes": [
 			'<style>@\\69mport "https://cdn.example.com/x.css";</style>',
-			"@import in <style>: put the CSS in a <link> or <style> instead",
+			'@import in <style>: import that stylesheet from the page instead (import "./other.css")',
 		],
 		"paint attribute of an inline SVG, written with an HTML entity": [
 			'<svg><rect fill="u&#x72;l(https://cdn.example.com/g.svg#p)"/></svg>',
@@ -202,16 +180,29 @@ describe("pack rejects network dependencies", () => {
 	} as const;
 
 	for (const [kind, [head, message]] of Object.entries(remote)) {
-		test(`a remote ${kind} fails with exit 1 and names it`, async () => {
+		test(`a remote ${kind} fails and names it`, async () => {
 			const input = dir.write(`remote-${kind.replace(/\W+/g, "-")}.html`, page(head));
 			const output = dir.path("rejected.html");
 
-			const result = await runCli(["pack", input, "-o", output]);
+			const packed = await packHtml(input, output);
 
-			expect(result.code).toBe(1);
-			expect(result.stderr).toContain("pack failed");
-			expect(result.stderr).toContain(message);
+			expect(packed.error).toContain(message);
 			expect(await Bun.file(output).exists()).toBe(false);
 		});
 	}
+
+	test("from an .mdx page, with exit 1 and nothing written", async () => {
+		const input = dir.write(
+			"remote.mdx",
+			'# Remote\n\n<img src="https://cdn.example.com/a.png" alt="A" />\n',
+		);
+		const output = dir.path("remote.out.html");
+
+		const result = await runCli(["pack", input, "-o", output]);
+
+		expect(result.code).toBe(1);
+		expect(result.stderr).toContain("pack failed");
+		expect(result.stderr).toContain("remote img: https://cdn.example.com/a.png");
+		expect(await Bun.file(output).exists()).toBe(false);
+	});
 });

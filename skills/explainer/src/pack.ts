@@ -23,6 +23,8 @@ const MIME: Record<string, string> = {
 	".otf": "font/otf",
 };
 
+const IMPORT_FIX = 'import that stylesheet from the page instead (import "./other.css")';
+
 const isRemote = (ref: string) => /^(https?:)?\/\//i.test(ref);
 const isInline = (ref: string) => /^(data:|#|about:|javascript:)/i.test(ref);
 
@@ -51,7 +53,7 @@ function dataUri(path: string): string {
 /** Inlines `url(...)` assets and rejects `@import` and remote URLs, so no stylesheet reaches the network. */
 function inlineCss(css: string, baseDir: string, from: string): string {
 	if (/@import/i.test(css)) {
-		throw new PackError(`@import in ${from}: put the CSS in a <link> or <style> instead`);
+		throw new PackError(`@import in ${from}: ${IMPORT_FIX}`);
 	}
 	return css.replace(/url\(\s*(["']?)([^)"']+)\1\s*\)/gi, (whole, _q, ref: string) => {
 		if (isInline(ref)) {
@@ -78,17 +80,12 @@ const refsIn = (markup: string) =>
 
 const STEPPED = `diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`;
 
-/** A start tag as innerHTML writes it, from the parser's raw (still escaped) attribute values. */
-const startTag = (el: HTMLRewriterTypes.Element) =>
-	`<${el.tagName}${[...el.attributes].map(([name, value]) => ` ${name}="${value}"`).join("")}>`;
-
 /**
  * Replaces the source of every `pre.mermaid` (or `div.mermaid`) block with its rendered diagram in a `div`: one SVG whose
  * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy. The source is the block's
- * inner HTML, decoded, as Mermaid reads it in a browser, so a literal `<br>` in a label breaks the line like `&lt;br&gt;`.
- * Blocks and attributes are found by the HTML parser, so any spelling the browser accepts counts. Syntax errors, unsupported
- * types, data-steps or data-step on a block (diagrams do not step) and a block left open at the end of the page are returned
- * as problems. `diagramRefs` collects every part id.
+ * text, decoded, as Mermaid reads it in a browser: a ```mermaid fence becomes such a block with its source escaped, so a `<br>`
+ * in a label breaks the line. Syntax errors, unsupported types and data-steps or data-step on a block (diagrams do not step)
+ * are returned as problems. `diagramRefs` collects every part id.
  */
 function renderMermaidBlocks(
 	html: string,
@@ -96,7 +93,6 @@ function renderMermaidBlocks(
 	diagramRefs: Set<string>,
 ): Promise<string> {
 	let blocks = 0;
-	let open: { n: number; tag: string } | undefined;
 	let source: string[] = [];
 	return new HTMLRewriter()
 		.on("pre.mermaid, div.mermaid", {
@@ -107,10 +103,8 @@ function renderMermaidBlocks(
 				}
 				const parts: string[] = [];
 				source = parts;
-				open = { n, tag: el.tagName };
 				el.tagName = "div";
 				el.onEndTag((end) => {
-					open = undefined;
 					const diagram = renderMermaid(unescapeHtml(parts.join("")), n - 1);
 					if (diagram instanceof Error) {
 						return void problems.push(`mermaid block ${n}: ${diagram.message}`);
@@ -121,33 +115,9 @@ function renderMermaidBlocks(
 					end.before(diagram.svg, { html: true });
 				});
 			},
-			// Text inside the block's child elements arrives here too, in document order with their tags.
 			text(chunk) {
 				source.push(chunk.text);
 				chunk.remove();
-			},
-		})
-		.on(".mermaid *", {
-			element(el) {
-				if (!open) {
-					return;
-				}
-				const parts = source;
-				const tag = el.tagName;
-				parts.push(startTag(el));
-				if (el.canHaveContent) {
-					el.onEndTag(() => void parts.push(`</${tag}>`));
-				}
-				el.removeAndKeepContent();
-			},
-		})
-		.onDocument({
-			end() {
-				if (open) {
-					problems.push(
-						`mermaid block ${open.n} has no end tag, so the rest of the page is its source: close it with </${open.tag}>`,
-					);
-				}
 			},
 		})
 		.transform(new Response(html))
@@ -279,7 +249,7 @@ function loadMessage({ origin, kind, target }: Load): string {
 		case "local":
 			return `url(${target}) in ${origin.label} is not inlined: write url() without CSS escapes so pack can inline it`;
 		case "import":
-			return `@import in ${origin.label}: put the CSS in a <link> or <style> instead`;
+			return `@import in ${origin.label}: ${IMPORT_FIX}`;
 		case "href":
 			return remote
 				? `remote ${origin.label}: ${target}`
@@ -292,23 +262,29 @@ function loadMessage({ origin, kind, target }: Load): string {
 }
 
 /**
- * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined. An `.mdx` page is first compiled and
- * prerendered to an HTML page (mdx/page.ts); everything after that is the same for both.
- * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
+ * Packs an .mdx page into one HTML file: it is compiled and prerendered (mdx/page.ts), then goes through `packPage`.
+ * Throws PackError listing everything the author must fix.
+ */
+export function pack(mdxPath: string): Promise<{ html: string; warnings: string[] }> {
+	const path = resolve(mdxPath);
+	// The page draws its diagrams before it chooses its kit scripts, so diagram parts bring link.js.
+	return packPage(dirname(path), (drawDiagrams) => mdxPage(path, drawDiagrams));
+}
+
+/**
+ * Everything after prerendering: the page `render` returns (it draws the Mermaid blocks with the function it is given, in this
+ * process) becomes one HTML file with local CSS, scripts, images and fonts inlined, relative to `baseDir`. Authors reach it only
+ * through `pack`; the kit runtime tests hand it hand-written HTML. Throws PackError listing every remaining network dependency
  * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render.
  * `warnings` lists links that go nowhere and page classes the kit styles too (see classCollisions).
  */
-export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
-	const baseDir = dirname(resolve(inputPath));
+export async function packPage(
+	baseDir: string,
+	render: (drawDiagrams: (html: string) => Promise<string>) => Promise<string>,
+): Promise<{ html: string; warnings: string[] }> {
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
-	const drawDiagrams = (html: string) => renderMermaidBlocks(html, problems, diagramRefs);
-	// An .mdx page draws its diagrams before it chooses its kit scripts, so diagram parts bring link.js.
-	const mdx = extname(inputPath).toLowerCase() === ".mdx";
-	const original = mdx
-		? await mdxPage(resolve(inputPath), drawDiagrams)
-		: readFileSync(inputPath, "utf8");
-	const source = mdx ? original : await drawDiagrams(original);
+	const source = await render((html) => renderMermaidBlocks(html, problems, diagramRefs));
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);
 	// The inliner names the loads it sees as written; findLoads also finds the escaped ones, so the same load can come twice.
@@ -316,14 +292,14 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 	if (all.length) {
 		const remote = all.some((p) => !p.startsWith("mermaid block"));
 		throw new PackError(
-			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and reference them relatively, or use kit: files." : ""}`,
+			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and import or reference them relatively." : ""}`,
 		);
 	}
 	const warnings = [
-		...loneRefs(original, diagramRefs).map(
+		...loneRefs(source, diagramRefs).map(
 			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
 		),
-		...(await classCollisions(original, (href) => {
+		...(await classCollisions(source, (href) => {
 			const path = isRemote(href) ? "" : refPath(href, baseDir);
 			return path && existsSync(path) ? path : undefined;
 		})),

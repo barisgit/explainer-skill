@@ -1,9 +1,11 @@
 import { expect } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
+import { packPage } from "../skills/explainer/src/pack.ts";
+import { PackError } from "../skills/explainer/src/pack-error.ts";
 
 /** The skill directory as an installer would copy it. */
 export const SKILL_DIR = join(import.meta.dir, "..", "skills", "explainer");
@@ -26,6 +28,31 @@ export async function runCli(args: string[]): Promise<CliResult> {
 		proc.exited,
 	]);
 	return { code, stdout, stderr };
+}
+
+/** What packHtml made of a page: `error` is the PackError's message (empty when it packed), `warnings` what pack would print. */
+export interface Packed {
+	error: string;
+	warnings: string[];
+}
+
+/**
+ * Packs a hand-written HTML page through pack's pipeline after prerendering (packPage), writing `output` when it packs. Authors
+ * pack only .mdx; the tests of the kit runtime and of the HTML pass write the markup the components render by hand.
+ */
+export async function packHtml(input: string, output: string): Promise<Packed> {
+	try {
+		const { html, warnings } = await packPage(dirname(input), (drawDiagrams) =>
+			drawDiagrams(readFileSync(input, "utf8")),
+		);
+		writeFileSync(output, html);
+		return { error: "", warnings };
+	} catch (e) {
+		if (!(e instanceof PackError)) {
+			throw e;
+		}
+		return { error: e.message, warnings: [] };
+	}
 }
 
 /** A temporary directory that is removed by `cleanup()`, with a helper to write files into it. */
@@ -63,9 +90,9 @@ export async function packAndCheck(
 	args: string[],
 ) {
 	const output = dir.path(`${name}.out.html`);
-	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
+	const packed = await packHtml(dir.write(`${name}.html`, page), output);
+	expect(packed.error).toBe("");
 	const checked = await runCli(["check", output, "--quick", "--out", dir.path(name), ...args]);
-	expect(packed.code).toBe(0);
 	expect(checked.stdout).not.toContain(contract);
 	expect(checked.code).toBe(0);
 }
@@ -120,7 +147,7 @@ export interface RunOptions {
 }
 
 /**
- * Packs `page` as `<name>.html` and runs the packed file with `runPacked`; the pack must succeed without a message on stderr.
+ * Packs `page` as `<name>.html` (packHtml) and runs the packed file with `runPacked`; the pack must succeed.
  */
 export async function packAndRun(
 	dir: ReturnType<typeof scratch>,
@@ -129,9 +156,7 @@ export async function packAndRun(
 	options: RunOptions = {},
 ): Promise<string[]> {
 	const output = dir.path(`${name}.out.html`);
-	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
-	expect(packed.stderr).toBe("");
-	expect(packed.code).toBe(0);
+	expect((await packHtml(dir.write(`${name}.html`, page), output)).error).toBe("");
 	return runPacked(output, options);
 }
 

@@ -30,28 +30,27 @@ const SUPPORTED_LIST =
 	"flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram, xychart-beta";
 
 /**
- * What to draw instead, per Mermaid type pack cannot render. The kit names are the files `kit <file>` documents. A Map, unlike an
- * object literal, finds nothing for a header such as `constructor`.
+ * What to draw instead, per Mermaid type pack cannot render. The kit names are the components `kit <Name>` documents. A Map, unlike
+ * an object literal, finds nothing for a header such as `constructor`.
  */
 const INSTEAD = new Map([
-	["pie", "a pie or, better for comparing, a bar chart with kit:charts.js (ECharts)"],
-	["gantt", "a horizontal bar chart on a time axis with kit:charts.js, or a table of dates"],
+	["pie", "a pie or, better for comparing, a bar chart with the kit's Chart (ECharts)"],
+	["gantt", "a horizontal bar chart on a time axis with the kit's Chart, or a table of dates"],
 	["timeline", "an ordered list or a table, or a flowchart LR with one node per period"],
-	["journey", "a line chart of the scores per step with kit:plot.js or kit:charts.js"],
-	["quadrantChart", "a scatter chart with kit:charts.js, with markLine at the two midpoints"],
+	["journey", "a line chart of the scores per step with the kit's Plot or Chart"],
+	["quadrantChart", "a scatter chart with the kit's Chart, with markLine at the two midpoints"],
 	["gitGraph", "a flowchart LR with one node per commit and a subgraph per branch"],
-	["sankey-beta", "a sankey chart with kit:charts.js"],
-	["sankey", "a sankey chart with kit:charts.js"],
+	["sankey-beta", "a sankey chart with the kit's Chart"],
+	["sankey", "a sankey chart with the kit's Chart"],
 	["architecture-beta", "a flowchart with a subgraph per group"],
-	["packet-beta", "an HTML table with one column per bit range"],
-	["packet", "an HTML table with one column per bit range"],
+	["packet-beta", "a table with one column per bit range"],
+	["packet", "a table with one column per bit range"],
 	["mindmap", "a flowchart LR or a nested list"],
 	["block-beta", "a flowchart with a subgraph per block group, or a CSS grid of boxes"],
 	["block", "a flowchart with a subgraph per block group, or a CSS grid of boxes"],
 ]);
 /** What to draw instead of a type INSTEAD does not name. */
-const INSTEAD_OTHERWISE =
-	"a flowchart for parts and links, or a chart with kit:charts.js for numbers";
+const INSTEAD_OTHERWISE = "a flowchart for parts and links, or the kit's Chart for numbers";
 
 /** The family of the source's header keyword; throws, saying what to draw instead, for a type pack cannot draw. */
 function familyOf(body: string): Family {

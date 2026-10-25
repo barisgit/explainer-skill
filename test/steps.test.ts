@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
+import { packAndRun, packHtml, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -37,7 +37,7 @@ test("a stepper that still has v0.7.0's data-labels hears it through check", asy
 	const input = dir.write("legacy.html", PAGE(""));
 	const output = dir.path("legacy.out.html");
 
-	const packed = await runCli(["pack", input, "-o", output]);
+	const packed = await packHtml(input, output);
 	const checked = await runCli([
 		"check",
 		output,
@@ -48,7 +48,7 @@ test("a stepper that still has v0.7.0's data-labels hears it through check", asy
 		dir.path("shots"),
 	]);
 
-	expect(packed.code).toBe(0);
+	expect(packed.error).toBe("");
 	expect(checked.stdout).toContain("kit:steps.js: data-labels is no longer read");
 	expect(checked.code).toBe(0);
 }, 60_000);
