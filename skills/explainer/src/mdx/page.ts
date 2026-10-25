@@ -114,7 +114,12 @@ export async function mdxPage(
 	}
 	const html = await drawDiagrams(prerendered.html);
 	const islands = prerendered.islands;
-	const modules = [...new Set(islands.map((island) => island.module))];
+	// The client modules the islands are from, and those whose exported functions their props hold.
+	const modules = [
+		...new Set(
+			islands.flatMap((island) => [island.module, ...(island.refs ?? []).map((ref) => ref.module)]),
+		),
+	];
 	const bundle = islands.length ? await clientBundle(compiled, modules, css) : "";
 	const needed = await kitScripts(html, bundle, page.front);
 	const kit = (names: KitScript[]) =>
@@ -123,10 +128,11 @@ export async function mdxPage(
 	const links = [...css].map(
 		(file) => `<link rel="stylesheet" href="${escapeHtml(relative(dir, file))}">`,
 	);
-	const islandData = islands.map(({ module, name, props, view }) => ({
+	const islandData = islands.map(({ module, name, props, refs, view }) => ({
 		m: modules.indexOf(module),
 		e: name,
 		p: props,
+		...(refs ? { r: refs.map((ref) => [ref.path, modules.indexOf(ref.module), ref.name]) } : {}),
 		...(view === undefined ? {} : { v: view }),
 	}));
 	return [

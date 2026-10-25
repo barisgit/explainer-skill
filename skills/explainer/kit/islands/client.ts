@@ -9,14 +9,34 @@ import { type DrawRecord, FilledRecord, type FillProps } from "../components/vie
 import "./bare-data.ts";
 
 /**
- * One island as pack writes it: the index of its module in hydrateIslands' list, its export name and its props; `v` names the
- * filled View it draws, for an island without markup.
+ * One island as pack writes it: the index of its module in hydrateIslands' list, its export name and its props; `r` lists the
+ * functions client modules export that go into the props, each as [path, module index, export name]; `v` names the filled View
+ * it draws, for an island without markup.
  */
 interface IslandData {
 	m: number;
 	e: string;
 	p: Record<string, unknown>;
+	r?: [(string | number)[], number, string][];
 	v?: string;
+}
+
+/** Puts each referenced export into `props` at its path, where pack left null (kit/islands/server.ts clientRefs). */
+function withRefs(
+	props: Record<string, unknown>,
+	refs: IslandData["r"],
+	modules: Record<string, unknown>[],
+): Record<string, unknown> {
+	for (const [path, m, name] of refs ?? []) {
+		const last = path.at(-1);
+		const parent = path
+			.slice(0, -1)
+			.reduce<unknown>((object, key) => (object as Record<string, unknown>)[key], props);
+		if (last !== undefined) {
+			(parent as Record<string, unknown>)[last] = modules[m]?.[name];
+		}
+	}
+	return props;
 }
 
 /**
@@ -105,7 +125,8 @@ export function hydrateIslands(modules: Record<string, unknown>[]): void {
 	);
 	// All markers are found before any island renders, since rendering changes the DOM between them.
 	const found = markers();
-	for (const [n, { m, e, p, v }] of data.entries()) {
+	for (const [n, { m, e, p: json, r, v }] of data.entries()) {
+		const p = withRefs(json, r, modules);
 		const component = modules[m]?.[e];
 		const pair = found.get(n);
 		if (typeof component === "function" && v !== undefined) {

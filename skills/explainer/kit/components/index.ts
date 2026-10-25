@@ -9,7 +9,8 @@
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
    To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun check (no install).
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
-   state and handlers work. Props from the page into such a component must be JSON. A control with an id keeps its value across
+   state and handlers work. Props from the page into such a component must be JSON, or functions a "use client" module exports
+   (a formatter, Explore's frame), which the page then imports in the browser. A control with an id keeps its value across
    reloads (kit keep); in such a component, set its state in onInput or onChange, which the restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
 export { Explore } from "./explore.tsx";

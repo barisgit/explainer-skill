@@ -190,7 +190,7 @@ describe("pack fails on page source that would not work in the browser", () => {
 			'import { Chart } from "kit";\n\n<Chart label="x" option={{ series: [{ label: { formatter: (p) => p } }] }} />\n',
 		);
 		expect(stderr).toContain(
-			'<Chart option.series[0].label.formatter> is a function, but props from the page to a client component must be JSON: move the code that makes it into your own "use client" component',
+			'<Chart option.series[0].label.formatter> is a function, but props from the page to a client component must be JSON or functions a "use client" module exports: export it from one, or render <Chart> in your own client component',
 		);
 	});
 
