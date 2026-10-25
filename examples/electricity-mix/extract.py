@@ -1,4 +1,4 @@
-"""Builds data.js, the small extract the page needs, from OWID's owid-energy-data.csv.
+"""Builds data.json, the small extract the page imports (model.ts reads it), from OWID's owid-energy-data.csv.
 
 Usage: python3 extract.py owid-energy-data.csv
 Source: https://github.com/owid/energy-data (CC BY 4.0), electricity columns by Ember and the Energy Institute.
@@ -33,6 +33,6 @@ for name, rows in keep.groupby("country"):
     places.append({"name": name, "region": name in REGIONS, "total": column("electricity_generation"), "twh": series})
 places.sort(key=lambda p: (not p["region"], REGIONS.index(p["name"]) if p["region"] else 0, p["name"]))
 
-out = {"years": [YEARS[0], YEARS[-1]], "places": places}
-with open("data.js", "w") as f:
-    f.write("window.MIX = " + json.dumps(out, separators=(",", ":"), allow_nan=False) + ";\n")
+out = {"first": YEARS[0], "last": YEARS[-1], "places": places}
+with open("data.json", "w") as f:
+    f.write(json.dumps(out, separators=(",", ":"), allow_nan=False) + "\n")

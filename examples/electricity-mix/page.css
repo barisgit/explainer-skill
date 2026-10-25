@@ -1,0 +1,46 @@
+:root {
+	--accent: light-dark(#1f5fbf, #7fb0ff);
+	/* One colour per source, the same in every chart: fossil fuels warm or dark, low-carbon sources cool or green. */
+	--s-coal: light-dark(#4a453e, #b9b1a4);
+	--s-oil: light-dark(#8c5a2b, #c08a5a);
+	--s-gas: light-dark(#d55e00, #ef7d3b);
+	--s-nuclear: light-dark(#7a5cb0, #b59be6);
+	--s-hydro: light-dark(#0072b2, #4aa3df);
+	--s-wind: light-dark(#009e73, #2fc095);
+	--s-solar: light-dark(#e0a800, #f0c230);
+	--s-bio: light-dark(#6b9a2e, #9bcf5a);
+	--s-other: light-dark(#cc79a7, #e08fc0);
+}
+.chart.mix {
+	block-size: clamp(22rem, 40vw, 24rem);
+}
+.chart.moves {
+	block-size: clamp(20rem, 52vw, 28rem);
+}
+.presets {
+	margin: 0;
+}
+.pick {
+	min-inline-size: 0;
+	max-inline-size: 100%;
+}
+/* Long tables scroll inside their fold, their header kept in view. */
+.table-box {
+	max-block-size: 26rem;
+	overflow: auto;
+}
+.table-box thead th {
+	position: sticky;
+	inset-block-start: 0;
+	background: var(--surface);
+}
+.minor li {
+	margin-block: 0.375rem;
+}
+.note {
+	min-block-size: 1.5em;
+	margin: 0;
+	padding: 0.625rem var(--pad);
+	color: var(--muted);
+	font-size: 0.875rem;
+}

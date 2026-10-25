@@ -13,7 +13,7 @@
 			"!skills/explainer/kit/parts/math/temml.css",
 			"!skills/explainer/vendor/preact",
 			"!skills/explainer/vendor/types",
-			"!examples/*/data.js"
+			"!examples/*/data.json"
 		]
 	},
 	"formatter": { "enabled": true, "indentStyle": "tab", "lineWidth": 100 },
