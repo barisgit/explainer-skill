@@ -1,0 +1,40 @@
+/* Page-specific: everything else comes from the kit's stylesheet. */
+:root {
+	--accent: light-dark(#0f6b5c, #5fd3bd);
+}
+#budget-chart {
+	block-size: clamp(22rem, 52vw, 27rem);
+}
+.settings-chart {
+	block-size: clamp(14rem, 36vw, 18rem);
+}
+.presets {
+	margin: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+.verdict-note {
+	margin-block: 0.75rem;
+	padding-inline: var(--pad);
+}
+/* The lists of rules and of notes. */
+:where(details, .view) ul {
+	padding-inline-start: 1.1rem;
+}
+:where(details, .view) ul > li {
+	margin-block: 0.4rem;
+}
+.sources li {
+	margin-block: 0.35rem;
+}
+
+/* The migration methods: the checked radio shows its panel, with no script. Print shows all three. */
+@media screen {
+	#migration:not(:has([value="login"]:checked)) [data-mig="login"],
+	#migration:not(:has([value="wrap"]:checked)) [data-mig="wrap"],
+	#migration:not(:has([value="expire"]:checked)) [data-mig="expire"] {
+		display: none;
+	}
+}

@@ -19,6 +19,7 @@
 		"skills/explainer/kit/islands",
 		"skills/explainer/example",
 		"examples/mdx-all",
+		"examples/password-hashing",
 		"kit-types"
 	]
 }
