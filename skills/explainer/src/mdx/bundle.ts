@@ -1,8 +1,9 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, sep } from "node:path";
+import { basename, dirname, extname, join, sep } from "node:path";
 import type { BuildConfig, BunPlugin, JavaScriptLoader } from "bun";
 import type { Island, renderPage } from "../../kit/islands/server.ts";
+import { dataUri, EMBEDDED, MIME } from "../data-uri.ts";
 import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT, shownPath } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
@@ -27,6 +28,13 @@ const LOADERS: Record<string, JavaScriptLoader> = {
 	".jsx": "jsx",
 };
 const SCRIPT = /\.m?[jt]sx?$/;
+/** The images and fonts a module may import: each becomes its data: URI, so the page and its client code carry the file. */
+const EMBEDDABLE = new RegExp(
+	`\\.(?:${Object.keys(MIME)
+		.map((ext) => ext.slice(1))
+		.join("|")})$`,
+	"i",
+);
 /** A module whose first statement, after comments, is the "use client" directive. */
 const USE_CLIENT = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(["'])use client\1/;
 const SOURCE = "island-source:";
@@ -91,6 +99,10 @@ function pagePlugin(
 				css.add(path);
 				return { contents: "", loader: "js" };
 			});
+			build.onLoad({ filter: EMBEDDABLE }, ({ path }) => ({
+				contents: `export default ${JSON.stringify(dataUri(path))};`,
+				loader: "js",
+			}));
 			build.onLoad({ filter: /\.mdx$/ }, async ({ path }) => ({
 				contents: path === page.path ? page.js : (await compileMdx(path, false)).js,
 				loader: "js",
@@ -161,12 +173,22 @@ async function buildEntry(
 				.join("\n"),
 		);
 	}
-	const [output] = built.outputs;
+	const [output, ...assets] = built.outputs;
 	if (!output) {
 		throw new PackError(`${entry.path}: the build wrote nothing`);
 	}
+	if (assets.length) {
+		throw new PackError(assets.map((asset) => notEmbedded(asset.path)).join("\n"));
+	}
 	return output.text();
 }
+
+/**
+ * The message for a file a module imports that EMBEDDABLE does not take: Bun would copy it beside the page under a hashed name
+ * (`clip-4hs4mfxp.mp4`), which the single file cannot carry.
+ */
+const notEmbedded = (asset: string) =>
+	`the page imports ${basename(asset).replace(/-[a-z0-9]{8}(?=\.[^.]*$)/, "")}, which pack cannot embed: it embeds imported images (${EMBEDDED.images}) and fonts (${EMBEDDED.fonts})`;
 
 /** What the prerender bundle exports: the page rendered by kit/islands/server.ts's renderPage with `labels` as kitLabels, and the components' language. */
 interface Prerender {

@@ -11,6 +11,7 @@ Pages are MDX. An agent writes `page.mdx`: Markdown prose, the kit's components,
 - Figures and interactions are components imported from `"kit"`. Behaviour no component covers goes in your own `.tsx` component whose first line is `"use client"`.
 - Page settings move into frontmatter: `lang` instead of `<html lang>`, `labels` instead of `var kitLabels`, `scheme` instead of `<html data-scheme>`.
 - Controls with ids are kept across reloads without `reply.js`. Ids repeated on one page fail `pack`.
+- Images and fonts that code shows are imported (`import icon from "./icon.svg"` gives a `data:` URL `pack` embeds). A file path written in client code, its props or a filled view's records fails `pack`, since the browser would load it later.
 - `example.html` is now `example/` (`page.mdx` and the model it imports).
 
 Before (v0.8.2), a step-through figure:

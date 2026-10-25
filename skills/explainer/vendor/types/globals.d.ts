@@ -130,8 +130,8 @@ interface ReplyNotesOptions {
 }
 
 /**
- * Set by the page in any of its scripts: its texts for the kit's own controls, accessible names and messages, by key; `kit <file>`
- * lists the keys. The kit scripts read it when they draw, never caching it, so it may be set after them.
+ * The page's texts for the kit's own controls, accessible names and messages, by key: pack sets it from the frontmatter `labels`,
+ * whose keys `kit labels` lists. The kit scripts read it when they draw, never caching it, so it may be set after them.
  */
 declare var kitLabels: Readonly<Record<string, string>> | undefined;
 
@@ -158,3 +158,49 @@ declare var ViewsNav: (options: {
 	show(view: HTMLElement | null, hash: string): void;
 };
 declare var ViewsFolds: (kitText: KitText<"expandAll" | "collapseAll">) => () => void;
+
+// An image or font a page's module imports is its data: URL, which pack embeds: import icon from "./icon.svg" (src/data-uri.ts).
+declare module "*.png" {
+	const url: string;
+	export default url;
+}
+declare module "*.jpg" {
+	const url: string;
+	export default url;
+}
+declare module "*.jpeg" {
+	const url: string;
+	export default url;
+}
+declare module "*.gif" {
+	const url: string;
+	export default url;
+}
+declare module "*.webp" {
+	const url: string;
+	export default url;
+}
+declare module "*.svg" {
+	const url: string;
+	export default url;
+}
+declare module "*.avif" {
+	const url: string;
+	export default url;
+}
+declare module "*.woff2" {
+	const url: string;
+	export default url;
+}
+declare module "*.woff" {
+	const url: string;
+	export default url;
+}
+declare module "*.ttf" {
+	const url: string;
+	export default url;
+}
+declare module "*.otf" {
+	const url: string;
+	export default url;
+}

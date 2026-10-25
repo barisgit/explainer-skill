@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { classCollisions } from "./collisions.ts";
+import { dataUri } from "./data-uri.ts";
 import { safeScript, unescapeHtml } from "./escape.ts";
 import { repeatedIdProblems } from "./ids.ts";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
@@ -9,20 +10,6 @@ import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
 import { PackError } from "./pack-error.ts";
 import { themeSvgImages } from "./svg-theme.ts";
-
-const MIME: Record<string, string> = {
-	".png": "image/png",
-	".jpg": "image/jpeg",
-	".jpeg": "image/jpeg",
-	".gif": "image/gif",
-	".webp": "image/webp",
-	".svg": "image/svg+xml",
-	".avif": "image/avif",
-	".woff2": "font/woff2",
-	".woff": "font/woff",
-	".ttf": "font/ttf",
-	".otf": "font/otf",
-};
 
 const IMPORT_FIX = 'import that stylesheet from the page instead (import "./other.css")';
 
@@ -41,14 +28,6 @@ function locate(ref: string, baseDir: string): string {
 		throw new PackError(`missing file: ${ref}${hint}`);
 	}
 	return path;
-}
-
-function dataUri(path: string): string {
-	const mime = MIME[extname(path).toLowerCase()];
-	if (!mime) {
-		throw new PackError(`unsupported asset type: ${path}`);
-	}
-	return `data:${mime};base64,${readFileSync(path).toString("base64")}`;
 }
 
 /** A CSS url(): its value in double quotes, single quotes or bare. */

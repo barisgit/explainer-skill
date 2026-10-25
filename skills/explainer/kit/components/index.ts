@@ -7,6 +7,9 @@
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
    right-aligned column (---:) is numeric (class="num"), and on phones each row stacks its cells under the column names.
    Data and styles are imported files: import plan from "./plan.json", import { rows } from "./data.ts", import "./page.css".
+   An imported image or font is a data: URL pack embeds: import icon from "./icon.svg", then <img src={icon} />. Client code must
+   import the files it shows: pack fails on a file path written in it, in its props or in a filled view's records, since the
+   browser would load that file later, from beside the page.
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
    To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun check (no install).
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its

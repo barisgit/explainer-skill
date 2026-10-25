@@ -158,3 +158,49 @@ declare var ViewsNav: (options: {
 	show(view: HTMLElement | null, hash: string): void;
 };
 declare var ViewsFolds: (kitText: KitText<"expandAll" | "collapseAll">) => () => void;
+
+// An image or font a page's module imports is its data: URL, which pack embeds: import icon from "./icon.svg" (src/data-uri.ts).
+declare module "*.png" {
+	const url: string;
+	export default url;
+}
+declare module "*.jpg" {
+	const url: string;
+	export default url;
+}
+declare module "*.jpeg" {
+	const url: string;
+	export default url;
+}
+declare module "*.gif" {
+	const url: string;
+	export default url;
+}
+declare module "*.webp" {
+	const url: string;
+	export default url;
+}
+declare module "*.svg" {
+	const url: string;
+	export default url;
+}
+declare module "*.avif" {
+	const url: string;
+	export default url;
+}
+declare module "*.woff2" {
+	const url: string;
+	export default url;
+}
+declare module "*.woff" {
+	const url: string;
+	export default url;
+}
+declare module "*.ttf" {
+	const url: string;
+	export default url;
+}
+declare module "*.otf" {
+	const url: string;
+	export default url;
+}

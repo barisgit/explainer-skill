@@ -5,6 +5,7 @@ import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
+import { CLIENT_LOAD_FIX, clientLoads } from "./client-loads.ts";
 import { compileMdx, type Frontmatter, frontmatterWarnings } from "./compile.ts";
 import {
 	AFTER_ISLANDS,
@@ -141,6 +142,10 @@ export async function mdxPage(
 	const [bundle, scan] = islands.length
 		? await Promise.all([clientBundle(compiled, modules, css), clientScan(compiled, modules, css)])
 		: ["", ""];
+	const loads = await clientLoads(scan, islands);
+	if (loads.length) {
+		throw new PackError(`${loads.map((load) => `- ${load}`).join("\n")}\n${CLIENT_LOAD_FIX}`);
+	}
 	const needed = await kitScripts(html, scan, page.front);
 	const kit = (names: KitScript[]) =>
 		names.filter((name) => needed.has(name)).map((name) => `<script src="kit:${name}"></script>`);

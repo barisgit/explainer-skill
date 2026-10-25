@@ -34,7 +34,8 @@ export interface ClientRef {
 /**
  * One prerendered client component: the module that defines it, its export name and the JSON props it hydrates with, with
  * `refs` put in place of the nulls at their paths. With `view`, it has no markup: it draws the open record of that filled View
- * in the browser, from props that are FillProps.
+ * in the browser, from props that are FillProps, and `drawn` holds each record's markup by param as pack drew it, for pack's
+ * checks of what the browser will draw (it is not written into the page).
  */
 export interface Island {
 	module: string;
@@ -42,6 +43,7 @@ export interface Island {
 	props: Record<string, unknown>;
 	refs?: ClientRef[];
 	view?: string;
+	drawn?: Record<string, string>;
 }
 
 /**
@@ -130,8 +132,8 @@ export function island(module: string, name: string, value: unknown, kit = false
 				`<View name="${view}" records>: ${problem.path.slice(1)} is ${problem.what}, but the records reach the browser as JSON`,
 			);
 		}
-		drawEach(view, label, Component as DrawRecord, props);
-		islands.push({ module, name, props: { ...props }, view });
+		const drawn = drawEach(view, label, Component as DrawRecord, props);
+		islands.push({ module, name, props: { ...props }, view, drawn });
 	};
 	Island.fill = fill;
 	wrappers.add(Island);
@@ -170,15 +172,21 @@ function prerendered(
 }
 
 /**
- * Draws every record of a filled view once and throws the HTML away: a record the component cannot draw fails the pack, naming
- * it, rather than leaving the reader an empty view.
+ * Draws every record of a filled view once, returning each one's HTML by param for pack to check: a record the component cannot
+ * draw fails the pack, naming it, rather than leaving the reader an empty view.
  */
-function drawEach(view: string, label: string, render: DrawRecord, { records, back }: FillProps) {
+function drawEach(
+	view: string,
+	label: string,
+	render: DrawRecord,
+	{ records, back }: FillProps,
+): Record<string, string> {
+	const drawn: Record<string, string> = {};
 	depth++;
 	try {
 		for (const [param, record] of Object.entries(records)) {
 			try {
-				renderToString(h(FilledRecord, { render, record, back }));
+				drawn[param] = renderToString(h(FilledRecord, { render, record, back }));
 			} catch (e) {
 				throw new IslandError(
 					`<View name="${view}" render={${label}}> threw for #${view}/${param}: ${e instanceof Error ? e.message : String(e)}`,
@@ -188,6 +196,7 @@ function drawEach(view: string, label: string, render: DrawRecord, { records, ba
 	} finally {
 		depth--;
 	}
+	return drawn;
 }
 
 /**
