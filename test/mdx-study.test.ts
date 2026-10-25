@@ -265,4 +265,16 @@ describe("frontmatter", () => {
 			),
 		]);
 	}, 30_000);
+
+	test("pack warns about a lang other than English with no labels, and says how to translate them", async () => {
+		const warned = async (name: string, front: string) =>
+			(await pack(name, `---\n${front}\n---\n\n# T\n`)).stdout
+				.split("\n")
+				.filter((line) => line.startsWith("warning: "));
+		expect(await warned("lang-sl", "lang: sl")).toEqual([
+			'warning: lang is "sl" but the frontmatter has no labels, so the texts the kit adds (Back, Next, Reply, Show answer) are English: run kit labels, translate the block and paste it into the frontmatter',
+		]);
+		expect(await warned("lang-en", "lang: en-GB")).toEqual([]);
+		expect(await warned("lang-labelled", 'lang: sl\nlabels:\n  next: "Naprej"')).toEqual([]);
+	}, 30_000);
 });

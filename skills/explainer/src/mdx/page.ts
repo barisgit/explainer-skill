@@ -3,7 +3,7 @@ import { basename, dirname, extname, relative } from "node:path";
 import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
 import { clientBundle, prerender } from "./bundle.ts";
-import { compileMdx, type Frontmatter } from "./compile.ts";
+import { compileMdx, type Frontmatter, frontmatterWarnings } from "./compile.ts";
 import {
 	AFTER_ISLANDS,
 	BEFORE_ISLANDS,
@@ -95,12 +95,13 @@ async function kitScripts(
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
  * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
- * scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError.
+ * scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError;
+ * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
  */
 export async function mdxPage(
 	file: string,
 	drawDiagrams: (html: string) => Promise<string>,
-): Promise<string> {
+): Promise<{ html: string; warnings: string[] }> {
 	// The bundler loads modules by their real path (/tmp is /private/tmp on macOS), and the page is recognised by it.
 	const path = realpathSync(file);
 	const page = await compileMdx(path, true);
@@ -130,7 +131,7 @@ export async function mdxPage(
 		...(view === undefined ? {} : { v: view }),
 	}));
 	const scheme = page.front.scheme ? ` data-scheme="${page.front.scheme}"` : "";
-	return [
+	const shell = [
 		"<!doctype html>",
 		`<html lang="${escapeHtml(page.front.lang)}"${scheme}>`,
 		"<head>",
@@ -157,5 +158,6 @@ export async function mdxPage(
 		"</body>",
 		"</html>",
 		"",
-	].join("\n");
+	];
+	return { html: shell.join("\n"), warnings: frontmatterWarnings(page.front) };
 }

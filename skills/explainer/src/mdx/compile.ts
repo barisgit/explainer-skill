@@ -107,6 +107,18 @@ function frontmatter(source: string, file: string): Frontmatter {
 	};
 }
 
+/**
+ * What pack warns about in a page's frontmatter: a language other than English without labels, whose kit texts (the stepper's
+ * buttons, the reply, Show answer) would stay English beside the page's own words.
+ */
+export function frontmatterWarnings({ lang, labels }: Frontmatter): string[] {
+	return /^en(-|$)/i.test(lang) || labels
+		? []
+		: [
+				`lang is "${lang}" but the frontmatter has no labels, so the texts the kit adds (Back, Next, Reply, Show answer) are English: run kit labels, translate the block and paste it into the frontmatter`,
+			];
+}
+
 /** Every element of the tree, depth first. */
 function* elementsOf(node: HastNodes): Generator<Element> {
 	if (node.type === "element") {
