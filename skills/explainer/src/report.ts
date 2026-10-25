@@ -36,6 +36,7 @@ function pages(shots: Shot[], stepNotes: string[]): string[] {
 	for (const s of shots) {
 		out.push(
 			`  ${s.problems.length ? "FAIL" : "ok  "} ${s.theme.padEnd(5)} ${s.viewport.padEnd(17)} ${(s.view || "overview").padEnd(14)} ${s.png}${s.problems.map((p) => `\n         ${p}`).join("")}`,
+			...s.elements.map((e) => `         ${e.step}  ${e.png}`),
 		);
 	}
 	return [...out, ...stepNotes.map((n) => `  --do ${n}`)];

@@ -67,7 +67,7 @@ The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, 
 
 1. **Write** `page.mdx`: Markdown prose, the kit's components (`Chart`, `Plot`, `Explore`, `Stepper`, `View`, `Tree`, `Table`, `Question`) and the `.ts` or `.json` data it imports. `kit` lists what is available and `kit <name>` documents one; a `.tsx` component whose first line is `"use client"` covers behaviour no component does.
 2. **Pack**: `pack page.mdx -o out.html` renders the page to static HTML, inlines the kit scripts it uses, the fonts and local assets, and draws the Mermaid diagrams (one SVG each, following light and dark) and TeX formulas, so the result is one offline file.
-3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
+3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks, presses keys, types and sets fields first, so the screenshots can show a later state, and `--do shot:<css>` saves one element at that point.
 
 A diagram whose parts light up from the text, for illustration:
 

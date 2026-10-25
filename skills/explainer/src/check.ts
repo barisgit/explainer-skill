@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./chrome.ts";
 import { settle, withPage } from "./chrome.ts";
+import { ELEMENT_NAME_JS, PAINTS_JS, REGION_VISIBLE_JS } from "./page-js.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
@@ -20,8 +21,14 @@ export interface FirstScreen {
 	figures: string[];
 	links: number;
 }
+/** A PNG of one element, written by a `--do shot:` step. */
+export interface ElementShot {
+	step: string;
+	png: string;
+}
 /**
  * `view` is the hash of a drill-down view ("" for the overview); `first` describes the first viewport, taken before any step (overview only).
+ * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
  * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
  * change only its captions).
@@ -32,6 +39,7 @@ export interface Shot {
 	view: string;
 	png: string;
 	first?: FirstScreen | undefined;
+	elements: ElementShot[];
 	problems: string[];
 	warnings: string[];
 }
@@ -74,19 +82,6 @@ export async function kitReferences(html: string): Promise<string[]> {
 	return [...refs];
 }
 
-/** Page-side function naming an element in reports: `div#panel.card` (tag, id, first class). */
-const ELEMENT_NAME_JS = `(el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")`;
-/**
- * Page-side function: true for an element laid out for the reader. Chrome still returns layout boxes for the descendants of a closed
- * `<details>`, so a box alone does not mean visible; only the `<summary>` of a closed disclosure is.
- */
-const SHOWN_JS = `(el) => {
-	if (el.getClientRects().length === 0) return false;
-	for (let child = el, p = el.parentElement; p; child = p, p = p.parentElement) {
-		if (p.tagName === "DETAILS" && !p.open && child.tagName !== "SUMMARY") return false;
-	}
-	return true;
-}`;
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
 
@@ -104,13 +99,14 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	const name = ${ELEMENT_NAME_JS};
 	const scrolls = (el) => { const o = getComputedStyle(el).overflowX; return o === "auto" || o === "scroll"; };
 	const clipped = (el) => { for (let p = el.parentElement; p; p = p.parentElement) if (scrolls(p)) return true; return false; };
-	const shown = ${SHOWN_JS};
+	const shown = ${PAINTS_JS};
+	const region = ${REGION_VISIBLE_JS};
 	const all = [...document.body.querySelectorAll("*")];
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
 	const wideByDesign = (el) => [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1);
-	const inner = all.filter((el) => scrolls(el) && shown(el) && !wideByDesign(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
+	const inner = all.filter((el) => scrolls(el) && region(el) && !wideByDesign(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
-	const cut = all.filter((el) => hides(el) && shown(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
+	const cut = all.filter((el) => hides(el) && region(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
 	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
 	if (${narrow}) for (const svg of document.querySelectorAll("svg")) {
@@ -139,7 +135,7 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 /** Runs in the page before any step: the headline, the figures at least partly in the first viewport (outermost only) and the largest list of in-page links in view. */
 const FIRST_SCREEN_JS = `(() => {
 	const name = ${ELEMENT_NAME_JS};
-	const shown = ${SHOWN_JS};
+	const shown = ${PAINTS_JS};
 	const seen = (el) => { if (!shown(el)) return false; const r = el.getBoundingClientRect(); return r.width >= 120 && r.height >= 80 && Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) >= Math.min(200, r.height * 0.4); };
 	const found = [...document.querySelectorAll("figure, .fig, .chart, .mermaid, .dg, svg, canvas, img")].filter(seen);
 	const outer = found.filter((el) => !found.some((o) => o !== el && o.contains(el)));
@@ -408,9 +404,19 @@ async function capture(run: Run, png: string, screen: Screen): Promise<string[]>
 	];
 }
 
+/**
+ * The path of an overview PNG for one screen, `part` saying what it shows beyond the full page: `<stem>[-<part>]-<theme>-<size>.png`,
+ * or under --quick, whose one theme the name leaves out, `[<tag>-][<part>-]<size>.png`.
+ */
+function overviewPng(run: Run, { theme, name }: Screen, part = "") {
+	const { tag, quick } = run.opts;
+	const parts = quick ? [tag, part, name] : [run.stem, part, theme, name];
+	return join(run.outDir, `${parts.filter(Boolean).join("-")}.png`);
+}
+
 /** The first viewport before any step: PNG, headline and the figures in view. */
-async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScreen> {
-	const png = join(run.outDir, `${run.stem}-first-${theme}-${name}.png`);
+async function firstScreen(run: Run, screen: Screen): Promise<FirstScreen> {
+	const png = overviewPng(run, screen, "first");
 	const { data } = await run.cdp.send<{ data: string }>("Page.captureScreenshot", {
 		format: "png",
 	});
@@ -434,18 +440,38 @@ async function discoverViews(run: Run) {
 	run.viewHashes = chosen.capture;
 }
 
-/** Runs the `--do` steps in order, recording their problems and notes. */
-async function runSteps(run: Run) {
+/**
+ * The `part` of a `--do shot:` PNG's name: the shot's ordinal among the shot: steps, the selector as a slug, then the match index
+ * when the step names one (`shot2-card-0`, as in `example-shot2-card-0-light-desktop.png`).
+ */
+function shotPart(ordinal: number, selector: string, index: number | undefined) {
+	const slug =
+		selector
+			.replace(/[^\w-]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40) || "element";
+	return `shot${ordinal}-${slug}${index === undefined ? "" : `-${index}`}`;
+}
+
+/** Runs the `--do` steps in order, recording their problems and notes; returns the PNGs the shot: steps wrote. */
+async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
+	const elements: ElementShot[] = [];
+	let ordinal = 0;
 	for (const step of run.opts.steps) {
-		const result = await runStep(run.cdp, step);
+		const shot = step.startsWith("shot:") ? ++ordinal : 0;
+		const result = await runStep(run.cdp, step, (selector, index) =>
+			overviewPng(run, screen, shotPart(shot, selector, index)),
+		);
 		if (result.problem) {
 			run.log.problems.push(`--do ${result.problem}`);
 		}
 		if (result.note) {
 			run.stepNotes.add(result.note);
 		}
+		elements.push(...(result.pngs ?? []).map((png) => ({ step, png })));
 		await settle(200);
 	}
+	return elements;
 }
 
 /** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, full-page shot. */
@@ -462,13 +488,8 @@ async function shootOverview(run: Run, screen: Screen) {
 	await sweep(run);
 	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
 	const stepperWarnings = firstPass ? await run.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
-	await runSteps(run);
-	const png = join(
-		run.outDir,
-		opts.quick
-			? `${opts.tag ? `${opts.tag}-` : ""}${name}.png`
-			: `${run.stem}-${theme}-${name}.png`,
-	);
+	const elements = await runSteps(run, screen);
+	const png = overviewPng(run, screen);
 	const warnings = [...stepperWarnings, ...(await capture(run, png, screen))];
 	run.shots.push({
 		theme,
@@ -476,6 +497,7 @@ async function shootOverview(run: Run, screen: Screen) {
 		view: "",
 		png,
 		first,
+		elements,
 		problems: [...new Set(run.log.problems)],
 		warnings,
 	});
@@ -500,6 +522,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 		viewport: `${name} ${vp.width}x${vp.height}`,
 		view: hash,
 		png,
+		elements: [],
 		problems: [...new Set(run.log.problems)],
 		warnings,
 	});
