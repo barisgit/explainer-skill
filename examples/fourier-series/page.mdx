@@ -1,0 +1,198 @@
+---
+title: "Fourier series: building signals from sines"
+---
+import { Coefficients, Gibbs, Hero, Symmetry } from "./figures.tsx";
+import { A0, An, Bn, Dx, F, Frac, Int, Nx, Period, Series, Sum, SumN } from "./math.tsx";
+import "./page.css";
+
+# A square wave is a sum of sines, and the bump at its jump never goes away
+
+Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.
+
+<Hero />
+
+{/* Study page: the reader answers first. Each textarea's data-reply names it in the reply; a reload keeps what was written. */}
+
+## Six questions to answer before you read on
+
+Write what you think in the box, then open the answer.
+
+<ol class="questions">
+<li>
+
+What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?
+
+<textarea id="a1" rows="3" data-reply="1. What a Fourier series says" placeholder="Your answer"></textarea>
+
+<details>
+<summary>Show answer</summary>
+
+A periodic signal can be written as a constant plus sines and cosines whose frequencies are whole multiples of the signal's own frequency. Each multiple, a harmonic, has one amplitude for its cosine and one for its sine.
+
+No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. The first section below shows why the amounts can be read off one at a time.
+
+</details>
+</li>
+<li>
+
+For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?
+
+<textarea id="a2" rows="3" data-reply="2. Square wave harmonics" placeholder="Your answer"></textarea>
+
+<details>
+<summary>Show answer</summary>
+
+Only sines with odd n: *b*<sub>*n*</sub> = 4/(*nπ*) for odd n, and zero for even n and for every cosine. The amplitudes fall like 1/n, so 4/π, 4/(3π), 4/(5π), …
+
+</details>
+</li>
+<li>
+
+The sawtooth *f*(*x*) = *x* on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?
+
+<textarea id="a3" rows="3" data-reply="3. Sawtooth versus square" placeholder="Your answer"></textarea>
+
+<details>
+<summary>Show answer</summary>
+
+*b*<sub>*n*</sub> = 2(−1)<sup>*n*+1</sup>/*n*. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.
+
+</details>
+</li>
+<li>
+
+You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?
+
+<textarea id="a4" rows="3" data-reply="4. Overshoot with more terms" placeholder="Your answer"></textarea>
+
+<details>
+<summary>Show answer</summary>
+
+It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at *x* = π/(2k) for k terms. The section on the bump lets you check.
+
+</details>
+</li>
+<li>
+
+If the bump never shrinks, in what sense does the series converge to the square wave? What value does it give exactly at the jump?
+
+<textarea id="a5" rows="3" data-reply="5. Convergence at a jump" placeholder="Your answer"></textarea>
+
+<details>
+<summary>Show answer</summary>
+
+At every point away from a jump the sum converges to the signal, because the bump has moved past any fixed point. The mean-square error also goes to zero, since the bump gets narrower while its height stays put. What does not happen is uniform convergence. Just beside a jump the sum is still near 0 while the signal is near ±1, so the largest error stays large, close to half the jump. The overshoot above the plateau tends to about 9% of the jump rather than to zero. At the jump itself, the series gives the midpoint of the two sides, 0 for the square wave.
+
+</details>
+</li>
+<li>
+
+Without integrating: which coefficients are zero for *x*², for *x*³, and for *x*² + *x* on (−π, π)?
+
+<textarea id="a6" rows="3" data-reply="6. Symmetry without integrating" placeholder="Your answer"></textarea>
+
+<details>
+<summary>Show answer</summary>
+
+*x*² is even: all *b*<sub>*n*</sub> are zero, only cosines (and *a*<sub>0</sub>) remain. *x*³ is odd: *a*<sub>0</sub> and all *a*<sub>*n*</sub> are zero, only sines remain. *x*² + *x* is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from *x*² and its sines from *x*.
+
+</details>
+</li>
+</ol>
+
+## Why sines and cosines are enough
+
+Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:
+
+<div class="eq"><Series /></div>
+
+Two facts make this work. First, every term repeats after 2π, so any sum of them does too. Second, the terms are **orthogonal**: over one period, the integral of the product of two different terms is zero, and for positive whole numbers the product of a sine or cosine with itself integrates to π. The constant term is its own case: its square integrates to 2π. Multiply the signal by one term and integrate, and every other term drops out. That leaves one number, the amount of that term in the signal. It is the formula for the coefficients used below.
+
+The figure above is the series in action. With one term the square wave is a single sine of amplitude 4/π. Each added sine puts back detail the previous sum lacked, and the corners get steeper.
+
+{/* These three sections' headings follow their controls, so each component renders its section's heading and figure. */}
+
+<section>
+<Coefficients />
+</section>
+
+<section>
+<Gibbs />
+</section>
+
+<section>
+<Symmetry />
+
+Spotting the symmetry first halves the work, and saves a mistake: a stray cosine term in an odd function's answer is wrong. The half ramp is the sum of its even part, a triangle, and its odd part, a straight line, so it has both kinds of term.
+
+</section>
+
+## Everything above on one table
+
+<dl class="sheet">
+<div>
+<dt>Series, period 2π</dt>
+<dd><Series /></dd>
+</div>
+<div>
+<dt>Coefficients</dt>
+<dd><An /> = <Frac top="1" bottom="π" /> <Period /> <F /> cos <Nx /><Dx /> &emsp; (*n* ≥ 0)</dd>
+<dd><Bn /> = <Frac top="1" bottom="π" /> <Period /> <F /> sin <Nx /><Dx /> &emsp; (*n* ≥ 1)</dd>
+</div>
+<div>
+<dt>Period T, ω = 2π/T</dt>
+<dd>*f*(*t*) = <Frac top={<A0 />} bottom="2" /> + <SumN /> (<An /> cos *nωt* + <Bn /> sin *nωt*)</dd>
+<dd><An /> = <Frac top="2" bottom={<i>T</i>} /> <Int from="0" to={<i>T</i>} /> *f*(*t*) cos *nωt* d*t*, &emsp; <Bn /> = <Frac top="2" bottom={<i>T</i>} /> <Int from="0" to={<i>T</i>} /> *f*(*t*) sin *nωt* d*t*</dd>
+</div>
+<div>
+<dt>Orthogonality</dt>
+<dd><Period /> sin *mx* sin <Nx /><Dx /> = <Period /> cos *mx* cos <Nx /><Dx /> = π if *m* = *n*, else 0 &emsp; (*m*, *n* = 1, 2, 3, …)</dd>
+<dd><Period /> sin *mx* cos <Nx /><Dx /> = 0 for all *m*, *n* &emsp; <Period /> cos <Nx /><Dx /> = 0 (*n* ≥ 1) &emsp; <Period /> 1<Dx /> = 2π</dd>
+</div>
+<div>
+<dt>Even *f*</dt>
+<dd><Bn /> = 0, &emsp; <An /> = <Frac top="2" bottom="π" /> <Int from="0" to="π" /> <F /> cos <Nx /><Dx /></dd>
+</div>
+<div>
+<dt>Odd *f*</dt>
+<dd><A0 /> = <An /> = 0, &emsp; <Bn /> = <Frac top="2" bottom="π" /> <Int from="0" to="π" /> <F /> sin <Nx /><Dx /></dd>
+</div>
+<div>
+<dt>Square wave, ±1, odd</dt>
+<dd><Bn /> = <Frac top="4" bottom={<><i>n</i>π</>} /> for odd *n*, 0 for even *n*</dd>
+<dd><F /> = <Frac top="4" bottom="π" /> <Sum from={<><i>n</i> odd</>} /> <Frac top={<>sin <Nx /></>} bottom={<i>n</i>} /></dd>
+</div>
+<div>
+<dt>Sawtooth, *f* = *x* on (−π, π)</dt>
+<dd><Bn /> = <Frac top={<>2(−1)<sup><i>n</i>+1</sup></>} bottom={<i>n</i>} /></dd>
+<dd><F /> = 2 ( sin *x* − <Frac top={<>sin 2<i>x</i></>} bottom="2" /> + <Frac top={<>sin 3<i>x</i></>} bottom="3" /> − … )</dd>
+</div>
+<div>
+<dt>At a jump</dt>
+<dd>The series gives the midpoint of the two one-sided limits: <Frac top={<><i>f</i>(<i>x</i><sup>+</sup>) + <i>f</i>(<i>x</i><sup>−</sup>)</>} bottom="2" /></dd>
+</div>
+<div>
+<dt>Gibbs overshoot</dt>
+<dd>Square wave ±1: the *k*-term sum peaks at *x* = <Frac top="π" bottom={<>2<i>k</i></>} />, and the peak tends to <Frac top="2" bottom="π" /> Si(π) ≈ 1.179</dd>
+<dd>Overshoot → 0.0895 × the jump, where Si(π) = <Int from="0" to="π" /> <Frac top={<>sin <i>t</i></>} bottom={<i>t</i>} /> d*t* ≈ 1.852</dd>
+</div>
+<div>
+<dt>Parseval</dt>
+<dd><Frac top="1" bottom="π" /> <Period /> <F /><sup>2</sup><Dx /> = <Frac top={<><i>a</i><sub>0</sub><sup>2</sup></>} bottom="2" /> + <SumN /> (<An /><sup>2</sup> + <Bn /><sup>2</sup>)</dd>
+<dd>After *N* terms the mean-square error is half the sum of the squared omitted coefficients.</dd>
+</div>
+</dl>
+
+<p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is *a*<sub>0</sub>/2, which makes the same *a*<sub>*n*</sub> formula work for *n* = 0. Books that write plain *a*<sub>0</sub> use the average, *a*<sub>0</sub> = (1/2π)∫*f* d*x*.</p>
+
+<section class="minor">
+
+## Sources
+
+- H. Wilbraham, “On a certain periodic function”, *Cambridge and Dublin Mathematical Journal* 3 (1848), pp. 198–201: the first analysis of the overshoot.
+- J. W. Gibbs, letter in *Nature* 59 (27 April 1899), p. 606: the correction that describes the overshoot.
+- M. Bôcher, “Introduction to the theory of Fourier’s series”, *Annals of Mathematics* 7 (1906): the detailed analysis that gave the effect its name.
+- Wikipedia, “Gibbs phenomenon” (en.wikipedia.org/wiki/Gibbs_phenomenon, CC BY-SA 4.0): the constants Si(π) = 1.851937… and 0.0894898… of the jump, which the page’s own sums reproduce.
+- Coefficient formulas and symmetry rules are standard; see for example Kreyszig, *Advanced Engineering Mathematics*, the chapter on Fourier series.
+
+</section>
