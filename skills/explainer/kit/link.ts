@@ -9,7 +9,7 @@
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
-   A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
+   A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
    Refs a page script writes or removes after load link and unlink at once. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
@@ -86,6 +86,10 @@
 		linkedParts = parts.filter((el) => refsOf(el).some((ref) => linked.has(ref)));
 		for (const el of linkedParts) {
 			mark(el, true);
+		}
+		// A pin outlives no partner: once its part stops linking it ends, so a partner written back later does not revive it.
+		if (pinned && !linkedParts.includes(pinned)) {
+			pinned = null;
 		}
 		paint(true);
 	}

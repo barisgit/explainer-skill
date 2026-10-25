@@ -105,6 +105,24 @@ test("HTML in one SVG is one place, and a nested SVG dims as part of the outermo
 	expect(await packAndRun(dir, "foreign", PAGE(script, body))).toEqual([]);
 }, 30_000);
 
+test("a pin ends when its ref stops linking and does not come back with the partner", async () => {
+	const body = `<p><span id="p1" data-ref="pair">one</span> and <span id="p2" data-ref="pair">two</span>.</p>`;
+	const script = `
+	click($("#p1"));
+	hover($("main"));
+	expect(lit() === "p1,p2", "a click pins the pair");
+	const partner = $("#p2");
+	partner.remove();
+	await Promise.resolve();
+	expect(lit() === "", "with the partner gone nothing is lit");
+	$("p").append(partner);
+	await Promise.resolve();
+	expect(lit() === "", "the partner's return does not bring back the pin");
+	click($("#p1"));
+	expect(lit() === "p1,p2", "a new click pins again");`;
+	expect(await packAndRun(dir, "pin", PAGE(script, body))).toEqual([]);
+}, 30_000);
+
 test("the light and dark copies of an SVG file are one place", async () => {
 	dir.write(
 		"twin.svg",
