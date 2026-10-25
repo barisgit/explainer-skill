@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
-import { runCli, scratch } from "./support.ts";
+import { act, inPage, kitScriptsIn, load, packedMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -111,55 +110,7 @@ async function pack(name: string, source: string): Promise<string> {
 	dir.write("queue.tsx", QUEUE);
 	dir.write("late.tsx", LATE);
 	dir.write("spark.tsx", SPARK);
-	const output = dir.path(`${name}.out.html`);
-	const result = await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]);
-	expect(result.stderr).toBe("");
-	expect(result.code).toBe(0);
-	return output;
-}
-
-/** Waits in the page until effects and the chart redraws they start have run: a frame, a task, another frame. */
-const FRAMES = `new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame))`;
-
-/** Opens `url` (or reloads, keeping storage) and waits until the page has settled: load, the kit's load tasks, the fonts and frames. */
-async function load(cdp: Cdp, url?: string) {
-	const loaded = cdp.once("Page.loadEventFired");
-	await (url ? cdp.send("Page.navigate", { url }) : cdp.send("Page.reload"));
-	await loaded;
-	await cdp.evaluate(
-		`new Promise((done) => setTimeout(done, 100)).then(() => document.fonts.ready).then(() => ${FRAMES})`,
-		true,
-	);
-}
-
-/** Runs `action` in the page, then waits for the re-render and returns the page's `state` expression. */
-const act = <T>(cdp: Cdp, action: string, state: string) =>
-	cdp.evaluate<T>(
-		`(() => { ${action} })(), ${FRAMES}.then(() => ${FRAMES}).then(() => (${state}))`,
-		true,
-	);
-
-/** Opens a packed page in headless Chrome with reduced motion and runs `fn`; fails on any uncaught page error or console warning. */
-function inPage<T>(output: string, fn: (cdp: Cdp) => Promise<T>): Promise<T> {
-	return withPage(async (cdp) => {
-		const errors: string[] = [];
-		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
-			errors.push(d.exception?.description ?? d.text),
-		);
-		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => {
-			if (type === "error" || type === "warning") {
-				errors.push(`${type}: ${JSON.stringify(args)}`);
-			}
-		});
-		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
-		await cdp.send("Emulation.setEmulatedMedia", {
-			features: [{ name: "prefers-reduced-motion", value: "reduce" }],
-		});
-		await load(cdp, `file://${output}`);
-		const result = await fn(cdp);
-		expect(errors).toEqual([]);
-		return result;
-	});
+	return packedMdx(dir, name, source);
 }
 
 /** The Queue island as the reader sees it, and whether steps.js's controls and root attributes survived Preact's renders. */
@@ -430,7 +381,7 @@ describe("keeping inside an island", () => {
 
 	test("without reply the controls are kept by keep.js alone, and no reply bar shows", async () => {
 		const output = await pack("kept-alone", queuePage("title: Queues"));
-		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["echarts", "charts", "steps", "keep"]);
+		expect(kitScriptsIn(output)).toEqual(["echarts", "charts", "steps", "keep"]);
 		const reloaded = await inPage(output, async (cdp) => {
 			await act(cdp, `document.getElementById("scenario-burst").click()`, "0");
 			await load(cdp);
@@ -439,10 +390,6 @@ describe("keeping inside an island", () => {
 		expect(reloaded).toEqual(["burst,1,false", null]);
 	}, 30_000);
 });
-
-/** The kit scripts a packed page includes, found by the documentation comment pack puts in front of each. */
-const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "keep", "reply"];
-const scriptsIn = (html: string) => KIT_SCRIPTS.filter((name) => html.includes(`/* ${name}: `));
 
 /** A client component that renders `jsx` (kit components from `imports`) only after #reveal is clicked. */
 const revealing = (imports: string, jsx: string) => `"use client";
@@ -460,15 +407,39 @@ export function Reveal() {
 }
 `;
 
-/** One use of each kit component, written so it needs every script the component can need (Tree: folds and refs). */
-const COMPONENT_USES: Record<string, string> = {
-	Chart: `<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />`,
-	Explore: `<Explore label="Bars" controls={[{ id: "n", label: "N", toggle: true }]} frame={(on) => ({ plot: { categories: ["a"], series: [{ type: "bar", data: [on ? 2 : 1] }] } })} />`,
-	Plot: `<Plot label="Bars" option={{ categories: ["a"], series: [{ type: "bar", data: [1] }] }} />`,
-	Question: `<Question name="pick" legend="Pick one" options={["yes", "no"]} />`,
-	Stepper: `<Stepper captions={["One", "Two"]}><p data-step="1">One</p><p data-step="2">Two</p></Stepper>`,
-	Table: `<Table rows={[{ name: "A", n: 1 }]} cols={[{ head: "Name", value: "name" }, { head: "N", value: "n" }]} />`,
-	Tree: `<Tree items={[{ label: "Plan", ref: "plan", items: [{ label: "Task", ref: "plan", text: "Do it" }] }]} />`,
+/**
+ * One use of each kit component, written so it needs every script the component can need (Tree: folds and refs), and the kit
+ * scripts the page carries when it renders that use itself.
+ */
+const COMPONENT_USES: Record<string, { use: string; scripts: string[] }> = {
+	Chart: {
+		use: `<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />`,
+		scripts: ["echarts", "charts"],
+	},
+	Explore: {
+		use: `<Explore label="Bars" controls={[{ id: "n", label: "N", toggle: true }]} frame={(on) => ({ plot: { categories: ["a"], series: [{ type: "bar", data: [on ? 2 : 1] }] } })} />`,
+		scripts: ["plot", "keep"],
+	},
+	Plot: {
+		use: `<Plot label="Bars" option={{ categories: ["a"], series: [{ type: "bar", data: [1] }] }} />`,
+		scripts: ["plot"],
+	},
+	Question: {
+		use: `<Question name="pick" legend="Pick one" options={["yes", "no"]} />`,
+		scripts: ["keep", "reply"],
+	},
+	Stepper: {
+		use: `<Stepper captions={["One", "Two"]}><p data-step="1">One</p><p data-step="2">Two</p></Stepper>`,
+		scripts: ["steps"],
+	},
+	Table: {
+		use: `<Table rows={[{ name: "A", n: 1 }]} cols={[{ head: "Name", value: "name" }, { head: "N", value: "n" }]} />`,
+		scripts: [],
+	},
+	Tree: {
+		use: `<Tree items={[{ label: "Plan", ref: "plan", items: [{ label: "Task", ref: "plan", text: "Do it" }] }]} />`,
+		scripts: ["views", "link"],
+	},
 };
 
 describe("kit scripts", () => {
@@ -484,7 +455,7 @@ describe("kit scripts", () => {
 			"ask",
 			'import { Reveal } from "./ask.tsx";\n\n# Ask\n\n<Reveal />\n',
 		);
-		expect(scriptsIn(readFileSync(output, "utf8"))).toContain("reply");
+		expect(kitScriptsIn(output)).toContain("reply");
 		const kept = await inPage(output, async (cdp) => {
 			const reveal = `document.getElementById("reveal").click()`;
 			await act(cdp, reveal, "0");
@@ -495,7 +466,7 @@ describe("kit scripts", () => {
 		expect(kept).toBe(true);
 	}, 30_000);
 
-	test("a self-check a client component renders later brings keep.js and no reply bar", async () => {
+	test("a self-check a client component renders later brings keep.js and not reply.js", async () => {
 		dir.write(
 			"check-later.tsx",
 			revealing(
@@ -507,7 +478,7 @@ describe("kit scripts", () => {
 			"check-later",
 			'import { Reveal } from "./check-later.tsx";\n\n# Check\n\n<Reveal />\n',
 		);
-		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["keep"]);
+		expect(kitScriptsIn(output)).toEqual(["keep"]);
 	});
 
 	test("a control a client component renders later brings keep.js when it has an id, however its props are written", async () => {
@@ -527,7 +498,7 @@ export function Later({ id }: { id: string }) {
 		const scripts = async (name: string, props: string) => {
 			dir.write(`${name}.tsx`, later(props));
 			const page = `import { Later } from "./${name}.tsx";\n\n# Later\n\n<Later id="scale" />\n`;
-			return scriptsIn(readFileSync(await pack(name, page), "utf8"));
+			return kitScriptsIn(await pack(name, page));
 		};
 		expect(await scripts("later-id", "id={id}")).toEqual(["keep"]);
 		expect(await scripts("later-no-id", 'aria-label="Scale"')).toEqual([]);
@@ -536,7 +507,7 @@ export function Later({ id }: { id: string }) {
 	test("two Mermaid diagrams sharing a node id bring link.js, and the parts light together", async () => {
 		const fence = (to: string) => `\`\`\`mermaid\nflowchart LR\n  A --> ${to}\n\`\`\`\n`;
 		const output = await pack("shared", `# Shared\n\n${fence("B")}\n${fence("C")}`);
-		expect(scriptsIn(readFileSync(output, "utf8"))).toContain("link");
+		expect(kitScriptsIn(output)).toContain("link");
 		const lit = await inPage(output, (cdp) =>
 			act(
 				cdp,
@@ -547,14 +518,14 @@ export function Later({ id }: { id: string }) {
 		expect(lit).toEqual([true, true]);
 	}, 30_000);
 
-	test("every kit component a client component renders later brings the scripts it brings when the page renders it", async () => {
+	test("every kit component brings its scripts when the page renders it, and at least those when a client component renders it later", async () => {
 		const exported = new Bun.Transpiler({ loader: "ts" }).scan(
 			readFileSync(new URL("../skills/explainer/kit/components/index.ts", import.meta.url), "utf8"),
 		).exports;
 		// A View inside a client component fails the pack, so it is the one component without a later use.
 		expect([...Object.keys(COMPONENT_USES), "View"].sort()).toEqual(exported.sort());
 		const found = await Promise.all(
-			Object.entries(COMPONENT_USES).map(async ([name, use]) => {
+			Object.entries(COMPONENT_USES).map(async ([name, { use }]) => {
 				dir.write(`later-${name}.tsx`, revealing(name, use));
 				const [now, later] = await Promise.all([
 					pack(`now-${name}`, `import { ${name} } from "kit";\n\n# Now\n\n${use}\n`),
@@ -563,121 +534,18 @@ export function Later({ id }: { id: string }) {
 						`import { Reveal } from "./later-${name}.tsx";\n\n# Later\n\n<Reveal />\n`,
 					),
 				]);
-				const [before, after] = [now, later].map((file) => scriptsIn(readFileSync(file, "utf8")));
-				return [name, before?.filter((script) => !after?.includes(script))] as const;
+				const [before, after] = [now, later].map(kitScriptsIn);
+				const missing = before?.filter((script) => !after?.includes(script));
+				return [name, { now: before, missing }] as const;
 			}),
 		);
 		expect(Object.fromEntries(found)).toEqual(
-			Object.fromEntries(Object.keys(COMPONENT_USES).map((name) => [name, []])),
+			Object.fromEntries(
+				Object.entries(COMPONENT_USES).map(([name, { scripts }]) => [
+					name,
+					{ now: scripts, missing: [] },
+				]),
+			),
 		);
 	}, 60_000);
-});
-
-/** Packs `body` under a kit import as `<name>.mdx`, expecting a failure; returns the exit code and the message. */
-async function packFailure(name: string, body: string) {
-	const source = `import { Question } from "kit";\n\n# Ids\n\n${body}\n`;
-	const result = await runCli([
-		"pack",
-		dir.write(`${name}.mdx`, source),
-		"-o",
-		dir.path(`${name}.out.html`),
-	]);
-	return [result.code, result.stderr.trim()];
-}
-
-describe("Question", () => {
-	test("options whose values differ only in case keep their own answer across a reload, and the reply holds it", async () => {
-		const output = await pack(
-			"case",
-			'import { Question } from "kit";\n\n# Case\n\n<Question name="pick" legend="Which one?" options={{ A: "Upper", a: "Lower" }} />\n',
-		);
-		const state = await inPage(output, async (cdp) => {
-			await act(cdp, `document.querySelector('input[value="a"]').click()`, "0");
-			await load(cdp);
-			return act(
-				cdp,
-				`document.querySelector(".reply-bar .primary").click()`,
-				`[[...document.querySelectorAll("input[name=pick]")].map((i) => i.checked).join(), document.querySelector(".reply-md").textContent.split("\\n").find((line) => line.includes("Which one?"))]`,
-			);
-		});
-		expect(state).toEqual(["false,true", expect.stringContaining("Lower")]);
-	}, 30_000);
-
-	test("a value twice in one Question, or two Questions writing one id, fails the pack, saying what to change", async () => {
-		const question = (name: string, options: string) =>
-			`<Question name="${name}" legend="Which?" options={${options}} />`;
-		const failed = packFailure;
-		expect(await failed("twice", question("pick", '["Yes", "No", "Yes"]'))).toEqual([
-			1,
-			expect.stringContaining('<Question name="pick"> has the option value "Yes" twice'),
-		]);
-		expect(
-			await failed("shared", `${question("a-b", '["c"]')}\n\n${question("a", '["b-c"]')}`),
-		).toEqual([
-			1,
-			expect.stringContaining(
-				'the id "a-b-c" is on 2 elements: <input type="radio" name="a-b" value="c"> under "Ids", <input type="radio" name="a" value="b-c"> under "Ids". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id (a Question\'s option ids are its name and value, so give each Question its own name)',
-			),
-		]);
-		expect(
-			await failed("grouped", `${question("pick", '["Yes"]')}\n\n${question("pick", '["No"]')}`),
-		).toEqual([1, expect.stringContaining('2 questions use the name "pick"')]);
-	}, 30_000);
-});
-
-describe("self-check Question", () => {
-	test("a self-check marks the choice, opens its explanation, keeps the choice after a reload, and is not in the reply", async () => {
-		const output = await pack(
-			"self-check",
-			`import { Question } from "kit";
-
-# Study
-
-<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">
-A **kWh** is a kW for an hour.
-</Question>
-
-<Question name="unit2" legend="Which one is power?" options={["kW", "kWh"]} answer="kW" />
-`,
-		);
-		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["keep"]);
-		// What the reader sees of the first question: the right and the chosen option's marks, and whether the explanation shows.
-		const seen = `(() => {
-			const look = (value) => { const s = getComputedStyle(document.querySelector('[name=unit][value="' + value + '"] + span')); return s.textDecorationLine + " " + s.boxShadow.includes("0px 0px 0px 2px"); };
-			return [look("kW"), look("kWh"), document.querySelector(".explain").checkVisibility(), document.querySelector(".reply-bar")];
-		})()`;
-		const state = await inPage(output, async (cdp) => {
-			const before = await cdp.evaluate(seen);
-			const wrong = await act(cdp, `document.getElementById("unit-kW").click()`, seen);
-			await load(cdp);
-			return { before, wrong, reloaded: await cdp.evaluate(seen) };
-		});
-		expect(state.before).toEqual(["none false", "none false", false, null]);
-		expect(state.wrong).toEqual(["line-through true", "none true", true, null]);
-		expect(state.reloaded).toEqual(state.wrong);
-	}, 30_000);
-
-	test("a self-check with an answer that cannot be checked fails the pack, saying what to change", async () => {
-		const question = (props: string, inside = "") =>
-			`<Question name="q" legend="Which?" options={["a", "b"]} ${props}${inside ? `>${inside}</Question>` : " />"}`;
-		const failed = (name: string, props: string, inside = "") =>
-			packFailure(name, question(props, inside));
-		expect(await failed("not-option", 'answer="c"')).toEqual([
-			1,
-			expect.stringContaining(
-				'<Question name="q"> has the answer "c", which is not one of its option values (a, b)',
-			),
-		]);
-		expect(await failed("multiple", 'answer="a" multiple')).toEqual([
-			1,
-			expect.stringContaining("a self-check has one right option"),
-		]);
-		expect(
-			await packFailure("two-checks", `${question('answer="a"')}\n\n${question('answer="b"')}`),
-		).toEqual([1, expect.stringContaining('2 questions use the name "q"')]);
-		expect(await failed("no-answer", "", "Because.")).toEqual([
-			1,
-			expect.stringContaining("has an explanation inside but no answer"),
-		]);
-	}, 30_000);
 });

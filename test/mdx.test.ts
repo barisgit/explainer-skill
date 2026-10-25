@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { withPage } from "../skills/explainer/src/chrome.ts";
-import { runCli, scratch } from "./support.ts";
+import { packMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -54,17 +54,17 @@ export function Counter({ start }: { start: number }) {
 `;
 
 /** Packs `source` as an .mdx page next to the counter and its data; returns the CLI result and the output path. */
-async function packMdx(name: string, source: string) {
-	dir.write("data.json", '{ "start": 3 }');
-	dir.write("page.css", ".marker-page-css { color: var(--accent); }");
-	dir.write("counter.tsx", COUNTER);
-	const output = dir.path(`${name}.out.html`);
-	return { result: await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]), output };
+function pack(name: string, source: string) {
+	return packMdx(dir, name, source, {
+		"data.json": '{ "start": 3 }',
+		"page.css": ".marker-page-css { color: var(--accent); }",
+		"counter.tsx": COUNTER,
+	});
 }
 
 describe("an .mdx page packs to one prerendered file", () => {
 	test("the static HTML holds the prose, the layout, the diagram and the island's first render", async () => {
-		const { result, output } = await packMdx("page", PAGE);
+		const { result, output } = await pack("page", PAGE);
 		expect(result.stderr).toBe("");
 		expect(result.code).toBe(0);
 		const html = readFileSync(output, "utf8");
@@ -84,7 +84,7 @@ describe("an .mdx page packs to one prerendered file", () => {
 	});
 
 	test("check finds no problems in light and dark, before and after a click on the island", async () => {
-		const { output } = await packMdx("checked", PAGE);
+		const { output } = await pack("checked", PAGE);
 		const checked = await runCli([
 			"check",
 			output,
@@ -98,7 +98,7 @@ describe("an .mdx page packs to one prerendered file", () => {
 	}, 60_000);
 
 	test("a click on the island re-renders it and re-applies the chart's option", async () => {
-		const { output } = await packMdx("clicked", PAGE);
+		const { output } = await pack("clicked", PAGE);
 		const state = await withPage(async (cdp) => {
 			await cdp.send("Page.enable");
 			const loaded = cdp.once("Page.loadEventFired");
@@ -126,7 +126,7 @@ describe("an .mdx page packs to one prerendered file", () => {
 		expect(state).toEqual({ before: { count: "3", bars: 3 }, after: { count: "4", bars: 4 } });
 	}, 30_000);
 
-	test("a bare data-* attribute is empty, as in HTML, wherever the JSX is, so reply.js labels a question by its legend", async () => {
+	test("a bare data-* attribute is empty, as in HTML, in the prerendered page and in DOM Preact makes later", async () => {
 		dir.write(
 			"marked.tsx",
 			`"use client";
@@ -143,7 +143,7 @@ export function Marked() {
 }
 `,
 		);
-		const { output } = await packMdx(
+		const { output } = await pack(
 			"bare-data",
 			`import { Marked } from "./marked.tsx";
 
@@ -179,7 +179,7 @@ export function Marked() {
 
 describe("pack fails on page source that would not work in the browser", () => {
 	const failure = async (name: string, source: string) => {
-		const { result } = await packMdx(name, source);
+		const { result } = await pack(name, source);
 		expect(result.code).toBe(1);
 		return result.stderr;
 	};
@@ -204,7 +204,7 @@ describe("pack fails on page source that would not work in the browser", () => {
 	test("a handler prop on a static component fails, and other function props do not", async () => {
 		const tree =
 			'import { Tree } from "kit";\n\n<Tree items={[{ name: "a" }]} row={(r) => ({ label: r.name, text: "t" })} />\n';
-		expect((await packMdx("static-function", tree)).result.code).toBe(0);
+		expect((await pack("static-function", tree)).result.code).toBe(0);
 		const stderr = await failure(
 			"component-handler",
 			'import { Stepper } from "kit";\n\n<Stepper captions={["a", "b"]} onStep={() => 1}><svg /></Stepper>\n',
@@ -231,7 +231,7 @@ export function Refs() {
 `,
 		);
 		expect(
-			(await packMdx("refs", 'import { Refs } from "./refs.tsx";\n\n<Refs />\n')).result.code,
+			(await pack("refs", 'import { Refs } from "./refs.tsx";\n\n<Refs />\n')).result.code,
 		).toBe(0);
 		expect(await failure("ref-element", '# T\n\n<span ref="flow">Flow</span>\n')).toContain(
 			'<span ref="flow"> in the page: ref is Preact\'s handle to the element (a function or useRef()) and never reaches the page; to link the part with others, write data-ref="flow"',

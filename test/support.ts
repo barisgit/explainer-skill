@@ -55,6 +55,42 @@ export async function packHtml(input: string, output: string): Promise<Packed> {
 	}
 }
 
+/** Packs `source` as `<name>.mdx` in `dir`, with `files` written beside it first; returns the CLI result and the output path. */
+export async function packMdx(
+	dir: ReturnType<typeof scratch>,
+	name: string,
+	source: string,
+	files: Record<string, string> = {},
+): Promise<{ result: CliResult; output: string }> {
+	for (const [file, text] of Object.entries(files)) {
+		dir.write(file, text);
+	}
+	const output = dir.path(`${name}.out.html`);
+	return { result: await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]), output };
+}
+
+/** packMdx for a page that must pack: fails the test unless pack succeeds with nothing on stderr; returns the output path. */
+export async function packedMdx(
+	dir: ReturnType<typeof scratch>,
+	name: string,
+	source: string,
+	files: Record<string, string> = {},
+): Promise<string> {
+	const { result, output } = await packMdx(dir, name, source, files);
+	expect(result.stderr).toBe("");
+	expect(result.code).toBe(0);
+	return output;
+}
+
+/** The kit scripts a page can include, in the order pack writes them. */
+const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "keep", "reply"];
+
+/** The kit scripts the packed file includes, found by the documentation comment pack puts in front of each. */
+export const kitScriptsIn = (file: string): string[] => {
+	const html = readFileSync(file, "utf8");
+	return KIT_SCRIPTS.filter((name) => html.includes(`/* ${name}: `));
+};
+
 /** A temporary directory that is removed by `cleanup()`, with a helper to write files into it. */
 export function scratch() {
 	const root = mkdtempSync(join(tmpdir(), "explainer-test-"));
@@ -130,11 +166,11 @@ export interface Viewport {
 	mobile: boolean;
 }
 
-/** The widths `check` shoots, so a page run covers the same layouts. */
-const WIDTHS: Viewport[] = [
-	{ width: 1440, height: 900, mobile: false },
-	{ width: 390, height: 844, mobile: true },
-];
+/** The desktop window `check` shoots first. */
+export const DESKTOP: Viewport = { width: 1440, height: 900, mobile: false };
+
+/** The widths `check` shoots, desktop then phone, so a page run covers the same layouts. */
+export const WIDTHS: Viewport[] = [DESKTOP, { width: 390, height: 844, mobile: true }];
 
 /** How packAndRun runs a page; every field has the default given here. */
 export interface RunOptions {
@@ -197,6 +233,61 @@ export function runPacked(
 			failures.push(...found.map((failure) => `${width}: ${failure}`));
 		}
 		return failures;
+	});
+}
+
+/** Waits in the page for a re-render and the effects and redraws it starts: a frame, a task, another frame. */
+export const FRAMES = `new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame))`;
+
+/**
+ * Opens `url` (or reloads, keeping storage) and waits until the page has settled: the load event, the kit's load-time tasks, the
+ * fonts (charts and plots redraw when theirs arrive), then FRAMES twice for the islands' effects and the redraws they start.
+ */
+export async function load(cdp: Cdp, url?: string) {
+	const loaded = cdp.once("Page.loadEventFired");
+	await (url ? cdp.send("Page.navigate", { url }) : cdp.send("Page.reload"));
+	await loaded;
+	await cdp.evaluate(
+		`new Promise((done) => setTimeout(done, 100)).then(() => document.fonts.ready).then(() => ${FRAMES}).then(() => ${FRAMES})`,
+		true,
+	);
+}
+
+/** Runs `action` in the page, waits for the re-render and the redraws it starts, and returns the page's `state` expression. */
+export const act = <T>(cdp: Cdp, action: string, state: string) =>
+	cdp.evaluate<T>(
+		`(() => { ${action} })(), ${FRAMES}.then(() => ${FRAMES}).then(() => (${state}))`,
+		true,
+	);
+
+/**
+ * Opens a packed page in headless Chrome with reduced motion, at `viewport` (default the desktop), and runs `fn`; fails on any
+ * uncaught page error or console error or warning.
+ */
+export function inPage<T>(
+	output: string,
+	fn: (cdp: Cdp) => Promise<T>,
+	viewport: Viewport = DESKTOP,
+): Promise<T> {
+	return withPage(async (cdp) => {
+		const errors: string[] = [];
+		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
+			errors.push(d.exception?.description ?? d.text),
+		);
+		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => {
+			if (type === "error" || type === "warning") {
+				errors.push(`${type}: ${JSON.stringify(args)}`);
+			}
+		});
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setEmulatedMedia", {
+			features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+		});
+		await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
+		await load(cdp, `file://${output}`);
+		const result = await fn(cdp);
+		expect(errors).toEqual([]);
+		return result;
 	});
 }
 

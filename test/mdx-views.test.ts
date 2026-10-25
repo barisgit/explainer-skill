@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
-import { runCli, scratch } from "./support.ts";
+import { load, packedMdx, packMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -88,35 +88,19 @@ ${ITEM_BODY}
 </View>
 ))}`);
 
-/** Packs `source` as `<name>.mdx` beside the items and the Item component; returns the CLI result and the output path. */
-async function packMdx(name: string, source: string, files: Record<string, string> = {}) {
-	dir.write("items.json", JSON.stringify(ITEMS));
-	dir.write("item.tsx", ITEM_TSX);
-	for (const [file, text] of Object.entries(files)) {
-		dir.write(file, text);
-	}
-	const output = dir.path(`${name}.out.html`);
-	return { result: await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]), output };
-}
+/** The items and the Item component the pages import, beside `files`. */
+const besideItems = (files: Record<string, string> = {}) => ({
+	"items.json": JSON.stringify(ITEMS),
+	"item.tsx": ITEM_TSX,
+	...files,
+});
 
-/** Packs `source`, failing the test unless the pack succeeds without a message; returns the output path. */
-async function packed(name: string, source: string): Promise<string> {
-	const { result, output } = await packMdx(name, source);
-	expect(result.stderr).toBe("");
-	expect(result.code).toBe(0);
-	return output;
-}
+/** Packs `source` as `<name>.mdx` beside the items, Item and `files`; returns the CLI result and the output path. */
+const pack = (name: string, source: string, files: Record<string, string> = {}) =>
+	packMdx(dir, name, source, besideItems(files));
 
-/** Opens `url` (or reloads, keeping storage) and waits for the load event, the kit's load-time tasks and a frame. */
-async function load(cdp: Cdp, url?: string) {
-	const loaded = cdp.once("Page.loadEventFired");
-	await (url ? cdp.send("Page.navigate", { url }) : cdp.send("Page.reload"));
-	await loaded;
-	await cdp.evaluate(
-		"new Promise((done) => setTimeout(done, 100)).then(() => new Promise(requestAnimationFrame))",
-		true,
-	);
-}
+/** Packs `source` beside the items and Item, failing the test unless the pack succeeds without a message; returns the output path. */
+const packed = (name: string, source: string) => packedMdx(dir, name, source, besideItems());
 
 /** Runs `fn` in headless Chrome with `media` emulated; fails on any uncaught page error. */
 function inChrome<T>(fn: (cdp: Cdp) => Promise<T>, media = "screen"): Promise<T> {
@@ -250,7 +234,7 @@ describe("a filled view in pack and check", () => {
 					'import { Item } from "./item.tsx";',
 					'import { Item } from "./item.tsx";\nimport { Boom } from "./boom.tsx";',
 				);
-				const { result } = await packMdx(`bad-${name}`, source, { "boom.tsx": BOOM });
+				const { result } = await pack(`bad-${name}`, source, { "boom.tsx": BOOM });
 				const message = result.stderr.trim().split("\n").at(-1) ?? "";
 				return `${result.code} ${message.split("the page threw while rendering: ").at(-1)}`;
 			}),

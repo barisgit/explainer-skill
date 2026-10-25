@@ -1,7 +1,15 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { ENGLISH, labelsScript, SLOVENIAN } from "./labels-contract.ts";
-import { pageAssertion, pageContract, runCli, runPacked, SETTLED, scratch } from "./support.ts";
+import {
+	packMdx,
+	pageAssertion,
+	pageContract,
+	runCli,
+	runPacked,
+	SETTLED,
+	scratch,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -146,14 +154,9 @@ ${PLAN.people
 <section class="view" data-view="about"><div class="view-head"><a class="back" href="#">The board</a><h1>How the hours were counted</h1><p class="lede">From the work list.</p></div>
 <section><h2>Sources</h2><p>The work list.</p></section></section></main>`;
 
-/** Packs `source` as `<name>.mdx` beside plan.json; returns the CLI result and the output path. */
-async function packMdx(name: string, source: string, files: Record<string, string> = {}) {
-	dir.write("plan.json", JSON.stringify(PLAN));
-	for (const [file, text] of Object.entries(files)) {
-		dir.write(file, text);
-	}
-	const output = dir.path(`${name}.out.html`);
-	return { result: await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]), output };
+/** Packs `source` as `<name>.mdx` beside plan.json and `files`; returns the CLI result and the output path. */
+function pack(name: string, source: string, files: Record<string, string> = {}) {
+	return packMdx(dir, name, source, { "plan.json": JSON.stringify(PLAN), ...files });
 }
 
 /** The page's `<main>`, with the whitespace between tags dropped, and void tags and empty attributes written one way. */
@@ -165,13 +168,13 @@ const mainOf = (html: string) =>
 
 describe("the kit's static components render a v0.8 page", () => {
 	test("View, Tree, Question, a Markdown table and an <h2 data-nav> render the markup a v0.8 author writes", async () => {
-		const { result, output } = await packMdx("parity", PAGE());
+		const { result, output } = await pack("parity", PAGE());
 		expect(result.code).toBe(0);
 		expect(mainOf(readFileSync(output, "utf8"))).toBe(mainOf(V08_MAIN));
 	});
 
 	test("check --view all finds no problems in light and dark, on desktop and phone", async () => {
-		const { output } = await packMdx("checked", PAGE());
+		const { output } = await pack("checked", PAGE());
 		const checked = await runCli(["check", output, "--view", "all", "--out", dir.path("shots")]);
 		expect(checked.stdout).toContain("Views captured (4)");
 		expect(checked.stdout).toContain("0 problems");
@@ -197,19 +200,15 @@ var contract = settled.then(async () => {
 	$(".reply-dialog").close();
 	return failures;
 });`;
-		const { result, output } = await packMdx(
-			"navigate",
-			PAGE('<script src="contract.js"></script>'),
-			{
-				"contract.js": contract,
-			},
-		);
+		const { result, output } = await pack("navigate", PAGE('<script src="contract.js"></script>'), {
+			"contract.js": contract,
+		});
 		expect(result.code).toBe(0);
 		expect(await runPacked(output)).toEqual([]);
 	}, 60_000);
 
 	test("a Table from records renders what the same Markdown table does, numbers written for the page's lang", async () => {
-		const { result, output } = await packMdx(
+		const { result, output } = await pack(
 			"table",
 			`---
 lang: sl
@@ -242,7 +241,7 @@ import { Table } from "kit";
 	});
 
 	test("a View inside another View fails the pack, saying where views go", async () => {
-		const { result } = await packMdx(
+		const { result } = await pack(
 			"nested",
 			'import { View } from "kit";\n\n<View name="a">\n\n# A\n\n<View name="b">\n\n# B\n\n</View>\n\n</View>\n',
 		);
@@ -316,7 +315,7 @@ test("kit labels prints every kit text, and the block, translated, is the page's
 			),
 		block,
 	);
-	const { result, output } = await packMdx("labels", LABELS_PAGE(translated), {
+	const { result, output } = await pack("labels", LABELS_PAGE(translated), {
 		"labels.js": labelsScript(SLOVENIAN),
 	});
 	expect(result.stderr).toBe("");
@@ -360,7 +359,7 @@ test("MDX records keep JSX category markers, a plain toolbar's Expand all, and n
 		"numeric alignment follows the kit on phones": `getComputedStyle(document.querySelector(".compare td.num")).textAlign === (innerWidth < 640 ? "start" : "end")`,
 		"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
 	});
-	const { result, output } = await packMdx("records", source, { "records.js": script });
+	const { result, output } = await pack("records", source, { "records.js": script });
 	expect(result.code).toBe(0);
 	expect(await runPacked(output)).toEqual([]);
 }, 30_000);
@@ -399,7 +398,7 @@ const why = () => document.getElementById("q1-why");
 ${probe("the reload restores the explanation", 'why().value === "q"')}
 ${probe("the reply holds the explanation", '(document.querySelector(".reply-bar .primary").click(), document.querySelector(".reply-md").textContent.includes("q"))')}
 ${probe("the answer's Markdown renders", 'document.querySelector("details strong")?.textContent === "90%" && document.querySelector("details em") && document.querySelector("details li")')}`;
-	const { result, output } = await packMdx("study", STUDY_PAGE, { "study.js": script });
+	const { result, output } = await pack("study", STUDY_PAGE, { "study.js": script });
 	expect(result.code).toBe(0);
 	const html = readFileSync(output, "utf8");
 	expect(html).toContain(

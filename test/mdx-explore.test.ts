@@ -1,7 +1,17 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
-import { runCli, scratch } from "./support.ts";
+import type { Cdp } from "../skills/explainer/src/chrome.ts";
+import {
+	act,
+	FRAMES,
+	inPage,
+	load,
+	packedMdx,
+	packMdx,
+	runCli,
+	scratch,
+	WIDTHS,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -60,10 +70,7 @@ function writeModels() {
 /** Packs `source` as `<name>.mdx` beside the models; returns the output path and its HTML. */
 async function pack(name: string, source: string) {
 	writeModels();
-	const output = dir.path(`${name}.out.html`);
-	const result = await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]);
-	expect(result.stderr).toBe("");
-	expect(result.code).toBe(0);
+	const output = await packedMdx(dir, name, source);
 	return { output, html: readFileSync(output, "utf8") };
 }
 
@@ -71,53 +78,8 @@ async function pack(name: string, source: string) {
 async function failure(name: string, body: string) {
 	writeModels();
 	const source = `import { Explore, Plot } from "kit";\n\n# Fails\n\n${body}\n`;
-	const result = await runCli([
-		"pack",
-		dir.write(`${name}.mdx`, source),
-		"-o",
-		dir.path(`${name}.out.html`),
-	]);
+	const { result } = await packMdx(dir, name, source);
 	return [result.code, result.stderr.trim()];
-}
-
-/** Waits for a frame, a task and another frame: Preact's render and the figure's redraw. */
-const FRAMES = `new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame))`;
-
-/** Opens `url`, or reloads keeping storage, and waits until the page has drawn. */
-async function load(cdp: Cdp, url?: string) {
-	const loaded = cdp.once("Page.loadEventFired");
-	await (url ? cdp.send("Page.navigate", { url }) : cdp.send("Page.reload"));
-	await loaded;
-	await cdp.evaluate(`document.fonts.ready.then(() => ${FRAMES}).then(() => ${FRAMES})`, true);
-}
-
-/** Runs `action` in the page, waits for the redraw and returns `state`. */
-const act = <T>(cdp: Cdp, action: string, state: string) =>
-	cdp.evaluate<T>(
-		`(() => { ${action} })(), ${FRAMES}.then(() => ${FRAMES}).then(() => (${state}))`,
-		true,
-	);
-
-/** Opens a packed page in headless Chrome, `mobile` as a phone, and runs `fn`; fails on any page error or console warning. */
-function inPage<T>(output: string, mobile: boolean, fn: (cdp: Cdp) => Promise<T>): Promise<T> {
-	return withPage(async (cdp) => {
-		const errors: string[] = [];
-		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
-			errors.push(d.exception?.description ?? d.text),
-		);
-		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => {
-			if (type === "error" || type === "warning") {
-				errors.push(`${type}: ${JSON.stringify(args)}`);
-			}
-		});
-		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
-		const size = mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 };
-		await cdp.send("Emulation.setDeviceMetricsOverride", { ...size, mobile, deviceScaleFactor: 1 });
-		await load(cdp, `file://${output}`);
-		const result = await fn(cdp);
-		expect(errors).toEqual([]);
-		return result;
-	});
 }
 
 /** Presses a key on the focused element, as a reader does. */
@@ -139,7 +101,7 @@ const SLIDER_STATE = `[document.getElementById("m").value, document.querySelecto
 	document.querySelector("#env svg path.line")?.getAttribute("d") === window.firstLine, document.querySelector("#env figcaption").textContent]`;
 
 describe("Explore", () => {
-	test("a slider whose frame a client module exports computes it in the browser: keyboard, pointer, a phone, kept across a reload", async () => {
+	test("a slider whose frame a client module exports computes it in the browser: keyboard, input events, a phone, kept across a reload", async () => {
 		const { output, html } = await pack("slider", slider("client.tsx"));
 		expect(html).toContain("plot: small line, stem and bar plots");
 		expect(html).not.toContain("Apache ECharts");
@@ -150,24 +112,28 @@ describe("Explore", () => {
 			"";
 		// The page carries the controls and a reference to envelope, not 31 frames of points.
 		expect(islands.length).toBeLessThan(2_000);
-		for (const mobile of [false, true]) {
-			const state = await inPage(output, mobile, async (cdp) => {
-				const first = await act(
-					cdp,
-					`window.firstLine = document.querySelector("#env svg path.line").getAttribute("d")`,
-					`[...${SLIDER_STATE}, [...document.querySelectorAll("#env svg text")].some((t) => t.textContent === "1.0 V")]`,
-				);
-				await cdp.evaluate(`document.getElementById("m").focus()`);
-				await press(cdp, "ArrowRight", 39);
-				const keyed = await cdp.evaluate(SLIDER_STATE);
-				const dragged = await act(
-					cdp,
-					`const m = document.getElementById("m"); m.value = "1.5"; m.dispatchEvent(new Event("input", { bubbles: true }))`,
-					SLIDER_STATE,
-				);
-				await load(cdp);
-				return { first, keyed, dragged, reloaded: await cdp.evaluate(SLIDER_STATE) };
-			});
+		for (const viewport of WIDTHS) {
+			const state = await inPage(
+				output,
+				async (cdp) => {
+					const first = await act(
+						cdp,
+						`window.firstLine = document.querySelector("#env svg path.line").getAttribute("d")`,
+						`[...${SLIDER_STATE}, [...document.querySelectorAll("#env svg text")].some((t) => t.textContent === "1.0 V")]`,
+					);
+					await cdp.evaluate(`document.getElementById("m").focus()`);
+					await press(cdp, "ArrowRight", 39);
+					const keyed = await cdp.evaluate(SLIDER_STATE);
+					const dragged = await act(
+						cdp,
+						`const m = document.getElementById("m"); m.value = "1.5"; m.dispatchEvent(new Event("input", { bubbles: true }))`,
+						SLIDER_STATE,
+					);
+					await load(cdp);
+					return { first, keyed, dragged, reloaded: await cdp.evaluate(SLIDER_STATE) };
+				},
+				viewport,
+			);
 			const caption = "Two periods of the tone.";
 			expect(state).toEqual({
 				first: ["0.5", "0.50", "Follows g(t): yes", true, true, caption, true],
@@ -184,7 +150,7 @@ describe("Explore", () => {
 		expect(html).not.toContain("plot: small line, stem and bar plots");
 		const chart = `(() => { const o = echarts.getInstanceByDom(document.querySelector("#plan .chart")).getOption(); return o.xAxis[0].data.join("") + " " + o.series.length; })()`;
 		const stats = `[...document.querySelectorAll("#sum .stat")].map((s) => s.textContent).join()`;
-		const state = await inPage(output, false, async (cdp) => ({
+		const state = await inPage(output, async (cdp) => ({
 			start: [await cdp.evaluate(chart), await cdp.evaluate(stats)],
 			chosen: await act(cdp, `document.getElementById("by-0").click()`, chart),
 			hidden: await act(cdp, `document.getElementById("hide").click()`, chart),
@@ -237,7 +203,7 @@ describe("client exports as props", () => {
 		const plot = (module: string) =>
 			`import { Plot } from "kit";\nimport { volts } from "./${module}";\n\n# Volts\n\n<Plot id="v" label="Volts" option={{ y: { format: volts }, series: [{ type: "line", data: [[0, 1], [1, 2]] }] }} />\n`;
 		const { output } = await pack("volts", plot("volts.ts"));
-		const ticks = await inPage(output, false, (cdp) =>
+		const ticks = await inPage(output, (cdp) =>
 			cdp.evaluate(
 				`[...document.querySelectorAll("#v svg text")].some((t) => t.textContent === "1.5 V")`,
 			),

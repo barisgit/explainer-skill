@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { pageContract, runCli, runPacked, scratch } from "./support.ts";
+import { packMdx, pageContract, runCli, runPacked, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -29,18 +29,9 @@ $$
 | Dissipation | $P_{diss} = (V_{in} - V_{out})\\,I_{load} + V_{in}\\,I_q = 1.35\\,\\text{W} + 0.055\\,\\text{W}$ |
 `;
 
-/** Packs `source` as `<name>.mdx` with `files` beside it; returns the CLI result and the output path. */
-async function packMdx(name: string, source: string, files: Record<string, string> = {}) {
-	for (const [file, text] of Object.entries(files)) {
-		dir.write(file, text);
-	}
-	const output = dir.path(`${name}.out.html`);
-	return { result: await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]), output };
-}
-
 describe("TeX math in an .mdx page", () => {
 	test("renders to MathML in pack: no script ships, and only a page with math carries the math stylesheet", async () => {
-		const math = await packMdx("math", PAGE);
+		const math = await packMdx(dir, "math", PAGE);
 		expect(math.result.stderr).toBe("");
 		const html = readFileSync(math.output, "utf8");
 		expect(html).not.toContain("<script");
@@ -49,7 +40,7 @@ describe("TeX math in an .mdx page", () => {
 		expect(html).toContain("<mtable");
 		expect(html).toContain("font-family: 'Temml'");
 
-		const plain = await packMdx("plain", "# No math\n\nA price of \\$5 and \\$6 is text.\n");
+		const plain = await packMdx(dir, "plain", "# No math\n\nA price of \\$5 and \\$6 is text.\n");
 		expect(plain.result.stderr).toBe("");
 		const text = readFileSync(plain.output, "utf8");
 		expect(text).not.toMatch(/<math|Temml|tml-/);
@@ -61,7 +52,7 @@ describe("TeX math in an .mdx page", () => {
 	])(
 		"two dollar amounts in prose (%s) fail the pack instead of turning into math",
 		async (prose, span) => {
-			const { result } = await packMdx("dollars", `# Prices\n\nIt ${prose}.\n`);
+			const { result } = await packMdx(dir, "dollars", `# Prices\n\nIt ${prose}.\n`);
 			expect(result.code).not.toBe(0);
 			expect(result.stderr).toContain(`dollars.mdx:3:`);
 			expect(result.stderr).toContain(`${span} reads as math between two dollar signs`);
@@ -70,6 +61,7 @@ describe("TeX math in an .mdx page", () => {
 
 	test("a TeX error fails the pack at the formula's line", async () => {
 		const { result } = await packMdx(
+			dir,
 			"broken",
 			"# Broken\n\nFine text.\n\nThe ratio $\\frac{a$ is wrong.\n",
 		);
@@ -85,15 +77,20 @@ describe("TeX math in an .mdx page", () => {
 			"the page itself never scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
 			"math is in the text colour": `getComputedStyle(document.querySelector("math")).color === getComputedStyle(document.querySelector("p")).color`,
 		});
-		const { result, output } = await packMdx("run", `${PAGE}\n<script src="math.js"></script>\n`, {
-			"math.js": script,
-		});
+		const { result, output } = await packMdx(
+			dir,
+			"run",
+			`${PAGE}\n<script src="math.js"></script>\n`,
+			{
+				"math.js": script,
+			},
+		);
 		expect(result.code).toBe(0);
 		expect(await runPacked(output)).toEqual([]);
 	}, 30_000);
 
 	test("check reports no overflow and no sideways scroll for a long equation at 390 px", async () => {
-		const { output } = await packMdx("checked", PAGE);
+		const { output } = await packMdx(dir, "checked", PAGE);
 		const checked = await runCli(["check", output, "--out", dir.path("checked")]);
 		expect(checked.stdout).not.toMatch(/overflow|scrolls sideways/);
 		expect(checked.code).toBe(0);
