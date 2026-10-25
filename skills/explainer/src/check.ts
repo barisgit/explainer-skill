@@ -20,8 +20,14 @@ export interface FirstScreen {
 	figures: string[];
 	links: number;
 }
+/** A PNG of one element, written by a `--do shot:` step. */
+export interface ElementShot {
+	step: string;
+	png: string;
+}
 /**
  * `view` is the hash of a drill-down view ("" for the overview); `first` describes the first viewport, taken before any step (overview only).
+ * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
  * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
  * change only its captions).
@@ -32,6 +38,7 @@ export interface Shot {
 	view: string;
 	png: string;
 	first?: FirstScreen | undefined;
+	elements: ElementShot[];
 	problems: string[];
 	warnings: string[];
 }
@@ -428,18 +435,47 @@ async function discoverViews(run: Run) {
 	run.viewHashes = chosen.capture;
 }
 
-/** Runs the `--do` steps in order, recording their problems and notes. */
-async function runSteps(run: Run) {
+/**
+ * The file of a `--do shot:` PNG: the shot's ordinal among the shot: steps, then the selector as a slug, then the match index when
+ * the step names one (`example-shot2-card-0-light-desktop.png`; `--quick`: `shot2-card-0-desktop.png`, after the tag).
+ */
+function shotFile(run: Run, screen: Screen, ordinal: number, step: string, index?: number) {
+	const slug =
+		step
+			.slice("shot:".length)
+			.replace(/@(all|\d+)$/, "")
+			.replace(/[^\w-]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40) || "element";
+	const name = `shot${ordinal}-${slug}${index === undefined ? "" : `-${index}`}`;
+	const { tag, quick } = run.opts;
+	return join(
+		run.outDir,
+		quick
+			? `${tag ? `${tag}-` : ""}${name}-${screen.name}.png`
+			: `${run.stem}-${name}-${screen.theme}-${screen.name}.png`,
+	);
+}
+
+/** Runs the `--do` steps in order, recording their problems and notes; returns the PNGs the shot: steps wrote. */
+async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
+	const elements: ElementShot[] = [];
+	let ordinal = 0;
 	for (const step of run.opts.steps) {
-		const result = await runStep(run.cdp, step);
+		const shot = step.startsWith("shot:") ? ++ordinal : 0;
+		const result = await runStep(run.cdp, step, (index) =>
+			shotFile(run, screen, shot, step, index),
+		);
 		if (result.problem) {
 			run.log.problems.push(`--do ${result.problem}`);
 		}
 		if (result.note) {
 			run.stepNotes.add(result.note);
 		}
+		elements.push(...(result.pngs ?? []).map((png) => ({ step, png })));
 		await settle(200);
 	}
+	return elements;
 }
 
 /** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, full-page shot. */
@@ -456,7 +492,7 @@ async function shootOverview(run: Run, screen: Screen) {
 	await sweep(run);
 	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
 	const stepperWarnings = firstPass ? await run.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
-	await runSteps(run);
+	const elements = await runSteps(run, screen);
 	const png = join(
 		run.outDir,
 		opts.quick
@@ -470,6 +506,7 @@ async function shootOverview(run: Run, screen: Screen) {
 		view: "",
 		png,
 		first,
+		elements,
 		problems: [...new Set(run.log.problems)],
 		warnings,
 	});
@@ -494,6 +531,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 		viewport: `${name} ${vp.width}x${vp.height}`,
 		view: hash,
 		png,
+		elements: [],
 		problems: [...new Set(run.log.problems)],
 		warnings,
 	});

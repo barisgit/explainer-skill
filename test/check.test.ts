@@ -1,4 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { withPage } from "../skills/explainer/src/chrome.ts";
 import { runCli, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -235,4 +238,92 @@ test("check stops stepping a stepper once it changes, and says so when its time 
 	);
 	expect(result.stdout).not.toContain("steps through 300 captions");
 	expect(result.stdout).not.toContain("figure#redrawn");
+}, 60_000);
+
+/** Width and height of a PNG, read from its IHDR chunk. */
+function pngSize(file: string): [number, number] {
+	const bytes = readFileSync(file);
+	return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
+}
+
+/** The colour ("r,g,b") of a PNG at each of `points`, read back through a canvas in Chrome. */
+const pngColours = (file: string, points: Array<[number, number]>) =>
+	withPage(async (cdp) => {
+		const png = readFileSync(file).toString("base64");
+		return cdp.evaluate<string[]>(
+			`(async () => {
+				const img = new Image();
+				img.src = "data:image/png;base64,${png}";
+				await img.decode();
+				const ctx = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height }).getContext("2d");
+				ctx.drawImage(img, 0, 0);
+				return ${JSON.stringify(points)}.map(([x, y]) => [...ctx.getImageData(x, y, 1, 1).data].slice(0, 3).join());
+			})()`,
+			true,
+		);
+	});
+
+test("check --do shot: saves a PNG of the element's box at each width, below the fold, taller than the viewport, and per match with @all", async () => {
+	const body = `<style>@media (max-width: 500px) { #wide-only { display: none } }</style>
+<p id="wide-only" style="width:200px;height:40px"></p><div style="height:1300px"></div>
+<div id="box" style="width:300px;height:200px;margin-left:40px;background:rgb(255,0,0)"></div>
+<div id="tall" style="width:120px;height:1400px;background:rgb(0,0,255)"></div>
+${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}px;margin:0;background:rgb(0,128,0)"></p>`).join("")}`;
+	const file = dir.write("shots.html", page("").replace("</h1>", `</h1>${body}`));
+	const out = dir.path("element-shots");
+
+	const result = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--view",
+		"none",
+		"--out",
+		out,
+		"--do",
+		"shot:#box",
+		"--do",
+		"shot:#tall",
+		"--do",
+		"shot:.card@all",
+		"--do",
+		"shot:#wide-only",
+	]);
+
+	expect(result.code).toBe(0);
+	for (const width of ["desktop", "narrow"]) {
+		const box = join(out, `shot1-box-${width}.png`);
+		expect(result.stdout).toContain(box);
+		expect(pngSize(box)).toEqual([300, 200]);
+		expect(
+			new Set(
+				await pngColours(box, [
+					[1, 1],
+					[298, 1],
+					[1, 198],
+					[298, 198],
+				]),
+			),
+		).toEqual(new Set(["255,0,0"]));
+		const tall = join(out, `shot2-tall-${width}.png`);
+		expect(pngSize(tall)).toEqual([120, 1400]);
+		expect(
+			new Set(
+				await pngColours(tall, [
+					[1, 1],
+					[118, 1398],
+				]),
+			),
+		).toEqual(new Set(["0,0,255"]));
+		expect([0, 1, 2].map((n) => pngSize(join(out, `shot3-card-${n}-${width}.png`)))).toEqual([
+			[100, 50],
+			[100, 60],
+			[100, 70],
+		]);
+	}
+	expect(existsSync(join(out, "shot4-wide-only-desktop.png"))).toBe(true);
+	expect(existsSync(join(out, "shot4-wide-only-narrow.png"))).toBe(false);
+	expect(result.stdout).toContain(
+		"--do shot:#wide-only: no PNG at 390 px wide: its match is not shown",
+	);
 }, 60_000);

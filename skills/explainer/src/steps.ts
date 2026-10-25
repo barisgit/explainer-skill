@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { type Cdp, settle } from "./chrome.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
@@ -14,7 +15,7 @@ const KEYS: Record<string, [number, string]> = {
 	End: [35, "End"],
 	Backspace: [8, "Backspace"],
 };
-const STEP = /^(click|key|hover|focus|type|set):(.+)$/;
+const STEP = /^(click|key|hover|focus|type|set|shot):(.+)$/;
 const POINT = /^(\d+),(\d+)$/;
 const NTH = /@(all|\d+)$/;
 const RELOAD = "reload";
@@ -23,11 +24,11 @@ const RELOAD_SETTLE_MS = 400;
 /** The steps that write a value into a field, with the form their help shows. */
 const VALUE_FORMS = { type: "type:<css>=<text>", set: "set:<css>=<value>" } as const;
 /** The steps that act on an element and cannot take a point. */
-const SELECTOR_ONLY = new Set(["focus", "type", "set"]);
+const SELECTOR_ONLY = new Set(["focus", "type", "set", "shot"]);
 /** Input types that take typed text; the others (range, date, color, checkbox) are set: or click: territory. */
 const TEXT_TYPES = ["text", "search", "email", "url", "tel", "password", "number"];
 
-type StepKind = "click" | "key" | "hover" | "focus" | "type" | "set";
+type StepKind = "click" | "key" | "hover" | "focus" | "type" | "set" | "shot";
 /** A parsed step: `arg` is the selector, point or key; `value` is what type: and set: write (undefined when the step has no `=`). */
 interface ParsedStep {
 	kind: StepKind;
@@ -56,7 +57,7 @@ export function stepError(step: string): string {
 	}
 	const parsed = parseStep(step);
 	if (!parsed) {
-		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, hover:<css | x,y>, focus:<css>, key:<Key>, ${VALUE_FORMS.type}, ${VALUE_FORMS.set} or reload`;
+		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, hover:<css | x,y>, focus:<css>, key:<Key>, ${VALUE_FORMS.type}, ${VALUE_FORMS.set}, shot:<css>[@all|@index] or reload`;
 	}
 	const { kind, arg, value } = parsed;
 	if ((kind === "type" || kind === "set") && (value === undefined || !arg)) {
@@ -113,11 +114,18 @@ const valueOnNth = <T>(cdp: Cdp, selector: string, index: number, body: string) 
 		`(() => { const el = document.querySelectorAll(${JSON.stringify(selector)})[${index}]; if (!el) return null; ${body} })()`,
 	);
 
-/** What a step reported: a `problem` fails the check, a `note` just says what happened (how many elements an `@all` click hit). */
+/**
+ * What a step reported: a `problem` fails the check, a `note` just says what happened (how many elements an `@all` click hit,
+ * matches a shot: could not capture), `pngs` are the files a shot: step wrote.
+ */
 export interface StepResult {
 	problem?: string;
 	note?: string;
+	pngs?: string[];
 }
+
+/** The file a shot: step writes for one match: `index` is the match's 0-based position when the step names @all or @<n>, else undefined. */
+export type ShotPath = (index: number | undefined) => string;
 
 /**
  * The key code and DOM code of a letter or digit, whose code point is its own key code. Other characters get none: their code
@@ -307,6 +315,67 @@ async function setStep(cdp: Cdp, step: string, target: Target, value: string): P
 	return {};
 }
 
+/** An element's box in document coordinates, whether it fits the viewport, and whether it had to be scrolled into view. */
+interface Box {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	fits: boolean;
+	scrolled: boolean;
+}
+
+/**
+ * Page-side body (with `el`): the element's box (null when it has none, as when hidden at this width). An element not wholly in view
+ * is scrolled to it first, so what draws on scroll has drawn; one that fits the viewport is left where it is, so a hover tooltip stays.
+ */
+const BOX_JS = `
+	let r = el.getBoundingClientRect();
+	if (!r.width || !r.height) return null;
+	const fits = r.height <= innerHeight && r.width <= innerWidth;
+	const scrolled = r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth;
+	if (scrolled) { el.scrollIntoView({ block: fits ? "center" : "start" }); r = el.getBoundingClientRect(); }
+	return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, fits, scrolled };`;
+
+/**
+ * Saves a PNG of each targeted element's box as the page is now. One that fits the viewport is captured from the screen as it is;
+ * a taller or wider one beyond the viewport, which relays the page out as the full-page shots do. Matches without a box are a note.
+ */
+async function shotStep(
+	cdp: Cdp,
+	step: string,
+	target: Target,
+	shotPath: ShotPath,
+): Promise<StepResult> {
+	const pngs: string[] = [];
+	const hidden: number[] = [];
+	for (const i of target.indices) {
+		const box = await valueOnNth<Box>(cdp, target.selector, i, BOX_JS);
+		if (!box) {
+			hidden.push(i);
+			continue;
+		}
+		if (box.scrolled) {
+			await settle(SETTLE_MS);
+		}
+		const { x, y, width, height, fits } = box;
+		const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
+			format: "png",
+			captureBeyondViewport: !fits,
+			clip: { x, y, width, height, scale: 1 },
+		});
+		const png = shotPath(target.nth === undefined ? undefined : i);
+		writeFileSync(png, Buffer.from(data, "base64"));
+		pngs.push(png);
+	}
+	if (!hidden.length) {
+		return { pngs };
+	}
+	const width = await cdp.evaluate<number>("innerWidth");
+	const which = target.nth === undefined ? "its match" : `match ${hidden.join(", ")}`;
+	return { pngs, note: `${step}: no PNG at ${width} px wide: ${which} is not shown` };
+}
+
 /** Reloads the page as the reader would (same URL, same storage) and waits for the load and for scripts to settle. */
 async function reloadStep(cdp: Cdp): Promise<StepResult> {
 	const loaded = cdp.once("Page.loadEventFired");
@@ -318,9 +387,9 @@ async function reloadStep(cdp: Cdp): Promise<StepResult> {
 
 /**
  * Runs one step in the page. Selectors may end in `@all` (every match, re-queried before each click, with a pause after each so handlers
- * that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used.
+ * that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used. A shot: step writes to `shotPath`.
  */
-export async function runStep(cdp: Cdp, step: string): Promise<StepResult> {
+export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
 	if (step === RELOAD) {
 		return reloadStep(cdp);
 	}
@@ -341,6 +410,9 @@ export async function runStep(cdp: Cdp, step: string): Promise<StepResult> {
 		return parsed.kind === "type"
 			? typeStep(cdp, step, target, value)
 			: setStep(cdp, step, target, value);
+	}
+	if (parsed.kind === "shot") {
+		return shotStep(cdp, step, target, shotPath);
 	}
 	if (parsed.kind === "focus") {
 		await onNth(cdp, target.selector, target.indices[0] ?? 0, "el.focus()");

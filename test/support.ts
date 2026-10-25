@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
-import { runStep } from "../skills/explainer/src/steps.ts";
+import { runStep, type ShotPath } from "../skills/explainer/src/steps.ts";
 
 /** The skill directory as an installer would copy it. */
 export const SKILL_DIR = join(import.meta.dir, "..", "skills", "explainer");
@@ -126,12 +126,15 @@ export interface RunOptions {
 /** Defines `stepsDone` before any page script runs, so a pageContract waits until `finishSteps()` says the steps have run. */
 const AWAIT_STEPS = "window.stepsDone = new Promise((done) => { window.finishSteps = done; });";
 
-/** Runs `steps` in the open page once it has `settled`, then lets its contract go on; returns the problems the steps reported. */
-async function runSteps(cdp: Cdp, steps: string[]): Promise<string[]> {
+/**
+ * Runs `steps` in the open page once it has `settled`, then lets its contract go on; returns the problems the steps reported. A
+ * shot: step writes to `shotPath`.
+ */
+async function runSteps(cdp: Cdp, steps: string[], shotPath: ShotPath): Promise<string[]> {
 	await cdp.evaluate("settled", true);
 	const problems: string[] = [];
 	for (const step of steps) {
-		const { problem } = await runStep(cdp, step);
+		const { problem } = await runStep(cdp, step, shotPath);
 		if (problem) {
 			problems.push(problem);
 		}
@@ -182,7 +185,10 @@ export async function packAndRun(
 			});
 			await open(cdp, `file://${output}`);
 			if (steps.length) {
-				failures.push(...(await runSteps(cdp, steps)).map((problem) => `${width}: ${problem}`));
+				const shotPath = (index: number | undefined) =>
+					dir.path(`${name}-${width}-${index ?? 0}.png`);
+				const problems = await runSteps(cdp, steps, shotPath);
+				failures.push(...problems.map((problem) => `${width}: ${problem}`));
 			}
 			const found = await cdp.evaluate<string[]>("contract", true);
 			failures.push(...found.map((failure) => `${width}: ${failure}`));
