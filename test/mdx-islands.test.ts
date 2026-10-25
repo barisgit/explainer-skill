@@ -495,6 +495,29 @@ describe("kit scripts", () => {
 		expect(kept).toBe(true);
 	}, 30_000);
 
+	test("a control a client component renders later brings keep.js when it has an id, however its props are written", async () => {
+		const later = (props: string) => `"use client";
+import { useState } from "preact/hooks";
+
+export function Later({ id }: { id: string }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div>
+			<button type="button" class="btn" id="reveal" onClick={() => setOpen(true)}>Show</button>
+			{open && <input type="range" style={{ inlineSize: "8rem" }} ${props} />}
+		</div>
+	);
+}
+`;
+		const scripts = async (name: string, props: string) => {
+			dir.write(`${name}.tsx`, later(props));
+			const page = `import { Later } from "./${name}.tsx";\n\n# Later\n\n<Later id="scale" />\n`;
+			return scriptsIn(readFileSync(await pack(name, page), "utf8"));
+		};
+		expect(await scripts("later-id", "id={id}")).toEqual(["keep"]);
+		expect(await scripts("later-no-id", 'aria-label="Scale"')).toEqual([]);
+	}, 30_000);
+
 	test("two Mermaid diagrams sharing a node id bring link.js, and the parts light together", async () => {
 		const fence = (to: string) => `\`\`\`mermaid\nflowchart LR\n  A --> ${to}\n\`\`\`\n`;
 		const output = await pack("shared", `# Shared\n\n${fence("B")}\n${fence("C")}`);
