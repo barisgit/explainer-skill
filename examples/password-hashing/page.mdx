@@ -1,0 +1,264 @@
+---
+title: "Which password hash: Argon2id, scrypt, bcrypt or PBKDF2"
+---
+import { Chart, Question, View } from "kit";
+import { AlgoStats, AlgoTable, Settings } from "./algorithms.tsx";
+import { Budget } from "./budget.tsx";
+import { iterationsChart, settingsChart } from "./owasp.ts";
+import "./page.css";
+
+# Use *Argon2id*, unless a FIPS-140 requirement makes it *PBKDF2*. Memory per login decides the rest.
+
+OWASP ranks the four: Argon2id first, scrypt when Argon2id is unavailable, PBKDF2 when FIPS-140 is required, bcrypt only for legacy systems. Set your deployment below and see which OWASP setting fits.
+
+<Budget />
+
+## What OWASP says about each algorithm
+
+<AlgoTable />
+
+<details>
+<summary>Rules that apply whichever you pick</summary>
+
+- **Salt:** a unique random salt per password. Most libraries generate and store it for you.
+- **Pepper:** an optional secret shared by all passwords and stored outside the database (secrets vault or HSM). OWASP says it adds defence in depth but not security on its own. Changing a pepper forces every affected user to reset their password.
+- **Work factor:** a hash should generally take under one second. Too high lets an attacker exhaust your CPU with login attempts. Benchmark on the servers you will actually run.
+- **Unicode:** accept every code point, including NUL bytes, and do not reduce the entropy of what the user typed before hashing.
+- **Fast hashes** such as plain SHA-256 are not suitable for password storage.
+
+</details>
+
+{/* The radios switch the panels through page.css alone; each panel's data-ref terms light the diagram node with that Mermaid id. */}
+
+<section id="migration">
+
+## Three ways OWASP describes to move old hashes forward
+
+Whatever you migrate to, store the algorithm and cost next to each hash, for example in the PHC string format, so old and new hashes can coexist during the transition.
+
+<div class="controls">
+<div class="seg" role="radiogroup" aria-label="Migration method">
+<label><input type="radio" name="mig" value="login" checked /><span>Re-hash at login</span></label>
+<label><input type="radio" name="mig" value="wrap" /><span>Wrap the stored hash</span></label>
+<label><input type="radio" name="mig" value="expire" /><span>Expire inactive users</span></label>
+</div>
+</div>
+
+<div class="beside" data-mig="login">
+<div>
+
+The user's <span data-ref="l_verify">old-hash check</span> is the only moment you hold the plaintext password, so that is when the <span data-ref="l_rehash">new hash</span> gets made. Users who never return keep their old hash until you act on them.
+
+1. <span data-ref="l_login">The user enters their password.</span>
+2. Your code reads the stored hash and its algorithm tag, and <span data-ref="l_verify">checks the password with the old algorithm</span>, the only judge of whether it is right.
+3. A wrong password is <span data-ref="l_reject">rejected</span>; nothing is stored.
+4. A correct one is <span data-ref="l_rehash">hashed again</span> with the new algorithm and cost.
+5. <span data-ref="l_store">The new hash replaces the old one.</span> This user no longer has a weak hash at rest.
+
+</div>
+<figure class="fig" aria-label="Re-hash at login">
+
+```mermaid
+flowchart TD
+	l_login["User logs in"] --> l_verify["Check against old hash"]
+	l_verify --> l_ok{"Correct?"}
+	l_ok -->|"no"| l_reject["Reject"]
+	l_ok -->|"yes"| l_rehash["Hash with new algorithm"]
+	l_rehash --> l_store["Store new hash, drop old"]
+```
+
+</figure>
+</div>
+
+<div class="beside" data-mig="wrap">
+<div>
+
+OWASP's second method feeds the <span data-ref="w_old">existing hash</span> into the new algorithm, so you can protect every row now without knowing any password. It also notes that layering can make hashes easier to crack, so the <span data-ref="w_plain">direct hash</span> should replace it at the next login.
+
+1. Every row holds <span data-ref="w_old">a hash made by the legacy algorithm</span>, such as `md5(password)`.
+2. A batch job <span data-ref="w_wrap">hashes each stored hash with the new algorithm</span>. No password is needed. Layering has algorithm- and encoding-specific risks, so it is a stopgap.
+3. At the <span data-ref="w_login">next login</span>, check the password through both layers.
+4. Then <span data-ref="w_plain">hash the plain password directly</span> with the new algorithm and drop the layered form.
+
+</div>
+<figure class="fig" aria-label="Wrap the stored hash">
+
+```mermaid
+flowchart TD
+	w_old["Stored: old(password)"] --> w_wrap["Stored: new(old(password))"]
+	w_wrap --> w_login["User logs in"]
+	w_login --> w_plain["Stored: new(password)"]
+```
+
+</figure>
+</div>
+
+<div class="beside" data-mig="expire">
+<div>
+
+The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.
+
+1. <span data-ref="x_idle">Some users never log in</span>, so the re-hash at login never reaches them.
+2. After an inactivity period you choose (OWASP gives none), <span data-ref="x_expire">their old hashes are deleted</span> from the database.
+3. Their next login <span data-ref="x_reset">needs a password reset</span>, which creates a hash with the new algorithm.
+
+</div>
+<figure class="fig" aria-label="Expire inactive users">
+
+```mermaid
+flowchart TD
+	x_idle["Inactive for a long time"] --> x_expire["Delete old hash"]
+	x_expire --> x_reset["Reset required to log in"]
+```
+
+</figure>
+</div>
+
+OWASP calls bcrypt at cost 10 or more acceptable for legacy systems, so those hashes can wait for the re-hash at login.
+
+</section>
+
+{/* The one band: the decision the page ends in, asked on the page. data-state="maybe" marks all three as open; a Markdown table cannot carry it. */}
+
+<section class="band" id="decision">
+
+## How many hashing algorithms will you run?
+
+The constraints leave one real decision: whether the FIPS-140 requirement applies to everyone or only to some deployments.
+
+<table class="compare">
+<thead><tr><th>Option</th><th>What it means</th><th>Cost</th></tr></thead>
+<tbody>
+<tr data-state="maybe"><th scope="row">A. Argon2id everywhere</th><td data-label="What it means">One code path, OWASP's first choice, at least 7 MiB per simultaneous login.</td><td data-label="Cost">Rules out customers who require FIPS-140 validated cryptography, unless your validated module also covers Argon2id (the cheat sheet does not say).</td></tr>
+<tr data-state="maybe"><th scope="row">B. PBKDF2-HMAC-SHA256 everywhere</th><td data-label="What it means">One code path that can serve FIPS-140 customers, provided PBKDF2 runs in a validated module in its approved configuration. No memory-cost parameter.</td><td data-label="Cost">Gives up memory-hard hashing for everyone. OWASP recommends it only when FIPS-140 is required.</td></tr>
+<tr data-state="maybe"><th scope="row">C. Argon2id by default, PBKDF2 where FIPS-140 is required</th><td data-label="What it means">Best algorithm where allowed; each record carries its algorithm and cost.</td><td data-label="Cost">Two code paths and two test matrices to maintain.</td></tr>
+</tbody>
+</table>
+
+<p class="caveat"><b>Inferred</b>OWASP does not rank these three options; they come from combining its rules. Our reading: if no customer requires FIPS-140, choose A. If only some do, C usually costs less security than B. If all do, choose B. Whichever you pick, set the memory budget from a measurement on your smallest VM, not from this page's sliders.</p>
+
+<Question name="option" legend="Which option will you take?" options={{ A: "A. Argon2id everywhere", B: "B. PBKDF2 everywhere", C: "C. Argon2id plus PBKDF2 for FIPS", Undecided: "Not yet" }} />
+
+{/* A checklist of long items reads better as toggles, one per line, than as Question's segmented buttons. */}
+
+<fieldset data-reply>
+<legend>What do you still need to find out?</legend>
+<div class="controls"><label class="toggle"><input type="checkbox" id="q-fips" name="todo" value="fips" /><span>Which customers require FIPS-140 validation, and for which part of the system</span></label></div>
+<div class="controls"><label class="toggle"><input type="checkbox" id="q-mem" name="todo" value="mem" /><span>Measured memory and time per login on the smallest VM</span></label></div>
+<div class="controls"><label class="toggle"><input type="checkbox" id="q-legacy" name="todo" value="legacy" /><span>Which legacy hash types are in the database</span></label></div>
+<div class="controls"><label class="toggle"><input type="checkbox" id="q-lib" name="todo" value="lib" /><span>Whether our language has a maintained Argon2id library</span></label></div>
+</fieldset>
+
+</section>
+
+<section class="sources minor">
+
+## Sources
+
+- [OWASP Cheat Sheet Series, Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), fetched 22 Oct 2026; latest change to the file on that date was commit 3c07d4a of 4 Oct 2026. Every setting, role and warning on this page comes from it; how the algorithms work, such as which are memory-hard, is standard background, and where the page reasons past the cheat sheet it says so beside the claim. Licence: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Settings are reproduced and rearranged here; this page is offered under the same licence.
+- The cheat sheet itself cites [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver) (PBKDF2 permitted), [RFC 9106](https://www.rfc-editor.org/rfc/rfc9106.html) (Argon2) and [RFC 7914](https://www.rfc-editor.org/rfc/rfc7914.html) (scrypt).
+
+</section>
+
+{/* One view per algorithm at #algo/<id>; the comparison table and the chart's bars link to them. */}
+
+<View name="algo" param="argon2id" back="All algorithms">
+
+# Argon2id
+
+Winner of the 2015 Password Hashing Competition. The Argon2id variant balances resistance to side-channel and GPU-based attacks.
+
+<AlgoStats algo="argon2id" />
+
+<figure class="fig">
+<Chart class="settings-chart" label="OWASP's Argon2id settings: memory against passes" option={settingsChart("argon2id")} />
+<figcaption>Vertical axis: passes (t). Horizontal axis: nominal memory in MiB. OWASP's settings trade memory against passes.</figcaption>
+</figure>
+
+## Every OWASP setting
+
+<Settings algo="argon2id" />
+
+## Notes from OWASP
+
+- Three cost parameters: memory m in KiB, passes t, and parallelism p (lanes the memory is divided over). Raising p does not multiply memory or act as a pass count.
+- All five settings give an equal level of defence. The only difference is the trade between CPU and RAM.
+- The first two lines (46 MiB with t=1, 19 MiB with t=2) must not be used with Argon2i.
+- Tune memory and passes to make cracking expensive while keeping login practical under expected load, and benchmark on the target system. More parallelism is not guaranteed to slow guessing.
+
+[Read this section in the cheat sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id)
+
+</View>
+
+<View name="algo" param="scrypt" back="All algorithms">
+
+# scrypt
+
+A password-based key derivation function by Colin Percival. OWASP calls Argon2id the best choice and scrypt the one to use when Argon2id is not available.
+
+<AlgoStats algo="scrypt" />
+
+<figure class="fig">
+<Chart class="settings-chart" label="OWASP's scrypt settings: memory against parallelism" option={settingsChart("scrypt")} />
+<figcaption>Vertical axis: parallelism (p). Horizontal axis: nominal memory in MiB. OWASP's settings trade memory against parallelism.</figcaption>
+</figure>
+
+## Every OWASP setting
+
+<Settings algo="scrypt" />
+
+## Notes from OWASP
+
+- Parameters: CPU/memory cost N, block size r (8 means 1024 bytes) and parallelism p.
+- The five settings give a similar minimal level of defence; the trade-off is parallelism against RAM.
+- The summary line names N=2^17 with r=8 and p=1 as the minimum.
+
+[Read this section in the cheat sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt)
+
+</View>
+
+<View name="algo" param="bcrypt" back="All algorithms">
+
+# bcrypt
+
+OWASP says bcrypt should only be used where Argon2 and scrypt are not available. Make the work factor as large as the verification server allows, with a minimum of 10.
+
+<AlgoStats algo="bcrypt" />
+
+## Notes from OWASP
+
+- Most implementations read at most 72 bytes of input, so enforce a maximum password length of 72 bytes, or less if your implementation has a smaller limit.
+- Pre-hashing the password with a fast hash before bcrypt is dangerous. A hash output can contain a NUL byte, which truncates the input in the original bcrypt, and password shucking lets a leaked fast hash of the same password be reused against yours.
+- If you must pre-hash, OWASP's summary is `bcrypt(base64(hmac-sha384(data: password, key: pepper)), salt, cost)`, with the pepper stored outside the database.
+- A work factor of 10 or more is OWASP's bar for existing bcrypt systems.
+
+[Read this section in the cheat sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#bcrypt)
+
+</View>
+
+<View name="algo" param="pbkdf2" back="All algorithms">
+
+# PBKDF2
+
+Permitted by NIST SP 800-63B-4 and with FIPS-140 validated implementations, so OWASP prefers it when those are required. HMAC-SHA-256 is widely supported and recommended by NIST.
+
+<AlgoStats algo="pbkdf2" />
+
+<figure class="fig">
+<Chart class="settings-chart" label="Iterations OWASP gives PBKDF2 for each inner hash" option={iterationsChart()} />
+<figcaption>Iterations OWASP gives for each inner hash. Grey is legacy only.</figcaption>
+</figure>
+
+## Every OWASP setting
+
+<Settings algo="pbkdf2" />
+
+## Notes from OWASP
+
+- The work factor is the iteration count, and it depends on the inner hash: SHA-1 needs the most and is legacy only, not for new systems.
+- When the password is longer than the hash's block size (64 bytes for SHA-256), HMAC pre-hashes it. Good implementations do that once before the iterations; some redo it every iteration, which makes very long passwords much more expensive and is a denial-of-service risk. Django disclosed such a vulnerability in 2013.
+- Manual pre-hashing reduces that risk but needs a salt in the pre-hash step.
+
+[Read this section in the cheat sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2)
+
+</View>
