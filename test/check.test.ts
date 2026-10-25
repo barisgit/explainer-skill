@@ -121,6 +121,19 @@ test("check warns about content cut off inside an overflow:hidden panel, but not
 	expect(result.stdout).not.toContain("p#title");
 }, 30_000);
 
+test("check warns about content cut off in a visibility:hidden panel whose child is visible, not in one wholly hidden", async () => {
+	const panel = (id: string, child: string) =>
+		`<div id="${id}" style="width:100px;overflow:hidden;visibility:hidden"><div style="width:300px${child}">wide content</div></div>`;
+	const body = panel("ghost", ";visibility:visible") + panel("gone", "");
+	const file = dir.write("hidden-panels.html", page("").replace("</h1>", `</h1>${body}`));
+
+	const result = await checkQuick(file);
+
+	expect(result.code).toBe(0);
+	expect(result.stdout).toContain("div#ghost has content cut off: 300px of content in 100px");
+	expect(result.stdout).not.toContain("div#gone");
+}, 30_000);
+
 test("check ignores content inside a closed <details>: no cut-off warnings and no text map from hidden links", async () => {
 	const hiddenBoxes = Array.from(
 		{ length: 7 },
@@ -268,6 +281,8 @@ test("check --do shot: saves a PNG of the element's box at each width, below the
 <p id="wide-only" style="width:200px;height:40px"></p>
 <p class="gone" style="visibility:hidden;width:50px;height:50px"></p>
 <details><summary>More</summary><p class="gone" style="width:50px;height:50px"></p></details>
+<div class="gone" style="visibility:hidden;width:50px;height:50px"><span>hidden too</span></div>
+<div id="ghost" style="visibility:hidden;width:80px;height:40px"><span style="visibility:visible">shown</span></div>
 <div style="height:1300px"></div>
 <div id="box" style="width:300px;height:200px;margin-left:40px;background:rgb(255,0,0)"></div>
 <div id="tall" style="width:120px;height:1400px;background:rgb(0,0,255)"></div>
@@ -293,6 +308,8 @@ ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}
 		"shot:#wide-only",
 		"--do",
 		"shot:.gone@all",
+		"--do",
+		"shot:#ghost",
 	]);
 
 	expect(result.code).toBe(0);
@@ -333,10 +350,13 @@ ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}
 	);
 	for (const width of [1440, 390]) {
 		expect(result.stdout).toContain(
-			`--do shot:.gone@all: no PNG at ${width} px wide: match 0, 1 is not shown`,
+			`--do shot:.gone@all: no PNG at ${width} px wide: match 0, 1, 2 is not shown`,
 		);
 	}
 	expect(readdirSync(out).filter((png) => png.includes("gone"))).toEqual([]);
+	for (const width of ["desktop", "narrow"]) {
+		expect(pngSize(join(out, `shot6-ghost-${width}.png`))).toEqual([80, 40]);
+	}
 }, 60_000);
 
 test("check --do shot: measures the element after the scroll that brings it into view has settled", async () => {

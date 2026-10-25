@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./chrome.ts";
 import { settle, withPage } from "./chrome.ts";
-import { ELEMENT_NAME_JS, SHOWN_JS } from "./page-js.ts";
+import { ELEMENT_NAME_JS, PAINTS_JS, REGION_VISIBLE_JS } from "./page-js.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
@@ -98,13 +98,14 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	const name = ${ELEMENT_NAME_JS};
 	const scrolls = (el) => { const o = getComputedStyle(el).overflowX; return o === "auto" || o === "scroll"; };
 	const clipped = (el) => { for (let p = el.parentElement; p; p = p.parentElement) if (scrolls(p)) return true; return false; };
-	const shown = ${SHOWN_JS};
+	const shown = ${PAINTS_JS};
+	const region = ${REGION_VISIBLE_JS};
 	const all = [...document.body.querySelectorAll("*")];
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
 	const wideTable = (el) => [...el.querySelectorAll("table")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1);
-	const inner = all.filter((el) => scrolls(el) && shown(el) && !wideTable(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
+	const inner = all.filter((el) => scrolls(el) && region(el) && !wideTable(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
-	const cut = all.filter((el) => hides(el) && shown(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
+	const cut = all.filter((el) => hides(el) && region(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
 	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
 	if (${narrow}) for (const svg of document.querySelectorAll("svg")) {
@@ -130,7 +131,7 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 /** Runs in the page before any step: the headline, the figures at least partly in the first viewport (outermost only) and the largest list of in-page links in view. */
 const FIRST_SCREEN_JS = `(() => {
 	const name = ${ELEMENT_NAME_JS};
-	const shown = ${SHOWN_JS};
+	const shown = ${PAINTS_JS};
 	const seen = (el) => { if (!shown(el)) return false; const r = el.getBoundingClientRect(); return r.width >= 120 && r.height >= 80 && Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) >= Math.min(200, r.height * 0.4); };
 	const found = [...document.querySelectorAll("figure, .fig, .chart, .mermaid, .dg, svg, canvas, img")].filter(seen);
 	const outer = found.filter((el) => !found.some((o) => o !== el && o.contains(el)));

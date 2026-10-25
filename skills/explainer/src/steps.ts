@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { type Cdp, settle } from "./chrome.ts";
-import { ELEMENT_NAME_JS, SHOWN_JS } from "./page-js.ts";
+import { ELEMENT_NAME_JS, REGION_VISIBLE_JS } from "./page-js.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
 const KEYS: Record<string, [number, string]> = {
@@ -357,8 +357,8 @@ interface Box {
 	inView: boolean;
 }
 
-/** Page-side expression (with `el`): true when the element is shown (SHOWN_JS) with a box of some size. */
-const HAS_BOX_JS = `((r) => r.width > 0 && r.height > 0)(el.getBoundingClientRect()) && (${SHOWN_JS})(el)`;
+/** Page-side expression (with `el`): true when the element has a box of some size and its region shows something (REGION_VISIBLE_JS). */
+const HAS_BOX_JS = `((r) => r.width > 0 && r.height > 0)(el.getBoundingClientRect()) && (${REGION_VISIBLE_JS})(el)`;
 /** Page-side expression (with `el`): true when the element lies wholly in the viewport. */
 const IN_VIEW_JS = `((r) => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth)(el.getBoundingClientRect())`;
 
