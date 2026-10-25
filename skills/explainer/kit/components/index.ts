@@ -13,6 +13,7 @@
    state is kept across reloads like any other (kit reply.js): give it an id and set the state in onInput or onChange, which the
    restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
+export { Explore } from "./explore.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
 export { Stepper } from "./stepper.tsx";

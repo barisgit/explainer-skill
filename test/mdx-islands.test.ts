@@ -433,6 +433,7 @@ export function Reveal() {
 /** One use of each kit component, written so it needs every script the component can need (Tree: folds and refs). */
 const COMPONENT_USES: Record<string, string> = {
 	Chart: `<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />`,
+	Explore: `<Explore label="Bars" controls={[{ id: "n", label: "N", toggle: true }]} frames={[1, 2].map((n) => ({ plot: { categories: ["a"], series: [{ type: "bar", data: [n] }] } }))} />`,
 	Plot: `<Plot label="Bars" option={{ categories: ["a"], series: [{ type: "bar", data: [1] }] }} />`,
 	Question: `<Question name="pick" legend="Pick one" options={["yes", "no"]} />`,
 	Stepper: `<Stepper captions={["One", "Two"]}><p data-step="1">One</p><p data-step="2">Two</p></Stepper>`,

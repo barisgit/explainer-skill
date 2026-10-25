@@ -26,7 +26,7 @@ test("kit types makes an external author's TSX typecheck without installed depen
 	expect(config.code).toBe(0);
 	dir.write("tsconfig.json", config.stdout);
 	const good = `"use client";
-import { Chart, Plot, Question, Stepper, Table, Tree, View } from "kit";
+import { Chart, Explore, Plot, Question, Stepper, Table, Tree, View } from "kit";
 import { useState } from "preact/hooks";
 const option: PlotOption = { series: [{ type: "line", data: [[0, 1]] }] };
 const chart: ChartOption = { series: [{ type: "bar", data: [1] }] };
@@ -35,6 +35,7 @@ export function Figure() {
   return <><button onClick={() => setCount(count + 1)}>{count}</button>
     <Chart option={chart} label="Values" setup={(instance) => instance.resize()} />
     <Plot option={option} label="Values" />
+    <Explore label="Values" controls={[{ id: "on", label: "On", toggle: true }]} frames={[{ plot: option }, { plot: option, readout: <b>On</b> }]} />
     <Question name="q" legend="Pick" options={["a", "b"]} />
     <Stepper captions={["One", "Two"]}><p data-step="1">One</p></Stepper>
     <Tree cols="4rem" head={["Task", "Hours"]} items={[{ label: "A", cells: [1], text: "Full" }]} />

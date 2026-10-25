@@ -41,6 +41,7 @@ export function authorTsconfig(): string {
 					kit: [join(KIT_DIR, "components/index.ts")],
 					preact: [join(types, "preact/src/index.d.ts")],
 					"preact/*": [join(types, "preact/*/src/index.d.ts")],
+					"preact-render-to-string": [join(types, "preact-render-to-string/dist/index.d.ts")],
 					echarts: [join(types, "echarts/types/dist/echarts.d.ts")],
 				},
 			},

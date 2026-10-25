@@ -21,7 +21,8 @@
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
    Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series.
-   To draw a plot from state, render it in your own client component; there format and label may also be functions:
+   A plot a slider, choice or toggle switches between computed options is an Explore. For anything more, render the plot in
+   your own client component; there format and label may also be functions:
    format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
