@@ -3,13 +3,13 @@
  * Release check for the install paths: clones the committed repo, installs the skill with `npx skills`
  * (global copy, and project scope with a symlink) and with Caplet (user and project scope) into a
  * disposable HOME, then runs `kit`, `pack` and `check` from each installed copy in an unrelated
- * directory. It needs network (npx fetches the skills CLI) and Chrome, so it is not part of `bun run ci`.
+ * directory, and typechecks a copy of the example page with `kit types` and `bun check`. It needs network (npx fetches the skills CLI) and Chrome, so it is not part of `bun run ci`.
  *
  * Usage: bun build/verify-install.ts [sandbox-dir]   (the directory must not exist yet; it is kept)
  * Requires `caplet` on PATH or CAPLET=/path/to/caplet.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -20,7 +20,7 @@ const source = join(sandbox, "source");
 const elsewhere = join(sandbox, "elsewhere");
 const problems: string[] = [];
 
-type Run = { code: number; out: string };
+type Run = { code: number; out: string; stdout: string };
 
 /** Runs a command with a HOME inside the sandbox so no installer can touch the real one. */
 function run(command: string[], cwd: string, home: string): Run {
@@ -35,7 +35,11 @@ function run(command: string[], cwd: string, home: string): Run {
 	}
 	const [file = "", ...args] = command;
 	const result = spawnSync(file, args, { cwd, env, encoding: "utf8" });
-	return { code: result.status ?? 1, out: `${result.stdout}${result.stderr}` };
+	return {
+		code: result.status ?? 1,
+		out: `${result.stdout}${result.stderr}`,
+		stdout: result.stdout,
+	};
 }
 
 /** Prints one line per check; a failure is kept with its detail for the summary. */
@@ -74,6 +78,17 @@ function verifyFiles(installed: string, expected: string[]): void {
 	record(differing.length === 0, "contents identical", differing.join("\n"));
 }
 
+/** A copy of the installed example page typechecks with `kit types > tsconfig.json` then `bun check`, with nothing installed. */
+function verifyTypes(cli: string, installed: string, home: string, outDir: string): void {
+	const page = join(outDir, "page");
+	cpSync(join(installed, "example"), page, { recursive: true });
+	const types = run(["bun", cli, "kit", "types"], page, home);
+	record(types.code === 0, "bun cli.ts kit types", types.out);
+	writeFileSync(join(page, "tsconfig.json"), types.code === 0 ? types.stdout : "");
+	const check = run(["bun", "check"], page, home);
+	record(check.code === 0, "bun check on the example page", check.out);
+}
+
 /** The CLI runs from the installed location with no npm install, and node explains what is missing. */
 function verifyCli(installed: string, home: string, outDir: string): void {
 	const cli = join(installed, "cli.ts");
@@ -88,6 +103,7 @@ function verifyCli(installed: string, home: string, outDir: string): void {
 	record(pack.code === 0 && existsSync(packed), "bun cli.ts pack example/page.mdx", pack.out);
 	const check = run(["bun", cli, "check", packed, "--out", join(outDir, "shots")], elsewhere, home);
 	record(check.code === 0, "bun cli.ts check", check.out);
+	verifyTypes(cli, installed, home, outDir);
 	const node = run(["node", cli, "kit"], elsewhere, home);
 	record(node.code === 2 && node.out.includes("needs Bun"), "node cli.ts explains Bun", node.out);
 }
