@@ -22,6 +22,19 @@ describe("pack takes an .mdx page only", () => {
 		expect(await Bun.file(dir.path("refused.out.html")).exists()).toBe(false);
 	});
 
+	test("a url() inside a quoted data URI is part of that URI, not a file to inline", async () => {
+		// Temml's stylesheet draws \cancelto with an SVG mask whose marker is url(%23a): text of the data URI, not a reference.
+		const mask = `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><line marker-end='url(%23a)'/></svg>")`;
+		dir.write("mask.css", `.marker-mask { mask-image: ${mask}; }`);
+		const input = dir.write("mask.mdx", 'import "./mask.css";\n\n# Mask\n');
+		const output = dir.path("mask.out.html");
+
+		const result = await runCli(["pack", input, "-o", output]);
+
+		expect(result.stderr).toBe("");
+		expect(readFileSync(output, "utf8")).toContain(`.marker-mask { mask-image: ${mask}; }`);
+	});
+
 	test("a missing page is a usage error (exit 2), not a stack trace", async () => {
 		const result = await runCli(["pack", dir.path("absent.mdx"), "-o", dir.path("out.html")]);
 

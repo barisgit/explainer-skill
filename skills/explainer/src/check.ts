@@ -93,7 +93,7 @@ const TALL_FIGURE = 1.5;
 /**
  * Runs in the page for the current viewport (`narrow`: the phone width). `culprits`: elements sticking out of the viewport that no scrolling
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
- * than their box and scrolls sideways (a wide data table may, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box (ellipsis truncation excepted),
+ * than their box and scrolls sideways (a wide data table or equation may, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box (ellipsis truncation excepted),
  * a missing viewport meta and SVG text rendered under 9 px (narrow only), diagrams and charts
  * (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players with a log) are tall by design and
  * are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to the screen. `repeated`: ids on more
@@ -107,8 +107,8 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	const shown = ${SHOWN_JS};
 	const all = [...document.body.querySelectorAll("*")];
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
-	const wideTable = (el) => [...el.querySelectorAll("table")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1);
-	const inner = all.filter((el) => scrolls(el) && shown(el) && !wideTable(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
+	const wideByDesign = (el) => [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1);
+	const inner = all.filter((el) => scrolls(el) && shown(el) && !wideByDesign(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
 	const cut = all.filter((el) => hides(el) && shown(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
 	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");

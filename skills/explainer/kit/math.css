@@ -1,0 +1,50 @@
+/* math: TeX formulas: $...$ in a sentence, $$ on lines of their own for a display equation. pack renders them to MathML: no script ships, they take the text colour in light and dark, and only a page with math carries this file.
+   An inline formula never breaks across lines: keep it short, and give a long one its own $$ block, which scrolls sideways on a
+   phone when it is wider than the column. To fit a long chain on a phone instead, break it into lines aligned at the =:
+     $$
+     \begin{aligned} P &= (V_{in} - V_{out})\,I \\ &= 9\,\text{V} \cdot 0.15\,\text{A} = 1.35\,\text{W} \end{aligned}
+     $$
+   Units are upright after a thin space (7.15\,\text{V}). A dollar sign in prose is \$; pack fails on "$5 and $6", which would read
+   as math, and on a TeX error, at its line.
+   Formula sheet (the end of a study page): a ## section with one table row per formula, its name first and its symbols after:
+     | Quantity | Formula | Symbols |
+     |---|---|---|
+     | Output voltage | $V_{out} = V_{ref}\,\frac{R_1 + R_2}{R_2}$ | $V_{ref}$ = 7.15 V; $R_1$ output to inverting input |
+   On phones each cell's label goes above its value, so a formula gets the full width; inside a table write | as \vert. */
+
+/* An inline formula is one unit in the line. Temml's sheet makes math a wrapping flex box for its own line breaks, which pack turns off. */
+math:not([display="block"]) {
+	flex-wrap: nowrap;
+	white-space: nowrap;
+}
+
+/* STIX Two and Cambria have a smaller x-height than Geist; this sets formulas level with the words around them. */
+math {
+	font-size: 1.1em;
+}
+
+/* The box around a display equation: centred, and scrolling sideways when the equation is wider than the column. */
+.math {
+	margin-block: 1.25rem;
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding-block: 0.25rem;
+}
+
+.math > math {
+	min-width: max-content;
+}
+
+/* A table.compare with formulas, on phones (theme.css's 48rem breakpoint): each cell's label goes above its value, so a formula
+   gets the full width and scrolls sideways when it is wider still, instead of squeezing beside the label. */
+@media (max-width: 48rem) {
+	:where(.compare:not(.table):has(math)) td[data-label] {
+		display: block;
+		overflow-x: auto;
+		overflow-y: hidden;
+	}
+	:where(.compare:not(.table):has(math)) td[data-label]::before {
+		display: block;
+		inline-size: auto;
+	}
+}

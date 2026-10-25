@@ -51,12 +51,17 @@ function dataUri(path: string): string {
 	return `data:${mime};base64,${readFileSync(path).toString("base64")}`;
 }
 
+/** A CSS url(): its value in double quotes, single quotes or bare. */
+const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"']+))\s*\)/gi;
+
 /** Inlines `url(...)` assets and rejects `@import` and remote URLs, so no stylesheet reaches the network. */
 function inlineCss(css: string, baseDir: string, from: string): string {
 	if (/@import/i.test(css)) {
 		throw new PackError(`@import in ${from}: ${IMPORT_FIX}`);
 	}
-	return css.replace(/url\(\s*(["']?)([^)"']+)\1\s*\)/gi, (whole, _q, ref: string) => {
+	// A quoted value is matched whole, so a url() inside it (an SVG data URI's url(%23marker)) stays part of its text.
+	return css.replace(CSS_URL, (whole, double?: string, single?: string, bare?: string) => {
+		const ref = (double ?? single ?? bare ?? "").trim();
 		if (isInline(ref)) {
 			return whole;
 		}

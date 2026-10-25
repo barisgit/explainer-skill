@@ -9,6 +9,9 @@
  *                                 pack bundles them into a page's prerender and its client components
  *   vendor/types/                Preact, ECharts and kit declarations for author typechecking
  *   kit/licenses/*.txt            licence texts the bundles must carry
+ *   vendor/math.js                remark-math and Temml, one ES module; used by `pack` to render $...$ to MathML, never inlined
+ *   kit/parts/math/temml.css      Temml's stylesheet for system math fonts, and kit/fonts/temml.woff2, the font it names;
+ *                                 the start of kit:math.css, which pack adds to a page that holds math
  */
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -174,3 +177,42 @@ for (const f of [
 ]) {
 	console.log(`${f} ${(statSync(join(skill, f)).size / 1024).toFixed(0)} KB`);
 }
+
+/**
+ * Math: remark-math and Temml as one module for pack, and Temml's stylesheet with its font as the start of kit:math.css. The
+ * stylesheet is Temml-Local.css (system math fonts, no 380 KB Latin Modern): its fixes for each browser's MathML gaps (\overline,
+ * \boxed, \cancel and array alignment in Chromium, accents in WebKit) are worth keeping whole, and Temml.woff2 (9 KB, a clone of
+ * KaTeX_Script with Unicode code points) sets primes and \mathscr, which system math fonts place badly in Chromium.
+ */
+async function vendorMath() {
+	const math = await build(join(import.meta.dir, "math-entry.ts"), "bun", "esm");
+	const notices = await packageLicences(math.inputs);
+	const [temml, remarkMath] = await Promise.all(["temml", "remark-math"].map(versionOf));
+	writeFileSync(
+		join(skill, "vendor/math.js"),
+		`/*! temml ${temml} and remark-math ${remarkMath}, bundled with the micromark and mdast packages remark-math uses, each under its own licence.
+   Their texts: kit/licenses/math.txt. Exports remarkMath and temml. Used by pack for .mdx pages, never inlined. Rebuild with: bun run vendor */\n${math.text}`,
+	);
+	const font = "url('Temml.woff2')";
+	const css = await text("temml", "dist", "Temml-Local.css");
+	if (!css.includes(font)) {
+		throw new Error(
+			`temml ${temml}: Temml-Local.css no longer loads ${font}; update the path rewrite below`,
+		);
+	}
+	mkdirSync(join(skill, "kit/parts/math"), { recursive: true });
+	writeFileSync(
+		join(skill, "kit/parts/math/temml.css"),
+		`/* temml ${temml} dist/Temml-Local.css, its font path set to the kit's fonts/. MIT, kit/licenses/math.txt. Rebuild with: bun run vendor */\n${css.replace(font, "url('fonts/temml.woff2')")}`,
+	);
+	copyFileSync(nm("temml", "dist", "Temml.woff2"), join(skill, "kit/fonts/temml.woff2"));
+	const katexFonts = await text("katex", "LICENSE");
+	writeFileSync(
+		join(skill, "kit/licenses/math.txt"),
+		`vendor/math.js bundles these ${notices.length} packages; each keeps its own licence. kit/parts/math/temml.css and\nkit/fonts/temml.woff2 come from temml (below). temml.woff2 is a clone of KaTeX_Script-Regular from the KaTeX fonts,\nwhose licence follows the package list.\n\n${[...notices, `KaTeX fonts\n\n${katexFonts.trim()}`].join(`\n\n${"-".repeat(72)}\n\n`)}`,
+	);
+	for (const f of ["vendor/math.js", "kit/parts/math/temml.css", "kit/fonts/temml.woff2"]) {
+		console.log(`${f} ${(statSync(join(skill, f)).size / 1024).toFixed(0)} KB`);
+	}
+}
+await vendorMath();

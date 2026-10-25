@@ -98,6 +98,12 @@ const FEATURES: Feature[] = [
 		doc: () => MERMAID_DOC,
 	},
 	{
+		name: "math.css",
+		files: ["math.css"],
+		line: "$x$ and $$...$$: TeX formulas drawn as MathML when you pack, no script; a formula sheet is a table of them.",
+		doc: () => kitHeader("math.css"),
+	},
+	{
 		name: "theme.css",
 		files: ["theme.css"],
 		line: "the warm-paper house style, light and dark: its classes and tokens.",
