@@ -1,6 +1,6 @@
 /* page: how an .mdx page is written. It imports the kit's components from "kit": import { Chart, View } from "kit".
-   Frontmatter: title (default: the text of the #), lang (default en), labels (the kit's own texts in the page's language, as
-   key: text lines), reply: true (the reader's notes on a page without a Question or data-reply).
+   Frontmatter: title (default: the text of the #), lang (default en), labels (the kit's own texts, English unless set: kit labels
+   prints them all to translate and paste here), reply: true (the reader's notes on a page without a Question or data-reply).
    The # and the paragraphs right under it are the masthead, the first one its lede. Each ## starts a section; to give one its
    short name in the contents rail, write its heading as <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a

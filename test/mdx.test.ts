@@ -261,6 +261,16 @@ export function Refs() {
 		);
 	});
 
+	test("a label key no kit script reads names the key, which would otherwise stay English", async () => {
+		const stderr = await failure(
+			"label-key",
+			"---\nlabels:\n  expandAl: Alle öffnen\n---\n\n# T\n",
+		);
+		expect(stderr).toContain(
+			'label-key.mdx frontmatter: the kit has no label "expandAl"; kit labels prints every key with its English text',
+		);
+	});
+
 	test("an MDX syntax error names file, line and column", async () => {
 		const stderr = await failure("syntax", "# T\n\nan {open expression\n");
 		expect(stderr).toMatch(/syntax\.mdx:3:\d+: /);

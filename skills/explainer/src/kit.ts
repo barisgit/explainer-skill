@@ -21,6 +21,37 @@ export const kitFiles = (): string[] =>
 		.map((e) => (e.name.endsWith(".ts") ? `${e.name.slice(0, -3)}.js` : e.name))
 		.sort();
 
+/** A kit script's English texts: its `const LABELS = {` block, one `key: "Text",` line per kitLabels key. */
+const LABELS_BLOCK = /^\s*const LABELS = \{\n([\s\S]*?)\n\s*\};$/m;
+const LABEL_LINE = /^\s*(\w+): ("(?:[^"\\]|\\.)*"),$/;
+
+/**
+ * The texts the kit scripts add, by script ("reply.js"): each one's kitLabels keys with their English text, read from the
+ * script's LABELS object, which is where the script itself takes its defaults from. A LABELS line in another form throws, so
+ * `kit labels` and pack's key check never miss a key silently.
+ */
+export function kitLabels(): { file: string; labels: Record<string, string> }[] {
+	return kitFiles().flatMap((file) => {
+		const path = kitPath(file);
+		const block = path.endsWith(".ts")
+			? LABELS_BLOCK.exec(readFileSync(path, "utf8"))?.[1]
+			: undefined;
+		if (block === undefined) {
+			return [];
+		}
+		const entries = block.split("\n").map((line) => {
+			const [, key, text] = LABEL_LINE.exec(line) ?? [];
+			if (key === undefined || text === undefined) {
+				throw new Error(
+					`kit ${file}: write each LABELS entry as key: "Text", on its own line, not ${line.trim()}`,
+				);
+			}
+			return [key, JSON.parse(text) as string] as const;
+		});
+		return [{ file, labels: Object.fromEntries(entries) }];
+	});
+}
+
 /**
  * A tsconfig for the author's page directory `dir` that checks `sources` (the files the pages import, see mdx/sources.ts) and what
  * they import, as browser code: `kit`, Preact and ECharts resolve to this skill's components and vendored declarations, so

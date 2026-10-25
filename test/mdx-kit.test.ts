@@ -225,15 +225,13 @@ const texts = (selector) => [...document.querySelectorAll(selector)].map((el) =>
 const navigated = (go) => new Promise((shown) => { addEventListener("hashchange", shown, { once: true }); go(); });`;
 
 /**
- * The counterpart of labels.test.ts for an .mdx page: lang and labels from the frontmatter, the same components (a stepper, two
- * kinds of view without a .back link, two folds, a question, three note parts) and the same contract.
+ * The counterpart of labels.test.ts for an .mdx page: lang and the `labels` block (as `kit labels` prints it) in the frontmatter,
+ * the same components (a stepper, two kinds of view without a .back link, two folds, a question, three note parts) and the same
+ * contract.
  */
-const LABELS_PAGE = `---
+const LABELS_PAGE = (labels: string) => `---
 lang: sl
-labels:
-${Object.entries(SLOVENIAN)
-	.map(([key, text]) => `  ${key}: ${JSON.stringify(text)}`)
-	.join("\n")}
+${labels}
 ---
 import { Question, Tree, View } from "kit";
 
@@ -272,13 +270,28 @@ import { Question, Tree, View } from "kit";
 <script src="labels.js"></script>
 `;
 
-test("an .mdx page with lang and labels in its frontmatter shows every kit text in its language", async () => {
-	expect(Object.keys(SLOVENIAN)).toEqual(Object.keys(ENGLISH));
-	const { result, output } = await packMdx("labels", LABELS_PAGE, {
+test("kit labels prints every kit text, and the block, translated, is the page's labels as it is", async () => {
+	const block = (await runCli(["kit", "labels"])).stdout;
+	expect(Bun.YAML.parse(block)).toEqual({ labels: ENGLISH });
+	// Translating replaces the values; the keys and the form stay as printed.
+	const keys = Object.keys(ENGLISH) as (keyof typeof ENGLISH)[];
+	const translated = keys.reduce(
+		(text, key) =>
+			text.replace(
+				`${key}: ${JSON.stringify(ENGLISH[key])}`,
+				`${key}: ${JSON.stringify(SLOVENIAN[key])}`,
+			),
+		block,
+	);
+	const { result, output } = await packMdx("labels", LABELS_PAGE(translated), {
 		"labels.js": labelsScript(SLOVENIAN),
 	});
 	expect(result.stderr).toBe("");
-	expect(readFileSync(output, "utf8")).toContain('<html lang="sl">');
+	const html = readFileSync(output, "utf8");
+	expect(html).toContain('<html lang="sl">');
+	expect(JSON.parse(/var kitLabels = (.*);<\/script>/.exec(html)?.[1] ?? "null")).toEqual(
+		SLOVENIAN,
+	);
 	expect(await runPacked(output, { slowdown: 4 })).toEqual([]);
 }, 60_000);
 

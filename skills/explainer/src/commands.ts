@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
-import { authorTsconfig, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { authorTsconfig, kitLabels, kitPath, leadingComment, readKitText } from "./kit.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
@@ -57,13 +57,14 @@ function kitHeader(file: string): string {
 
 /** The kit's Preact components, by the name a page imports ("Chart"), each from the header of its file in kit/components. */
 function components(): { name: string; file: string; summary: string }[] {
+	// A component file's header starts "Name: description"; a helper module beside them (view-body.ts) has no such line.
 	return readdirSync(kitPath("components"))
 		.filter((name) => name !== "index.ts")
 		.sort()
-		.map((name) => {
+		.flatMap((name) => {
 			const file = `components/${name}`;
-			const [, component = name, summary = ""] = /^(\w+): (.*)/.exec(kitHeader(file)) ?? [];
-			return { name: component, file, summary };
+			const [, component, summary = ""] = /^([A-Z]\w*): (.*)/.exec(kitHeader(file)) ?? [];
+			return component ? [{ name: component, file, summary }] : [];
 		});
 }
 
@@ -145,6 +146,20 @@ function topicDoc(topic: string): string | undefined {
 	return FEATURES.find((f) => f.name === key || f.name === `${key}.css`)?.doc();
 }
 
+/**
+ * What `kit labels` prints: the frontmatter `labels` key with every text the kit scripts add, in English and grouped by script,
+ * so an author translates the values and pastes the block whole into a page's frontmatter. Values are JSON strings, which YAML
+ * reads as they are, so a colon or quote in a translation needs no thought.
+ */
+const labelsBlock = (): string =>
+	[
+		"labels:",
+		...kitLabels().flatMap(({ file, labels }) => [
+			`  # kit ${file}`,
+			...Object.entries(labels).map(([key, text]) => `  ${key}: ${JSON.stringify(text)}`),
+		]),
+	].join("\n");
+
 /** What `kit` prints: one line per component and feature, and how to read one. */
 function kitListing(): string {
 	const line = (name: string, files: string[], text: string) =>
@@ -153,7 +168,7 @@ function kitListing(): string {
 		'An .mdx page imports components from "kit" (import { Chart, View } from "kit"); pack adds the theme and the kit scripts it uses.',
 		...components().map((c) => line(c.name, componentScripts(c.file), c.summary)),
 		...FEATURES.map((f) => line(f.name, f.files, f.line)),
-		`Read one: ${CLI} kit <name>. The kit's texts are English; frontmatter labels translate them (kit page).`,
+		`Read one: ${CLI} kit <name>. The kit's texts are English: kit labels prints them to translate.`,
 	].join("\n");
 }
 
@@ -190,10 +205,10 @@ async function types(): Promise<number> {
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List what an .mdx page can use, one line per component and feature, or print one's documentation. kit types prints a tsconfig.json that typechecks the page's own .ts and .tsx files with bun check.",
-		usage: "kit [<name> | types]",
+			"List what an .mdx page can use, one line per component and feature, or print one's documentation. kit types prints a tsconfig.json that typechecks the page's own .ts and .tsx files with bun check; kit labels prints the kit's texts as a frontmatter labels block to translate.",
+		usage: "kit [<name> | types | labels]",
 		flags: [],
-		examples: ["kit", "kit Stepper", "kit page", "kit types > tsconfig.json"],
+		examples: ["kit", "kit Stepper", "kit page", "kit types > tsconfig.json", "kit labels"],
 		run: async ([topic]) => {
 			if (!topic) {
 				console.log(kitListing());
@@ -205,6 +220,10 @@ export const COMMANDS: Record<string, Command> = {
 			}
 			if (topic === "types") {
 				return types();
+			}
+			if (topic === "labels") {
+				console.log(labelsBlock());
+				return 0;
 			}
 			const doc = topicDoc(topic);
 			if (doc === undefined) {
