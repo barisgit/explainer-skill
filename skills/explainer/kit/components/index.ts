@@ -16,5 +16,5 @@ export { Chart } from "./chart.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
 export { Stepper } from "./stepper.tsx";
-export { Tree } from "./tree.tsx";
+export { Tree, type TreeItem, type TreeRow } from "./tree.tsx";
 export { View } from "./view.tsx";

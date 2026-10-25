@@ -2,7 +2,8 @@
    <Tree items={plan.phases} cols="4rem 4rem" head={["Task", "Hours", "Owner"]}
      row={(r) => ({ label: r.name, cells: [`${r.hours} h`, r.owner], items: r.tasks, text: r.note })} />
      items  the top-level records
-     row    (record) => its row; leave it out when the records already have this shape:
+     row    (record) => its row (type: TreeRow<Record> from "kit"); leave it out when the records already have this shape
+            (type: TreeItem):
               label  the row's name
               cells  its numbers, in columns that line up across rows and levels. Give every row the same cells in the same order,
                      units included; null keeps a column empty, and a row with fewer cells gets empty ones at the end

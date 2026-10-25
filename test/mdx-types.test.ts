@@ -26,9 +26,12 @@ test("kit types makes an external author's TSX typecheck without installed depen
 	expect(config.code).toBe(0);
 	dir.write("tsconfig.json", config.stdout);
 	const good = `"use client";
-import { Chart, Plot, Question, Stepper, Tree, View } from "kit";
+import { Chart, Plot, Question, Stepper, Tree, type TreeItem, type TreeRow, View } from "kit";
 import { useState } from "preact/hooks";
 const option: PlotOption = { series: [{ type: "line", data: [[0, 1]] }] };
+interface Task { name: string; hours: number; tasks?: Task[] }
+const taskRow = (task: Task): TreeRow<Task> => ({ label: task.name, cells: [task.hours], items: task.tasks, text: "Full" });
+const rows: TreeItem[] = [{ label: "A", cells: [1], text: "Full" }];
 const chart: ChartOption = { series: [{ type: "bar", data: [1] }] };
 export function Figure() {
   const [count, setCount] = useState(0);
@@ -37,7 +40,8 @@ export function Figure() {
     <Plot option={option} label="Values" />
     <Question name="q" legend="Pick" options={["a", "b"]} />
     <Stepper captions={["One", "Two"]}><p data-step="1">One</p></Stepper>
-    <Tree cols="4rem" head={["Task", "Hours"]} items={[{ label: "A", cells: [1], text: "Full" }]} />
+    <Tree cols="4rem" head={["Task", "Hours"]} items={rows} />
+    <Tree items={[{ name: "B", hours: 2 }]} row={taskRow} />
     <View name="detail"><h1>Detail</h1></View></>;
 }
 `;
