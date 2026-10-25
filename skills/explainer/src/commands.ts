@@ -7,10 +7,11 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
 import { authorTsconfig, kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
+import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
 import { report } from "./report.ts";
@@ -110,6 +111,35 @@ Documentation of one component or kit file: ${CLI} kit <name>; kit components pr
 The texts the kit adds (buttons, accessible names, messages) are English; a page in another language sets them with labels in its frontmatter.`;
 }
 
+/**
+ * `kit types`: prints the tsconfig for the .mdx pages in the current directory, and on stderr which files it covers, since a file
+ * a page imports later needs a new one.
+ */
+async function types(): Promise<number> {
+	const dir = process.cwd();
+	if (!readdirSync(dir).some((name) => name.endsWith(".mdx"))) {
+		return usage(
+			"kit types makes a tsconfig.json for the .mdx pages in the current directory, and there are none: run it beside page.mdx",
+		);
+	}
+	try {
+		const sources = await pageSources(dir);
+		console.log(authorTsconfig(dir, sources));
+		console.error(
+			sources.length
+				? `kit types: checks ${sources.map((file) => relative(dir, file)).join(", ")} and what they import; run it again when a page imports another file`
+				: "kit types: the pages import no .ts or .tsx file, so there is nothing to check yet; run it again when one does",
+		);
+		return 0;
+	} catch (e) {
+		if (!(e instanceof PackError)) {
+			throw e;
+		}
+		console.error(`error: ${e.message}`);
+		return 1;
+	}
+}
+
 /** One spec per command: drives dispatch, flag validation and --help. Exit codes: 0 ok, 1 problems found, 2 usage. */
 export const COMMANDS: Record<string, Command> = {
 	kit: {
@@ -128,8 +158,7 @@ export const COMMANDS: Record<string, Command> = {
 				return 0;
 			}
 			if (topic === "types") {
-				console.log(authorTsconfig());
-				return 0;
+				return types();
 			}
 			if (topic === "components") {
 				console.log(componentsDoc());

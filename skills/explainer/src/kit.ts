@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, extname, join, sep } from "node:path";
+import { basename, dirname, extname, join, relative, sep } from "node:path";
 import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
 
 /**
@@ -21,8 +21,12 @@ export const kitFiles = (): string[] =>
 		.map((e) => (e.name.endsWith(".ts") ? `${e.name.slice(0, -3)}.js` : e.name))
 		.sort();
 
-/** A tsconfig for the author's current page directory, pointing at this skill's components and vendored declarations. */
-export function authorTsconfig(): string {
+/**
+ * A tsconfig for the author's page directory `dir` that checks `sources` (the files the pages import, see mdx/sources.ts) and what
+ * they import, as browser code: `kit`, Preact and ECharts resolve to this skill's components and vendored declarations, so
+ * `bun check` needs no install. Nothing else beside the page (a Bun script, a scratch file) is checked.
+ */
+export function authorTsconfig(dir: string, sources: string[]): string {
 	const types = join(SKILL_ROOT, "vendor/types");
 	return JSON.stringify(
 		{
@@ -36,6 +40,7 @@ export function authorTsconfig(): string {
 				strict: true,
 				noEmit: true,
 				allowImportingTsExtensions: true,
+				resolveJsonModule: true,
 				types: [],
 				paths: {
 					kit: [join(KIT_DIR, "components/index.ts")],
@@ -44,9 +49,7 @@ export function authorTsconfig(): string {
 					echarts: [join(types, "echarts/types/dist/echarts.d.ts")],
 				},
 			},
-			files: [join(types, "globals.d.ts")],
-			include: ["**/*.ts", "**/*.tsx"],
-			exclude: [SKILL_ROOT],
+			files: [join(types, "globals.d.ts"), ...sources.map((file) => relative(dir, file))],
 		},
 		null,
 		2,

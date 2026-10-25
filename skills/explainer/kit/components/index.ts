@@ -7,7 +7,7 @@
    right-aligned column (---:) is numeric (class="num"), and on phones each row stacks its cells under the column names.
    Data and styles are imported files: import plan from "./plan.json", import { rows } from "./data.ts", import "./page.css".
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
-   To typecheck them: bun /path/to/explainer/cli.ts kit types > tsconfig.json, then bun check (Bun only, no install).
+   To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun check (no install).
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
    state and handlers work. Props from the page into such a component must be JSON. A control such a component renders from its
    state is kept across reloads like any other (kit reply.js): give it an id and set the state in onInput or onChange, which the

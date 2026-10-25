@@ -20,18 +20,34 @@ async function run(args: string[]) {
 	return { stdout, stderr, code };
 }
 
-test("kit types makes an external author's TSX typecheck without installed dependencies, and catches bad props and plot data", async () => {
+test("kit types checks an external page's own sources without installed dependencies, and not the Bun scripts and scratch files beside it", async () => {
 	cpSync(SKILL_DIR, dir.path("skill"), { recursive: true });
-	const config = await run(["skill/cli.ts", "kit", "types"]);
-	expect(config.code).toBe(0);
-	dir.write("tsconfig.json", config.stdout);
+	dir.write(
+		"page.mdx",
+		'import { Figure } from "./figure.tsx";\nimport { start } from "./data.ts";\n\n# Page\n\n<Figure start={start} />\n',
+	);
+	dir.write(
+		"data.ts",
+		'import plan from "./plan.json";\nexport const start: number = plan.start;\n',
+	);
+	dir.write("plan.json", '{ "start": 1 }');
+	// What authors keep beside a page: a Bun script that prepares the data, and a scratch file with errors of its own.
+	dir.write(
+		"prepare.ts",
+		'await Bun.write("plan.json", JSON.stringify({ start: Number(process.argv[2] ?? 1) }));\n',
+	);
+	dir.write(
+		"scratch/probe.ts",
+		'const probe: number = "not checked";\nconsole.log(probe, Bun.version);\n',
+	);
 	const good = `"use client";
 import { Chart, Plot, Question, Stepper, Tree, View } from "kit";
 import { useState } from "preact/hooks";
+import { start as first } from "./data.ts";
 const option: PlotOption = { series: [{ type: "line", data: [[0, 1]] }] };
 const chart: ChartOption = { series: [{ type: "bar", data: [1] }] };
-export function Figure() {
-  const [count, setCount] = useState(0);
+export function Figure({ start = first }: { start?: number }) {
+  const [count, setCount] = useState(start);
   return <><button onClick={() => setCount(count + 1)}>{count}</button>
     <Chart option={chart} label="Values" setup={(instance) => instance.resize()} />
     <Plot option={option} label="Values" />
@@ -42,15 +58,21 @@ export function Figure() {
 }
 `;
 	dir.write("figure.tsx", good);
-	const checked = await run(["check", "--no-pretty", "--all"]);
+	const config = await run(["skill/cli.ts", "kit", "types"]);
+	expect(config.code).toBe(0);
+	expect(config.stderr).toContain("figure.tsx");
+	dir.write("tsconfig.json", config.stdout);
+	const checked = await run(["check"]);
 	expect(checked.stdout + checked.stderr).not.toContain("error TS");
 	expect(checked.code).toBe(0);
 	dir.write(
 		"figure.tsx",
 		`${good}\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Tree items={[]} cell="4rem" />;\n`,
 	);
-	const failed = await run(["check", "--no-pretty", "--all"]);
+	const failed = await run(["check", "--no-pretty"]);
 	expect(failed.code).not.toBe(0);
 	expect(failed.stdout + failed.stderr).toContain("'string' is not assignable");
 	expect(failed.stdout + failed.stderr).toContain("cell");
+	expect(failed.stdout + failed.stderr).not.toContain("prepare.ts");
+	expect(failed.stdout + failed.stderr).not.toContain("probe.ts");
 }, 30_000);
