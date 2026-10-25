@@ -1,4 +1,4 @@
-/* reply: reader notes and answers sent as one Markdown reply: data-reply on form controls, select text or click a data-ref part to add a note. Also keeps what the reader entered across reloads. Needs kit:theme.css.
+/* reply: reader notes and answers sent as one Markdown reply: data-reply on form controls, select text or click a data-ref part to add a note. Needs kit:theme.css and kit:keep.js before it.
    Nothing shows until the reader selects text, clicks a data-ref part (a Note button appears), or changes an input (a Clear button
    appears), or the page has data-reply controls (a Reply button).
    Questions and state are plain form controls inside any element marked data-reply:
@@ -18,20 +18,10 @@
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }.
-   Keeping: including this file is all a page needs. The reader's answers and notes are saved in localStorage under the page's own
-   address and restored after the page's load handlers have run. Answers are every text, textarea, radio, checkbox, select, range and
-   number control, with or without data-reply, that the reader moved off its default (what the markup says: value, checked,
-   selected) or chose on a data-reply question, even when that equals the default. Restored controls get input and change events,
-   so the page's own listeners redraw charts and outputs; a control changed by script without events is saved at the next click or
-   when the page is left. Controls the page renders later (views, panels) are picked up as they appear and get their saved value
-   then; one the page replaces (also in answer to a restored value) keeps its answer. Controls are matched by id (else radio form,
-   group and value, else position), so give inputs ids; a saved value is dropped when the control's own label or type differs from
-   when it was saved (a regenerated page). The "Clear answers and notes" button (shown while anything is answered, a note exists,
-   or answers wait for a control not yet shown) asks first: one click turns it red ("Clear everything?"), a second
-   within 4 s puts every control back to its default, again with events, and drops the notes and the saved copy. Escape, leaving
-   the button or the wait cancels.
-   Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept.
+   Keeping (kit keep.js): the reader's answers and notes are kept across reloads. The "Clear answers and notes" button (shown while
+   anything is answered, a note exists, or answers wait for a control not yet shown) asks first: one click turns it red ("Clear
+   everything?"), a second within 4 s puts every control back to its default, with input and change events, and drops the notes
+   and the saved copy. Escape, leaving the button or the wait cancels.
    Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
    object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { reply: "Odgovor", ... }. Keys here:
    reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press
@@ -45,8 +35,8 @@
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const root = document.querySelector<HTMLElement>("main") ?? document.body;
-	const CONTROL =
-		"input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
+	const keep = window.Keep;
+	const CONTROL = keep.selector;
 	const notes: ReplyNote[] = [];
 	/** The English texts, by kitLabels key. */
 	const LABELS = {
@@ -104,14 +94,7 @@
 		target.matches(CONTROL)
 			? target
 			: null;
-	const ownText = (label: HTMLLabelElement) => {
-		const copy = document.createElement("div");
-		copy.innerHTML = label.innerHTML;
-		for (const n of copy.querySelectorAll("input, select, textarea, output")) {
-			n.remove();
-		}
-		return clean(copy.textContent ?? "");
-	};
+	const { ownText } = keep;
 	/** Controls answering together; never empty. */
 	type Group = [ReplyControl, ...ReplyControl[]];
 	const optionText = (c: ReplyControl) => (c.labels?.[0] ? ownText(c.labels[0]) : c.value);
@@ -198,14 +181,6 @@
 			}));
 		});
 	}
-
-	const keep = window.ReplyKeep({
-		selector: CONTROL,
-		clean,
-		ownText,
-		notes: { list: () => filledNotes(), restore: restoreNotes },
-		onChange: sync,
-	});
 
 	function restoreNotes(saved: unknown) {
 		for (const n of Array.isArray(saved) ? saved : []) {
@@ -486,5 +461,5 @@
 		}
 	});
 
-	sync();
+	keep.attach({ notes: { list: () => filledNotes(), restore: restoreNotes }, onChange: sync });
 })();

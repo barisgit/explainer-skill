@@ -101,7 +101,7 @@ async function kitScripts(
 	return new Set([
 		...(await scriptsInHtml(html)),
 		...scriptsInCode(bundle),
-		...(front.reply ? (["reply.js"] as const) : []),
+		...(front.reply ? (["keep.js", "reply.js"] as const) : []),
 	]);
 }
 

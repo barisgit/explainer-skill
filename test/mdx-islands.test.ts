@@ -376,10 +376,21 @@ describe("keeping inside an island", () => {
 		expect(state.reloaded).toEqual(queue(1, 5, "Hour 1: 2 waiting", "burst,3,true", "6"));
 		expect(state.cleared).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2"));
 	}, 30_000);
+
+	test("without reply the controls are kept by keep.js alone, and no reply bar shows", async () => {
+		const output = await pack("kept-alone", queuePage("title: Queues"));
+		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["echarts", "charts", "steps", "keep"]);
+		const reloaded = await inPage(output, async (cdp) => {
+			await act(cdp, `document.getElementById("scenario-burst").click()`, "0");
+			await load(cdp);
+			return cdp.evaluate(`[${QUEUE_STATE}.controls, document.querySelector(".reply-bar")]`);
+		});
+		expect(reloaded).toEqual(["burst,1,false", null]);
+	}, 30_000);
 });
 
 /** The kit scripts a packed page includes, found by the documentation comment pack puts in front of each. */
-const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "reply"];
+const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "keep", "reply"];
 const scriptsIn = (html: string) => KIT_SCRIPTS.filter((name) => html.includes(`/* ${name}: `));
 
 /** A client component that renders `jsx` (kit components from `imports`) only after #reveal is clicked. */

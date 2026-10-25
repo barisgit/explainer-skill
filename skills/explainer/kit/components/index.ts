@@ -1,6 +1,6 @@
 /* components: the kit's Preact components for .mdx pages: import { Chart, View } from "kit". Each renders the markup the kit scripts read.
    Frontmatter: title (default: the text of the #), lang (default en), labels (the kit's own texts in the page's language, by the
-   keys kit views.js, steps.js and reply.js list), reply: true (notes and kept inputs on a page without a Question or data-reply).
+   keys kit views.js, steps.js and reply.js list), reply: true (the reader's notes on a page without a Question or data-reply).
    The # and the paragraphs right under it are the masthead, the first one its lede. Each ## starts a section; to give one its
    short name in the contents rail, write its heading as <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
@@ -9,9 +9,8 @@
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
    To typecheck them: bun /path/to/explainer/cli.ts kit types > tsconfig.json, then bun check (Bun only, no install).
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
-   state and handlers work. Props from the page into such a component must be JSON. A control such a component renders from its
-   state is kept across reloads like any other (kit reply.js): give it an id and set the state in onInput or onChange, which the
-   restore and Clear fire too. */
+   state and handlers work. Props from the page into such a component must be JSON. A control with an id keeps its value across
+   reloads (kit keep.js); in such a component, set its state in onInput or onChange, which the restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";

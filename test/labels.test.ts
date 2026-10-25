@@ -28,7 +28,7 @@ const PAGE = (
 <ol data-captions><li>one</li><li>two</li></ol></figure></section></div>
 <section class="view" data-view="p"><h1>Person</h1></section>
 <section class="view" data-view="i"><h1>Item</h1></section></main>
-<script src="kit:steps.js"></script><script src="kit:views.js"></script><script src="kit:reply.js"></script>
+<script src="kit:steps.js"></script><script src="kit:views.js"></script><script src="kit:keep.js"></script><script src="kit:reply.js"></script>
 <script>
 ${labels ? `var kitLabels = ${JSON.stringify(labels)};` : ""}
 ${labelsScript(expected)}</script></body></html>`;

@@ -13,10 +13,10 @@ const replyButton = () => document.querySelector(".reply-bar .primary");
 const armed = () => clearButton().classList.contains("is-armed");
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;`;
 
-/** A small page: \`body\` inside <main>, then reply.js, then the helpers and \`script\`. */
+/** A small page: \`body\` inside <main>, then keep.js and reply.js, then the helpers and \`script\`. */
 const SMALL = (body: string, script: string) =>
 	`<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Small</h1>${body}</main>
-<script src="kit:reply.js"></script><script>${COMMON}
+<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${COMMON}
 ${script}</script></body></html>`;
 
 /** The page's own listeners are the only thing that updates #out, and it starts as "authored", so a restore that skips them shows. */
@@ -33,7 +33,7 @@ const PAGE = (
 <label><input type="checkbox" id="cb"> Tick</label>
 <select id="sel"><option value="x">X</option><option value="y">Y</option></select>
 <button type="button" id="pick-y">Y by script</button> <output id="out">authored</output></main>
-<script src="kit:reply.js"></script>
+<script src="kit:keep.js"></script><script src="kit:reply.js"></script>
 <script>
 ${COMMON}
 $("pick-y").addEventListener("click", () => { $("sel").value = "y"; });
@@ -234,7 +234,7 @@ test("saved values are dropped when the regenerated page has other controls, so 
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
 if (sessionStorage.loads === "2") document.querySelector("main").insertAdjacentHTML("afterbegin", '<input type="text" aria-label="New">');`;
 	const html = `<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Layout</h1>
-<input type="text" aria-label="Old"></main><script>${script}</script><script src="kit:reply.js"></script>
+<input type="text" aria-label="Old"></main><script>${script}</script><script src="kit:keep.js"></script><script src="kit:reply.js"></script>
 <script>${onLoad(2, "the control that now holds the old one's position stays empty", `document.querySelector("[aria-label=New]").value === ""`)}</script></body></html>`;
 	const input = dir.write("layout.html", html);
 	const output = dir.path("layout.out.html");
@@ -288,12 +288,15 @@ ${onLoad(2, "the saved value survives a later load handler and the page's listen
 	expect(checked.code).toBe(0);
 }, 60_000);
 
-test("reply.js started after the page has loaded still restores", async () => {
-	const body = `<label>Name <input type="text" id="name"></label><script type="text/plain" src="kit:reply.js"></script>`;
+test("keep.js and reply.js started after the page has loaded still restore", async () => {
+	const body = `<label>Name <input type="text" id="name"></label><script type="text/plain" src="kit:keep.js"></script><script type="text/plain" src="kit:reply.js"></script>`;
 	const script = `
-addEventListener("load", () => { const s = document.createElement("script"); s.textContent = document.querySelector("script[type='text/plain']").textContent; document.body.append(s); });
+addEventListener("load", () => { for (const plain of document.querySelectorAll("script[type='text/plain']")) { const s = document.createElement("script"); s.textContent = plain.textContent; document.body.append(s); } });
 ${later("a value saved before is back", `sessionStorage.loads !== "2" || $("name").value === "z"`)}`;
-	const html = SMALL(body, script).replace('<script src="kit:reply.js"></script>', "");
+	const html = SMALL(body, script).replace(
+		'<script src="kit:keep.js"></script><script src="kit:reply.js"></script>',
+		"",
+	);
 	const input = dir.write("started-late.html", html);
 	const output = dir.path("started-late.out.html");
 
@@ -471,7 +474,7 @@ const BAR_PAGE = (question: boolean, script: string) =>
 <link rel="stylesheet" href="kit:theme.css"></head><body><main><table class="compare">${ROWS}</table><h1>Bar</h1>${PROSE}
 ${question ? `<fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" checked> A</label> <label><input type="radio" name="p" value="b" id="b"> B</label></fieldset>` : ""}
 <input id="late" aria-label="Late">${PROSE}<table class="compare">${ROWS}</table></main>
-<script src="kit:reply.js"></script><script>${BAR_GEOMETRY}
+<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_GEOMETRY}
 ${script}</script></body></html>`;
 
 test("the reply bar never covers content: at the top nothing is under it, and scrolled it stays in view with the count and content passes only under all of it", async () => {

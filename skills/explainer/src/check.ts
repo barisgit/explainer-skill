@@ -348,7 +348,7 @@ interface Run {
 /**
  * Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. Local storage is emptied
  * once the old page is gone: every file:// page shares one origin and one profile serves all shots, so a page that keeps what the
- * reader entered (kit:reply.js) would otherwise carry one shot's `--do` state into the next, and the old page saves again as it unloads.
+ * reader entered (kit:keep.js) would otherwise carry one shot's `--do` state into the next, and the old page saves again as it unloads.
  */
 async function open(run: Run, hash: string) {
 	const { cdp } = run;

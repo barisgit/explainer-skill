@@ -69,19 +69,30 @@ interface ReplyNote {
 
 type ReplyControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
-interface ReplyKeepOptions {
-	selector: string;
-	clean: (text: string) => string;
-	ownText: (label: HTMLLabelElement) => string;
-	notes: { list(): ReplyNote[]; restore(saved: unknown): void };
-	onChange: () => void;
+/** What keep.js saves beside the answers: reply.js's notes once it attaches, else the notes as they were stored. */
+interface KeepNotes {
+	list(): unknown[];
+	restore(saved: unknown): void;
 }
 
-interface ReplyKeepApi {
+/** keep.js's keeper, which reply.js drives: the controls it keeps, and its save, clear and touch calls. */
+interface KeepApi {
+	/** CSS selector of the controls that can be kept. */
+	selector: string;
+	/** A label's text without the controls inside it. */
+	ownText(label: HTMLLabelElement): string;
+	/** After any change: adopts new controls, saves, returns whether anything is kept. */
 	update(): boolean;
+	/** Every control back to its default (with input and change events), saved state dropped; notes are the owner's to empty. */
 	clear(): void;
+	/** The reader acted on a control, even if the value equals the default. */
 	touch(el: ReplyControl): void;
 	touched(el: ReplyControl): boolean;
+	/**
+	 * Hands the notes and the change callback to an owner (reply.js): from then on `onChange` runs instead of keep.js's own save
+	 * when a page script moved a control, the DOM changed, the page is being left or the restore finished, and must call update().
+	 */
+	attach(owner: { notes: KeepNotes; onChange: () => void }): void;
 }
 
 /**
@@ -122,7 +133,7 @@ declare var Plot: {
 };
 declare var Steps: { refresh(el: Element, step?: number): void };
 declare var Views: { on(name: string, fn: ViewHandler): void };
-declare var ReplyKeep: (options: ReplyKeepOptions) => ReplyKeepApi;
+declare var Keep: KeepApi;
 declare var ReplyNotes: (options: ReplyNotesOptions) => void;
 declare var ViewsNav: (options: {
 	views: HTMLElement[];
