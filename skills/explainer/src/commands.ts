@@ -54,10 +54,13 @@ function kitHeader(file: string): string {
 		.trim();
 }
 
-/** The kit's Preact components, by the name a page imports ("Chart"), each from the header of its file in kit/components. */
+/**
+ * The kit's Preact components, by the name a page imports ("Chart"), each from the header of its .tsx file in kit/components;
+ * the modules they share live in kit/components/parts.
+ */
 function components(): { name: string; file: string; summary: string }[] {
 	return readdirSync(kitPath("components"))
-		.filter((name) => name !== "index.ts")
+		.filter((name) => name.endsWith(".tsx"))
 		.sort()
 		.map((name) => {
 			const file = `components/${name}`;

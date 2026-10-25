@@ -26,7 +26,7 @@ test("kit types makes an external author's TSX typecheck without installed depen
 	expect(config.code).toBe(0);
 	dir.write("tsconfig.json", config.stdout);
 	const good = `"use client";
-import { Chart, Plot, Question, Stepper, Tree, View } from "kit";
+import { Chart, Plot, Question, Stepper, Table, Tree, View } from "kit";
 import { useState } from "preact/hooks";
 const option: PlotOption = { series: [{ type: "line", data: [[0, 1]] }] };
 const chart: ChartOption = { series: [{ type: "bar", data: [1] }] };
@@ -38,6 +38,7 @@ export function Figure() {
     <Question name="q" legend="Pick" options={["a", "b"]} />
     <Stepper captions={["One", "Two"]}><p data-step="1">One</p></Stepper>
     <Tree cols="4rem" head={["Task", "Hours"]} items={[{ label: "A", cells: [1], text: "Full" }]} />
+    <Table rows={[{ name: "A", share: 0.5 }]} cols={[{ head: "Name", value: "name", link: (r) => \`#\${r.name}\` }, { head: "Share", value: "share", format: { percent: true } }]} />
     <View name="detail"><h1>Detail</h1></View></>;
 }
 `;

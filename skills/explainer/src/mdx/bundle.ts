@@ -54,6 +54,8 @@ function islandModule(path: string, source: string): string {
 export interface CompiledPage {
 	path: string;
 	js: string;
+	/** The frontmatter lang, which components write numbers in while the page prerenders. */
+	lang: string;
 }
 
 /**
@@ -156,10 +158,12 @@ async function buildEntry(
 	return output.text();
 }
 
-/** What the prerender bundle exports: kit/islands/server.ts's renderPage and the page's content component. */
+/** What the prerender bundle exports: kit/islands/server.ts's renderPage, the page's content component and the components' language. */
 interface Prerender {
 	renderPage: typeof renderPage;
 	Content: Parameters<typeof renderPage>[0];
+	/** kit/components/parts/format.ts's, which this file does not import: its types need the kit's globals. */
+	setPageLang: (lang: string) => void;
 }
 
 /**
@@ -174,7 +178,8 @@ export async function prerender(
 ): Promise<{ html: string; islands: Island[] }> {
 	const code = `import Content from ${JSON.stringify(page.path)};
 export { Content };
-export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`;
+export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};
+export { setPageLang } from ${JSON.stringify(join(KIT_DIR, "components/parts/format.ts"))};`;
 	const js = await buildEntry(
 		page,
 		{ path: join(dirname(page.path), "explainer-prerender.ts"), code },
@@ -187,6 +192,7 @@ export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`;
 		const file = join(dir, "page.js");
 		writeFileSync(file, js);
 		const module: Prerender = await import(file);
+		module.setPageLang(page.lang);
 		return module.renderPage(module.Content);
 	} catch (e) {
 		if (e instanceof PackError) {
