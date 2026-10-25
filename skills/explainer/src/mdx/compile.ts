@@ -9,7 +9,7 @@ import { PackError } from "../pack-error.ts";
 import { mathToMathml } from "./math.ts";
 import { structurePage } from "./structure.ts";
 
-/** What a page's YAML frontmatter sets; see MDX-ARM.md. */
+/** What a page's YAML frontmatter sets; authors read it in kit/components/index.ts (kit page). */
 export interface Frontmatter {
 	title?: string;
 	lang: string;
