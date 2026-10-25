@@ -3,11 +3,12 @@
      <p>The <span data-ref="cache">cache</span> answers most reads.</p>      a prose term (made focusable)
      <tr data-ref="cache">…</tr>   <div class="chart" data-ref="cache">…</div>   a table row, a chart panel, any element
      <pre class="mermaid">flowchart LR; api --> cache</pre>                   pack gives every diagram part the data-ref of its Mermaid id
-   A ref links only when its elements sit in two places or more. One SVG is one place, so the parts of one diagram never link each
-   other; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
+   A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
+   too), so the parts of one diagram never link each other; the light and dark copies pack makes of an SVG file in <img> count
+   once; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked.
-   One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In a diagram that has a lit part, unlit parts dim.
+   One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
    Refs a page script writes or removes after load link and unlink at once. */
@@ -32,13 +33,18 @@
 	let lit: Part[] = [];
 	let dimmed: SVGSVGElement[] = [];
 
+	/** The outermost SVG holding `el` (HTML in a foreignObject included), or null outside any SVG. */
+	function outermostSvg(el: Element): SVGSVGElement | null {
+		let svg = el.closest("svg");
+		for (let up = svg?.parentElement?.closest("svg"); up; up = up.parentElement?.closest("svg")) {
+			svg = up;
+		}
+		return svg;
+	}
+
 	/** The place an element sits in: its outermost SVG, or the element itself. pack's dark copy of an SVG file sits with its light copy. */
 	function placeOf(el: Part): Element {
-		let svg =
-			el instanceof SVGSVGElement ? el : el instanceof SVGElement ? el.ownerSVGElement : null;
-		while (svg?.ownerSVGElement) {
-			svg = svg.ownerSVGElement;
-		}
+		const svg = outermostSvg(el);
 		if (svg) {
 			return svg;
 		}
@@ -115,13 +121,7 @@
 		for (const el of lit) {
 			el.classList.add("is-lit");
 		}
-		dimmed = [
-			...new Set(
-				lit
-					.map((el) => (el instanceof SVGElement ? el.ownerSVGElement : null))
-					.filter((svg) => svg !== null),
-			),
-		];
+		dimmed = [...new Set(lit.map(outermostSvg).filter((svg) => svg !== null))];
 		for (const svg of dimmed) {
 			svg.classList.add("has-lit");
 		}

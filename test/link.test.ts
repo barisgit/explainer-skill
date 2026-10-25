@@ -91,3 +91,31 @@ test("an unlinked part inside a linked one does not activate it", async () => {
 	expect(lit() === "cache,g", "a child with no ref of its own still activates its linked part");`;
 	expect(await packAndRun(dir, "child", PAGE(script, body))).toEqual([]);
 }, 30_000);
+
+test("HTML in one SVG is one place, and a nested SVG dims as part of the outermost", async () => {
+	const body = `<p>The <span data-ref="nest">nested part</span>.</p>
+<svg id="outer" viewBox="0 0 200 40"><foreignObject width="100" height="40"><span id="fa" data-ref="fo">a</span> <span id="fb" data-ref="fo">b</span></foreignObject>
+<svg id="inner" x="120" width="40" height="40"><rect data-ref="nest" width="40" height="40"/></svg></svg>`;
+	const script = `
+	hover($("#fa"));
+	expect(lit() === "" && !$("#fa").classList.contains("is-linked"), "two labels in one SVG's foreignObject do not link");
+	hover($("main span"));
+	expect($("#outer").classList.contains("has-lit") && !$("#inner").classList.contains("has-lit"), "the outermost SVG holds the dimming");
+	expect(getComputedStyle($("#fa")).opacity === "0.3", "the rest of the outermost SVG dims");`;
+	expect(await packAndRun(dir, "foreign", PAGE(script, body))).toEqual([]);
+}, 30_000);
+
+test("the light and dark copies of an SVG file are one place", async () => {
+	dir.write(
+		"twin.svg",
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>',
+	);
+	const body = `<img src="twin.svg" alt="alone" data-ref="alone" width="40"> <img src="twin.svg" alt="named" data-ref="named" width="40">
+<p>The <span id="name" data-ref="named">named drawing</span>.</p>`;
+	const script = `
+	const copies = (ref) => [...document.querySelectorAll('img[data-ref="' + ref + '"]')];
+	expect(copies("alone").length === 2 && copies("alone").every((img) => !img.classList.contains("is-linked")), "an image's two copies do not link each other");
+	hover($("#name"));
+	expect(copies("named").every((img) => img.classList.contains("is-lit")), "a term lights both copies of its image");`;
+	expect(await packAndRun(dir, "twin", PAGE(script, body))).toEqual([]);
+}, 30_000);
