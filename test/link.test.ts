@@ -137,3 +137,41 @@ test("the light and dark copies of an SVG file are one place", async () => {
 	expect(copies("named").every((img) => img.classList.contains("is-lit")), "a term lights both copies of its image");`;
 	expect(await packAndRun(dir, "twin", PAGE(script, body))).toEqual([]);
 }, 30_000);
+
+/** Focuses `el` and presses Enter on it, as a keyboard reader asks for a note; true when the note editor opened. */
+const NOTE_BY_KEY = `const noteByKey = (el) => {
+		el.focus();
+		const focused = document.activeElement === el;
+		el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		const opened = $(".reply-pop") !== null;
+		$(".reply-pop .btn:not(.primary)")?.click();
+		return focused && opened;
+	};
+	const underlined = (el) => getComputedStyle(el).textDecorationLine === "underline";`;
+
+test("with kit:reply.js an unlinked ref stays a note target without becoming a link", async () => {
+	const body = `${DIAGRAM}<p>Only the <span id="lone" data-ref="lone">lone part</span> takes a note.</p>`;
+	const script = `${NOTE_BY_KEY}
+	expect(noteByKey($("#lone")), "Enter on the focused unlinked ref opens its note");
+	expect(noteByKey($("#term")), "Enter on a linked term opens its note too");
+	hover($("#lone"));
+	click($("#lone"));
+	hover($("main"));
+	expect(lit() === "", "the unlinked ref lights and pins nothing");
+	expect(underlined($("#lone")) && getComputedStyle($("#lone")).cursor !== "pointer" && !$("#lone").classList.contains("is-linked"), "the unlinked ref shows it takes notes, not the link cue");
+	expect(getComputedStyle($("#lone")).textDecorationColor !== getComputedStyle($("#term")).textDecorationColor, "a note target looks unlike a link");`;
+	expect(await packAndRun(dir, "reply-link", PAGE(script, body, ["link", "reply"]))).toEqual([]);
+}, 30_000);
+
+test("on a page with kit:reply.js alone its note targets are reachable and marked", async () => {
+	const body = `<p>The <span id="a" data-ref="pair">first</span> and <span id="b" data-ref="pair">second</span> part.</p>`;
+	const script = `${NOTE_BY_KEY}
+	expect(noteByKey($("#a")), "Enter on a focused ref opens its note");
+	expect(underlined($("#a")), "the ref shows it takes notes");
+	$("p").insertAdjacentHTML("beforeend", ' <span id="late" data-ref="late">late</span>');
+	await Promise.resolve();
+	expect(noteByKey($("#late")), "a ref written after load takes notes by keyboard too");
+	hover($("#a"));
+	expect(lit() === "", "without kit:link.js nothing lights");`;
+	expect(await packAndRun(dir, "reply-only", PAGE(script, body, ["reply"]))).toEqual([]);
+}, 30_000);

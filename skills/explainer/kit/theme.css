@@ -38,7 +38,7 @@
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
-   Scripts toggle the classes is-on, is-now, is-linked and is-lit; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
+   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
 [data-live] [data-step] {
 	transition: opacity 0.3s var(--ease);
@@ -96,6 +96,13 @@ body:has(> .reply-bar) {
 /* Focus and in-page links scroll their target clear of the strip. */
 :root:has(> body > .reply-bar:not([hidden])) {
 	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
+}
+/* A term that takes a note (is-annotatable, set by reply.js) and links nothing: a fainter underline than a link's and the menu
+   cursor, since a click offers a note rather than lighting anything. */
+:is(span, b, strong, em, code, mark).is-annotatable:not(.is-linked) {
+	text-decoration: underline dotted var(--rule-strong) 1px;
+	text-underline-offset: 0.22em;
+	cursor: context-menu;
 }
 .reply-bar {
 	position: fixed;

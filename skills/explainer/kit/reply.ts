@@ -12,7 +12,8 @@
    A control works alone too: <select data-reply="Region">. Radios and checkboxes group by name; a checkbox group answers with the
    checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A control the reader never touched
    is sent as "(default)", one with nothing chosen as "no answer". Notes come from selected text and clicks on [data-ref] parts
-   (kit:link.js refs, Mermaid node ids); Enter on a focused ref opens its note.
+   (kit:link.js refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
+   is-annotatable (a faint underline), also those a page script writes later.
    The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is

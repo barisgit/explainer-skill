@@ -119,6 +119,54 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		...located(part),
 	});
 
+	/** Elements the browser already makes focusable. */
+	const FOCUSABLE = "a[href], button, input, select, textarea, summary";
+
+	/**
+	 * Makes a part keyboard-reachable while it is a note target (is-annotatable) or kit:link.js linked it (is-linked), and undoes
+	 * only what the kit set (data-kit-focusable), so the author's tabindex stays. link.js keeps the same rule; reading both classes
+	 * makes the result the same whichever script runs first. Diagram parts are not made reachable: a diagram has dozens.
+	 */
+	function syncFocus(el: Part) {
+		const wanted =
+			el.matches(".is-linked, .is-annotatable") && !el.matches(FOCUSABLE) && !el.closest("svg");
+		if (wanted && !el.hasAttribute("tabindex")) {
+			el.tabIndex = 0;
+			el.dataset.kitFocusable = "";
+		} else if (!wanted && el.dataset.kitFocusable !== undefined) {
+			el.removeAttribute("tabindex");
+			delete el.dataset.kitFocusable;
+		}
+	}
+
+	/** Marks `el` as a note target (is-annotatable) when Enter on it can open a note: an HTML data-ref part of root outside a control. */
+	function markTarget(el: Part) {
+		const on =
+			el.matches("[data-ref]") && root.contains(el) && !el.closest(NATIVE) && !el.closest("svg");
+		el.classList.toggle("is-annotatable", on);
+		syncFocus(el);
+	}
+
+	/** Marks the targets now on the page, and those a page script adds or retargets later, so they take notes by keyboard too. */
+	function markTargets() {
+		// An added node and its descendants, or the element whose data-ref changed (now with it or without it).
+		const partsIn = (n: Node): Part[] =>
+			n instanceof HTMLElement || n instanceof SVGElement
+				? [n, ...n.querySelectorAll<Part>("[data-ref]")]
+				: [];
+		for (const el of root.querySelectorAll<Part>("[data-ref]")) {
+			markTarget(el);
+		}
+		new MutationObserver((records) => {
+			const changed = records.flatMap((r) =>
+				r.type === "attributes" ? partsIn(r.target) : [...r.addedNodes].flatMap(partsIn),
+			);
+			for (const el of changed) {
+				markTarget(el);
+			}
+		}).observe(root, { subtree: true, childList: true, attributeFilter: ["data-ref"] });
+	}
+
 	let timer: number | undefined;
 	document.addEventListener("selectionchange", () => {
 		clearTimeout(timer);
@@ -187,6 +235,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		const target = partTarget(part);
 		showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
 	});
+	markTargets();
 	document.addEventListener("keydown", (e) => {
 		const part = e.target instanceof Element ? e.target.closest<Part>("[data-ref]") : null;
 		if (

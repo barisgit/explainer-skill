@@ -7,7 +7,7 @@
    too), so the parts of one diagram never link each other; the light and dark copies pack makes of an SVG file in <img> count
    once; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
-   to a linked part around it. Linked elements carry class is-linked.
+   to a linked part around it. Linked elements carry class is-linked; kit:reply.js keeps its note targets focusable on its own.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
@@ -15,13 +15,12 @@
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const refsOf = (el: Part | null) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
-	const NATIVE = "a[href], button, input, select, textarea, summary, [tabindex]";
+	/** Elements the browser already makes focusable. */
+	const NATIVE = "a[href], button, input, select, textarea, summary";
 
 	// What links, kept current by refresh: the refs whose elements sit in two places or more, and the elements carrying one of them.
 	let linked = new Set<string>();
 	let linkedParts: Part[] = [];
-	/** Elements this script made focusable, so it can undo that when they stop linking. */
-	const madeFocusable = new WeakSet<Part>();
 
 	// The active part is the hovered one, else the focused one, else the pinned one.
 	let hovered: Part | null = null;
@@ -63,14 +62,27 @@
 		return new Set([...places].filter(([, where]) => where.size > 1).map(([ref]) => ref));
 	}
 
-	/** Sets or clears is-linked. Prose terms and rows become keyboard-reachable; diagram parts do not (a diagram has dozens, prose links to the same refs). */
+	/** Sets or clears is-linked and, through syncFocus, the focus it gives. */
 	function mark(el: Part, on: boolean) {
 		el.classList.toggle("is-linked", on);
-		if (on && !el.matches(NATIVE) && !el.closest("svg")) {
+		syncFocus(el);
+	}
+
+	/**
+	 * Makes a part keyboard-reachable while it is linked or a kit:reply.js note target (is-annotatable), and undoes only what the
+	 * kit set (data-kit-focusable), so the author's tabindex stays. reply.js keeps the same rule; reading both classes makes the
+	 * result the same whichever script runs first. Diagram parts are not made reachable: a diagram has dozens, and prose links to
+	 * the same refs.
+	 */
+	function syncFocus(el: Part) {
+		const wanted =
+			el.matches(".is-linked, .is-annotatable") && !el.matches(NATIVE) && !el.closest("svg");
+		if (wanted && !el.hasAttribute("tabindex")) {
 			el.tabIndex = 0;
-			madeFocusable.add(el);
-		} else if (!on && madeFocusable.delete(el)) {
+			el.dataset.kitFocusable = "";
+		} else if (!wanted && el.dataset.kitFocusable !== undefined) {
 			el.removeAttribute("tabindex");
+			delete el.dataset.kitFocusable;
 		}
 	}
 
