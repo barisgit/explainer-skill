@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
-import { authorTsconfig, kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { authorTsconfig, kitPath, leadingComment, readKitText } from "./kit.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
@@ -29,18 +29,18 @@ export interface Command {
 	run: (args: string[], flags: Map<string, string[]>) => Promise<number>;
 }
 
-const MERMAID_DOC = `\`\`\`mermaid fences (<pre class="mermaid"> in HTML) hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
-pack renders each block to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
-It draws a subset of each type and fails on any line, or part of one, it cannot read (notes, titles, cross and circle edge ends, new-style shapes) and on a block left open, naming the line.
+const MERMAID_DOC = `\`\`\`mermaid fences hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
+pack renders each one to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
+It draws a subset of each type and fails on any line, or part of one, it cannot read (notes, titles, cross and circle edge ends, new-style shapes), naming the line.
 Labels wrap at about 30 characters into tall boxes: keep them to a few words, or break one with <br>. Markdown strings ("\`...\`") are not supported; **bold** and *italic* work in plain labels.
 Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
   flowchart / state / class / ER   nodes and subgraphs: the node id (cache in "api --> cache[(Cache)]")
   edges                            the edge id: name one with "api e1@--> cache" (otherwise Mermaid's, e.g. L_api_cache_0)
   sequence                         participants and lifelines: the participant id; messages: m1, m2, ... in order
 Use the ids from prose and replies:
-  <span data-ref="cache">the cache</span>                  hover or focus lights the node (kit:link.js)
-  clicking a node offers a note on it (kit:reply.js)
-Diagrams do not step: pack fails on data-steps. To walk through one, show it whole and give each step's text the data-ref of its parts.
+  <span data-ref="cache">the cache</span>                  hover or focus lights the node (kit link)
+  clicking a node offers a note on it (kit reply)
+Diagrams do not step. To walk through one, show it whole and give each step's text the data-ref of its parts.
 Keep ids short and meaningful: they are what you type here.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
 Phones: the diagram scales to the column, so a wide left-to-right chart gets tiny text; prefer top-down (flowchart TD) and few nodes. check warns under 9 px.`;
@@ -78,37 +78,71 @@ const componentScripts = (file: string): string[] => [
 const kitSize = (files: string[]) =>
 	`${(files.reduce((sum, f) => sum + Buffer.byteLength(readKitText(kitPath(f))), 0) / 1024).toFixed(0)} KB`;
 
-/** The one-line description of a kit file: the first line of its header without the leading "name: ". */
-const kitSummary = (file: string) => (kitHeader(file).split("\n")[0] ?? "").replace(/^\S+: /, "");
+/** A part of the kit other than a component: its `kit` line, the kit files a page using it carries, and its documentation. */
+interface Feature {
+	name: string;
+	files: string[];
+	line: string;
+	doc: () => string;
+}
 
-/** The documentation of the kit's Preact components: the index (the page conventions), then each component file's header. */
-const componentsDoc = (): string =>
-	["components/index.ts", ...components().map((c) => c.file)].map(kitHeader).join("\n\n");
+/**
+ * The features `kit` lists after the components, in that order, each one line long: the listing is what an author reads before
+ * writing (about 17 lines), and `kit <name>` prints the rest. Pages include their scripts by themselves, so no line names a file.
+ */
+const FEATURES: Feature[] = [
+	{
+		name: "mermaid",
+		files: [],
+		line: "```mermaid fences: flowchart, state, sequence, class, ER and xychart, drawn as one SVG; each part gets a data-ref of its id.",
+		doc: () => MERMAID_DOC,
+	},
+	{
+		name: "theme.css",
+		files: ["theme.css"],
+		line: "the warm-paper house style, light and dark: its classes and tokens.",
+		doc: () => kitHeader("theme.css"),
+	},
+	{
+		name: "link",
+		files: ["link.js"],
+		line: 'data-ref="cache" on your elements: those sharing a ref light up together.',
+		doc: () => kitHeader("link.js"),
+	},
+	{
+		name: "reply",
+		files: ["reply.js"],
+		line: 'data-reply="Label" on a panel of controls with ids: their values join the reader\'s reply; notes; kept inputs.',
+		doc: () => kitHeader("reply.js"),
+	},
+	{
+		name: "page",
+		files: [],
+		line: 'frontmatter, layout, tables, imports, your own "use client" components, typechecking.',
+		doc: () => kitHeader("components/index.ts"),
+	},
+];
 
-/** The page conventions of an .mdx page: the index header after its first line. */
-const pageDoc = () => kitHeader("components/index.ts").split("\n").slice(1).join("\n");
+/** The documentation `kit <topic>` prints: a component's (any case) or a feature's (kit:reply.js and reply.js name reply). */
+function topicDoc(topic: string): string | undefined {
+	const key = topic.replace(/^kit:/, "").replace(/\.js$/, "").toLowerCase();
+	const component = components().find((c) => c.name.toLowerCase() === key);
+	if (component) {
+		return kitHeader(component.file);
+	}
+	return FEATURES.find((f) => f.name === key || f.name === `${key}.css`)?.doc();
+}
 
-/** What `kit` prints: everything an .mdx page can use, with where each one's documentation is. */
+/** What `kit` prints: one line per component and feature, and how to read one. */
 function kitListing(): string {
-	const list = components().map(
-		(c) => `${c.name.padEnd(9)} ${kitSize(componentScripts(c.file)).padStart(7)}  ${c.summary}`,
-	);
-	return `An .mdx page imports the kit's components; pack renders the page, adds the stylesheet and inlines the kit scripts its parts use:
-  import { Chart, View } from "kit"
-
-${list.join("\n")}
-\`\`\`mermaid          a fenced diagram (flowchart, state, sequence, class, ER, xychart); pack renders it as one SVG for light and dark and gives every node, edge and participant a data-ref of its Mermaid id (kit mermaid)
-theme.css  ${kitSize(["theme.css"]).padStart(6)}  ${kitSummary("theme.css")} Its classes and tokens: kit theme.css
-Attributes you write on your own elements:
-  data-ref="cache"     elements sharing a ref light up together on hover, focus and click; Mermaid node ids are refs (kit link.js)
-  data-reply="Label"   on a panel around controls with ids: their values join the reader's reply; select text or click a data-ref part to add a note (kit reply.js)
-  data-keep="off"      on a control or its container: reloads do not keep it (kit reply.js)
-  data-step="2 4"      on a Stepper's parts (kit stepper)
-
-${pageDoc()}
-
-Documentation of one component or kit file: ${CLI} kit <name>; kit components prints every component. Fonts are inlined from theme.css.
-The texts the kit adds (buttons, accessible names, messages) are English; a page in another language sets them with labels in its frontmatter.`;
+	const line = (name: string, files: string[], text: string) =>
+		`${name.padEnd(9)} ${(files.length ? kitSize(files) : "").padStart(6)}  ${text}`;
+	return [
+		'An .mdx page imports components from "kit" (import { Chart, View } from "kit"); pack adds the theme and the kit scripts it uses.',
+		...components().map((c) => line(c.name, componentScripts(c.file), c.summary)),
+		...FEATURES.map((f) => line(f.name, f.files, f.line)),
+		`Read one: ${CLI} kit <name>. The kit's texts are English; frontmatter labels translate them (kit page).`,
+	].join("\n");
 }
 
 /**
@@ -144,10 +178,10 @@ async function types(): Promise<number> {
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List what an .mdx page can use (the kit's components, Mermaid fences, the stylesheet, the attributes the kit reads, the page conventions), or print the documentation of one component, kit file, the mermaid fences or every component; types prints a tsconfig for author typechecking.",
-		usage: "kit [Component | file | mermaid | components | types]",
+			"List what an .mdx page can use, one line per component and feature, or print one's documentation. kit types prints a tsconfig.json that typechecks the page's own .ts and .tsx files with bun check.",
+		usage: "kit [<name> | types]",
 		flags: [],
-		examples: ["kit", "kit Stepper", "kit theme.css", "kit mermaid", "kit components", "kit types"],
+		examples: ["kit", "kit Stepper", "kit page", "kit types > tsconfig.json"],
 		run: async ([topic]) => {
 			if (!topic) {
 				console.log(kitListing());
@@ -160,20 +194,11 @@ export const COMMANDS: Record<string, Command> = {
 			if (topic === "types") {
 				return types();
 			}
-			if (topic === "components") {
-				console.log(componentsDoc());
-				return 0;
+			const doc = topicDoc(topic);
+			if (doc === undefined) {
+				return usage(`the kit has no component or feature "${topic}". Run: ${CLI} kit`);
 			}
-			const component = components().find((c) => c.name.toLowerCase() === topic.toLowerCase());
-			if (component) {
-				console.log(kitHeader(component.file));
-				return 0;
-			}
-			const name = topic.replace(/^kit:/, "");
-			if (!kitFiles().includes(name)) {
-				return usage(`no kit component or file "${name}". Run: ${CLI} kit`);
-			}
-			console.log(kitHeader(name));
+			console.log(doc);
 			return 0;
 		},
 	},
@@ -221,7 +246,7 @@ export const COMMANDS: Record<string, Command> = {
 		usage:
 			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--quick] [--tag <name>] [--out dir] [--json]",
 		flags: [
-			"--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a point; use it for chart marks\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, or one character\n                   reload               reload the page, keeping what it saved for the reader (kit:reply.js); each load otherwise starts with empty storage\n                   Attribute values may be unquoted: [value=0] works.",
+			"--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a point; use it for chart marks\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, or one character\n                   reload               reload the page, keeping what it saved for the reader (kit reply); each load otherwise starts with empty storage\n                   Attribute values may be unquoted: [value=0] works.",
 			"--quick          light theme only, no first-viewport shots; writes desktop.png and narrow.png into --out (a temp directory without it)",
 			"--view <what>    choose drill-down views to capture. The report lists every view hash found (links and static views) and which were captured. Default: the first hash of each view name, at most 6 names. --view all = every hash found (one PNG set each: slower). A hash (repo/mobile) captures exactly the hashes given; repeatable. none = overview only. Hashes only a script navigates to are never found: pass them as --view name/param.",
 			"--tag <name>     add to the PNG names so states do not overwrite each other; with --quick too (kind-desktop.png)",

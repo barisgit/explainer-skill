@@ -230,7 +230,7 @@ const STEPPERS_JS = `(async () => {
 		if (taken < 0 || total < 2) continue;
 		warnings.push(taken + 1 < total
 			? name(root) + " was not fully checked: its first " + (taken + 1) + " of " + total + " steps change only the captions, and check stops after ${STEPPER_MAX_STEPS} steps or ${STEPPER_BUDGET_MS / 1000} s: step through the rest by hand"
-			: name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without data-stepper, or mark its parts with data-step=\\"<n>\\" (kit steps.js)");
+			: name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without a Stepper, or mark its parts with data-step=\\"<n>\\" (kit Stepper)");
 	}
 	return warnings;
 })()`;

@@ -11,7 +11,7 @@
               href   a link to the item's view ("#task/1.1.3") that stands as the row in place of a fold; its label names the view
                      in the navigation
               id     lets a link elsewhere open that branch: <a href="#spike">Spike boards: 4 tasks, 70 h</a>
-              ref    data-ref on the row: with kit:link.js the row lights, and a closed fold that holds a lit row is tinted too
+              ref    data-ref on the row: the row lights with its ref (kit link), and a closed fold that holds a lit row is tinted too
      cols   one width per number column (--tree-cols). Unset, each is 5rem, narrower where a deep row on a phone has no room
      head   the names of the label and of each column, over the rows
    Labels and cells take JSX: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> marks a category; a

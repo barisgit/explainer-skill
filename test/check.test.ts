@@ -206,7 +206,7 @@ test("check warns about a stepper whose steps change only its captions, not one 
 
 	expect(result.code).toBe(0);
 	expect(result.stdout).toContain(
-		'figure#still.fig steps through 3 captions, but nothing else in it changes: show it whole without data-stepper, or mark its parts with data-step="<n>" (kit steps.js)',
+		'figure#still.fig steps through 3 captions, but nothing else in it changes: show it whole without a Stepper, or mark its parts with data-step="<n>" (kit Stepper)',
 	);
 	expect(result.stdout).not.toContain("figure#redrawn");
 	expect(result.stdout).not.toContain("figure#marked");

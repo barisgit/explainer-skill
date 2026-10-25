@@ -32,8 +32,8 @@
    the button or the wait cancels.
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept.
-   Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in one
-   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { reply: "Odgovor", ... }. Keys here:
+   Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in
+   the page's frontmatter labels, one key: text per line (reply: Odgovor). Keys here:
    reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press
    again to clear all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and

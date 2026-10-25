@@ -6,7 +6,7 @@ function help(name?: string): string {
 	if (c) {
 		return `${c.summary}\n\nUsage: ${CLI} ${c.usage}\n${c.flags.length ? `\nFlags:\n${c.flags.map((f) => `  ${f}`).join("\n")}\n` : ""}\nExamples:\n${c.examples.map((e) => `  ${CLI} ${e}`).join("\n")}\n`;
 	}
-	return `Build one self-contained, interactive, visual HTML file that works offline from file://.
+	return `Build one self-contained, interactive, visual HTML file from an .mdx page; it works offline from file://.
 
 Usage: ${CLI} <command> [args]
 
