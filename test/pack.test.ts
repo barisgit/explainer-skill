@@ -34,6 +34,19 @@ describe("pack inlines what is local", () => {
 		expect(html).not.toMatch(/(href|src)="(local\.(css|js)|kit:link\.js)"/);
 	});
 
+	test("a url() inside a quoted data URI is part of that URI, not a file to inline", async () => {
+		// Temml's stylesheet draws \cancelto with an SVG mask whose marker is url(%23a): text of the data URI, not a reference.
+		const mask = `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><line marker-end='url(%23a)'/></svg>")`;
+		dir.write("mask.css", `.marker-mask { mask-image: ${mask}; }`);
+		const input = dir.write("mask.mdx", 'import "./mask.css";\n\n# Mask\n');
+		const output = dir.path("mask.out.html");
+
+		const result = await runCli(["pack", input, "-o", output]);
+
+		expect(result.stderr).toBe("");
+		expect(readFileSync(output, "utf8")).toContain(`.marker-mask { mask-image: ${mask}; }`);
+	});
+
 	test("a page's own .ts script is inlined as written, not transpiled like the kit", async () => {
 		const source = '"use strict";\nwindow.markerTs = (x: number) => x;';
 		dir.write("own.ts", source);
