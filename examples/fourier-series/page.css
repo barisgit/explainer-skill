@@ -1,0 +1,109 @@
+/* Page-specific: everything else comes from the kit's stylesheet. */
+:root {
+	--accent: light-dark(#1f5fbf, #7fb0ff);
+}
+#hero-chart {
+	block-size: clamp(20rem, 40vw, 26rem);
+}
+#gibbs-chart,
+#peak-chart,
+#sym-chart {
+	block-size: clamp(16rem, 34vw, 21rem);
+}
+
+/* Maths set in plain HTML (math.tsx): italic variables, stacked fractions, limits above and below a symbol. */
+.eq {
+	margin: 0.35rem 0;
+	line-height: 2.1;
+}
+.eqs {
+	padding-block: 0.5rem;
+}
+.frac {
+	display: inline-flex;
+	flex-direction: column;
+	vertical-align: middle;
+	text-align: center;
+	line-height: 1.25;
+	margin-inline: 0.15em;
+}
+.frac > :first-child {
+	border-bottom: 1px solid currentcolor;
+	padding-inline: 0.2em;
+}
+.lim {
+	display: inline-flex;
+	flex-direction: column;
+	vertical-align: middle;
+	align-items: center;
+	line-height: 1.05;
+	margin-inline: 0.15em;
+}
+.lim > :first-child,
+.lim > :last-child {
+	font-size: 0.7em;
+}
+.lim > .sym {
+	font-size: 1.5em;
+}
+
+/* The questions: numbered in the accent, each with a box to write in and its answer behind a details. */
+.questions {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+	counter-reset: q;
+	display: grid;
+	gap: 1.5rem;
+}
+.questions > li {
+	counter-increment: q;
+}
+.questions > li > p:first-child::before {
+	content: counter(q) ". ";
+	color: var(--accent);
+	font-weight: 700;
+}
+.questions textarea {
+	min-block-size: 4.5rem;
+	margin-block: 0.4rem;
+}
+.questions details p {
+	margin-block: 0.5rem;
+}
+
+/* The formula sheet: a name, then its formulas, one per line; stacked on phones. */
+.sheet {
+	margin: 0;
+	border-top: 1px solid var(--rule-strong);
+}
+.sheet > div {
+	display: grid;
+	grid-template-columns: minmax(9rem, 13rem) 1fr;
+	column-gap: 1.5rem;
+	padding-block: 0.6rem;
+	border-bottom: 1px solid var(--rule);
+}
+.sheet dt {
+	font-weight: 600;
+	font-size: 0.95rem;
+	letter-spacing: -0.01em;
+	line-height: 2.1;
+}
+.sheet dd {
+	grid-column: 2;
+	margin: 0;
+	line-height: 2.2;
+}
+@media (max-width: 40rem) {
+	.sheet > div {
+		grid-template-columns: 1fr;
+	}
+	.sheet dt {
+		margin-block-end: 0.25rem;
+		line-height: 1.4;
+	}
+	.sheet dd {
+		grid-column: 1;
+	}
+}

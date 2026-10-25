@@ -2037,202 +2037,126 @@ dialog.reply-dialog[open] {
 }
 /* end features */
 }</style>
-<style>
-	/* Page-specific: everything else comes from kit:theme.css. */
-	:root { --accent: light-dark(#1f5fbf, #7fb0ff); }
-	#hero-chart { block-size: clamp(20rem, 40vw, 26rem); }
-	#gibbs-chart, #peak-chart, #sym-chart { block-size: clamp(16rem, 34vw, 21rem); }
+<style>/* Page-specific: everything else comes from the kit's stylesheet. */
+:root {
+	--accent: light-dark(#1f5fbf, #7fb0ff);
+}
+#hero-chart {
+	block-size: clamp(20rem, 40vw, 26rem);
+}
+#gibbs-chart,
+#peak-chart,
+#sym-chart {
+	block-size: clamp(16rem, 34vw, 21rem);
+}
 
-	/* Maths set in plain HTML: italic variables, stacked fractions, limits above and below a symbol. */
-	.eq { margin: 0.35rem 0; line-height: 2.1; }
-	.eqs { padding-block: 0.5rem; }
-	.frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.25; margin-inline: 0.15em; }
-	.frac > :first-child { border-bottom: 1px solid currentcolor; padding-inline: 0.2em; }
-	.lim { display: inline-flex; flex-direction: column; vertical-align: middle; align-items: center; line-height: 1.05; margin-inline: 0.15em; }
-	.lim > :first-child, .lim > :last-child { font-size: 0.7em; }
-	.lim > .sym { font-size: 1.5em; }
+/* Maths set in plain HTML (math.tsx): italic variables, stacked fractions, limits above and below a symbol. */
+.eq {
+	margin: 0.35rem 0;
+	line-height: 2.1;
+}
+.eqs {
+	padding-block: 0.5rem;
+}
+.frac {
+	display: inline-flex;
+	flex-direction: column;
+	vertical-align: middle;
+	text-align: center;
+	line-height: 1.25;
+	margin-inline: 0.15em;
+}
+.frac > :first-child {
+	border-bottom: 1px solid currentcolor;
+	padding-inline: 0.2em;
+}
+.lim {
+	display: inline-flex;
+	flex-direction: column;
+	vertical-align: middle;
+	align-items: center;
+	line-height: 1.05;
+	margin-inline: 0.15em;
+}
+.lim > :first-child,
+.lim > :last-child {
+	font-size: 0.7em;
+}
+.lim > .sym {
+	font-size: 1.5em;
+}
 
-	.questions { padding: 0; margin: 0; list-style: none; counter-reset: q; display: grid; gap: 1.5rem; }
-	.questions > li { counter-increment: q; }
-	.questions > li > p:first-child::before { content: counter(q) ". "; color: var(--accent); font-weight: 700; }
-	.questions textarea { inline-size: 100%; box-sizing: border-box; min-block-size: 4.5rem; margin-block: 0.4rem; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0.4rem; padding: 0.5rem 0.65rem; resize: vertical; }
-	.questions details p { margin-block: 0.5rem; }
-	.sheet { border-top: 1px solid var(--rule-strong); }
-	.sheet-row { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: 0.25rem 1.5rem; padding-block: 0.6rem; border-bottom: 1px solid var(--rule); }
-	.sheet-row h3 { margin: 0; font-size: 0.95rem; line-height: 2.1; }
-	.sheet-row .eq { margin: 0; line-height: 2.2; }
-	@media (max-width: 40rem) { .sheet-row { grid-template-columns: 1fr; } .sheet-row h3 { line-height: 1.4; } }
+/* The questions: numbered in the accent, each with a box to write in and its answer behind a details. */
+.questions {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+	counter-reset: q;
+	display: grid;
+	gap: 1.5rem;
+}
+.questions > li {
+	counter-increment: q;
+}
+.questions > li > p:first-child::before {
+	content: counter(q) ". ";
+	color: var(--accent);
+	font-weight: 700;
+}
+.questions textarea {
+	min-block-size: 4.5rem;
+	margin-block: 0.4rem;
+}
+.questions details p {
+	margin-block: 0.5rem;
+}
+
+/* The formula sheet: a name, then its formulas, one per line; stacked on phones. */
+.sheet {
+	margin: 0;
+	border-top: 1px solid var(--rule-strong);
+}
+.sheet > div {
+	display: grid;
+	grid-template-columns: minmax(9rem, 13rem) 1fr;
+	column-gap: 1.5rem;
+	padding-block: 0.6rem;
+	border-bottom: 1px solid var(--rule);
+}
+.sheet dt {
+	font-weight: 600;
+	font-size: 0.95rem;
+	letter-spacing: -0.01em;
+	line-height: 2.1;
+}
+.sheet dd {
+	grid-column: 2;
+	margin: 0;
+	line-height: 2.2;
+}
+@media (max-width: 40rem) {
+	.sheet > div {
+		grid-template-columns: 1fr;
+	}
+	.sheet dt {
+		margin-block-end: 0.25rem;
+		line-height: 1.4;
+	}
+	.sheet dd {
+		grid-column: 1;
+	}
+}
 </style>
 </head>
 <body>
-<main class="page">
-	<header class="masthead">
-		<h1>A square wave is a sum of sines, and the bump at its jump never goes away</h1>
-		<p class="lede">Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.</p>
-	</header>
-
-	<figure class="fig">
-		<div class="controls">
-			<div class="seg" role="radiogroup" aria-label="Signal to build">
-				<label><input type="radio" id="wave-square" name="wave" value="square" checked><span>Square wave</span></label>
-				<label><input type="radio" id="wave-saw" name="wave" value="saw"><span>Sawtooth</span></label>
-			</div>
-			<label class="field"><span>Terms in the sum</span><input type="range" id="terms" min="1" max="40" value="3"><output id="terms-out" for="terms">3</output></label>
-			<label class="toggle"><input type="checkbox" id="parts"><span>Show each sine</span></label>
-		</div>
-		<dl class="stats" aria-live="polite">
-			<div class="stat"><dt>Highest frequency used</dt><dd id="h-top"></dd></div>
-			<div class="stat"><dt>Highest point of the sum</dt><dd id="h-peak"></dd></div>
-			<div class="stat"><dt>Highest point vs target, share of the jump</dt><dd id="h-over"></dd></div>
-		</dl>
-		<div class="chart" id="hero-chart" role="img" aria-label="A square wave or sawtooth and the sum of its first sines, over two periods"></div>
-		<figcaption id="hero-cap">Dashed: the signal to build. Solid: the sum. Horizontal axis in radians, one period is 2π. Scroll or pinch to zoom.</figcaption>
-	</figure>
-
-	<section id="questions">
-		<h2>Six questions to answer before you read on</h2>
-		<p>Write what you think in the box, then open the answer.</p>
-		<ol class="questions">
-			<li>
-				<p>What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?</p>
-				<textarea id="a1" rows="3" data-reply="1. What a Fourier series says" placeholder="Your answer"></textarea>
-				<details><summary>Show answer</summary>
-					<p>A periodic signal can be written as a constant plus sines and cosines whose frequencies are whole multiples of the signal's own frequency. Each multiple, a harmonic, has one amplitude for its cosine and one for its sine.</p>
-					<p>No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. The first section below shows why the amounts can be read off one at a time.</p>
-				</details>
-			</li>
-			<li>
-				<p>For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?</p>
-				<textarea id="a2" rows="3" data-reply="2. Square wave harmonics" placeholder="Your answer"></textarea>
-				<details><summary>Show answer</summary>
-					<p>Only sines with odd n: <i>b</i><sub><i>n</i></sub> = 4/(<i>nπ</i>) for odd n, and zero for even n and for every cosine. The amplitudes fall like 1/n, so 4/π, 4/(3π), 4/(5π), …</p>
-				</details>
-			</li>
-			<li>
-				<p>The sawtooth <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?</p>
-				<textarea id="a3" rows="3" data-reply="3. Sawtooth versus square" placeholder="Your answer"></textarea>
-				<details><summary>Show answer</summary>
-					<p><i>b</i><sub><i>n</i></sub> = 2(−1)<sup><i>n</i>+1</sup>/<i>n</i>. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.</p>
-				</details>
-			</li>
-			<li>
-				<p>You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?</p>
-				<textarea id="a4" rows="3" data-reply="4. Overshoot with more terms" placeholder="Your answer"></textarea>
-				<details><summary>Show answer</summary>
-					<p>It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at <i>x</i> = π/(2k) for k terms. The section on the bump lets you check.</p>
-				</details>
-			</li>
-			<li>
-				<p>If the bump never shrinks, in what sense does the series converge to the square wave? What value does it give exactly at the jump?</p>
-				<textarea id="a5" rows="3" data-reply="5. Convergence at a jump" placeholder="Your answer"></textarea>
-				<details><summary>Show answer</summary>
-					<p>At every point away from a jump the sum converges to the signal, because the bump has moved past any fixed point. The mean-square error also goes to zero, since the bump gets narrower while its height stays put. What does not happen is uniform convergence. Just beside a jump the sum is still near 0 while the signal is near ±1, so the largest error stays large, close to half the jump. The overshoot above the plateau tends to about 9% of the jump rather than to zero. At the jump itself, the series gives the midpoint of the two sides, 0 for the square wave.</p>
-				</details>
-			</li>
-			<li>
-				<p>Without integrating: which coefficients are zero for <i>x</i>², for <i>x</i>³, and for <i>x</i>² + <i>x</i> on (−π, π)?</p>
-				<textarea id="a6" rows="3" data-reply="6. Symmetry without integrating" placeholder="Your answer"></textarea>
-				<details><summary>Show answer</summary>
-					<p><i>x</i>² is even: all <i>b</i><sub><i>n</i></sub> are zero, only cosines (and <i>a</i><sub>0</sub>) remain. <i>x</i>³ is odd: <i>a</i><sub>0</sub> and all <i>a</i><sub><i>n</i></sub> are zero, only sines remain. <i>x</i>² + <i>x</i> is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from <i>x</i>² and its sines from <i>x</i>.</p>
-				</details>
-			</li>
-		</ol>
-	</section>
-
-	<section id="why">
-		<h2>Why sines and cosines are enough</h2>
-		<p>Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:</p>
-		<div class="eq" id="eq-series"></div>
-		<p>Two facts make this work. First, every term repeats after 2π, so any sum of them does too. Second, the terms are <b>orthogonal</b>: over one period, the integral of the product of two different terms is zero, and for positive whole numbers the product of a sine or cosine with itself integrates to π. The constant term is its own case: its square integrates to 2π. Multiply the signal by one term and integrate, and every other term drops out. That leaves one number, the amount of that term in the signal. It is the formula for the coefficients used below.</p>
-		<p>The figure above is the series in action. With one term the square wave is a single sine of amplitude 4/π. Each added sine puts back detail the previous sum lacked, and the corners get steeper.</p>
-	</section>
-
-	<section id="coefficients">
-		<h2 id="coef-head"></h2>
-		<p>Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.</p>
-		<figure class="fig" id="deriv-fig" data-stepper data-start="1" aria-label="Derivation of the Fourier coefficients, step by step">
-			<div class="controls">
-				<div class="seg" role="radiogroup" aria-label="Wave to derive">
-					<label><input type="radio" id="coef-square" name="coef-wave" value="square" checked><span>Square wave</span></label>
-					<label><input type="radio" id="coef-saw" name="coef-wave" value="saw"><span>Sawtooth</span></label>
-				</div>
-			</div>
-			<ol data-captions><li>Loading</li><li>Loading</li></ol>
-			<div class="eqs" id="deriv"></div>
-			<div class="chart" id="coef-plot" role="img" aria-label="The sine coefficients b-n for n from 1 to 12"></div>
-			<figcaption>The sine coefficients <i>b</i><sub><i>n</i></sub>, first twelve. Square wave: ±1 jumps at 0 and ±π. Sawtooth: <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π), repeating, with jumps at ±π.</figcaption>
-		</figure>
-	</section>
-
-	<section id="gibbs">
-		<h2 id="gibbs-head"></h2>
-		<p>Here is the square wave from the top, close to its jump at <i>x</i> = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.</p>
-		<figure class="fig">
-			<div class="controls">
-				<label class="field"><span>Terms</span><input type="range" id="gk" min="1" max="200" value="5"><output id="gk-out" for="gk">5</output></label>
-				<label class="toggle"><input type="checkbox" id="gzoom"><span>Zoom in on the bump</span></label>
-			</div>
-			<dl class="stats" aria-live="polite">
-				<div class="stat"><dt>Highest point</dt><dd id="g-peak"></dd></div>
-				<div class="stat"><dt>Bump sits at</dt><dd id="g-at"></dd></div>
-				<div class="stat"><dt>Typical error (rms)</dt><dd id="g-rms"></dd></div>
-			</dl>
-			<div class="chart" id="gibbs-chart" role="img" aria-label="Partial sum of the square wave near its jump at zero, with the target and the limit of the peak"></div>
-			<figcaption>Dashed grey: the square wave. Dotted: the limit the peak approaches, 1.179. Horizontal axis in radians.
-				<span class="src">Computed in the page from the series. Peak position and the 9% limit: Wikipedia, “Gibbs phenomenon”.</span></figcaption>
-		</figure>
-		<div class="beside">
-			<p>The bump keeps its height and gets thinner. The typical error falls because the bump takes up less and less of the period, so the area under it goes to zero. The largest error does not fall: the bump stays, and just beside the jump the sum is still far from the wave. That is why the series converges at every fixed point away from the jump (convergence is not uniform) while no finite number of terms removes the bump.</p>
-			<figure class="fig">
-				<div class="chart" id="peak-chart" role="img" aria-label="Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179"></div>
-				<figcaption>Highest point of the partial sum for 1 to 200 terms (logarithmic horizontal axis). It does not head for 1; it levels off at 1.179, which is 1 + 0.179, and 0.179 is 8.95% of the jump of 2. The sawtooth behaves the same way at its jump.</figcaption>
-			</figure>
-		</div>
-	</section>
-
-	<section id="symmetry">
-		<h2 id="sym-head"></h2>
-		<p>An even function (<i>f</i>(−<i>x</i>) = <i>f</i>(<i>x</i>)) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.</p>
-		<figure class="fig">
-			<div class="controls">
-				<div class="seg" role="radiogroup" aria-label="Signal">
-					<label><input type="radio" id="sym-even" name="sym" value="even" checked><span>Even: triangle</span></label>
-					<label><input type="radio" id="sym-odd" name="sym" value="odd"><span>Odd: square wave</span></label>
-					<label><input type="radio" id="sym-none" name="sym" value="none"><span>Neither: half ramp</span></label>
-				</div>
-			</div>
-			<dl class="stats" aria-live="polite">
-				<div class="stat"><dt>Cosine terms that survive</dt><dd id="s-a"></dd></div>
-				<div class="stat"><dt>Sine terms that survive</dt><dd id="s-b"></dd></div>
-			</dl>
-			<div class="chart" id="sym-chart" role="img" aria-label="The chosen signal on one period, with its even part and odd part"></div>
-			<div class="split">
-				<div class="chart" id="sym-a" role="img" aria-label="Cosine coefficients a-n for n from 0 to 9"></div>
-				<div class="chart" id="sym-b" role="img" aria-label="Sine coefficients b-n for n from 1 to 9"></div>
-			</div>
-			<figcaption>Top: the signal over one period, with its even part (<i>f</i>(<i>x</i>) + <i>f</i>(−<i>x</i>))/2 and odd part (<i>f</i>(<i>x</i>) − <i>f</i>(−<i>x</i>))/2; click a legend entry to hide a line. Bottom: coefficients <i>a</i><sub>0</sub> to <i>a</i><sub>9</sub> (left) and <i>b</i><sub>1</sub> to <i>b</i><sub>9</sub> (right), where <i>a</i><sub>0</sub>/2 is the average.</figcaption>
-		</figure>
-		<p>Spotting the symmetry first halves the work, and saves a mistake: a stray cosine term in an odd function's answer is wrong. The half ramp is the sum of its even part, a triangle, and its odd part, a straight line, so it has both kinds of term.</p>
-	</section>
-
-	<section id="sheet">
-		<h2>Everything above on one table</h2>
-		<div class="sheet" id="sheet-rows"></div>
-		<p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is <i>a</i><sub>0</sub>/2, which makes the same <i>a<sub>n</sub></i> formula work for <i>n</i> = 0. Books that write plain <i>a</i><sub>0</sub> use the average, <i>a</i><sub>0</sub> = (1/2π)∫<i>f</i> d<i>x</i>.</p>
-	</section>
-
-	<section class="minor">
-		<h2>Sources</h2>
-		<ul>
-			<li>H. Wilbraham, “On a certain periodic function”, <i>Cambridge and Dublin Mathematical Journal</i> 3 (1848), pp. 198–201: the first analysis of the overshoot.</li>
-			<li>J. W. Gibbs, letter in <i>Nature</i> 59 (27 April 1899), p. 606: the correction that describes the overshoot.</li>
-			<li>M. Bôcher, “Introduction to the theory of Fourier’s series”, <i>Annals of Mathematics</i> 7 (1906): the detailed analysis that gave the effect its name.</li>
-			<li>Wikipedia, “Gibbs phenomenon” (en.wikipedia.org/wiki/Gibbs_phenomenon, CC BY-SA 4.0): the constants Si(π) = 1.851937… and 0.0894898… of the jump, which the page’s own sums reproduce.</li>
-			<li>Coefficient formulas and symmetry rules are standard; see for example Kreyszig, <i>Advanced Engineering Mathematics</i>, the chapter on Fourier series.</li>
-		</ul>
-	</section>
-</main>
-
+<main class="page"><div data-overview><header class="masthead"><h1>A square wave is a sum of sines, and the bump at its jump never goes away</h1><p class="lede">Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.</p></header><!--island:0--><figure class="fig"><div class="controls"><div class="seg" role="radiogroup" aria-label="Signal to build"><label><input type="radio" id="wave-square" name="wave" value="square" checked/><span>Square wave</span></label><label><input type="radio" id="wave-saw" name="wave" value="saw"/><span>Sawtooth</span></label></div><label class="field"><span>Terms in the sum</span><input type="range" id="terms" min="1" max="40" value="3"/><output id="terms-out" for="terms">3</output></label><label class="toggle"><input type="checkbox" id="parts"/><span>Show each sine</span></label></div><dl class="stats" aria-live="polite"><div class="stat"><dt>Highest frequency used</dt><dd>5× <small>base frequency</small></dd></div><div class="stat"><dt>Highest point of the sum</dt><dd>1.188 <small>target 1</small></dd></div><div class="stat"><dt>Highest point vs target, share of the jump</dt><dd>+9.4%</dd></div></dl><div class="chart" id="hero-chart" role="img" aria-label="A square wave or sawtooth and the sum of its first sines, over two periods"></div><figcaption>Dashed: the square wave to build. Solid: the sum. Horizontal axis in radians, one period is 2π. Scroll or pinch to zoom.</figcaption></figure><!--/island--><section><h2>Six questions to answer before you read on</h2><p>Write what you think in the box, then open the answer.</p><ol class="questions"><li><p>What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?</p><textarea id="a1" rows="3" data-reply="1. What a Fourier series says" placeholder="Your answer"></textarea><details><summary>Show answer</summary><p>A periodic signal can be written as a constant plus sines and cosines whose frequencies are whole multiples of the signal's own frequency. Each multiple, a harmonic, has one amplitude for its cosine and one for its sine.</p><p>No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. The first section below shows why the amounts can be read off one at a time.</p></details></li><li><p>For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?</p><textarea id="a2" rows="3" data-reply="2. Square wave harmonics" placeholder="Your answer"></textarea><details><summary>Show answer</summary><p>Only sines with odd n: <em>b</em><sub><em>n</em></sub> = 4/(<em>nπ</em>) for odd n, and zero for even n and for every cosine. The amplitudes fall like 1/n, so 4/π, 4/(3π), 4/(5π), …</p></details></li><li><p>The sawtooth <em>f</em>(<em>x</em>) = <em>x</em> on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?</p><textarea id="a3" rows="3" data-reply="3. Sawtooth versus square" placeholder="Your answer"></textarea><details><summary>Show answer</summary><p><em>b</em><sub><em>n</em></sub> = 2(−1)<sup><em>n</em>+1</sup>/<em>n</em>. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.</p></details></li><li><p>You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?</p><textarea id="a4" rows="3" data-reply="4. Overshoot with more terms" placeholder="Your answer"></textarea><details><summary>Show answer</summary><p>It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at <em>x</em> = π/(2k) for k terms. The section on the bump lets you check.</p></details></li><li><p>If the bump never shrinks, in what sense does the series converge to the square wave? What value does it give exactly at the jump?</p><textarea id="a5" rows="3" data-reply="5. Convergence at a jump" placeholder="Your answer"></textarea><details><summary>Show answer</summary><p>At every point away from a jump the sum converges to the signal, because the bump has moved past any fixed point. The mean-square error also goes to zero, since the bump gets narrower while its height stays put. What does not happen is uniform convergence. Just beside a jump the sum is still near 0 while the signal is near ±1, so the largest error stays large, close to half the jump. The overshoot above the plateau tends to about 9% of the jump rather than to zero. At the jump itself, the series gives the midpoint of the two sides, 0 for the square wave.</p></details></li><li><p>Without integrating: which coefficients are zero for <em>x</em>², for <em>x</em>³, and for <em>x</em>² + <em>x</em> on (−π, π)?</p><textarea id="a6" rows="3" data-reply="6. Symmetry without integrating" placeholder="Your answer"></textarea><details><summary>Show answer</summary><p><em>x</em>² is even: all <em>b</em><sub><em>n</em></sub> are zero, only cosines (and <em>a</em><sub>0</sub>) remain. <em>x</em>³ is odd: <em>a</em><sub>0</sub> and all <em>a</em><sub><em>n</em></sub> are zero, only sines remain. <em>x</em>² + <em>x</em> is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from <em>x</em>² and its sines from <em>x</em>.</p></details></li></ol></section><section><h2>Why sines and cosines are enough</h2><p>Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:</p><div class="eq"><i>f</i>(<i>x</i>) = <span class="frac"><span><i>a</i><sub>0</sub></span><span>2</span></span> + <span class="lim"><span>∞</span><span class="sym">Σ</span><span><i>n</i> = 1</span></span> (<i>a</i><sub><i>n</i></sub> cos <i>nx</i> + <i>b</i><sub><i>n</i></sub> sin <i>nx</i>)</div><p>Two facts make this work. First, every term repeats after 2π, so any sum of them does too. Second, the terms are <strong>orthogonal</strong>: over one period, the integral of the product of two different terms is zero, and for positive whole numbers the product of a sine or cosine with itself integrates to π. The constant term is its own case: its square integrates to 2π. Multiply the signal by one term and integrate, and every other term drops out. That leaves one number, the amount of that term in the signal. It is the formula for the coefficients used below.</p><p>The figure above is the series in action. With one term the square wave is a single sine of amplitude 4/π. Each added sine puts back detail the previous sum lacked, and the corners get steeper.</p></section><section><!--island:1--><h2>Square wave: only odd harmonics, amplitudes 4/(nπ)</h2><p>Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.</p><figure class="fig" id="deriv-fig" data-stepper data-start="1" aria-label="Derivation of the Fourier coefficients, step by step"><div class="controls"><div class="seg" role="radiogroup" aria-label="Wave to derive"><label><input type="radio" id="coef-square" name="coef" value="square" checked/><span>Square wave</span></label><label><input type="radio" id="coef-saw" name="coef" value="saw"/><span>Sawtooth</span></label></div></div><ol data-captions><li>Cosine coefficients first. The square wave is odd and cos <i>nx</i> is even, so the integrand is odd and its integral over a symmetric interval is zero. The same argument gives <i>a</i><sub>0</sub> = 0.</li><li>The sine coefficient uses the same recipe with sin <i>nx</i>. Here <i>f</i> = −1 on the left half of the period and +1 on the right half.</li><li><i>f</i> and sin <i>nx</i> are both odd, so their product is even: integrate over half the period and double. On (0, π) the square wave is 1.</li><li>Integrate sin <i>nx</i> and put in the limits. cos 0 = 1 supplies the 1.</li><li>cos <i>n</i>π is −1 or +1 as <i>n</i> is odd or even. Even harmonics cancel; odd ones keep 4/(<i>n</i>π).</li><li>Put the coefficients back into the series. This is the sum being built at the top of the page.</li></ol><div class="eqs"><p class="eq" data-step="1"><i>a</i><sub><i>n</i></sub> = <span class="frac"><span>1</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> <i>f</i>(<i>x</i>) cos <i>nx</i> d<i>x</i> = 0</p><p class="eq" data-step="2"><i>b</i><sub><i>n</i></sub> = <span class="frac"><span>1</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> <i>f</i>(<i>x</i>) sin <i>nx</i> d<i>x</i></p><p class="eq" data-step="3">= <span class="frac"><span>2</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>0</span></span> sin <i>nx</i> d<i>x</i></p><p class="eq" data-step="4">= <span class="frac"><span>2</span><span>π</span></span> [ −<span class="frac"><span>cos <i>nx</i></span><span><i>n</i></span></span> ]<sub>0</sub><sup>π</sup> = <span class="frac"><span>2</span><span><i>n</i>π</span></span> (1 − cos <i>n</i>π)</p><p class="eq" data-step="5">= <span class="frac"><span>2</span><span><i>n</i>π</span></span> (1 − (−1)<sup><i>n</i></sup>) = <span class="frac"><span>4</span><span><i>n</i>π</span></span> for odd <i>n</i>, and 0 for even <i>n</i></p><p class="eq" data-step="6"><i>f</i>(<i>x</i>) = <span class="frac"><span>4</span><span>π</span></span> ( sin <i>x</i> + <span class="frac"><span>1</span><span>3</span></span> sin 3<i>x</i> + <span class="frac"><span>1</span><span>5</span></span> sin 5<i>x</i> + … )</p></div><div class="chart plot" id="coef-plot" role="img" aria-label="The sine coefficients b-n for n from 1 to 12"></div><figcaption>The sine coefficients <i>b</i><sub><i>n</i></sub>, first twelve. Square wave: ±1 jumps at 0 and ±π. Sawtooth: <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π), repeating, with jumps at ±π.</figcaption></figure><!--/island--></section><section><!--island:2--><h2>With 5 terms the sum peaks at 1.182; as the number of terms grows, the peak approaches 1.179</h2><p>Here is the square wave from the top, close to its jump at <i>x</i> = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.</p><figure class="fig"><div class="controls"><label class="field"><span>Terms</span><input type="range" id="gk" min="1" max="200" value="5"/><output id="gk-out" for="gk">5</output></label><label class="toggle"><input type="checkbox" id="gzoom"/><span>Zoom in on the bump</span></label></div><dl class="stats" aria-live="polite"><div class="stat"><dt>Highest point</dt><dd>1.182 <small>wave is 1</small></dd></div><div class="stat"><dt>Bump sits at</dt><dd>0.314 <small>radians from the jump</small></dd></div><div class="stat"><dt>Typical error (rms)</dt><dd>0.201</dd></div></dl><div class="chart" id="gibbs-chart" role="img" aria-label="Partial sum of the square wave near its jump at zero, with the target and the limit of the peak"></div><figcaption>Dashed grey: the square wave. Dotted: the limit the peak approaches, 1.179. Horizontal axis in radians.<span class="src">Computed in the page from the series. Peak position and the 9% limit: Wikipedia, “Gibbs phenomenon”.</span></figcaption></figure><div class="beside"><p>The bump keeps its height and gets thinner. The typical error falls because the bump takes up less and less of the period, so the area under it goes to zero. The largest error does not fall: the bump stays, and just beside the jump the sum is still far from the wave. That is why the series converges at every fixed point away from the jump (convergence is not uniform) while no finite number of terms removes the bump.</p><figure class="fig"><div class="chart" id="peak-chart" role="img" aria-label="Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179"></div><figcaption>Highest point of the partial sum for 1 to 200 terms (logarithmic horizontal axis). It does not head for 1; it levels off at 1.179, which is 1 + 0.179, and 0.179 is 8.95% of the jump of 2. The sawtooth behaves the same way at its jump.</figcaption></figure></div><!--/island--></section><section><!--island:3--><h2>The triangle |x| is even, so every sine coefficient is zero</h2><p>An even function (<i>f</i>(−<i>x</i>) = <i>f</i>(<i>x</i>)) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.</p><figure class="fig"><div class="controls"><div class="seg" role="radiogroup" aria-label="Signal"><label><input type="radio" id="sym-even" name="sym" value="even" checked/><span>Even: triangle</span></label><label><input type="radio" id="sym-odd" name="sym" value="odd"/><span>Odd: square wave</span></label><label><input type="radio" id="sym-none" name="sym" value="none"/><span>Neither: half ramp</span></label></div></div><dl class="stats" aria-live="polite"><div class="stat"><dt>Cosine terms that survive</dt><dd>a₀, a₁, a₃, a₅, a₇, a₉</dd></div><div class="stat"><dt>Sine terms that survive</dt><dd>none</dd></div></dl><div class="chart" id="sym-chart" role="img" aria-label="The chosen signal on one period, with its even part and odd part"></div><div class="split"><div class="chart plot" id="sym-a" role="img" aria-label="Cosine coefficients a-n for n from 0 to 9"></div><div class="chart plot" id="sym-b" role="img" aria-label="Sine coefficients b-n for n from 1 to 9"></div></div><figcaption>Top: the signal over one period, with its even part (<i>f</i>(<i>x</i>) + <i>f</i>(−<i>x</i>))/2 and odd part (<i>f</i>(<i>x</i>) − <i>f</i>(−<i>x</i>))/2; click a legend entry to hide a line. Bottom: coefficients <i>a</i><sub>0</sub> to <i>a</i><sub>9</sub> (left) and <i>b</i><sub>1</sub> to <i>b</i><sub>9</sub> (right), where <i>a</i><sub>0</sub>/2 is the average.</figcaption></figure><!--/island--><p>Spotting the symmetry first halves the work, and saves a mistake: a stray cosine term in an odd function's answer is wrong. The half ramp is the sum of its even part, a triangle, and its odd part, a straight line, so it has both kinds of term.</p></section><section><h2>Everything above on one table</h2><dl class="sheet"><div><dt>Series, period 2π</dt><dd><i>f</i>(<i>x</i>) = <span class="frac"><span><i>a</i><sub>0</sub></span><span>2</span></span> + <span class="lim"><span>∞</span><span class="sym">Σ</span><span><i>n</i> = 1</span></span> (<i>a</i><sub><i>n</i></sub> cos <i>nx</i> + <i>b</i><sub><i>n</i></sub> sin <i>nx</i>)</dd></div><div><dt>Coefficients</dt><dd><i>a</i><sub><i>n</i></sub> = <span class="frac"><span>1</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> <i>f</i>(<i>x</i>) cos <i>nx</i> d<i>x</i>   (<em>n</em> ≥ 0)</dd><dd><i>b</i><sub><i>n</i></sub> = <span class="frac"><span>1</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> <i>f</i>(<i>x</i>) sin <i>nx</i> d<i>x</i>   (<em>n</em> ≥ 1)</dd></div><div><dt>Period T, ω = 2π/T</dt><dd><em>f</em>(<em>t</em>) = <span class="frac"><span><i>a</i><sub>0</sub></span><span>2</span></span> + <span class="lim"><span>∞</span><span class="sym">Σ</span><span><i>n</i> = 1</span></span> (<i>a</i><sub><i>n</i></sub> cos <em>nωt</em> + <i>b</i><sub><i>n</i></sub> sin <em>nωt</em>)</dd><dd><i>a</i><sub><i>n</i></sub> = <span class="frac"><span>2</span><span><i>T</i></span></span> <span class="lim"><span><i>T</i></span><span class="sym">∫</span><span>0</span></span> <em>f</em>(<em>t</em>) cos <em>nωt</em> d<em>t</em>,   <i>b</i><sub><i>n</i></sub> = <span class="frac"><span>2</span><span><i>T</i></span></span> <span class="lim"><span><i>T</i></span><span class="sym">∫</span><span>0</span></span> <em>f</em>(<em>t</em>) sin <em>nωt</em> d<em>t</em></dd></div><div><dt>Orthogonality</dt><dd><span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> sin <em>mx</em> sin <i>nx</i> d<i>x</i> = <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> cos <em>mx</em> cos <i>nx</i> d<i>x</i> = π if <em>m</em> = <em>n</em>, else 0   (<em>m</em>, <em>n</em> = 1, 2, 3, …)</dd><dd><span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> sin <em>mx</em> cos <i>nx</i> d<i>x</i> = 0 for all <em>m</em>, <em>n</em>   <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> cos <i>nx</i> d<i>x</i> = 0 (<em>n</em> ≥ 1)   <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> 1 d<i>x</i> = 2π</dd></div><div><dt>Even <em>f</em></dt><dd><i>b</i><sub><i>n</i></sub> = 0,   <i>a</i><sub><i>n</i></sub> = <span class="frac"><span>2</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>0</span></span> <i>f</i>(<i>x</i>) cos <i>nx</i> d<i>x</i></dd></div><div><dt>Odd <em>f</em></dt><dd><i>a</i><sub>0</sub> = <i>a</i><sub><i>n</i></sub> = 0,   <i>b</i><sub><i>n</i></sub> = <span class="frac"><span>2</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>0</span></span> <i>f</i>(<i>x</i>) sin <i>nx</i> d<i>x</i></dd></div><div><dt>Square wave, ±1, odd</dt><dd><i>b</i><sub><i>n</i></sub> = <span class="frac"><span>4</span><span><i>n</i>π</span></span> for odd <em>n</em>, 0 for even <em>n</em></dd><dd><i>f</i>(<i>x</i>) = <span class="frac"><span>4</span><span>π</span></span> <span class="lim"><span></span><span class="sym">Σ</span><span><i>n</i> odd</span></span> <span class="frac"><span>sin <i>nx</i></span><span><i>n</i></span></span></dd></div><div><dt>Sawtooth, <em>f</em> = <em>x</em> on (−π, π)</dt><dd><i>b</i><sub><i>n</i></sub> = <span class="frac"><span>2(−1)<sup><i>n</i>+1</sup></span><span><i>n</i></span></span></dd><dd><i>f</i>(<i>x</i>) = 2 ( sin <em>x</em> − <span class="frac"><span>sin 2<i>x</i></span><span>2</span></span> + <span class="frac"><span>sin 3<i>x</i></span><span>3</span></span> − … )</dd></div><div><dt>At a jump</dt><dd>The series gives the midpoint of the two one-sided limits: <span class="frac"><span><i>f</i>(<i>x</i><sup>+</sup>) + <i>f</i>(<i>x</i><sup>−</sup>)</span><span>2</span></span></dd></div><div><dt>Gibbs overshoot</dt><dd>Square wave ±1: the <em>k</em>-term sum peaks at <em>x</em> = <span class="frac"><span>π</span><span>2<i>k</i></span></span>, and the peak tends to <span class="frac"><span>2</span><span>π</span></span> Si(π) ≈ 1.179</dd><dd>Overshoot → 0.0895 × the jump, where Si(π) = <span class="lim"><span>π</span><span class="sym">∫</span><span>0</span></span> <span class="frac"><span>sin <i>t</i></span><span><i>t</i></span></span> d<em>t</em> ≈ 1.852</dd></div><div><dt>Parseval</dt><dd><span class="frac"><span>1</span><span>π</span></span> <span class="lim"><span>π</span><span class="sym">∫</span><span>−π</span></span> <i>f</i>(<i>x</i>)<sup>2</sup> d<i>x</i> = <span class="frac"><span><i>a</i><sub>0</sub><sup>2</sup></span><span>2</span></span> + <span class="lim"><span>∞</span><span class="sym">Σ</span><span><i>n</i> = 1</span></span> (<i>a</i><sub><i>n</i></sub><sup>2</sup> + <i>b</i><sub><i>n</i></sub><sup>2</sup>)</dd><dd>After <em>N</em> terms the mean-square error is half the sum of the squared omitted coefficients.</dd></div></dl><p class="caveat"><b>Notation</b>Different books split the constant term differently. Here it is <em>a</em><sub>0</sub>/2, which makes the same <em>a</em><sub><em>n</em></sub> formula work for <em>n</em> = 0. Books that write plain <em>a</em><sub>0</sub> use the average, <em>a</em><sub>0</sub> = (1/2π)∫<em>f</em> d<em>x</em>.</p></section><section class="minor"><h2>Sources</h2><ul>
+<li>H. Wilbraham, “On a certain periodic function”, <em>Cambridge and Dublin Mathematical Journal</em> 3 (1848), pp. 198–201: the first analysis of the overshoot.</li>
+<li>J. W. Gibbs, letter in <em>Nature</em> 59 (27 April 1899), p. 606: the correction that describes the overshoot.</li>
+<li>M. Bôcher, “Introduction to the theory of Fourier’s series”, <em>Annals of Mathematics</em> 7 (1906): the detailed analysis that gave the effect its name.</li>
+<li>Wikipedia, “Gibbs phenomenon” (en.wikipedia.org/wiki/Gibbs_phenomenon, CC BY-SA 4.0): the constants Si(π) = 1.851937… and 0.0894898… of the jump, which the page’s own sums reproduce.</li>
+<li>Coefficient formulas and symmetry rules are standard; see for example Kreyszig, <em>Advanced Engineering Mathematics</em>, the chapter on Fourier series.</li>
+</ul></section></div></main>
+<script type="application/json" id="explainer-islands">[{"m":0,"e":"Hero","p":{}},{"m":0,"e":"Coefficients","p":{}},{"m":0,"e":"Gibbs","p":{}},{"m":0,"e":"Symmetry","p":{}}]</script>
 <script>/* echarts: Apache ECharts 6.1.0, custom build, global echarts.
    Charts: line bar scatter pie heatmap treemap sankey sunburst radar boxplot. Components: grid polar radar calendar axisPointer tooltip legend
    dataZoom brush toolbox visualMap markLine/Area/Point title dataset transform aria. Features: label layout, universal transition. Canvas renderer.
@@ -2310,7 +2234,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
 `),Pt(i);n.push({dimIdx:g.index,parser:y,comparator:new av(p,v)})});var o=t.sourceFormat;if(o!==ge&&o!==Ke)i='sourceFormat "'+o+'" is not supported yet',Pt(i);var s=[];for(var l=0,u=t.count();l<u;l++)s.push(t.getRawDataItem(l));return s.sort(function(f,c){for(var p=0;p<n.length;p++){var h=n[p],v=t.retrieveValueFromItem(f,h.dimIdx),d=t.retrieveValueFromItem(c,h.dimIdx);if(h.parser)v=h.parser(v),d=h.parser(d);var m=h.comparator.evaluate(v,d);if(m!==0)return m}return 0}),{data:s}}};function R1(r){r.registerTransform(Mk),r.registerTransform(Ek)}var U6=function(r){L(t,r);function t(){var e=r!==null&&r.apply(this,arguments)||this;return e.type="dataset",e}return t.prototype.init=function(e,i,a){r.prototype.init.call(this,e,i,a),this._sourceManager=new Nv(this),h_(this)},t.prototype.mergeOption=function(e,i){r.prototype.mergeOption.call(this,e,i),h_(this)},t.prototype.optionUpdated=function(){this._sourceManager.dirty()},t.prototype.getSourceManager=function(){return this._sourceManager},t.type="dataset",t.defaultOption={seriesLayoutBy:xr},t}(xt);var B6=function(r){L(t,r);function t(){var e=r!==null&&r.apply(this,arguments)||this;return e.type="dataset",e}return t.type="dataset",t}(zt);function P1(r){r.registerComponentModel(U6),r.registerComponentView(B6)}function F6(r){return Gr(null,r)}var H6={isDimensionStacked:Sr,enableDataStack:hv,getStackedDimension:ql};function G6(r,t){var e=t;if(!(t instanceof It))e=new It(t);var i=pu(e),a=hu(e,i,!1);if(r[1]<r[0])r=r.slice().reverse();return iS(a,e,null,null,r),a}function W6(r){$t(r,bo)}function Y6(r,t){return t=t||{},Ft(r,null,null,t.state!=="normal")}function Z6(r){var t=xt.extend(r);return xt.registerClass(t),t}function X6(r){var t=zt.extend(r);return zt.registerClass(t),t}function q6(r){var t=Xt.extend(r);return Xt.registerClass(t),t}function K6(r){var t=Gt.extend(r);return Gt.registerClass(t),t}function j6(r){if(r){var t=[];for(var e=0;e<r.length;e++)t.push(r[e].slice());return t}}function Q6(r,t){var e=r.label,i=t&&t.getTextGuideLine();return{dataIndex:r.dataIndex,dataType:r.dataType,seriesIndex:r.seriesModel.seriesIndex,text:r.label.style.text,rect:r.hostRect,labelRect:r.rect,align:e.style.align,verticalAlign:e.style.verticalAlign,labelLinePoints:j6(i&&i.shape.points)}}var Ik=["align","verticalAlign","width","height","fontSize"],Mr=new Si,F1=et(),J6=et();function Sg(r,t,e){for(var i=0;i<e.length;i++){var a=e[i];if(t[a]!=null)r[a]=t[a]}}var bg=["x","y","rotation"],$6=function(){function r(){this._labelList=[],this._chartViewList=[]}return r.prototype.clearLabels=function(){this._labelList=[],this._chartViewList=[]},r.prototype._addLabel=function(t,e,i,a,n){var{style:o,__hostTarget:s}=a,l=s.textConfig||{},u=a.getComputedTransform(),f=a.getBoundingRect().plain();if(rt.applyTransform(f,f,u),u)Mr.setLocalTransform(u);else Mr.x=Mr.y=Mr.rotation=Mr.originX=Mr.originY=0,Mr.scaleX=Mr.scaleY=1;Mr.rotation=rr(Mr.rotation);var c=a.__hostTarget,p;if(c){p=c.getBoundingRect().plain();var h=c.getComputedTransform();rt.applyTransform(p,p,h)}var v=p&&c.getTextGuideLine();this._labelList.push({label:a,labelLine:v,seriesModel:i,dataIndex:t,dataType:e,layoutOptionOrCb:n,layoutOption:null,rect:f,hostRect:p,priority:p?p.width*p.height:0,defaultAttr:{ignore:a.ignore,labelGuideIgnore:v&&v.ignore,x:Mr.x,y:Mr.y,scaleX:Mr.scaleX,scaleY:Mr.scaleY,rotation:Mr.rotation,style:{x:o.x,y:o.y,align:o.align,verticalAlign:o.verticalAlign,width:o.width,height:o.height,fontSize:o.fontSize},cursor:a.cursor,attachedPos:l.position,attachedRot:l.rotation}})},r.prototype.addLabelsOfSeries=function(t){var e=this;this._chartViewList.push(t);var i=t.__model,a=i.get("labelLayout");if(!(W(a)||wt(a).length))return;t.group.traverse(function(n){if(n.ignore)return!0;var o=n.getTextContent(),s=ft(n);if(o&&!o.disableLabelLayout)e._addLabel(s.dataIndex,s.dataType,i,o,a)})},r.prototype.updateLayoutConfig=function(t){var e=t.getWidth(),i=t.getHeight();function a(_,x){return function(){q_(_,x)}}for(var n=0;n<this._labelList.length;n++){var o=this._labelList[n],s=o.label,l=s.__hostTarget,u=o.defaultAttr,f=void 0;if(W(o.layoutOptionOrCb))f=o.layoutOptionOrCb(Q6(o,l));else f=o.layoutOptionOrCb;f=f||{},o.layoutOption=f;var c=Math.PI/180;if(l)l.setTextConfig({local:!1,position:f.x!=null||f.y!=null?null:u.attachedPos,rotation:f.rotate!=null?f.rotate*c:u.attachedRot,offset:[f.dx||0,f.dy||0]});var p=!1;if(f.x!=null)s.x=st(f.x,e),s.setStyle("x",0),p=!0;else s.x=u.x,s.setStyle("x",u.style.x);if(f.y!=null)s.y=st(f.y,i),s.setStyle("y",0),p=!0;else s.y=u.y,s.setStyle("y",u.style.y);if(f.labelLinePoints){var h=l.getTextGuideLine();if(h)h.setShape({points:f.labelLinePoints}),p=!1}var v=F1(s);v.needsUpdateLabelLine=p,s.rotation=f.rotate!=null?f.rotate*c:u.rotation,s.scaleX=u.scaleX,s.scaleY=u.scaleY;for(var d=0;d<Ik.length;d++){var m=Ik[d];s.setStyle(m,f[m]!=null?f[m]:u.style[m])}if(f.draggable){if(s.draggable=!0,s.cursor="move",l){var g=o.seriesModel;if(o.dataIndex!=null){var y=o.seriesModel.getData(o.dataType);g=y.getItemModel(o.dataIndex)}s.on("drag",a(l,g.getModel("labelLine")))}}else s.off("drag"),s.cursor=u.cursor}},r.prototype.layout=function(t){var e=t.getWidth(),i=t.getHeight(),a=[];T(this._labelList,function(l){if(!l.defaultAttr.ignore)a.push(Cc({},l))});var n=Dt(a,function(l){return l.layoutOption.moveOverlap==="shiftX"}),o=Dt(a,function(l){return l.layoutOption.moveOverlap==="shiftY"});Ac(n,0,0,e),Ac(o,1,0,i);var s=Dt(a,function(l){return l.layoutOption.hideOverlap});FM(s),md(s)},r.prototype.processLabelsOverall=function(){var t=this;T(this._chartViewList,function(e){var{__model:i,ignoreLabelLineUpdate:a}=e,n=i.isAnimationEnabled();e.group.traverse(function(o){if(o.ignore&&!o.forceLabelAnimation)return!0;var s=!a,l=o.getTextContent();if(!s&&l)s=F1(l).needsUpdateLabelLine;if(s)t._updateLabelLine(o,i);if(n)t._animateLabels(o,i)})})},r.prototype._updateLabelLine=function(t,e){var i=t.getTextContent(),a=ft(t),n=a.dataIndex;if(i&&n!=null){var o=e.getData(a.dataType),s=o.getItemModel(n),l={},u=o.getItemVisual(n,"style");if(u){var f=o.getVisual("drawType");l.stroke=u[f]}var c=s.getModel("labelLine");Od(t,Rd(s),l),q_(t,c)}},r.prototype._animateLabels=function(t,e){var i=t.getTextContent(),a=t.getTextGuideLine();if(i&&(t.forceLabelAnimation||!i.ignore&&!i.invisible&&!t.disableLabelAnimation&&!fn(t))){var n=F1(i),o=n.oldLayout,s=ft(t),l=s.dataIndex,u={x:i.x,y:i.y,rotation:i.rotation},f=e.getData(s.dataType);if(!o){if(i.attr(u),!hn(i).valueAnimation){var c=q(i.style.opacity,1);i.style.opacity=0,Ut(i,{style:{opacity:c}},e,l)}}else{i.attr(o);var p=t.prevStates;if(p){if(nt(p,"select")>=0)i.attr(n.oldLayoutSelect);if(nt(p,"emphasis")>=0)i.attr(n.oldLayoutEmphasis)}Nt(i,u,e,l)}if(n.oldLayout=u,i.states.select){var h=n.oldLayoutSelect={};Sg(h,u,bg),Sg(h,i.states.select,bg)}if(i.states.emphasis){var v=n.oldLayoutEmphasis={};Sg(v,u,bg),Sg(v,i.states.emphasis,bg)}fA(i,l,f,e,e)}if(a&&!a.ignore&&!a.invisible){var n=J6(a),o=n.oldLayout,d={points:a.shape.points};if(!o)a.setShape(d),a.style.strokePercent=0,Ut(a,{style:{strokePercent:1}},e);else a.attr({shape:o}),Nt(a,{shape:d},e);n.oldLayout=d}},r}(),Lk=$6;var H1=et();function G1(r){r.registerUpdateLifecycle("series:beforeupdate",function(t,e,i){var a=H1(e).labelManager;if(!a)a=H1(e).labelManager=new Lk;a.clearLabels()}),r.registerUpdateLifecycle("series:layoutlabels",function(t,e,i){var a=H1(e).labelManager;T(i.updatedSeries,function(n){a.addLabelsOfSeries(e.getViewOfSeriesModel(n))}),a.updateLayoutConfig(e),a.layout(e),a.processLabelsOverall()})}var Wa=er.CMD;function Ku(r,t){return Math.abs(r-t)<0.00001}function Tg(r){var t=r.data,e=r.len(),i=[],a,n=0,o=0,s=0,l=0;function u(E,O){if(a&&a.length>2)i.push(a);a=[E,O]}function f(E,O,P,N){if(!(Ku(E,P)&&Ku(O,N)))a.push(E,O,P,N,P,N)}function c(E,O,P,N,H,B){var G=Math.abs(O-E),X=Math.tan(G/4)*4/3,tt=O<E?-1:1,it=Math.cos(E),ot=Math.sin(E),at=Math.cos(O),gt=Math.sin(O),Lt=it*H+P,Jt=ot*B+N,Ct=at*H+P,ct=gt*B+N,Ot=H*X*tt,pt=B*X*tt;a.push(Lt-Ot*ot,Jt+pt*it,Ct+Ot*gt,ct-pt*at,Ct,ct)}var p,h,v,d;for(var m=0;m<e;){var g=t[m++],y=m===1;if(y){if(n=t[m],o=t[m+1],s=n,l=o,g===Wa.L||g===Wa.C||g===Wa.Q)a=[s,l]}switch(g){case Wa.M:n=s=t[m++],o=l=t[m++],u(s,l);break;case Wa.L:p=t[m++],h=t[m++],f(n,o,p,h),n=p,o=h;break;case Wa.C:a.push(t[m++],t[m++],t[m++],t[m++],n=t[m++],o=t[m++]);break;case Wa.Q:p=t[m++],h=t[m++],v=t[m++],d=t[m++],a.push(n+0.6666666666666666*(p-n),o+0.6666666666666666*(h-o),v+0.6666666666666666*(p-v),d+0.6666666666666666*(h-d),v,d),n=v,o=d;break;case Wa.A:var _=t[m++],x=t[m++],S=t[m++],b=t[m++],w=t[m++],A=t[m++]+w;m+=1;var C=!t[m++];if(p=Math.cos(w)*S+_,h=Math.sin(w)*b+x,y)s=p,l=h,u(s,l);else f(n,o,p,h);n=Math.cos(A)*S+_,o=Math.sin(A)*b+x;var M=(C?-1:1)*Math.PI/2;for(var D=w;C?D>A:D<A;D+=M){var I=C?Math.max(D+M,A):Math.min(D+M,A);c(D,I,_,x,S,b)}break;case Wa.R:s=n=t[m++],l=o=t[m++],p=s+t[m++],h=l+t[m++],u(p,l),f(p,l,p,h),f(p,h,s,h),f(s,h,s,l),f(s,l,p,l);break;case Wa.Z:a&&f(n,o,s,l),n=s,o=l;break}}if(a&&a.length>2)i.push(a);return i}function Y1(r,t,e,i,a,n,o,s,l,u){if(Ku(r,e)&&Ku(t,i)&&Ku(a,o)&&Ku(n,s)){l.push(o,s);return}var f=2/u,c=f*f,p=o-r,h=s-t,v=Math.sqrt(p*p+h*h);p/=v,h/=v;var d=e-r,m=i-t,g=a-o,y=n-s,_=d*d+m*m,x=g*g+y*y;if(_<c&&x<c){l.push(o,s);return}var S=p*d+h*m,b=-p*g-h*y,w=_-S*S,A=x-b*b;if(w<c&&S>=0&&A<c&&b>=0){l.push(o,s);return}var C=[],M=[];Ti(r,e,a,o,0.5,C),Ti(t,i,n,s,0.5,M),Y1(C[0],M[0],C[1],M[1],C[2],M[2],C[3],M[3],l,u),Y1(C[4],M[4],C[5],M[5],C[6],M[6],C[7],M[7],l,u)}function Ok(r,t){var e=Tg(r),i=[];t=t||1;for(var a=0;a<e.length;a++){var n=e[a],o=[],s=n[0],l=n[1];o.push(s,l);for(var u=2;u<n.length;){var f=n[u++],c=n[u++],p=n[u++],h=n[u++],v=n[u++],d=n[u++];Y1(s,l,f,c,p,h,v,d,o,t),s=v,l=d}i.push(o)}return i}function kk(r,t,e){var i=r[t],a=r[1-t],n=Math.abs(i/a),o=Math.ceil(Math.sqrt(n*e)),s=Math.floor(e/o);if(s===0)s=1,o=e;var l=[];for(var u=0;u<o;u++)l.push(s);var f=o*s,c=e-f;if(c>0)for(var u=0;u<c;u++)l[u%o]+=1;return l}function Rk(r,t,e){var{r0:i,r:a,startAngle:n,endAngle:o}=r,s=Math.abs(o-n),l=s*a,u=a-i,f=l>Math.abs(u),c=kk([l,u],f?0:1,t),p=(f?s:u)/c.length;for(var h=0;h<c.length;h++){var v=(f?u:s)/c[h];for(var d=0;d<c[h];d++){var m={};if(f)m.startAngle=n+p*h,m.endAngle=n+p*(h+1),m.r0=i+v*d,m.r=i+v*(d+1);else m.startAngle=n+v*d,m.endAngle=n+v*(d+1),m.r0=i+p*h,m.r=i+p*(h+1);m.clockwise=r.clockwise,m.cx=r.cx,m.cy=r.cy,e.push(m)}}}function t9(r,t,e){var{width:i,height:a}=r,n=i>a,o=kk([i,a],n?0:1,t),s=n?"width":"height",l=n?"height":"width",u=n?"x":"y",f=n?"y":"x",c=r[s]/o.length;for(var p=0;p<o.length;p++){var h=r[l]/o[p];for(var v=0;v<o[p];v++){var d={};d[u]=p*c,d[f]=v*h,d[s]=c,d[l]=h,d.x+=r.x,d.y+=r.y,e.push(d)}}}function Pk(r,t,e,i){return r*i-e*t}function e9(r,t,e,i,a,n,o,s){var l=e-r,u=i-t,f=o-a,c=s-n,p=Pk(f,c,l,u);if(Math.abs(p)<0.000001)return null;var h=r-a,v=t-n,d=Pk(h,v,f,c)/p;if(d<0||d>1)return null;return new _t(d*l+r,d*u+t)}function r9(r,t,e){var i=new _t;_t.sub(i,e,t),i.normalize();var a=new _t;_t.sub(a,r,t);var n=a.dot(i);return n}function ju(r,t){var e=r[r.length-1];if(e&&e[0]===t[0]&&e[1]===t[1])return;r.push(t)}function i9(r,t,e){var i=r.length,a=[];for(var n=0;n<i;n++){var o=r[n],s=r[(n+1)%i],l=e9(o[0],o[1],s[0],s[1],t.x,t.y,e.x,e.y);if(l)a.push({projPt:r9(l,t,e),pt:l,idx:n})}if(a.length<2)return[{points:r},{points:r}];a.sort(function(m,g){return m.projPt-g.projPt});var u=a[0],f=a[a.length-1];if(f.idx<u.idx){var c=u;u=f,f=c}var p=[u.pt.x,u.pt.y],h=[f.pt.x,f.pt.y],v=[p],d=[h];for(var n=u.idx+1;n<=f.idx;n++)ju(v,r[n].slice());ju(v,h),ju(v,p);for(var n=f.idx+1;n<=u.idx+i;n++)ju(d,r[n%i].slice());return ju(d,p),ju(d,h),[{points:v},{points:d}]}function Nk(r){var t=r.points,e=[],i=[];Ly(t,e,i);var a=new rt(e[0],e[1],i[0]-e[0],i[1]-e[1]),{width:n,height:o,x:s,y:l}=a,u=new _t,f=new _t;if(n>o)u.x=f.x=s+n/2,u.y=l,f.y=l+o;else u.y=f.y=l+o/2,u.x=s,f.x=s+n;return i9(t,u,f)}function wg(r,t,e,i){if(e===1)i.push(t);else{var a=Math.floor(e/2),n=r(t);wg(r,n[0],a,i),wg(r,n[1],e-a,i)}return i}function a9(r,t){var e=[];for(var i=0;i<t;i++)e.push(Rl(r));return e}function n9(r,t){t.setStyle(r.style),t.z=r.z,t.z2=r.z2,t.zlevel=r.zlevel}function o9(r){var t=[];for(var e=0;e<r.length;)t.push([r[e++],r[e++]]);return t}function zk(r,t){var e=[],i=r.shape,a;switch(r.type){case"rect":t9(i,t,e),a=mt;break;case"sector":Rk(i,t,e),a=Ae;break;case"circle":Rk({r0:0,r:i.r,startAngle:0,endAngle:Math.PI*2,cx:i.cx,cy:i.cy},t,e),a=Ae;break;default:var n=r.getComputedTransform(),o=n?Math.sqrt(Math.max(n[0]*n[0]+n[1]*n[1],n[2]*n[2]+n[3]*n[3])):1,s=z(Ok(r.getUpdatedPathProxy(),o),function(g){return o9(g)}),l=s.length;if(l===0)wg(Nk,{points:s[0]},t,e);else if(l===t)for(var u=0;u<l;u++)e.push({points:s[u]});else{var f=0,c=z(s,function(g){var y=[],_=[];Ly(g,y,_);var x=(_[1]-y[1])*(_[0]-y[0]);return f+=x,{poly:g,area:x}});c.sort(function(g,y){return y.area-g.area});var p=t;for(var u=0;u<l;u++){var h=c[u];if(p<=0)break;var v=u===l-1?p:Math.ceil(h.area/f*t);if(v<0)continue;wg(Nk,{points:h.poly},v,e),p-=v}}a=De;break}if(!a)return a9(r,t);var d=[];for(var u=0;u<e.length;u++){var m=new a;m.setShape(e[u]),n9(r,m),d.push(m)}return d}function s9(r,t){var e=r.length,i=t.length;if(e===i)return[r,t];var a=[],n=[],o=e<i?r:t,s=Math.min(e,i),l=Math.abs(i-e)/6,u=(s-2)/6,f=Math.ceil(l/u)+1,c=[o[0],o[1]],p=l;for(var h=2;h<s;){var v=o[h-2],d=o[h-1],m=o[h++],g=o[h++],y=o[h++],_=o[h++],x=o[h++],S=o[h++];if(p<=0){c.push(m,g,y,_,x,S);continue}var b=Math.min(p,f-1)+1;for(var w=1;w<=b;w++){var A=w/b;Ti(v,m,y,x,A,a),Ti(d,g,_,S,A,n),v=a[3],d=n[3],c.push(a[1],n[1],a[2],n[2],v,d),m=a[5],g=n[5],y=a[6],_=n[6]}p-=b-1}return o===r?[c,t]:[r,c]}function Vk(r,t){var e=r.length,i=r[e-2],a=r[e-1],n=[];for(var o=0;o<t.length;)n[o++]=i,n[o++]=a;return n}function l9(r,t){var e,i,a,n=[],o=[];for(var s=0;s<Math.max(r.length,t.length);s++){var l=r[s],u=t[s],f=void 0,c=void 0;if(!l)f=Vk(i||u,u),c=u;else if(!u)c=Vk(a||l,l),f=l;else e=s9(l,u),f=e[0],c=e[1],i=f,a=c;n.push(f),o.push(c)}return[n,o]}function Uk(r){var t=0,e=0,i=0,a=r.length;for(var n=0,o=a-2;n<a;o=n,n+=2){var s=r[o],l=r[o+1],u=r[n],f=r[n+1],c=s*f-u*l;t+=c,e+=(s+u)*c,i+=(l+f)*c}if(t===0)return[r[0]||0,r[1]||0];return[e/t/3,i/t/3,t]}function u9(r,t,e,i){var a=(r.length-2)/6,n=1/0,o=0,s=r.length,l=s-2;for(var u=0;u<a;u++){var f=u*6,c=0;for(var p=0;p<s;p+=2){var h=p===0?f:(f+p-2)%l+2,v=r[h]-e[0],d=r[h+1]-e[1],m=t[p]-i[0],g=t[p+1]-i[1],y=m-v,_=g-d;c+=y*y+_*_}if(c<n)n=c,o=u}return o}function f9(r){var t=[],e=r.length;for(var i=0;i<e;i+=2)t[i]=r[e-i-2],t[i+1]=r[e-i-1];return t}function c9(r,t,e,i){var a=[],n;for(var o=0;o<r.length;o++){var s=r[o],l=t[o],u=Uk(s),f=Uk(l);if(n==null)n=u[2]<0!==f[2]<0;var c=[],p=[],h=0,v=1/0,d=[],m=s.length;if(n)s=f9(s);var g=u9(s,l,u,f)*6,y=m-2;for(var _=0;_<y;_+=2){var x=(g+_)%y+2;c[_+2]=s[x]-u[0],c[_+3]=s[x+1]-u[1]}if(c[0]=s[g]-u[0],c[1]=s[g+1]-u[1],e>0){var S=i/e;for(var b=-i/2;b<=i/2;b+=S){var w=Math.sin(b),A=Math.cos(b),C=0;for(var _=0;_<s.length;_+=2){var M=c[_],D=c[_+1],I=l[_]-f[0],E=l[_+1]-f[1],O=I*A-E*w,P=I*w+E*A;d[_]=O,d[_+1]=P;var N=O-M,H=P-D;C+=N*N+H*H}if(C<v){v=C,h=b;for(var B=0;B<d.length;B++)p[B]=d[B]}}}else for(var G=0;G<m;G+=2)p[G]=l[G]-f[0],p[G+1]=l[G+1]-f[1];a.push({from:c,to:p,fromCp:u,toCp:f,rotation:-h})}return a}function Tp(r){return r.__isCombineMorphing}var Fk="__mOriginal_";function Cg(r,t,e){var i=Fk+t,a=r[i]||r[t];if(!r[i])r[i]=r[t];var{replace:n,after:o,before:s}=e;r[t]=function(){var l=arguments,u;if(s&&s.apply(this,l),n)u=n.apply(this,l);else u=a.apply(this,l);return o&&o.apply(this,l),u}}function bp(r,t){var e=Fk+t;if(r[e])r[t]=r[e],r[e]=null}function Bk(r,t){for(var e=0;e<r.length;e++){var i=r[e];for(var a=0;a<i.length;){var n=i[a],o=i[a+1];i[a++]=t[0]*n+t[2]*o+t[4],i[a++]=t[1]*n+t[3]*o+t[5]}}}function Hk(r,t){var e=r.getUpdatedPathProxy(),i=t.getUpdatedPathProxy(),a=l9(Tg(e),Tg(i)),n=a[0],o=a[1],s=r.getComputedTransform(),l=t.getComputedTransform();function u(){this.transform=null}s&&Bk(n,s),l&&Bk(o,l),Cg(t,"updateTransform",{replace:u}),t.transform=null;var f=c9(n,o,10,Math.PI),c=[];Cg(t,"buildPath",{replace:function(p){var h=t.__morphT,v=1-h,d=[];for(var m=0;m<f.length;m++){var g=f[m],{from:y,to:_}=g,x=g.rotation*h,{fromCp:S,toCp:b}=g,w=Math.sin(x),A=Math.cos(x);zo(d,S,b,h);for(var C=0;C<y.length;C+=2){var M=y[C],D=y[C+1],I=_[C],E=_[C+1],O=M*v+I*h,P=D*v+E*h;c[C]=O*A-P*w+d[0],c[C+1]=O*w+P*A+d[1]}var N=c[0],H=c[1];p.moveTo(N,H);for(var C=2;C<y.length;){var I=c[C++],E=c[C++],B=c[C++],G=c[C++],X=c[C++],tt=c[C++];if(N===I&&H===E&&B===X&&G===tt)p.lineTo(X,tt);else p.bezierCurveTo(I,E,B,G,X,tt);N=X,H=tt}}}})}function Dg(r,t,e){if(!r||!t)return t;var{done:i,during:a}=e;Hk(r,t),t.__morphT=0;function n(){bp(t,"buildPath"),bp(t,"updateTransform"),t.__morphT=-1,t.createPathProxy(),t.dirtyShape()}return t.animateTo({__morphT:1},j({during:function(o){t.dirtyShape(),a&&a(o)},done:function(){n(),i&&i()}},e)),t}function p9(r,t,e,i,a,n){var o=16;r=a===e?0:Math.round(32767*(r-e)/(a-e)),t=n===i?0:Math.round(32767*(t-i)/(n-i));var s=0,l;for(var u=(1<<o)/2;u>0;u/=2){var f=0,c=0;if((r&u)>0)f=1;if((t&u)>0)c=1;if(s+=u*u*(3*f^c),c===0){if(f===1)r=u-1-r,t=u-1-t;l=r,r=t,t=l}}return s}function Ag(r){var t=1/0,e=1/0,i=-1/0,a=-1/0,n=z(r,function(s){var l=s.getBoundingRect(),u=s.getComputedTransform(),f=l.x+l.width/2+(u?u[4]:0),c=l.y+l.height/2+(u?u[5]:0);return t=Math.min(f,t),e=Math.min(c,e),i=Math.max(f,i),a=Math.max(c,a),[f,c]}),o=z(n,function(s,l){return{cp:s,z:p9(s[0],s[1],t,e,i,a),path:r[l]}});return o.sort(function(s,l){return s.z-l.z}).map(function(s){return s.path})}function Gk(r){return zk(r.path,r.count)}function Z1(){return{fromIndividuals:[],toIndividuals:[],count:0}}function Wk(r,t,e){var i=[];function a(S){for(var b=0;b<S.length;b++){var w=S[b];if(Tp(w))a(w.childrenRef());else if(w instanceof vt)i.push(w)}}a(r);var n=i.length;if(!n)return Z1();var o=e.dividePath||Gk,s=o({path:t,count:n});if(s.length!==n)return console.error("Invalid morphing: unmatched splitted path"),Z1();i=Ag(i),s=Ag(s);var{done:l,during:u,individualDelay:f}=e,c=new Si;for(var p=0;p<n;p++){var h=i[p],v=s[p];if(v.parent=t,v.copyTransform(c),!f)Hk(h,v)}t.__isCombineMorphing=!0,t.childrenRef=function(){return s};function d(S){for(var b=0;b<s.length;b++)s[b].addSelfToZr(S)}Cg(t,"addSelfToZr",{after:function(S){d(S)}}),Cg(t,"removeSelfFromZr",{after:function(S){for(var b=0;b<s.length;b++)s[b].removeSelfFromZr(S)}});function m(){t.__isCombineMorphing=!1,t.__morphT=-1,t.childrenRef=null,bp(t,"addSelfToZr"),bp(t,"removeSelfFromZr")}var g=s.length;if(f){var y=g,_=function(){if(y--,y===0)m(),l&&l()};for(var p=0;p<g;p++){var x=f?j({delay:(e.delay||0)+f(p,g,i[p],s[p]),done:_},e):e;Dg(i[p],s[p],x)}}else t.__morphT=0,t.animateTo({__morphT:1},j({during:function(S){for(var b=0;b<g;b++){var w=s[b];w.__morphT=t.__morphT,w.dirtyShape()}u&&u(S)},done:function(){m();for(var S=0;S<r.length;S++)bp(r[S],"updateTransform");l&&l()}},e));if(t.__zr)d(t.__zr);return{fromIndividuals:i,toIndividuals:s,count:g}}function Yk(r,t,e){var i=t.length,a=[],n=e.dividePath||Gk;function o(h){for(var v=0;v<h.length;v++){var d=h[v];if(Tp(d))o(d.childrenRef());else if(d instanceof vt)a.push(d)}}if(Tp(r)){o(r.childrenRef());var s=a.length;if(s<i){var l=0;for(var u=s;u<i;u++)a.push(Rl(a[l++%s]))}a.length=i}else{a=n({path:r,count:i});var f=r.getComputedTransform();for(var u=0;u<a.length;u++)a[u].setLocalTransform(f);if(a.length!==i)return console.error("Invalid morphing: unmatched splitted path"),Z1()}a=Ag(a),t=Ag(t);var c=e.individualDelay;for(var u=0;u<i;u++){var p=c?j({delay:(e.delay||0)+c(u,i,a[u],t[u])},e):e;Dg(a[u],t[u],p)}return{fromIndividuals:a,toIndividuals:t,count:t.length}}function Zk(r){return R(r[0])}function Xk(r,t){var e=[],i=r.length;for(var a=0;a<i;a++)e.push({one:r[a],many:[]});for(var a=0;a<t.length;a++){var n=t[a].length,o=void 0;for(o=0;o<n;o++)e[o%i].many.push(t[a][o])}var s=0;for(var a=i-1;a>=0;a--)if(!e[a].many.length){var l=e[s].many;if(l.length<=1)if(s)s=0;else return e;var n=l.length,u=Math.ceil(n/2);e[a].many=l.slice(u,n),e[s].many=l.slice(0,u),s++}return e}var h9={clone:function(r){var t=[],e=1-Math.pow(1-r.path.style.opacity,1/r.count);for(var i=0;i<r.count;i++){var a=Rl(r.path);a.setStyle("opacity",e),t.push(a)}return t},split:null};function Mg(r,t,e,i,a,n){if(!r.length||!t.length)return;var o=kl("update",i,a);if(!(o&&o.duration>0))return;var s=i.getModel("universalTransition").get("delay"),l=k({setToFinal:!0},o),u,f;if(Zk(r))u=r,f=t;if(Zk(t))u=t,f=r;function c(g,y,_,x,S){var{many:b,one:w}=g;if(b.length===1&&!S){var A=y?b[0]:w,C=y?w:b[0];if(Tp(A))c({many:[A],one:C},!0,_,x,!0);else{var M=s?j({delay:s(_,x)},l):l;Dg(A,C,M),n(A,C,A,C,M)}}else{var D=j({dividePath:h9[e],individualDelay:s&&function(H,B,G,X){return s(H+_,x)}},l),I=y?Wk(b,w,D):Yk(w,b,D),{fromIndividuals:E,toIndividuals:O}=I,P=E.length;for(var N=0;N<P;N++){var M=s?j({delay:s(N,P)},l):l;n(E[N],O[N],y?b[N]:g.one,y?g.one:b[N],M)}}}var p=u?u===r:r.length>t.length,h=u?Xk(f,u):Xk(p?t:r,[p?r:t]),v=0;for(var d=0;d<h.length;d++)v+=h[d].many.length;var m=0;for(var d=0;d<h.length;d++)c(h[d],p,m,v),m+=h[d].many.length}function Lo(r){if(!r)return[];if(R(r)){var t=[];for(var e=0;e<r.length;e++)t.push(Lo(r[e]));return t}var i=[];return r.traverse(function(a){if(a instanceof vt&&!a.disableMorphing&&!a.invisible&&!a.ignore)i.push(a)}),i}var ez=1e4,v9=0,qk=1,Kk=2,d9=et();function m9(r,t){var e=r.dimensions;for(var i=0;i<e.length;i++){var a=r.getDimensionInfo(e[i]);if(a&&a.otherDims[t]===0)return e[i]}}function g9(r,t,e){var i=r.getDimensionInfo(e),a=i&&i.ordinalMeta;if(i){var n=r.get(i.name,t);if(a)return a.categories[n]||n+"";return n+""}}function jk(r,t,e,i){var a=i?"itemChildGroupId":"itemGroupId",n=m9(r,a);if(n){var o=g9(r,t,n);return o}var s=r.getRawDataItem(t),l=i?"childGroupId":"groupId";if(s&&s[l])return s[l]+"";if(i)return;return e||r.getId(t)}function Qk(r){var t=[];return T(r,function(e){var{data:i,dataGroupId:a}=e;if(i.count()>ez){Zt("Universal transition is disabled on large data > 10k.");return}var n=i.getIndices();for(var o=0;o<n.length;o++)t.push({data:i,groupId:jk(i,o,a,!1),childGroupId:jk(i,o,a,!0),divide:e.divide,dataIndex:o})}),t}function X1(r,t,e){r.traverse(function(i){if(i instanceof vt)Ut(i,{style:{opacity:0}},t,{dataIndex:e,isFrom:!0})})}function q1(r){if(r.parent){var t=r.getComputedTransform();r.setLocalTransform(t),r.parent.remove(r)}}function Qu(r){if(r.stopAnimation(),r.isGroup)r.traverse(function(t){t.stopAnimation()})}function y9(r,t,e){var i=kl("update",e,t);i&&r.traverse(function(a){if(a instanceof Pr){var n=QC(a);if(n)a.animateFrom({style:n},i)}})}function _9(r,t){var e=r.length;if(e!==t.length)return!1;for(var i=0;i<e;i++){var a=r[i],n=t[i];if(a.data.getId(a.dataIndex)!==n.data.getId(n.dataIndex))return!1}return!0}function rz(r,t,e){var i=Qk(r),a=Qk(t);function n(_,x,S,b,w){if(S||_)x.animateFrom({style:S&&S!==_?k(k({},S.style),_.style):_.style},w)}var o=!1,s=v9,l=Y(),u=Y();T(i,function(_){_.groupId&&l.set(_.groupId,!0),_.childGroupId&&u.set(_.childGroupId,!0)});for(var f=0;f<a.length;f++){var c=a[f].groupId;if(u.get(c)){s=qk;break}var p=a[f].childGroupId;if(p&&l.get(p)){s=Kk;break}}function h(_,x){return function(S){var{data:b,dataIndex:w}=S;if(x)return b.getId(w);if(_)return s===qk?S.childGroupId:S.groupId;else return s===Kk?S.childGroupId:S.groupId}}var v=_9(i,a),d={};if(!v)for(var f=0;f<a.length;f++){var m=a[f],g=m.data.getItemGraphicEl(m.dataIndex);if(g)d[g.id]=!0}function y(_,x){var S=i[x],b=a[_],w=b.data.hostModel,A=S.data.getItemGraphicEl(S.dataIndex),C=b.data.getItemGraphicEl(b.dataIndex);if(A===C){C&&y9(C,b.dataIndex,w);return}if(A&&d[A.id])return;if(C)if(Qu(C),A)Qu(A),q1(A),o=!0,Mg(Lo(A),Lo(C),b.divide,w,_,n);else X1(C,w,_)}if(new si(i,a,h(!0,v),h(!1,v),null,"multiple").update(y).updateManyToOne(function(_,x){var S=a[_],b=S.data,w=b.hostModel,A=b.getItemGraphicEl(S.dataIndex),C=Dt(z(x,function(M){return i[M].data.getItemGraphicEl(i[M].dataIndex)}),function(M){return M&&M!==A&&!d[M.id]});if(A)if(Qu(A),C.length)T(C,function(M){Qu(M),q1(M)}),o=!0,Mg(Lo(C),Lo(A),S.divide,w,_,n);else X1(A,w,S.dataIndex)}).updateOneToMany(function(_,x){var S=i[x],b=S.data.getItemGraphicEl(S.dataIndex);if(b&&d[b.id])return;var w=Dt(z(_,function(C){return a[C].data.getItemGraphicEl(a[C].dataIndex)}),function(C){return C&&C!==b}),A=a[_[0]].data.hostModel;if(w.length)if(T(w,function(C){return Qu(C)}),b)Qu(b),q1(b),o=!0,Mg(Lo(b),Lo(w),S.divide,A,_[0],n);else T(w,function(C){return X1(C,A,_[0])})}).updateManyToMany(function(_,x){new si(x,_,function(S){return i[S].data.getId(i[S].dataIndex)},function(S){return a[S].data.getId(a[S].dataIndex)}).update(function(S,b){y(_[S],x[b])}).execute()}).execute(),o)T(t,function(_){var x=_.data,S=x.hostModel,b=S&&e.getViewOfSeriesModel(S),w=kl("update",S,0);if(b&&S.isAnimationEnabled()&&w&&w.duration>0)b.group.traverse(function(A){if(A instanceof vt&&!A.animators.length)A.animateFrom({style:{opacity:0}},w)})})}function Jk(r){var t=r.getModel("universalTransition").get("seriesKey");if(!t)return r.id;return t}function $k(r){if(R(r))return r.sort().join(",");return r}function Oo(r){if(r.hostModel)return r.hostModel.getModel("universalTransition").get("divideShape")}function x9(r,t){var e=Y(),i=Y(),a=Y();T(r.oldSeries,function(o,s){var l=r.oldDataGroupIds[s],u=r.oldData[s],f=Jk(o),c=$k(f);if(i.set(c,{dataGroupId:l,data:u}),R(f))T(f,function(p){a.set(p,{key:c,dataGroupId:l,data:u})})});function n(o){if(e.get(o))Zt("Duplicated seriesKey in universalTransition "+o)}return T(t.updatedSeries,function(o){if(o.isUniversalTransitionEnabled()&&o.isAnimationEnabled()){var s=o.get("dataGroupId"),l=o.getData(),u=Jk(o),f=$k(u),c=i.get(f);if(c)n(f),e.set(f,{oldSeries:[{dataGroupId:c.dataGroupId,divide:Oo(c.data),data:c.data}],newSeries:[{dataGroupId:s,divide:Oo(l),data:l}]});else if(R(u)){n(f);var p=[];if(T(u,function(d){var m=i.get(d);if(m.data)p.push({dataGroupId:m.dataGroupId,divide:Oo(m.data),data:m.data})}),p.length)e.set(f,{oldSeries:p,newSeries:[{dataGroupId:s,data:l,divide:Oo(l)}]})}else{var h=a.get(u);if(h){var v=e.get(h.key);if(!v)v={oldSeries:[{dataGroupId:h.dataGroupId,data:h.data,divide:Oo(h.data)}],newSeries:[]},e.set(h.key,v);v.newSeries.push({dataGroupId:s,data:l,divide:Oo(l)})}}}}),e}function tz(r,t){for(var e=0;e<r.length;e++){var i=t.seriesIndex!=null&&t.seriesIndex===r[e].seriesIndex||t.seriesId!=null&&t.seriesId===r[e].id;if(i)return e}}function S9(r,t,e,i){var a=[],n=[];if(T(kt(r.from),function(o){var s=tz(t.oldSeries,o);if(s>=0)a.push({dataGroupId:t.oldDataGroupIds[s],data:t.oldData[s],divide:Oo(t.oldData[s]),groupIdDim:o.dimension})}),T(kt(r.to),function(o){var s=tz(e.updatedSeries,o);if(s>=0){var l=e.updatedSeries[s].getData();n.push({dataGroupId:t.oldDataGroupIds[s],data:l,divide:Oo(l),groupIdDim:o.dimension})}}),a.length>0&&n.length>0)rz(a,n,i)}function K1(r){r.registerUpdateLifecycle("series:beforeupdate",function(t,e,i){T(kt(i.seriesTransition),function(a){T(kt(a.to),function(n){var o=i.updatedSeries;for(var s=0;s<o.length;s++)if(n.seriesIndex!=null&&n.seriesIndex===o[s].seriesIndex||n.seriesId!=null&&n.seriesId===o[s].id)o[s][cc]=!0})})}),r.registerUpdateLifecycle("series:transition",function(t,e,i){var a=d9(e);if(a.oldSeries&&i.updatedSeries&&i.optionChanged){var n=i.seriesTransition;if(n)T(kt(n),function(h){S9(h,a,i,e)});else{var o=x9(a,i);T(o.keys(),function(h){var v=o.get(h);rz(v.oldSeries,v.newSeries,e)})}T(i.updatedSeries,function(h){if(h[cc])h[cc]=!1})}var s=t.getSeries(),l=a.oldSeries=[],u=a.oldDataGroupIds=[],f=a.oldData=[];for(var c=0;c<s.length;c++){var p=s[c].getData();if(p.count()<ez)l.push(s[c]),u.push(s[c].get("dataGroupId")),f.push(p)}})}function iz(r,t,e){var i=ne.createCanvas(),a=t.getWidth(),n=t.getHeight(),o=i.style;if(o)o.position="absolute",o.left="0",o.top="0",o.width=a+"px",o.height=n+"px",i.setAttribute("data-zr-dom-id",r);return i.width=a*e,i.height=n*e,i}function Eg(r){return!r.__cursors.get(v0)}function az(r){var t=r.__cursors.get(v0);return{startIdx:t?t.startIdx:0,endIdx:t?t.endIdx:0}}var b9=function(r){L(t,r);function t(e,i,a){var n=r.call(this)||this;n.motionBlur=!1,n.lastFrameAlpha=0.7,n.dpr=1,n.virtual=!1,n.config={},n.zlevel=0,n.zlevel2=Nl,n.maxRepaintRectCount=5,n.__dirty=!0,n.__firstTimePaint=!0,n.__prevIdx={startIdx:0,endIdx:0};var o;if(a=a||jo,typeof e==="string")o=iz(e,i,a);else if(Z(e))o=e,e=o.id;n.id=e,n.dom=o;var s=o.style;if(s)af(o),o.onselectstart=function(){return!1},s.padding="0",s.margin="0",s.borderWidth="0";return n.painter=i,n.dpr=a,n}return t.prototype.afterBrush=function(){this.__prevIdx=az(this)},t.prototype.initContext=function(){this.ctx=this.dom.getContext("2d"),this.ctx.dpr=this.dpr},t.prototype.setUnpainted=function(){this.__firstTimePaint=!0},t.prototype.createBackBuffer=function(){var e=this.dpr;if(this.domBack=iz("back-"+this.id,this.painter,e),this.ctxBack=this.domBack.getContext("2d"),e!==1)this.ctxBack.scale(e,e)},t.prototype.createRepaintRects=function(e,i,a,n){if(this.__firstTimePaint)return this.__firstTimePaint=!1,null;var o=[],s=this.maxRepaintRectCount,l=!1,u=new rt(0,0,0,0);function f(x){if(!x.isFinite()||x.isZero())return;if(o.length===0){var S=new rt(0,0,0,0);S.copy(x),o.push(S)}else{var b=!1,w=1/0,A=0;for(var C=0;C<o.length;++C){var M=o[C];if(M.intersect(x)){var D=new rt(0,0,0,0);D.copy(M),D.union(x),o[C]=D,b=!0;break}else if(l){u.copy(x),u.union(M);var I=x.width*x.height,E=M.width*M.height,O=u.width*u.height,P=O-I-E;if(P<w)w=P,A=C}}if(l)o[A].union(x),b=!0;if(!b){var S=new rt(0,0,0,0);S.copy(x),o.push(S)}if(!l)l=o.length>=s}}var c=az(this);for(var p=c.startIdx;p<c.endIdx;++p){var h=e[p];if(h){var v=h.shouldBePainted(a,n,!0,!0),d=h.__isRendered&&(h.__dirty&Re||!v)?h.getPrevPaintRect():null;if(d)f(d);var m=v&&(h.__dirty&Re||!h.__isRendered)?h.getPaintRect():null;if(m)f(m)}}var g=this.__prevIdx;for(var p=g.startIdx;p<g.endIdx;++p){var h=i[p],v=h&&h.shouldBePainted(a,n,!0,!0);if(h&&(!v||!h.__zr)&&h.__isRendered){var d=h.getPrevPaintRect();if(d)f(d)}}var y;do{y=!1;for(var p=0;p<o.length;){if(o[p].isZero()){o.splice(p,1);continue}for(var _=p+1;_<o.length;)if(o[p].intersect(o[_]))y=!0,o[p].union(o[_]),o.splice(_,1);else _++;p++}}while(y);return this._paintRects=o,o},t.prototype.debugGetPaintRects=function(){return(this._paintRects||[]).slice()},t.prototype.resize=function(e,i){var a=this.dpr,n=this.dom,o=n.style,s=this.domBack;if(o)o.width=e+"px",o.height=i+"px";if(n.width=e*a,n.height=i*a,s){if(s.width=e*a,s.height=i*a,a!==1)this.ctxBack.scale(a,a)}},t.prototype.clear=function(e,i,a){var n=this.dom,o=this.ctx,{width:s,height:l}=n;i=i||this.clearColor;var u=this.motionBlur&&!e,f=this.lastFrameAlpha,c=this.dpr,p=this;if(u){if(!this.domBack)this.createBackBuffer();this.ctxBack.globalCompositeOperation="copy",this.ctxBack.drawImage(n,0,0,s/c,l/c)}var h=this.domBack;function v(d,m,g,y){if(o.clearRect(d,m,g,y),i&&i!=="transparent"){var _=void 0;if(Za(i)){var x=i.global||i.__width===g&&i.__height===y;_=x&&i.__canvasGradient||Zc(o,i,{x:0,y:0,width:g,height:y}),i.__canvasGradient=_,i.__width=g,i.__height=y}else if(Fg(i))i.scaleX=i.scaleX||c,i.scaleY=i.scaleY||c,_=Jd(o,i,{dirty:function(){p.setUnpainted(),p.painter.refresh()}});o.save(),o.fillStyle=_||i,o.fillRect(d,m,g,y),o.restore()}if(u)o.save(),o.globalAlpha=f,o.drawImage(h,d,m,g,y),o.restore()}if(!a||u)v(0,0,s,l);else if(a.length)T(a,function(d){v(d.x*c,d.y*c,d.width*c,d.height*c)})},t}(Oe),j1=b9;var nz=1e5,ol=314159,Q1=void 0,T9=1,J1=2;function w9(r){if(!r)return!1;if(r.__builtin__)return!0;if(typeof r.resize!=="function"||typeof r.refresh!=="function")return!1;return!0}function C9(r,t){var e=document.createElement("div");return e.style.cssText=["position:relative","width:"+r+"px","height:"+t+"px","padding:0","margin:0","border-width:0"].join(";")+";",e}function oz(r,t,e,i){var a=new j1(r,t,t.dpr);return a.zlevel=e,a.zlevel2=i,a.__builtin__=!0,sz(a),a}function sz(r){r.__cursorStack=[],r.__cursors=Y()}function A9(r){return r.startIdx=r.drawIdx=r.endIdx=r.endIdxNew=0,r.used=!1,r.first=r.last=NaN,r.notClearIdx=-1,r}function D9(r,t){var e=r.__cursors,i=+t;return e.get(i)||(r.__cursorStack.push(i),e.set(i,A9({key:i})))}function Ig(r,t){var e=r.__cursorStack;for(var i=0;i<e.length;i++)t(r.__cursors.get(e[i]))}function $1(r,t){var e=r.layers;return e[t]||(e[t]=[,,,])}function gr(r,t,e){var i=r.layerStack;for(var a=0;a<i.length;a++){var n=i[a].zl,o=i[a].zl2,s=r.layers[n][o];if(!e||(!(e&wp)||s.__builtin__)&&(!(e&tT)||!s.__builtin__)&&(!(e&lz)||s!==r.hoverlayer))t(s,n,o,a)}}var wp=1,tT=2,lz=4,Lg=wp|lz,M9=function(){function r(t,e,i,a){this.type="canvas",this._prevDisplayList=[],this._layerConfig={},this._needsManuallyCompositing=!1,this.type="canvas",this._i={layerStack:[],layers:[]};var n=!t.nodeName||t.nodeName.toUpperCase()==="CANVAS";this._opts=i=k({},i||{}),this.dpr=i.devicePixelRatio||jo,this._singleCanvas=n,this.root=t;var o=t.style;if(o)af(t),t.innerHTML="";if(this.storage=e,this._prevDisplayList=[],!n){this._width=Xc(t,0,i),this._height=Xc(t,1,i);var s=this._domRoot=C9(this._width,this._height);t.appendChild(s)}else{var l=t,{width:u,height:f}=l;if(i.width!=null)u=i.width;if(i.height!=null)f=i.height;this.dpr=i.devicePixelRatio||1,l.width=u*this.dpr,l.height=f*this.dpr,this._width=u,this._height=f;var c=oz(l,this,ol,Nl);c.initContext(),this._insertLayer(c,ol,Nl,!0),this._domRoot=t}}return r.prototype.getType=function(){return"canvas"},r.prototype.isSingleCanvas=function(){return this._singleCanvas},r.prototype.getViewportRoot=function(){return this._domRoot},r.prototype.getViewportRootOffset=function(){var t=this.getViewportRoot();if(t)return{offsetLeft:t.offsetLeft||0,offsetTop:t.offsetTop||0}},r.prototype.refresh=function(t){var e;if(t&&!Z(t))e={paintAll:!!t};else e=t||{};var i=q(e.refresh,!0),a=q(e.refreshHover,!1);if(a)this._hoverLayerDirty=J1;if(!i){if(a)this._paintHoverList(this.storage.getDisplayList(!1));return this}var n=this.storage.getDisplayList(!0);this._updateLayerStatus(n,e.paintAll),this._redrawId=Math.random();var o=this._prevDisplayList;this._paintList(n,o,this._redrawId);var s=this._backgroundColor;if(gr(this._i,function(l,u,f,c){if(l.refresh)l.refresh(c===0?s:null)},tT),this._opts.useDirtyRect)this._prevDisplayList=n.slice();return this},r.prototype._paintHoverList=function(t){var e=this._i.hoverlayer,i=this._hoverLayerDirty;if(this._hoverLayerDirty=Q1,i===Q1)return;if(!e&&i===J1)e=this._i.hoverlayer=this._ensureLayer(nz);if(!e)return;e.clear();var a={inHover:!0,viewWidth:this._width,viewHeight:this._height,beforeBrushParam:{}},n;for(var o=0,s=t.length;o<s;o++){var l=t[o];if(!l.__inHover)continue;if(!n)n=e.ctx,n.save();var u=l.__hoverStyle,f=void 0;if(u)f=l.style,l.style=u;if(So(n,l,a),u)l.style=f}if(n)Zs(n,a),n.restore()},r.prototype.getHoverLayer=function(){return this._ensureLayer(nz)},r.prototype.paintOne=function(t,e){Du(t,e)},r.prototype._paintList=function(t,e,i){if(this._redrawId!==i)return;var a=this._doPaintList(t,e);if(this._needsManuallyCompositing)this._compositeManually();if(!a){var n=this;kc(function(){n._paintList(t,e,i)})}else gr(this._i,function(o){o.afterBrush&&o.afterBrush()},Lg),this._paintHoverList(t)},r.prototype._compositeManually=function(){var t=this._ensureLayer(ol).ctx,e=this._domRoot.width,i=this._domRoot.height;t.clearRect(0,0,e,i),gr(this._i,function(a){if(a.virtual)t.drawImage(a.dom,0,0,e,i)},wp)},r.prototype._doPaintList=function(t,e){var i=this,a=!0;if(gr(this._i,function(n){var o=!1;if(Ig(n,function(c){if(c.drawIdx<c.endIdx||c.notClearIdx>=0)o=!0}),!o&&!n.__dirty)return;var s=i._opts.useDirtyRect&&!Eg(n)?n.createRepaintRects(t,e,i._width,i._height):null,l=i._i.layerStack[0],u=!0;if(n.__dirty){u=!1,n.__dirty=!1;var f=n.zlevel===l.zl&&n.zlevel2===l.zl2?i._backgroundColor:null;n.clear(!1,f,s)}Ig(n,function(c){var p=i._paintPerCursor(n,c,t,s,u);a=a&&p})},Lg),St.wxa)gr(this._i,function(n){if(n&&n.ctx&&n.ctx.draw)n.ctx.draw()});return a},r.prototype._paintPerCursor=function(t,e,i,a,n){var o=t.ctx;if(a)if(!a.length)e.drawIdx=e.endIdx;else{var s=this.dpr;for(var l=0;l<a.length;++l){var u=a[l];o.save(),o.beginPath(),o.rect(u.x*s,u.y*s,u.width*s,u.height*s),o.clip(),this._paintPerCursorInRect(t,e,i,u,n),o.restore()}}else o.save(),this._paintPerCursorInRect(t,e,i,null,n),o.restore();return e.drawIdx>=e.endIdx},r.prototype._paintPerCursorInRect=function(t,e,i,a,n){var o={inHover:!1,allClipped:!1,prevEl:null,viewWidth:this._width,viewHeight:this._height,beforeBrushParam:{contentRetained:n}},s=t.ctx,l=Eg(t),u=l&&ne.getTime(),{drawIdx:f,notClearIdx:c}=e,p=c>=0?Math.min(c,f):f;for(;p<e.endIdx;p++){var h=i[p];if(p<f&&!h.notClear)continue;if(h.__inHover)this._hoverLayerDirty=J1;if(a!=null){var v=h.getPaintRect();if(v&&v.intersect(a))So(s,h,o),h.setPrevPaintRect(v)}else So(s,h,o);if(l){var d=ne.getTime()-u;if(d>15){p++;break}}}Zs(s,o),e.drawIdx=Math.max(p,f)},r.prototype.getLayer=function(t,e){return this._ensureLayer(t,0,e)},r.prototype._ensureLayer=function(t,e,i){e=e||0;var a=this._singleCanvas;if(a&&!this._needsManuallyCompositing)t=ol,e=0;var n=$1(this._i,t)[e];if(!n){if(n=oz("zr_"+t+"."+e,this,t,e),this._layerConfig[t])ht(n,this._layerConfig[t],!0);if(i||a&&t!==ol)n.virtual=!0;this._insertLayer(n,t,e,!1),n.initContext()}return n},r.prototype.insertLayer=function(t,e){this._insertLayer(e,t,0,!1)},r.prototype._insertLayer=function(t,e,i,a){var n=this._i,{layers:o,layerStack:s}=n,l=this._domRoot,u=null;if(o[e]&&o[e][i]){or("ZLevel "+e+"."+i+" has been used already");return}if(!w9(t)){or("Layer of zlevel "+e+" is not valid");return}var f=s.length,c=0;while(c<f&&(s[c].zl<e||s[c].zl===e&&s[c].zl2<i))c++;if(c>0)u=$1(n,s[c-1].zl)[s[c-1].zl2];if(s.splice(c,0,{zl:e,zl2:i}),$1(n,e)[i]=t,!a&&!t.virtual)if(u){var p=u.dom;if(p.nextSibling)l.insertBefore(t.dom,p.nextSibling);else l.appendChild(t.dom)}else if(l.firstChild)l.insertBefore(t.dom,l.firstChild);else l.appendChild(t.dom);t.painter||(t.painter=this)},r.prototype.eachLayer=function(t,e){return gr(this._i,function(i,a){t.call(e,i,a)})},r.prototype.eachBuiltinLayer=function(t,e){return gr(this._i,function(i,a){t.call(e,i,a)},wp)},r.prototype.eachOtherLayer=function(t,e){return gr(this._i,function(i,a){t.call(e,i,a)},tT)},r.prototype.getLayers=function(){var t={};return gr(this._i,function(e,i,a){t[e.id]=e}),t},r.prototype._updateLayerStatus=function(t,e){var i=this;if(i._singleCanvas)for(var a=1;a<t.length;a++){var n=t[a];if(n.zlevel!==t[a-1].zlevel||n.incremental){i._needsManuallyCompositing=!0;break}}gr(i._i,function(m){m.__dirty=!1,Ig(m,function(g){g.used=!1,g.endIdxNew=0,g.notClearIdx=-1})},Lg);var o,s=null,l=null,u=!1;for(var f=0,c=t.length;f<c;f++){var n=t[f],{zlevel:p,incremental:h}=n,v=void 0;if(o!==p)o=p,u=!1;if(h)u=!0,v=qC;else v=u?XC:Nl;if(!s||p!==s.zlevel||v!==s.zlevel2){if(s=i._ensureLayer(p,v),l=null,!s.__builtin__){or("ZLevel "+p+" has been used by unknown layer "+s.id);continue}}if(!l||h!==l.key){if(l=D9(s,h),!l.used)if(l.used=!0,!e&&l.first===n.id){var d=f-l.startIdx;l.startIdx=f,l.drawIdx+=d,l.endIdx+=d}else s.__dirty=!0,l.first=n.id,l.startIdx=l.drawIdx=f,l.endIdx=f+1}if(l.endIdxNew=f+1,n.__dirty&Re&&!n.__inHover){if(!h||!n.notClear&&f<l.drawIdx)s.__dirty=!0;if(h&&n.notClear&&l.notClearIdx<0)l.notClearIdx=f}}gr(i._i,function(m){var{__cursorStack:g,__cursors:y}=m;for(var _=g.length-1;_>=0;_--){var x=y.get(g[_]);if(!x.used)m.__dirty=!0,y.removeKey(g[_]),g.splice(_,1);else{var S=x.endIdxNew;if(Eg(m)?S<x.drawIdx:S!==x.endIdx||!S||t[S-1].id!==x.last)m.__dirty=!0;x.endIdx=x.endIdxNew,x.last=S?t[S-1].id:NaN}}if(m.__dirty){if(Ig(m,function(b){b.drawIdx=b.startIdx}),i._hoverLayerDirty===Q1)i._hoverLayerDirty=T9}},Lg)},r.prototype.clear=function(){return gr(this._i,function(t){t.clear(),sz(t)},wp),this},r.prototype.setBackgroundColor=function(t){this._backgroundColor=t,gr(this._i,function(e){e.setUnpainted()})},r.prototype.configLayer=function(t,e){if(e){var i=this._layerConfig;if(!i[t])i[t]=e;else ht(i[t],e,!0);gr(this._i,function(a,n){ht(a,i[n],!0)})}},r.prototype.delLayer=function(t){var e=this._i.layerStack,i=this._i.layers;for(var a=e.length-1;a>=0;a--){var n=e[a];if(n.zl===t){var o=i[t][n.zl2];if(o.__builtin__)continue;if(e.splice(a,1),i[t][n.zl2]=void 0,!o.virtual){var s=o.dom.parentNode;s&&s.removeChild(o.dom)}}}},r.prototype.resize=function(t,e){if(!this._domRoot.style){if(t==null||e==null)return;this._width=t,this._height=e,this._ensureLayer(ol).resize(t,e)}else{var i=this._domRoot;i.style.display="none";var a=this._opts,n=this.root;if(t!=null&&(a.width=t),e!=null&&(a.height=e),t=Xc(n,0,a),e=Xc(n,1,a),i.style.display="",this._width!==t||e!==this._height)i.style.width=t+"px",i.style.height=e+"px",gr(this._i,function(o){o.resize(t,e)}),this.refresh({paintAll:!0});this._width=t,this._height=e}return this},r.prototype.clearLayer=function(t){T(this._i.layers[t],function(e){if(e&&!e.__builtin__)e.clear()})},r.prototype.dispose=function(){this.root.innerHTML="",this.root=this.storage=this._domRoot=this._i=null},r.prototype.getRenderedCanvas=function(t){if(t=t||{},this._singleCanvas&&!this._compositeManually)return this._i.layers[ol][0].dom;var e=new j1("image",this,t.pixelRatio||this.dpr);e.initContext(),e.clear(!1,t.backgroundColor||this._backgroundColor);var i=e.ctx;if(t.pixelRatio<=this.dpr){this.refresh();var a=e.dom.width,n=e.dom.height;gr(this._i,function(c){if(c.__builtin__)i.drawImage(c.dom,0,0,a,n);else if(c.renderToCanvas)i.save(),c.renderToCanvas(i),i.restore()})}else{var o={inHover:!1,viewWidth:this._width,viewHeight:this._height,beforeBrushParam:{}},s=this.storage.getDisplayList(!0);for(var l=0,u=s.length;l<u;l++){var f=s[l];So(i,f,o)}Zs(i,o)}return e.dom},r.prototype.getWidth=function(){return this._width},r.prototype.getHeight=function(){return this._height},r}(),uz=M9;function eT(r){r.registerPainter("canvas",uz)}ie([Z_,db,mb,M_,tx,dS,pb,cS,yb,ZS,I1,In,r1,zb,T1,P1,Mb,y1,c1,f1,l1,Pb,Qc,i1,Xb,Qb,R1,M1,G1,K1,eT]);Object.assign(globalThis,{echarts:W1});})();
 </script>
 <script>/* charts: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light/dark. Load after kit:echarts.js.
-   Charts.make(el, option, setup?)  -> { chart, set(patch) }
+   Charts.make(el, option, setup?)  -> { chart, set(patch), dispose() }
      el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width
      option  any ECharts option; colours default to --c1..--c6, text to the page font
      setup   (chart) => void, run after every (re)mount: attach chart.on("click", ...), chart.group, echarts.connect(...)
@@ -2318,6 +2242,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
      set(patch)            merges into the instance and into the option remounts reuse: objects merge, series/axes match by id else position
      set(patch, ["series"]) ReplaceMerge: the listed components become exactly the patch's list (same id merges, others are removed;
                            set({ series: [] }, ["series"]) clears them). Use it to remove or swap series; set(patch) alone cannot.
+     dispose()             removes the chart and stops watching el, for code that takes the element away
    Colours: write "var(--accent)", "color-mix(in srgb, var(--accent) 20%, transparent)" or Charts.color("accent") (the same var string)
      in any colour option (color, borderColor, fill, colorStops[].color, ...). They are resolved when the chart mounts, so they follow
      light/dark. Charts.color(token) is not a resolved rgb: do not use it in canvas code or alpha maths.
@@ -2505,6 +2430,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   function make(el, option, setup) {
     made.get(el)?.();
     let chart = null;
+    let live = true;
     const mount = () => {
       chart?.dispose();
       chart = echarts.init(el, theme(el));
@@ -2519,18 +2445,25 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       if (chart) {
         chart.resize();
       } else {
-        fontReady.then(() => !chart && el.clientWidth && mount());
+        fontReady.then(() => live && !chart && el.clientWidth && mount());
       }
     });
     const remount = () => chart && mount();
     resizer.observe(el);
     remounts.add(remount);
-    made.set(el, () => {
+    const dispose = () => {
+      live = false;
       resizer.disconnect();
       remounts.delete(remount);
       chart?.dispose();
-    });
+      chart = null;
+      if (made.get(el) === dispose) {
+        made.delete(el);
+      }
+    };
+    made.set(el, dispose);
     return {
+      dispose,
       get chart() {
         return chart;
       },
@@ -2544,7 +2477,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
 })();
 </script>
 <script>/* plot: small line, stem and bar plots as SVG in the page theme, no ECharts. For zoom, drill-down, heatmaps or sankey use charts.js. Needs kit:theme.css.
-   Plot.make(el, option) -> { set(patch) }
+   Plot.make(el, option) -> { set(patch), dispose() }
      el      element with a height (.chart); Plot fills it with a legend and an SVG drawn at its pixel size and redrawn on resize,
              so text stays 13 px from phone to desktop. Colours are CSS tokens: light and dark switch with no redraw.
      option  { series, categories, horizontal, stack, x, y, legend }
@@ -2561,6 +2494,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
               Range and step are automatic and round; format(v) => text writes the tick labels and values (decimal comma, units).
        legend false hides the legend (by default it shows when two or more series have a name)
      set(patch)  shallow-merges the patch into the option (x and y one level deeper) and redraws at once; series is replaced whole.
+     dispose()   stops redrawing on resize, for code that takes the element away
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A bar label sits past the bar's end, or inside the end when the panel has no room past it. A label on a stacked segment is left out
    when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
@@ -2882,9 +2816,16 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     const resizer = new ResizeObserver(draw);
     resizer.observe(area);
     document.fonts.load(`500 ${FONT}px ${getComputedStyle(el).fontFamily}`).then(draw, draw);
-    made.set(el, () => resizer.disconnect());
+    const dispose = () => {
+      resizer.disconnect();
+      if (made.get(el) === dispose) {
+        made.delete(el);
+      }
+    };
+    made.set(el, dispose);
     draw();
     return {
+      dispose,
       set(patch) {
         option = {
           ...option,
@@ -2897,6 +2838,541 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
     };
   }
   window.Plot = { make };
+})();
+</script>
+<script>(()=>{var Nt=Object.defineProperty;var Mt=(e)=>e;function Et(e,t){this[e]=Mt.bind(null,t)}var It=(e,t)=>{for(var o in t)Nt(e,o,{get:t[o],enumerable:!0,configurable:!0,set:Et.bind(t,o)})};var Ve={};It(Ve,{Coefficients:()=>en,Gibbs:()=>an,Hero:()=>Yt,Symmetry:()=>fn});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var ae,_,Ke,qt,H,Be,Je,Xe,be,te,Q,Ye,we,ye,xe,Ht,re={},ie=[],Wt=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,le=Array.isArray;function I(e,t){for(var o in t)e[o]=t[o];return e}function Ce(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function ue(e,t,o){var i,s,r,l={};for(r in t)r=="key"?i=t[r]:r=="ref"?s=t[r]:l[r]=t[r];if(arguments.length>2&&(l.children=arguments.length>3?ae.call(arguments,2):o),typeof e=="function"&&e.defaultProps!=null)for(r in e.defaultProps)l[r]===void 0&&(l[r]=e.defaultProps[r]);return ne(e,l,i,s,null)}function ne(e,t,o,i,s){var r={type:e,props:t,key:o,ref:i,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:s==null?++Ke:s,__i:-1,__u:0};return s==null&&_.vnode!=null&&_.vnode(r),r}function f(e){return e.children}function oe(e,t){this.props=e,this.context=t}function O(e,t){if(t==null)return e.__?O(e.__,e.__i+1):null;for(var o;t<e.__k.length;t++)if((o=e.__k[t])!=null&&o.__e!=null)return o.__e;return typeof e.type=="function"?O(e):null}function $t(e){if(e.__P&&e.__d){var t=e.__v,o=t.__e,i=[],s=[],r=I({},t);r.__v=t.__v+1,_.vnode&&_.vnode(r),Se(e.__P,r,t,e.__n,e.__P.namespaceURI,32&t.__u?[o]:null,i,o==null?O(t):o,!!(32&t.__u),s),r.__v=t.__v,r.__.__k[r.__i]=r,ot(i,r,s),t.__e=t.__=null,r.__e!=o&&Ze(r)}}function Ze(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(t){if(t!=null&&t.__e!=null)return e.__e=e.__c.base=t.__e}),Ze(e)}function ze(e){(!e.__d&&(e.__d=!0)&&H.push(e)&&!se.__r++||Be!=_.debounceRendering)&&((Be=_.debounceRendering)||Je)(se)}function se(){try{for(var e,t=1;H.length;)H.length>t&&H.sort(Xe),e=H.shift(),t=H.length,$t(e)}finally{H.length=se.__r=0}}function et(e,t,o,i,s,r,l,c,m,u,d){var g,a,p,h,S,w,C=i&&i.__k||ie,v=t.length;for(m=Lt(o,t,C,m,v),g=0;g<v;g++)(p=o.__k[g])!=null&&(a=p.__i!=-1&&C[p.__i]||re,p.__i=g,w=Se(e,p,a,s,r,l,c,m,u,d),h=p.__e,p.ref&&a.ref!=p.ref&&(a.ref&&ke(a.ref,null,p),d.push(p.ref,p.__c||h,p)),S==null&&h!=null&&(S=h),4&p.__u?(m=tt(p,m,e),a.__e&&(a.__e=null)):typeof p.type=="function"&&w!==void 0?m=w:h&&(m=h.nextSibling),p.__u&=-7);return o.__e=S,m}function Lt(e,t,o,i,s){var r,l,c,m,u,d=o.length,g=d,a=0;for(e.__k=Array(s),r=0;r<s;r++)(l=t[r])!=null&&typeof l!="boolean"&&typeof l!="function"?(typeof l=="string"||typeof l=="number"||typeof l=="bigint"||l.constructor==String?l=e.__k[r]=ne(null,l,null,null,null):le(l)?l=e.__k[r]=ne(f,{children:l},null,null,null):l.constructor===void 0&&l.__b>0?l=e.__k[r]=ne(l.type,l.props,l.key,l.ref?l.ref:null,l.__v):e.__k[r]=l,m=r+a,l.__=e,l.__b=e.__b+1,c=null,(u=l.__i=Ot(l,o,m,g))!=-1&&(g--,(c=o[u])&&(c.__u|=2)),c==null||c.__v==null?(u==-1&&(s>d?a--:s<d&&a++),typeof l.type!="function"&&(l.__u|=4)):u!=m&&(u==m-1?a--:u==m+1?a++:(u>m?a--:a++,l.__u|=4))):e.__k[r]=null;if(g)for(r=0;r<d;r++)(c=o[r])!=null&&(2&c.__u)==0&&(c.__e==i&&(i=O(c)),it(c,c));return i}function tt(e,t,o){var i,s;if(typeof e.type=="function"){for(i=e.__k,s=0;i&&s<i.length;s++)i[s]&&(i[s].__=e,t=tt(i[s],t,o));return t}e.__e!=t&&(t&&e.type&&!t.parentNode&&(t=O(e)),t=o.insertBefore(e.__e,t||null));do t=t&&t.nextSibling;while(t!=null&&t.nodeType==8);return t}function Ot(e,t,o,i){var s,r,l,{key:c,type:m}=e,u=t[o],d=u!=null&&(2&u.__u)==0;if(u===null&&c==null||d&&c==u.key&&m==u.type)return o;if(i>(d?1:0)){for(s=o-1,r=o+1;s>=0||r<t.length;)if((u=t[l=s>=0?s--:r++])!=null&&(2&u.__u)==0&&c==u.key&&m==u.type)return l}return-1}function Ge(e,t,o){t[0]=="-"?e.setProperty(t,o==null?"":o):e[t]=o==null?"":typeof o!="number"||Wt.test(t)?o:o+"px"}function ee(e,t,o,i,s){var r,l;e:if(t=="style")if(typeof o=="string")e.style.cssText=o;else{if(typeof i=="string"&&(e.style.cssText=i=""),i)for(t in i)o&&t in o||Ge(e.style,t,"");if(o)for(t in o)i&&o[t]==i[t]||Ge(e.style,t,o[t])}else if(t[0]=="o"&&t[1]=="n")r=t!=(t=t.replace(Ye,"$1")),l=t.toLowerCase(),t=l in e||t=="onFocusOut"||t=="onFocusIn"?l.slice(2):t.slice(2),e.l||(e.l={}),e.l[t+r]=o,o?i?o[Q]=i[Q]:(o[Q]=we,e.addEventListener(t,r?xe:ye,r)):e.removeEventListener(t,r?xe:ye,r);else{if(s=="http://www.w3.org/2000/svg")t=t.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(t!="width"&&t!="height"&&t!="href"&&t!="list"&&t!="form"&&t!="tabIndex"&&t!="download"&&t!="rowSpan"&&t!="colSpan"&&t!="role"&&t!="popover"&&t in e)try{e[t]=o==null?"":o;break e}catch(c){}typeof o=="function"||(o==null||o===!1&&t[4]!="-"?e.removeAttribute(t):e.setAttribute(t,t=="popover"&&o==1?"":o))}}function Qe(e){return function(t){if(this.l){var o=this.l[t.type+e];if(t[te]==null)t[te]=we++;else if(t[te]<o[Q])return;return o(_.event?_.event(t):t)}}}function Se(e,t,o,i,s,r,l,c,m,u){var d,g,a,p,h,S,w,C,v,T,z,L,G,Ue,Z,ve,A=t.type;if(t.constructor!==void 0)return null;128&o.__u&&(m=!!(32&o.__u),r=[c=t.__e=o.__e]),(d=_.__b)&&d(t);e:if(typeof A=="function"){g=l.length;try{if(v=t.props,T=A.prototype&&A.prototype.render,z=(d=A.contextType)&&i[d.__c],L=d?z?z.props.value:d.__:i,o.__c?C=(a=t.__c=o.__c).__=a.__E:(T?t.__c=a=new A(v,L):(t.__c=a=new oe(v,L),a.constructor=A,a.render=Rt),z&&z.sub(a),a.state||(a.state={}),a.__n=i,p=a.__d=!0,a.__h=[],a._sb=[]),T&&a.__s==null&&(a.__s=a.state),T&&A.getDerivedStateFromProps!=null&&(a.__s==a.state&&(a.__s=I({},a.__s)),I(a.__s,A.getDerivedStateFromProps(v,a.__s))),h=a.props,S=a.state,a.__v=t,p)T&&A.getDerivedStateFromProps==null&&a.componentWillMount!=null&&a.componentWillMount(),T&&a.componentDidMount!=null&&a.__h.push(a.componentDidMount);else{if(T&&A.getDerivedStateFromProps==null&&v!==h&&a.componentWillReceiveProps!=null&&a.componentWillReceiveProps(v,L),t.__v==o.__v||!a.__e&&a.shouldComponentUpdate!=null&&a.shouldComponentUpdate(v,a.__s,L)===!1){t.__v!=o.__v&&(a.props=v,a.state=a.__s,a.__d=!1),t.__e=o.__e,t.__k=o.__k,t.__k.some(function(D){D&&(D.__=t)}),ie.push.apply(a.__h,a._sb),a._sb=[],a.__h.length&&l.push(a),c=O(o);break e}a.componentWillUpdate!=null&&a.componentWillUpdate(v,a.__s,L),T&&a.componentDidUpdate!=null&&a.__h.push(function(){a.componentDidUpdate(h,S,w)})}if(a.context=L,a.props=v,a.__P=e,a.__e=!1,G=_.__r,Ue=0,T)a.state=a.__s,a.__d=!1,G&&G(t),d=a.render(a.props,a.state,a.context),ie.push.apply(a.__h,a._sb),a._sb=[];else do a.__d=!1,G&&G(t),d=a.render(a.props,a.state,a.context),a.state=a.__s;while(a.__d&&++Ue<25);a.state=a.__s,a.getChildContext!=null&&(i=I(I({},i),a.getChildContext())),T&&!p&&a.getSnapshotBeforeUpdate!=null&&(w=a.getSnapshotBeforeUpdate(h,S)),Z=d!=null&&d.type===f&&d.key==null?rt(d.props.children):d,c=et(e,le(Z)?Z:[Z],t,o,i,s,r,l,c,m,u),a.base=t.__e,t.__u&=-161,a.__h.length&&l.push(a),C&&(a.__E=a.__=null)}catch(D){if(l.length=g,t.__v=null,m||r!=null){if(D.then){for(t.__u|=m?160:128;c&&c.nodeType==8&&c.nextSibling;)c=c.nextSibling;r!=null&&(r[r.indexOf(c)]=null),t.__e=c}else if(r!=null)for(ve=r.length;ve--;)Ce(r[ve])}else t.__e=o.__e;t.__k==null&&(t.__k=o.__k||[]),D.then||nt(t),_.__e(D,t,o)}}else r==null&&t.__v==o.__v?(t.__k=o.__k,t.__e=o.__e):c=t.__e=jt(o.__e,t,o,i,s,r,l,m,u);return(d=_.diffed)&&d(t),128&t.__u?void 0:c}function nt(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(nt))}function ot(e,t,o){for(var i=0;i<o.length;i++)ke(o[i],o[++i],o[++i]);_.__c&&_.__c(t,e),e.some(function(s){try{e=s.__h,s.__h=[],e.some(function(r){r.call(s)})}catch(r){_.__e(r,s.__v)}})}function rt(e){return typeof e!="object"||e==null||e.__b>0?e:le(e)?e.map(rt):e.constructor!==void 0?null:I({},e)}function jt(e,t,o,i,s,r,l,c,m){var u,d,g,a,p,h,S,w=o.props||re,{props:C,type:v}=t;if(v=="svg"?s="http://www.w3.org/2000/svg":v=="math"?s="http://www.w3.org/1998/Math/MathML":s||(s="http://www.w3.org/1999/xhtml"),r!=null){for(u=0;u<r.length;u++)if((p=r[u])&&"setAttribute"in p==!!v&&(v?p.localName==v:p.nodeType==3)){e=p,r[u]=null;break}}if(e==null){if(v==null)return document.createTextNode(C);e=document.createElementNS(s,v,C.is&&C),c&&(_.__m&&_.__m(t,r),c=!1),r=null}if(v==null)w===C||c&&e.data==C||(e.data=C);else{if(r=v=="textarea"&&C.defaultValue!=null?null:r&&ae.call(e.childNodes),!c&&r!=null)for(w={},u=0;u<e.attributes.length;u++)w[(p=e.attributes[u]).name]=p.value;for(u in w)p=w[u],u=="dangerouslySetInnerHTML"?g=p:u=="children"||(u in C)||u=="value"&&("defaultValue"in C)||u=="checked"&&("defaultChecked"in C)||ee(e,u,null,p,s);for(u in C)p=C[u],u=="children"?a=p:u=="dangerouslySetInnerHTML"?d=p:u=="value"?h=p:u=="checked"?S=p:c&&typeof p!="function"||w[u]===p||ee(e,u,p,w[u],s);if(d)c||g&&(d.__html==g.__html||d.__html==e.innerHTML)||(e.innerHTML=d.__html),t.__k=[];else if(g&&(e.innerHTML=""),et(t.type=="template"?e.content:e,le(a)?a:[a],t,o,i,v=="foreignObject"?"http://www.w3.org/1999/xhtml":s,r,l,r?r[0]:o.__k&&O(o,0),c,m),r!=null)for(u=r.length;u--;)Ce(r[u]);c&&v!="textarea"||(u="value",v=="progress"&&h==null?e.removeAttribute("value"):h!=null&&(h!==e[u]||v=="progress"&&!h||v=="option"&&h!=w[u])&&ee(e,u,h,w[u],s),u="checked",S!=null&&S!=e[u]&&ee(e,u,S,w[u],s))}return e}function ke(e,t,o){try{if(typeof e=="function"){var i=typeof e.__u=="function";i&&e.__u(),i&&t==null||(e.__u=e(t))}else e.current=t}catch(s){_.__e(s,o)}}function it(e,t,o){var i,s;if(_.unmount&&_.unmount(e),(i=e.ref)&&(i.current&&i.current!=e.__e||ke(i,null,t)),(i=e.__c)!=null){if(i.componentWillUnmount)try{i.componentWillUnmount()}catch(r){_.__e(r,t)}i.base=i.__P=i.__n=null}if(i=e.__k)for(s=0;s<i.length;s++)i[s]&&it(i[s],t,o||typeof e.type!="function");o||Ce(e.__e),e.__c=e.__=e.__e=void 0}function Rt(e,t,o){return this.constructor(e,o)}function Dt(e,t,o){var i,s,r,l;t==document&&(t=document.documentElement),_.__&&_.__(e,t),s=(i=typeof o=="function")?null:o&&o.__k||t.__k,r=[],l=[],Se(t,e=(!i&&o||t).__k=ue(f,null,[e]),s||re,re,t.namespaceURI,!i&&o?[o]:s?null:t.firstChild?ae.call(t.childNodes):null,r,!i&&o?o:s?s.__e:t.firstChild,i,l),ot(r,e,l),e.props.children=null}function Pe(e,t){Dt(e,t,Pe)}ae=ie.slice,_={__e:function(e,t,o,i){for(var s,r,l;t=t.__;)if((s=t.__c)&&!s.__)try{if((r=s.constructor)&&r.getDerivedStateFromError!=null&&(s.setState(r.getDerivedStateFromError(e)),l=s.__d),s.componentDidCatch!=null&&(s.componentDidCatch(e,i||{}),l=s.__d),l)return s.__E=s}catch(c){e=c}throw e}},Ke=0,qt=function(e){return e!=null&&e.constructor===void 0},oe.prototype.setState=function(e,t){var o;o=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=I({},this.state),typeof e=="function"&&(e=e(I({},o),this.props)),e&&I(o,e),e!=null&&this.__v&&(t&&this._sb.push(t),ze(this))},oe.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),ze(this))},oe.prototype.render=f,H=[],Je=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,Xe=function(e,t){return e.__v.__b-t.__v.__b},se.__r=0,be=Math.random().toString(8),te="__d"+be,Q="__a"+be,Ye=/(PointerCapture)$|Capture$/i,we=0,ye=Qe(!1),xe=Qe(!0),Ht=0;var Ft=_.vnode;_.vnode=(e)=>{if(typeof e.type==="string"){let t=e.props;for(let o of Object.keys(t))if(o.startsWith("data-")&&t[o]===!0)t[o]=""}Ft?.(e)};function Vt(e,t){let o=t.parentNode;if(!o)throw Error("island marker without a parent");let i=()=>{let r=[];for(let l=e.nextSibling;l&&l!==t;l=l.nextSibling)r.push(l);return r},s=(r)=>r;return{nodeType:1,parentNode:o,get firstChild(){return i()[0]??null},get childNodes(){return i()},contains:(r)=>i().some((l)=>r!==null&&l.contains(s(r))),insertBefore:(r,l)=>o.insertBefore(s(r),l?s(l):t),appendChild:(r)=>o.insertBefore(s(r),t),removeChild:(r)=>o.removeChild(s(r))}}function Ut(){let e=new Map,t=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),o;for(let i=t.nextNode();i;i=t.nextNode()){if(!(i instanceof Comment))continue;let s=/^island:(\d+)$/.exec(i.data);if(s)o={n:Number(s[1]),start:i};else if(i.data==="/island"&&o)e.set(o.n,[o.start,i]),o=void 0}return e}function st(e){let t=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),o=Ut();for(let[i,{m:s,e:r,p:l}]of t.entries()){let c=e[s]?.[r],m=o.get(i);if(typeof c!=="function"||!m)throw Error(`island ${i} (${r}) is missing from the page`);Pe(ue(c,l),Vt(...m))}}/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var F,x,Te,at,pe=0,_t=[],k=_,{__b:lt,__r:ut,diffed:ct,__c:pt,unmount:mt,__:ft}=k;function me(e,t){k.__h&&k.__h(x,e,pe||t),pe=0;var o=x.__H||(x.__H={__:[],__h:[]});return e>=o.__.length&&o.__.push({}),o.__[e]}function W(e){return pe=1,Bt(ht,e)}function Bt(e,t,o){var i=me(F++,2);if(i.t=e,!i.__c&&(i.__=[o?o(t):ht(void 0,t),function(c){var m=i.__N?i.__N[0]:i.__[0],u=i.t(m,c);m!==u&&(i.__N=[u,i.__[1]],i.__c.setState({}))}],i.__c=x,!x.__f)){var s=function(c,m,u){if(!i.__c.__H)return!0;var d=!1,g=i.__c.props!==c;if(i.__c.__H.__.some(function(p){if(p.__N){d=!0;var h=p.__[0];p.__=p.__N,p.__N=void 0,h!==p.__[0]&&(g=!0)}}),r){var a=r.call(this,c,m,u);return d?a||g:a}return!d||g};x.__f=!0;var r=x.shouldComponentUpdate,l=x.componentWillUpdate;x.componentWillUpdate=function(c,m,u){if(this.__e){var d=r;r=void 0,s(c,m,u),r=d}l&&l.call(this,c,m,u)},x.shouldComponentUpdate=s}return i.__N||i.__}function V(e,t){var o=me(F++,3);!k.__s&&Ne(o.__H,t)&&(o.__=e,o.u=t,x.__H.__h.push(o))}function K(e,t){var o=me(F++,4);!k.__s&&Ne(o.__H,t)&&(o.__=e,o.u=t,x.__h.push(o))}function N(e){return pe=5,j(function(){return{current:e}},[])}function j(e,t){var o=me(F++,7);return Ne(o.__H,t)&&(o.__=e(),o.__H=t,o.__h=e),o.__}function zt(){for(var e;e=_t.shift();){var t=e.__H;if(e.__P&&t)try{t.__h.some(ce),t.__h.some(Ae),t.__h=[]}catch(o){t.__h=[],k.__e(o,e.__v)}}}k.__b=function(e){x=null,lt&&lt(e)},k.__=function(e,t){e&&t.__k&&t.__k.__m&&(e.__m=t.__k.__m),ft&&ft(e,t)},k.__r=function(e){ut&&ut(e),F=0;var t=(x=e.__c).__H;t&&(Te===x?(t.__h=[],x.__h=[],t.__.some(function(o){o.__N&&(o.__=o.__N),o.u=o.__N=void 0})):(t.__h.some(ce),t.__h.some(Ae),t.__h=[],F=0)),Te=x},k.diffed=function(e){ct&&ct(e);var t=e.__c;t&&t.__H&&(t.__H.__h.length&&(_t.push(t)!==1&&at===k.requestAnimationFrame||((at=k.requestAnimationFrame)||Gt)(zt)),t.__H.__.some(function(o){o.u&&(o.__H=o.u,o.u=void 0)})),Te=x=null},k.__c=function(e,t){t.some(function(o){try{o.__h.some(ce),o.__h=o.__h.filter(function(i){return!i.__||Ae(i)})}catch(i){t.some(function(s){s.__h&&(s.__h=[])}),t=[],k.__e(i,o.__v)}}),pt&&pt(e,t)},k.unmount=function(e){mt&&mt(e);var t,o=e.__c;o&&o.__H&&(o.__H.__.some(function(i){try{ce(i)}catch(s){t=s}}),o.__H=void 0,t&&k.__e(t,o.__v))};var dt=typeof requestAnimationFrame=="function";function Gt(e){var t,o=function(){clearTimeout(i),dt&&cancelAnimationFrame(t),setTimeout(e)},i=setTimeout(o,35);dt&&(t=requestAnimationFrame(o))}function ce(e){var t=x,o=e.__c;typeof o=="function"&&(e.__c=void 0,o()),x=t}function Ae(e){var t=x;e.__c=e.__(),x=t}function Ne(e,t){return!e||e.length!==t.length||t.some(function(o,i){return o!==e[i]})}function ht(e,t){return typeof t=="function"?t(e):t}/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var Qt=0;function n(e,t,o,i,s,r){t||(t={});var l,c,m=t;if("ref"in m)for(c in m={},t)c=="ref"?l=t[c]:m[c]=t[c];var u={type:e,props:m,key:o,ref:l,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--Qt,__i:-1,__u:0,__source:s,__self:r};if(typeof e=="function"&&(l=e.defaultProps))for(c in l)m[c]===void 0&&(m[c]=l[c]);return _.vnode&&_.vnode(u),u}function fe(e){if(Array.isArray(e))return e.map(fe);if(e!==null&&typeof e==="object"&&Object.getPrototypeOf(e)===Object.prototype)return Object.fromEntries(Object.entries(e).map(([t,o])=>[t,fe(o)]));return e}function U({option:e,label:t,class:o,id:i,setup:s}){let r=N(null),l=N(null),c=N(s);return c.current=s,V(()=>{if(l.current)l.current.set(fe(e),["series"]);else if(r.current)l.current=Charts.make(r.current,fe(e),(m)=>c.current?.(m))},[e]),V(()=>()=>{l.current?.dispose(),l.current=null},[]),n("div",{ref:r,class:o?`chart ${o}`:"chart",id:i,role:"img","aria-label":t})}function J({option:e,label:t,class:o,id:i}){let s=N(null),r=N(null);return V(()=>{if(r.current)r.current.set(e);else if(s.current)r.current=window.Plot.make(s.current,e)},[e]),V(()=>()=>{r.current?.dispose(),r.current=null},[]),n("div",{ref:s,class:o?`chart plot ${o}`:"chart plot",id:i,role:"img","aria-label":t})}var Kt=(e)=>e instanceof CustomEvent&&typeof e.detail?.step==="number";function Me({children:e,captions:t,start:o,label:i,class:s="fig",id:r,onStep:l}){let c=N(null),m=N(l);return m.current=l,K(()=>{let u=c.current,d=(g)=>{if(Kt(g)&&g.target===u)m.current?.(g.detail.step,g.detail.steps)};return u?.addEventListener("stepchange",d),()=>u?.removeEventListener("stepchange",d)},[]),K(()=>{if(c.current&&typeof Steps<"u")Steps.refresh(c.current)}),n("figure",{ref:c,class:s,id:r,"data-stepper":"","data-start":o,"aria-label":i,children:[e,t&&n("ol",{"data-captions":"",children:t.map((u)=>n("li",{children:u}))})]})}function de({name:e,label:t,options:o,value:i,onChange:s}){return n("div",{class:"seg",role:"radiogroup","aria-label":t,children:Object.entries(o).map(([r,l])=>n("label",{children:[n("input",{type:"radio",id:`${e}-${r}`,name:e,value:r,checked:r===i,onChange:()=>s(r)}),n("span",{children:l})]}))})}function Ee({id:e,label:t,max:o,value:i,onInput:s}){return n("label",{class:"field",children:[n("span",{children:t}),n("input",{type:"range",id:e,min:"1",max:o,value:i,onInput:(r)=>s(Number(r.currentTarget.value))}),n("output",{id:`${e}-out`,for:e,children:i})]})}function Ie({id:e,label:t,on:o,onChange:i}){return n("label",{class:"toggle",children:[n("input",{type:"checkbox",id:e,checked:o,onChange:(s)=>i(s.currentTarget.checked)}),n("span",{children:t})]})}var y=({top:e,bottom:t})=>n("span",{class:"frac",children:[n("span",{children:e}),n("span",{children:t})]}),Jt=({sym:e,from:t,to:o})=>n("span",{class:"lim",children:[n("span",{children:o}),n("span",{class:"sym",children:e}),n("span",{children:t})]}),qe=({from:e,to:t})=>n(Jt,{sym:"∫",from:e,to:t});var X=()=>n(qe,{from:"−π",to:"π"});var Y=()=>n(f,{children:[n("i",{children:"f"}),"(",n("i",{children:"x"}),")"]}),He=()=>n(f,{children:[n("i",{children:"a"}),n("sub",{children:n("i",{children:"n"})})]}),We=()=>n(f,{children:[n("i",{children:"b"}),n("sub",{children:n("i",{children:"n"})})]});var M=()=>n("i",{children:"nx"}),R=()=>n(f,{children:[" ","d",n("i",{children:"x"})]}),_e=()=>n(f,{children:["(−1)",n("sup",{children:n("i",{children:"n"})})]});var $e=n(f,{children:[n("i",{children:"n"}),"π"]}),gt=n(qe,{from:"0",to:"π"}),vt={square:[{eq:n(f,{children:[n(He,{})," = ",n(y,{top:"1",bottom:"π"})," ",n(X,{})," ",n(Y,{})," cos ",n(M,{}),n(R,{})," = 0"]}),caption:n(f,{children:["Cosine coefficients first. The square wave is odd and cos ",n("i",{children:"nx"})," is even, so the integrand is odd and its integral over a symmetric interval is zero. The same argument gives ",n("i",{children:"a"}),n("sub",{children:"0"})," = 0."]})},{eq:n(f,{children:[n(We,{})," = ",n(y,{top:"1",bottom:"π"})," ",n(X,{})," ",n(Y,{})," sin ",n(M,{}),n(R,{})]}),caption:n(f,{children:["The sine coefficient uses the same recipe with sin ",n("i",{children:"nx"}),". Here ",n("i",{children:"f"})," = −1 on the left half of the period and +1 on the right half."]})},{eq:n(f,{children:["= ",n(y,{top:"2",bottom:"π"})," ",gt," sin ",n(M,{}),n(R,{})]}),caption:n(f,{children:[n("i",{children:"f"})," and sin ",n("i",{children:"nx"})," are both odd, so their product is even: integrate over half the period and double. On (0, π) the square wave is 1."]})},{eq:n(f,{children:["= ",n(y,{top:"2",bottom:"π"})," [ −",n(y,{top:n(f,{children:["cos ",n(M,{})]}),bottom:n("i",{children:"n"})})," ","]",n("sub",{children:"0"}),n("sup",{children:"π"})," = ",n(y,{top:"2",bottom:$e})," (1 − cos ",n("i",{children:"n"}),"π)"]}),caption:n(f,{children:["Integrate sin ",n("i",{children:"nx"})," and put in the limits. cos 0 = 1 supplies the 1."]})},{eq:n(f,{children:["= ",n(y,{top:"2",bottom:$e})," (1 − ",n(_e,{}),") = ",n(y,{top:"4",bottom:$e})," for odd"," ",n("i",{children:"n"}),", and 0 for even ",n("i",{children:"n"})]}),caption:n(f,{children:["cos ",n("i",{children:"n"}),"π is −1 or +1 as ",n("i",{children:"n"})," is odd or even. Even harmonics cancel; odd ones keep 4/(",n("i",{children:"n"}),"π)."]})},{eq:n(f,{children:[n(Y,{})," = ",n(y,{top:"4",bottom:"π"})," ( sin ",n("i",{children:"x"})," + ",n(y,{top:"1",bottom:"3"})," sin 3",n("i",{children:"x"})," + ",n(y,{top:"1",bottom:"5"})," sin 5",n("i",{children:"x"})," + … )"]}),caption:n(f,{children:"Put the coefficients back into the series. This is the sum being built at the top of the page."})}],saw:[{eq:n(f,{children:[n(He,{})," = ",n(y,{top:"1",bottom:"π"})," ",n(X,{})," ",n("i",{children:"x"})," cos ",n(M,{}),n(R,{})," = 0"]}),caption:n(f,{children:["Cosine coefficients first. ",n("i",{children:"x"})," is odd and cos ",n("i",{children:"nx"})," is even, so the integrand is odd and integrates to zero over (−π, π). So does ",n("i",{children:"a"}),n("sub",{children:"0"}),"."]})},{eq:n(f,{children:[n(We,{})," = ",n(y,{top:"1",bottom:"π"})," ",n(X,{})," ",n("i",{children:"x"})," sin ",n(M,{}),n(R,{})]}),caption:n(f,{children:["The sine coefficient with ",n("i",{children:"f"}),"(",n("i",{children:"x"}),") = ",n("i",{children:"x"})," on one period."]})},{eq:n(f,{children:["= ",n(y,{top:"2",bottom:"π"})," ",gt," ",n("i",{children:"x"})," sin ",n(M,{}),n(R,{})]}),caption:n(f,{children:[n("i",{children:"x"})," and sin ",n("i",{children:"nx"})," are both odd, so the product is even: integrate over (0, π) and double."]})},{eq:n(f,{children:["= ",n(y,{top:"2",bottom:"π"})," [ −",n(y,{top:n(f,{children:[n("i",{children:"x"})," cos ",n(M,{})]}),bottom:n("i",{children:"n"})})," ","+"," ",n(y,{top:n(f,{children:["sin ",n(M,{})]}),bottom:n(f,{children:[n("i",{children:"n"}),n("sup",{children:"2"})]})})," ","]",n("sub",{children:"0"}),n("sup",{children:"π"})," = ",n(y,{top:"2",bottom:"π"})," · −",n(y,{top:n(f,{children:["π cos ",n("i",{children:"n"}),"π"]}),bottom:n("i",{children:"n"})})]}),caption:n(f,{children:["Integration by parts. At both limits sin ",n("i",{children:"nx"})," is 0, and the ",n("i",{children:"x"})," cos ",n("i",{children:"nx"})," ","term is 0 at ",n("i",{children:"x"})," = 0, so only −π cos ",n("i",{children:"n"}),"π/",n("i",{children:"n"})," remains."]})},{eq:n(f,{children:["= −",n(y,{top:n(f,{children:["2",n(_e,{})]}),bottom:n("i",{children:"n"})})," ","="," ",n(y,{top:n(f,{children:["2(−1)",n("sup",{children:[n("i",{children:"n"}),"+1"]})]}),bottom:n("i",{children:"n"})})]}),caption:n(f,{children:["With cos ",n("i",{children:"n"}),"π = ",n(_e,{}),": +2/",n("i",{children:"n"})," for odd ",n("i",{children:"n"})," and −2/",n("i",{children:"n"})," for even"," ",n("i",{children:"n"}),". Every harmonic is present, with alternating signs."]})},{eq:n(f,{children:[n(Y,{})," = 2 ( sin ",n("i",{children:"x"})," − ",n(y,{top:"1",bottom:"2"})," sin 2",n("i",{children:"x"})," +"," ",n(y,{top:"1",bottom:"3"})," sin 3",n("i",{children:"x"})," − … )"]}),caption:n(f,{children:"Put the coefficients back into the series. This is the sawtooth being built at the top of the page."})}]};var b=Math.PI,bt="−",he={square:{name:"Square wave",harmonic:(e)=>2*e-1,coef:(e)=>4/(b*e),top:1,jump:2,jumpAt:0,side:1,bumpAt:(e)=>b/(2*e),yLim:1.5,yStep:0.5,target:[[-2*b,1],[-b,1],[-b,-1],[0,-1],[0,1],[b,1],[b,-1],[2*b,-1]]},saw:{name:"Sawtooth",harmonic:(e)=>e,coef:(e)=>2*(e%2?1:-1)/e,top:b,jump:2*b,jumpAt:b,side:-1,bumpAt:(e)=>b/(e+1),yLim:4,yStep:2,target:[[-2*b,0],[-b,b],[-b,-b],[b,b],[b,-b],[2*b,0]]}};function ge(e,t,o){let i=0;for(let s=1;s<=t;s++){let r=e.harmonic(s);i+=e.coef(r)*Math.sin(r*o)}return i}var B=(e,t)=>ge(e,t,e.jumpAt+e.side*e.bumpAt(t)),Le=2/b*1.851937051982466,Oe=(e,t,o)=>Array.from({length:o},(i,s)=>e+(t-e)*s/(o-1));function yt(e){let t=Math.round(e/b);if(t===0)return"0";return`${t<0?"−":""}${Math.abs(t)===1?"":Math.abs(t)}π`}var P=(e,t=2)=>e.toFixed(t).replace("-","−"),xt=(e)=>`${(e*100).toFixed(1)}%`,wt={even:{name:"The triangle |x|",fn:(e)=>Math.abs(e)},odd:{name:"The square wave",fn:(e)=>Math.sign(e)},none:{name:"The half ramp",fn:(e)=>Math.max(0,e)}},je=Array.from({length:1000},(e,t)=>-b+(t+0.5)*2*b/1000);function Re(e,t,o){let i=je.reduce((s,r)=>s+e(r)*t(o*r),0)*0.002;return Math.abs(i)<0.000000001?0:i}function De(e,t){let o=t.filter(([,i])=>i!==0).map(([i])=>`${e}${String.fromCodePoint(8320+i)}`);if(o.length===0)return"none";return o.length>6?`${o.slice(0,5).join(", ")}, …`:o.join(", ")}var E=Math.PI,St={square:"Square wave",saw:"Sawtooth"},kt=8,Ct=Oe(-2*E,2*E,1400),Pt=(e)=>`${e} ${e===1?"term":"terms"}`;function Xt(e,t,o){let i=`Sum of ${Pt(t)}`,s=o?Array.from({length:Math.min(t,kt)},(r,l)=>{let c=e.harmonic(l+1);return{id:`part${l}`,name:`${c}× sine`,type:"line",showSymbol:!1,silent:!0,lineStyle:{width:1.2,opacity:0.75},z:1,data:Ct.map((m)=>[m,e.coef(c)*Math.sin(c*m)])}}):[];return{grid:{top:44,left:8,right:24,bottom:8},legend:{top:8,left:8,data:["Target",i]},tooltip:{trigger:"axis",valueFormatter:(r)=>P(r,3),axisPointer:{label:{formatter:(r)=>`${P(r.value/E)}π`}}},xAxis:{type:"value",min:-2*E,max:2*E,interval:E,axisLabel:{formatter:yt}},yAxis:{type:"value",min:-e.yLim,max:e.yLim,interval:e.yStep},dataZoom:[{type:"inside",xAxisIndex:0,filterMode:"none"}],series:[{id:"target",name:"Target",type:"line",showSymbol:!1,silent:!0,color:"var(--muted)",lineStyle:{type:"dashed",width:1.6},data:e.target,z:2},...s,{id:"sum",name:i,type:"line",showSymbol:!1,color:"var(--accent)",lineStyle:{width:2.6},z:3,data:Ct.map((r)=>[r,ge(e,t,r)])}]}}function Yt(){let[e,t]=W("square"),[o,i]=W(3),[s,r]=W(!1),l=he[e],c=j(()=>Xt(l,o,s),[l,o,s]),m=B(l,o),u=(m-l.top)/l.jump,d=s?`Thin lines: the first ${Math.min(o,kt)} sines of the sum, each at its own amplitude. `:"";return n("figure",{class:"fig",children:[n("div",{class:"controls",children:[n(de,{name:"wave",label:"Signal to build",options:St,value:e,onChange:t}),n(Ee,{id:"terms",label:"Terms in the sum",max:40,value:o,onInput:i}),n(Ie,{id:"parts",label:"Show each sine",on:s,onChange:r})]}),n("dl",{class:"stats","aria-live":"polite",children:[n("div",{class:"stat",children:[n("dt",{children:"Highest frequency used"}),n("dd",{children:[l.harmonic(o),"× ",n("small",{children:"base frequency"})]})]}),n("div",{class:"stat",children:[n("dt",{children:"Highest point of the sum"}),n("dd",{children:[P(m,3)," ",n("small",{children:["target ",P(l.top,e==="saw"?2:0)]})]})]}),n("div",{class:"stat",children:[n("dt",{children:"Highest point vs target, share of the jump"}),n("dd",{children:[u<0?bt:"+",xt(Math.abs(u))]})]})]}),n(U,{id:"hero-chart",label:"A square wave or sawtooth and the sum of its first sines, over two periods",option:c}),n("figcaption",{children:["Dashed: the ",l.name.toLowerCase()," to build. Solid: the sum. ",d,"Horizontal axis in radians, one period is 2π. Scroll or pinch to zoom."]})]})}var Tt=(e,t=0)=>t===0?"0":P(t);function Zt(e){let t=he[e];return{series:[{name:"b",type:"stem",data:Array.from({length:12},(i,s)=>{let r=s+1;return[r,e==="saw"||r%2===1?t.coef(r):0]}),color:"var(--accent)",label:Tt}],x:{min:0,max:13,step:1,name:"harmonic n"},y:e==="square"?{min:0,max:1.6}:{min:-1.4,max:2.4},legend:!1}}function en(){let[e,t]=W("square"),o=vt[e],i=j(()=>Zt(e),[e]);return K(()=>{let s=document.getElementById("deriv-fig");if(s&&typeof Steps<"u")Steps.refresh(s,1)},[e]),n(f,{children:[n("h2",{children:e==="square"?"Square wave: only odd harmonics, amplitudes 4/(nπ)":"Sawtooth: every harmonic, amplitudes 2/n with alternating sign"}),n("p",{children:"Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work."}),n(Me,{id:"deriv-fig",start:1,label:"Derivation of the Fourier coefficients, step by step",children:[n("div",{class:"controls",children:n(de,{name:"coef",label:"Wave to derive",options:St,value:e,onChange:t})}),n("ol",{"data-captions":"",children:o.map((s)=>n("li",{children:s.caption}))}),n("div",{class:"eqs",children:o.map((s,r)=>n("p",{class:"eq","data-step":r+1,children:s.eq}))}),n(J,{id:"coef-plot",label:"The sine coefficients b-n for n from 1 to 12",option:i}),n("figcaption",{children:["The sine coefficients ",n("i",{children:"b"}),n("sub",{children:n("i",{children:"n"})}),", first twelve. Square wave: ±1 jumps at 0 and ±π. Sawtooth: ",n("i",{children:"f"}),"(",n("i",{children:"x"}),") = ",n("i",{children:"x"})," ","on (−π, π), repeating, with jumps at ±π."]})]})]})}var q=he.square,tn=Oe(-1.6,1.6,2400),nn=Array.from({length:200},(e,t)=>[t+1,B(q,t+1)]),Fe=(e,t,o)=>({yAxis:e,lineStyle:{type:o,color:"var(--muted)"},label:{formatter:t,position:"insideEndTop",color:"var(--muted)"}}),At=(e,t)=>({symbol:"circle",symbolSize:t,itemStyle:{color:"var(--accent)"},label:{show:!1},data:[{coord:e}]});function on(e,t){return{grid:{top:24,left:8,right:24,bottom:8},tooltip:{trigger:"axis",valueFormatter:(o)=>P(o,3),axisPointer:{label:{formatter:(o)=>`x = ${P(o.value,3)}`}}},xAxis:{type:"value",interval:0.4,axisLabel:{formatter:(o)=>P(o,1).replace(".0","")},...t?{min:0,max:1.6}:{min:-1.6,max:1.6}},yAxis:{type:"value",...t?{min:0.8,max:1.3}:{min:-1.4,max:1.4}},series:[{id:"target",name:"Square wave",type:"line",showSymbol:!1,silent:!0,color:"var(--muted)",lineStyle:{type:"dashed",width:1.6},data:[[-1.6,-1],[0,-1],[0,1],[1.6,1]]},{id:"sum",name:`Sum of ${e} terms`,type:"line",showSymbol:!1,color:"var(--accent)",lineStyle:{width:2.4},z:3,data:tn.map((o)=>[o,ge(q,e,o)]),markLine:{silent:!0,symbol:"none",data:[Fe(Le,"limit 1.179","dotted")]},markPoint:At([q.bumpAt(e),B(q,e)],11)}]}}function rn(e){return{grid:{top:24,left:8,right:24,bottom:36},tooltip:{trigger:"axis",valueFormatter:(t)=>P(t,4)},xAxis:{type:"log",min:1,max:200,name:"terms in the sum",nameLocation:"middle",nameGap:28,axisLabel:{formatter:"{value}"}},yAxis:{type:"value",min:0.9,max:1.3},series:[{id:"peak",name:"Highest point",type:"line",showSymbol:!1,color:"var(--accent)",lineStyle:{width:2.4},data:nn,markLine:{silent:!0,symbol:"none",data:[Fe(1,"square wave = 1","dashed"),Fe(Le,"limit 1.179","dotted")]},markPoint:At([e,B(q,e)],12)}]}}function sn(e){let t=0;for(let o=1;o<=e;o++)t+=q.coef(q.harmonic(o))**2/2;return Math.sqrt(Math.max(0,1-t))}function an(){let[e,t]=W(5),[o,i]=W(!1),s=B(q,e),r=j(()=>on(e,o),[e,o]),l=j(()=>rn(e),[e]);return n(f,{children:[n("h2",{children:["With ",Pt(e)," the sum peaks at ",P(s,3),"; as the number of terms grows, the peak approaches 1.179"]}),n("p",{children:["Here is the square wave from the top, close to its jump at ",n("i",{children:"x"})," = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height."]}),n("figure",{class:"fig",children:[n("div",{class:"controls",children:[n(Ee,{id:"gk",label:"Terms",max:200,value:e,onInput:t}),n(Ie,{id:"gzoom",label:"Zoom in on the bump",on:o,onChange:i})]}),n("dl",{class:"stats","aria-live":"polite",children:[n("div",{class:"stat",children:[n("dt",{children:"Highest point"}),n("dd",{children:[P(s,3)," ",n("small",{children:"wave is 1"})]})]}),n("div",{class:"stat",children:[n("dt",{children:"Bump sits at"}),n("dd",{children:[P(q.bumpAt(e),3)," ",n("small",{children:"radians from the jump"})]})]}),n("div",{class:"stat",children:[n("dt",{children:"Typical error (rms)"}),n("dd",{children:P(sn(e),3)})]})]}),n(U,{id:"gibbs-chart",label:"Partial sum of the square wave near its jump at zero, with the target and the limit of the peak",option:r}),n("figcaption",{children:["Dashed grey: the square wave. Dotted: the limit the peak approaches, 1.179. Horizontal axis in radians.",n("span",{class:"src",children:"Computed in the page from the series. Peak position and the 9% limit: Wikipedia, “Gibbs phenomenon”."})]})]}),n("div",{class:"beside",children:[n("p",{children:"The bump keeps its height and gets thinner. The typical error falls because the bump takes up less and less of the period, so the area under it goes to zero. The largest error does not fall: the bump stays, and just beside the jump the sum is still far from the wave. That is why the series converges at every fixed point away from the jump (convergence is not uniform) while no finite number of terms removes the bump."}),n("figure",{class:"fig",children:[n(U,{id:"peak-chart",label:"Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179",option:l}),n("figcaption",{children:"Highest point of the partial sum for 1 to 200 terms (logarithmic horizontal axis). It does not head for 1; it levels off at 1.179, which is 1 + 0.179, and 0.179 is 8.95% of the jump of 2. The sawtooth behaves the same way at its jump."})]})]})]})}var ln={even:"Even: triangle",odd:"Odd: square wave",none:"Neither: half ramp"},un=["−π","−π/2","0","π/2","π"],cn={min:-0.5,max:9.5,step:1,name:"aₙ : cosine coefficients"},pn={min:0.5,max:9.5,step:1,name:"bₙ : sine coefficients"};function mn(e){let t=wt[e],o=t.fn,i=Array.from({length:10},(p,h)=>[h,Re(o,Math.cos,h)]),s=Array.from({length:9},(p,h)=>[h+1,Re(o,Math.sin,h+1)]),r=i.every(([,p])=>p===0),c=s.every(([,p])=>p===0)?`${t.name} is even, so every sine coefficient is zero`:r?`${t.name} is odd, so a₀ and every cosine coefficient are zero`:`${t.name} is neither even nor odd, so it needs sines and cosines`,m=Math.max(...[...i,...s].map(([,p])=>Math.abs(p)))*1.2,u={min:-m,max:m},d=(p,h,S,w)=>({series:[{name:p,type:"stem",data:h,color:S,label:Tt}],x:w,y:u,legend:!1}),g=(p,h,S,w)=>({id:p,name:h,type:"line",showSymbol:!1,color:S,lineStyle:p==="f"?{width:3}:{width:1.8,type:"dashed"},data:je.map((C)=>[C,w(C)])}),a={grid:{top:44,left:8,right:24,bottom:8},legend:{top:8,left:8},tooltip:{trigger:"axis",valueFormatter:(p)=>P(p,3)},xAxis:{type:"value",min:-E,max:E,interval:E/2,axisLabel:{formatter:(p)=>un[Math.round(p/(E/2))+2]}},yAxis:e==="odd"?{type:"value",min:-1.5,max:1.5,interval:0.5}:{type:"value",min:-1,max:4,interval:1},series:[g("f","f(x)","var(--accent)",o),g("even","Even part","var(--c2)",(p)=>(o(p)+o(-p))/2),g("odd","Odd part","var(--c3)",(p)=>(o(p)-o(-p))/2)]};return{heading:c,cosines:De("a",i),sines:De("b",s),chart:a,a:d("a",i,"var(--c1)",cn),b:d("b",s,"var(--c2)",pn)}}function fn(){let[e,t]=W("even"),o=j(()=>mn(e),[e]);return n(f,{children:[n("h2",{children:o.heading}),n("p",{children:["An even function (",n("i",{children:"f"}),"(−",n("i",{children:"x"}),") = ",n("i",{children:"f"}),"(",n("i",{children:"x"}),")) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration."]}),n("figure",{class:"fig",children:[n("div",{class:"controls",children:n(de,{name:"sym",label:"Signal",options:ln,value:e,onChange:t})}),n("dl",{class:"stats","aria-live":"polite",children:[n("div",{class:"stat",children:[n("dt",{children:"Cosine terms that survive"}),n("dd",{children:o.cosines})]}),n("div",{class:"stat",children:[n("dt",{children:"Sine terms that survive"}),n("dd",{children:o.sines})]})]}),n(U,{id:"sym-chart",label:"The chosen signal on one period, with its even part and odd part",option:o.chart}),n("div",{class:"split",children:[n(J,{id:"sym-a",label:"Cosine coefficients a-n for n from 0 to 9",option:o.a}),n(J,{id:"sym-b",label:"Sine coefficients b-n for n from 1 to 9",option:o.b})]}),n("figcaption",{children:["Top: the signal over one period, with its even part (",n("i",{children:"f"}),"(",n("i",{children:"x"}),") + ",n("i",{children:"f"}),"(−",n("i",{children:"x"}),"))/2 and odd part (",n("i",{children:"f"}),"(",n("i",{children:"x"}),") − ",n("i",{children:"f"}),"(−",n("i",{children:"x"}),"))/2; click a legend entry to hide a line. Bottom: coefficients ",n("i",{children:"a"}),n("sub",{children:"0"})," to ",n("i",{children:"a"}),n("sub",{children:"9"})," (left) and ",n("i",{children:"b"}),n("sub",{children:"1"})," to ",n("i",{children:"b"}),n("sub",{children:"9"})," (right), where ",n("i",{children:"a"}),n("sub",{children:"0"}),"/2 is the average."]})]})]})}st([Ve]);})();
+</script>
+<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
+   its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
+   A section (an overview section or a view) with two or more <details> of its own (at any depth, not inside a nested section)
+   gets one button just above the block holding its first fold, or at the end of the section's .toolbar when one comes before
+   that fold: Expand all, which opens every level of nested folds (a .tree), or Collapse all once every fold is open, which closes
+   them all; it is kept in step when the reader opens folds one at a time.
+   Folds a view handler draws count from its next refresh. */
+window.ViewsFolds = (kitText) => {
+  const buttons = new Map;
+  function foldsOf(section) {
+    return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section);
+  }
+  function sync(section) {
+    const button = buttons.get(section);
+    if (!button) {
+      return;
+    }
+    const all = foldsOf(section).every((d) => d.open);
+    button.setAttribute("aria-expanded", String(all));
+    button.textContent = kitText(all ? "collapseAll" : "expandAll");
+  }
+  function create(section) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "expand fold-all";
+    button.addEventListener("click", () => {
+      const folds = foldsOf(section);
+      const opening = !folds.every((d) => d.open);
+      for (const d of folds) {
+        d.open = opening;
+      }
+      sync(section);
+    });
+    section.addEventListener("toggle", () => sync(section), true);
+    buttons.set(section, button);
+    return button;
+  }
+  function toolbarBefore(fold, section) {
+    return [...section.querySelectorAll(".toolbar")].find((bar) => bar.closest("section") === section && Boolean(bar.compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING));
+  }
+  function place(button, fold, section) {
+    const toolbar = toolbarBefore(fold, section);
+    if (toolbar) {
+      if (toolbar.lastElementChild !== button) {
+        toolbar.append(button);
+      }
+      return;
+    }
+    const block = blockOf(fold, section);
+    if (button.nextElementSibling !== block) {
+      block.before(button);
+    }
+  }
+  function blockOf(el, section) {
+    let block = el;
+    while (block.parentElement && block.parentElement !== section) {
+      block = block.parentElement;
+    }
+    return block;
+  }
+  return () => {
+    for (const section of document.querySelectorAll("section")) {
+      const [first, second] = foldsOf(section);
+      if (!(first && second)) {
+        buttons.get(section)?.remove();
+        continue;
+      }
+      place(buttons.get(section) ?? create(section), first, section);
+      sync(section);
+    }
+  };
+};
+
+/* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
+   views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
+   every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
+   was left from.
+   All of it is derived from markup the page already has:
+     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
+               its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
+               ("Open", "→") is passed over for the view's heading, else its param.
+     trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
+               that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
+               view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
+               every sibling. Steps live in the history entry (its Navigation API state; history.state stays the page's), so Back,
+               Forward and reload keep them; a link opened fresh starts a new trail.
+     .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
+               listener or selector the page gave it), with previous and next on the right.
+     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their data-nav or else
+               their h2 (ids added when missing), and under the section that first links to a view name, each trail step's
+               siblings (only the step itself past 12). The current section follows scrolling; 07-nav.css places the rail. */
+window.ViewsNav = ({ views, decode, canonical, kitText }) => {
+  const STATE_KEY = "viewTrail";
+  const AT_KEY = "viewTrailAt";
+  const RAIL_LIST_MAX = 12;
+  const KIT_NAV = ".trail, .toc";
+  const overview = document.querySelector("[data-overview]");
+  const overviewName = () => clean(document.querySelector(".back")?.textContent) || kitText("overview");
+  const nameOf = (hash) => hash.split("/")[0] ?? "";
+  const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
+  const drawn = new Map;
+  let steps = [];
+  function clean(text) {
+    return (text ?? "").replace(/\s+/g, " ").trim();
+  }
+  function make(tag, attrs = {}, text = "") {
+    const el = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      el.setAttribute(key, value);
+    }
+    el.textContent = text;
+    return el;
+  }
+  function item(child) {
+    const li = make("li");
+    li.append(child);
+    return li;
+  }
+  function linksTo(name, scope = document) {
+    const selector = `a[href^=${JSON.stringify(`#${name}/`)}]`;
+    return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(KIT_NAV));
+  }
+  const hashOf = (a) => canonical((a.getAttribute("href") ?? "").slice(1));
+  const unique = (hashes) => [...new Set(hashes)];
+  const viewDrawnFor = (hash) => [...drawn].find(([, h]) => h === hash)?.[0];
+  function allSiblings(name) {
+    const statics = views.map((v) => v.dataset.view ?? "").filter((claim) => claim.startsWith(`${name}/`)).map(canonical);
+    return unique([...linksTo(name).map(hashOf), ...statics]);
+  }
+  const siblingsOf = (step) => step.list ?? allSiblings(nameOf(step.hash));
+  const linkText = (a) => {
+    const row = a.parentElement?.matches(".tree, .tree details");
+    return clean((row && a.firstElementChild || a).textContent);
+  };
+  function linkLabels(name) {
+    const texts = new Map;
+    const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
+    for (const { hash, text } of links) {
+      texts.set(text, (texts.get(text) ?? new Set).add(hash));
+    }
+    const found = new Map;
+    for (const { hash, text } of links) {
+      if (text && texts.get(text)?.size === 1 && !found.has(hash)) {
+        found.set(hash, text);
+      }
+    }
+    return found;
+  }
+  function label(hash, known = linkLabels(nameOf(hash))) {
+    return known.get(hash) || clean(viewDrawnFor(hash)?.querySelector("h1, h2")?.textContent) || decode(hash.split("/").slice(1).join("/"));
+  }
+  function savedTrail() {
+    const trail = entryState()[STATE_KEY];
+    return Array.isArray(trail) ? trail.filter((s) => typeof s?.hash === "string") : null;
+  }
+  function entryState() {
+    const state = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
+    return state && typeof state === "object" ? state : {};
+  }
+  const locationHash = () => canonical(location.hash.slice(1));
+  function inheritedList(hash, parent, replaced) {
+    if (replaced?.list?.includes(hash)) {
+      return replaced.list;
+    }
+    const view = parent && viewDrawnFor(parent.hash);
+    const list = view ? unique(linksTo(nameOf(hash), view).map(hashOf)) : [];
+    return list.includes(hash) ? list : undefined;
+  }
+  function extended(hash) {
+    const cut = steps.findIndex((s) => nameOf(s.hash) === nameOf(hash));
+    const before = cut < 0 ? steps : steps.slice(0, cut);
+    const list = inheritedList(hash, before.at(-1), steps[cut]);
+    return [...before, { hash, label: label(hash), ...list ? { list } : {} }];
+  }
+  function stamp(hash, redrawn) {
+    const kept = savedTrail();
+    const last = kept?.at(-1);
+    if (kept && last?.hash === hash) {
+      steps = redrawn ? [...kept.slice(0, -1), { ...last, label: label(hash) }] : kept;
+    } else {
+      steps = hash ? extended(hash) : [];
+    }
+    try {
+      navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
+    } catch {}
+  }
+  function crumbs(here, back) {
+    const list = make("ol", { class: "crumbs" });
+    list.append(item(back ?? make("a", { href: "#" }, overviewName())));
+    for (const step of steps.slice(0, -1)) {
+      list.append(item(make("a", { href: `#${step.hash}` }, step.label)));
+    }
+    list.append(item(make("span", { "aria-current": "page" }, here.label)));
+    return list;
+  }
+  function neighbours(here) {
+    const list = siblingsOf(here);
+    const at = list.indexOf(here.hash);
+    if (at < 0 || list.length < 2) {
+      return [];
+    }
+    const known = linkLabels(nameOf(here.hash));
+    const link = (hash, rel) => hash ? make("a", { href: `#${hash}`, rel }, label(hash, known)) : make("span");
+    const box = make("div", { class: "sibs" });
+    box.append(link(list[at - 1], "prev"), make("span", { class: "count" }, `${at + 1} / ${list.length}`), link(list[at + 1], "next"));
+    return [box];
+  }
+  function trailBar(view) {
+    let bar = view.querySelector(".trail");
+    if (!bar) {
+      bar = make("nav", { class: "trail", "aria-label": kitText("breadcrumb") });
+      const back = view.querySelector(".back");
+      if (back) {
+        back.before(bar);
+      } else {
+        (view.querySelector(".view-head") ?? view).prepend(bar);
+      }
+    }
+    return bar;
+  }
+  const freeId = (id) => id !== "" && !names.has(id) && !document.getElementById(id);
+  function sectionId(section, text, n) {
+    if (!section.id) {
+      let id = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
+      for (let k = n;!freeId(id); k++) {
+        id = `section-${k}`;
+      }
+      section.id = id;
+    }
+    return section.id;
+  }
+  function entry(section, heading, n, claimed) {
+    const text = clean(section.dataset.nav) || clean(heading.textContent);
+    const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
+    const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
+    for (const name of owns) {
+      claimed.add(name);
+    }
+    return { section, li: item(link), link, owns };
+  }
+  function buildRail(page, overview) {
+    const sections = [...overview.querySelectorAll(":scope > section")];
+    const headed = sections.flatMap((section) => {
+      const heading = section.querySelector(":scope > h2");
+      return heading ? [{ section, heading }] : [];
+    });
+    const claimed = new Set;
+    const entries = headed.map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
+    const home = make("a", { href: "#" }, overviewName());
+    const list = make("ol", { id: "toc-list" });
+    list.append(item(home), ...entries.map((e) => e.li));
+    const nav = make("nav", { class: "toc", "aria-label": kitText("contents") });
+    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, kitText("contents"));
+    const setOpen = (on) => {
+      nav.classList.toggle("is-open", on);
+      toggle.setAttribute("aria-expanded", String(on));
+    };
+    toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
+    list.addEventListener("click", (e) => {
+      if (e.target instanceof Element && e.target.closest("a")) {
+        setOpen(false);
+      }
+    });
+    nav.append(toggle, list);
+    page.prepend(nav);
+    const rail = { nav, home, entries };
+    addEventListener("scroll", () => spySoon(rail), { passive: true });
+    return rail;
+  }
+  function stepList(step, hash) {
+    const all = siblingsOf(step);
+    const shown = all.length > RAIL_LIST_MAX ? [step.hash] : all;
+    const known = linkLabels(nameOf(step.hash));
+    const sub = make("ol");
+    for (const h of shown) {
+      const text = h === step.hash ? step.label : label(h, known);
+      const a = make("a", { href: `#${h}` }, text);
+      a.classList.toggle("is-trail", h === step.hash && h !== hash);
+      if (h === hash) {
+        a.setAttribute("aria-current", "page");
+      }
+      sub.append(item(a));
+    }
+    return sub;
+  }
+  function updateRail(rail, hash) {
+    for (const { li, owns } of rail.entries) {
+      for (const old of li.querySelectorAll("ol")) {
+        old.remove();
+      }
+      li.append(...steps.filter((s) => owns.includes(nameOf(s.hash))).map((s) => stepList(s, hash)));
+    }
+    const current = rail.nav.querySelector('[aria-current="page"]');
+    if (current && rail.nav.scrollHeight > rail.nav.clientHeight) {
+      rail.nav.scrollTop = current.offsetTop - rail.nav.clientHeight / 3;
+    }
+    spy(rail);
+  }
+  let spyQueued = false;
+  function spySoon(rail) {
+    if (!spyQueued) {
+      spyQueued = true;
+      requestAnimationFrame(() => spy(rail));
+    }
+  }
+  function spy(rail) {
+    spyQueued = false;
+    const inView = document.documentElement.classList.contains("in-view");
+    const passed = rail.entries.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3).at(-1);
+    const here = inView ? null : passed?.link ?? rail.home;
+    for (const a of [rail.home, ...rail.entries.map((e) => e.link)]) {
+      a.removeAttribute("aria-current");
+    }
+    here?.setAttribute("aria-current", "location");
+  }
+  const page = overview?.parentElement;
+  const railHost = page && overview && names.size > 1 ? { page, overview } : null;
+  document.documentElement.classList.toggle("has-toc", Boolean(railHost));
+  let toc = null;
+  let shownHash = null;
+  const revisited = () => entryState()[AT_KEY] === locationHash();
+  return {
+    revisited,
+    savedHash: () => revisited() ? savedTrail()?.at(-1)?.hash ?? null : null,
+    show(view, routeHash) {
+      const hash = canonical(routeHash);
+      const redrawn = hash === shownHash;
+      shownHash = hash;
+      if (railHost && !toc) {
+        toc = buildRail(railHost.page, railHost.overview);
+      }
+      if (view) {
+        drawn.set(view, hash);
+      }
+      const current = view ? hash : "";
+      stamp(current, redrawn);
+      const here = steps.at(-1);
+      if (view && here) {
+        const back = view.querySelector(".back");
+        trailBar(view).replaceChildren(crumbs(here, back), ...neighbours(here));
+      }
+      if (toc) {
+        updateRail(toc, current);
+      }
+    }
+  };
+};
+
+/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
+   `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
+   no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
+   on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to.
+   A static view may claim one param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for
+   its param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
+   Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
+   (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
+   (an async callback) runs its handler at once if the current hash is its view.
+   Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it briefly
+   ("Blaž", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the view's
+   heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
+   breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
+   was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
+   its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
+   data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
+   link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
+   opens them at every level, at the end of the section's .toolbar when one comes before them.
+   Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
+   in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
+   its numbers, which line up in columns across rows and levels. --tree-cols on the .tree gives one width per number column
+   (unset, each is 5rem, narrower where a deep row on a phone has no room); a .tree-head first in the tree names the label and
+   each column over the rows. On phones a row with two or more numbers puts them on a line under its label, in the same columns:
+   at the third level a 360-pixel phone leaves about 16rem for them and their 0.5rem gaps, and a width written as minmax(0, 4rem)
+   gives way where they do not fit. A leaf opens to its full text. Give every row the same cells in the same order, units
+   included; an empty <span></span> keeps a column:
+     <div class="tree" style="--tree-cols: 4rem 4rem">
+       <div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
+       <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
+         <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
+         <a href="#task/1.1.2"><span>1.1.2 Power stage</span><span>24 h</span><span>Ana</span></a>
+       </details>
+     </div>
+   A link to an id inside it (<a href="#spike">Spike boards: 4 tasks, 70 h</a>) opens that branch. A row link's label names its view
+   in the navigation. With kit:link.js, data-ref on a row lights it, and a closed fold that holds a lit row is tinted too. Trees
+   print fully open.
+   Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
+   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
+   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
+   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
+   .back link names it). A key left out stays English. */
+(() => {
+  const root = document.documentElement;
+  const views = [...document.querySelectorAll("[data-view]")];
+  const handlers = {};
+  let started = false;
+  let overviewY = 0;
+  const LABELS = {
+    contents: "Contents",
+    breadcrumb: "Breadcrumb",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    overview: "Overview"
+  };
+  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
+  const nav = window.ViewsNav({ views, decode, canonical, kitText });
+  const refreshFolds = window.ViewsFolds(kitText);
+  function decode(text) {
+    try {
+      return decodeURIComponent(text);
+    } catch {
+      return text;
+    }
+  }
+  function canonical(hash) {
+    return new URL(`#${hash}`, "file:///").hash.slice(1);
+  }
+  const OVERVIEW = { name: "", view: undefined, param: "", hash: "" };
+  let shown = OVERVIEW;
+  function claim(hash) {
+    const [name = "", ...rest] = hash.split("/");
+    const view = views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
+    return view ? { name, view, param: decode(rest.join("/")), hash } : OVERVIEW;
+  }
+  const targetOf = (hash) => hash ? document.getElementById(decode(hash)) : null;
+  function route() {
+    const hash = canonical(location.hash.slice(1));
+    const claimed = claim(hash);
+    if (claimed.view) {
+      return claimed;
+    }
+    if (nav.revisited()) {
+      const saved = nav.savedHash();
+      if (!saved) {
+        return OVERVIEW;
+      }
+      return shown.view && saved === shown.hash ? shown : claim(saved);
+    }
+    return shown.view?.contains(targetOf(hash)) ? shown : OVERVIEW;
+  }
+  function reveal(target) {
+    for (let d = target.closest("details");d; d = d.parentElement?.closest("details") ?? null) {
+      d.open = true;
+    }
+  }
+  function shownTarget(at) {
+    const hash = canonical(location.hash.slice(1));
+    const target = hash === at.hash ? null : targetOf(hash);
+    const inView = target?.closest("[data-view]");
+    return target && (at.view ? at.view.contains(target) : !inView) ? target : null;
+  }
+  function draw(at, again = false) {
+    if (at.view && !again) {
+      handlers[at.name]?.(at.view, at.param);
+    }
+    shown = at;
+    nav.show(at.view ?? null, at.hash);
+    refreshFolds();
+  }
+  function show() {
+    const revisited = nav.revisited();
+    const at = route();
+    const { view } = at;
+    const again = started && at === shown && Boolean(view);
+    const wasInView = root.classList.contains("in-view");
+    if (view && !wasInView) {
+      overviewY = scrollY;
+    }
+    for (const v of views) {
+      v.classList.toggle("active", v === view);
+    }
+    root.classList.toggle("in-view", Boolean(view));
+    if (!started) {
+      return;
+    }
+    draw(at, again);
+    land(at, { wasInView, again, revisited });
+  }
+  function land(at, { wasInView, again, revisited }) {
+    const target = shownTarget(at);
+    if (target) {
+      reveal(target);
+    }
+    if (target && (at.view || !revisited)) {
+      target.scrollIntoView();
+    } else if (!at.view) {
+      if (wasInView) {
+        scrollTo(0, overviewY);
+      }
+    } else if (!again) {
+      scrollTo(0, 0);
+      const heading = at.view.querySelector("h1, h2");
+      heading?.setAttribute("tabindex", "-1");
+      heading?.focus({ preventScroll: true });
+    }
+  }
+  window.Views = {
+    on(name, fn) {
+      handlers[name] = fn;
+      if (!started) {
+        return;
+      }
+      const at = route();
+      if (at.view && at.name === name) {
+        draw(at);
+        const target = shownTarget(at);
+        if (target) {
+          reveal(target);
+          target.scrollIntoView();
+        }
+      }
+    }
+  };
+  root.classList.add("js-views");
+  addEventListener("hashchange", show);
+  document.addEventListener("click", (e) => {
+    const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+    const hash = canonical((link?.getAttribute("href") ?? "").slice(1));
+    const target = hash === canonical(location.hash.slice(1)) && shownTarget(shown);
+    if (target) {
+      reveal(target);
+    }
+  });
+  show();
+  const start = () => {
+    started = true;
+    show();
+  };
+  if (document.readyState === "loading") {
+    addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
 })();
 </script>
 <script>/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts (HTML or hand-built SVG), <ol data-captions>; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
@@ -2922,6 +3398,7 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
    captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
    have different lengths. Position: it stays on the current step (clamped to the new count), or on the new last step if it was on the last;
    Steps.refresh(el, 1) restarts. A stepper left with fewer than 2 steps hides its controls and shows everything; they return when it grows.
+   A [data-stepper] the page adds after load starts with Steps.refresh(el).
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
    replacing content, whether or not the event fires. The opening step is announced once the page has loaded (after its scripts and
    DOMContentLoaded handlers), so a listener added while loading hears it, also with data-start; one added after load misses it.
@@ -3118,12 +3595,16 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
       this.show(wanted ?? (opening ? Number(this.root.dataset.start) || this.total : stay));
     }
   }
-  const all = [...document.querySelectorAll("[data-stepper]")].map((root) => {
+  const all = [];
+  function register(root) {
     const stepper = new Stepper(root);
-    steppers.set(root, (step) => stepper.refresh(step));
-    stepper.refresh();
+    steppers.set(root, stepper);
+    all.push(stepper);
     return stepper;
-  });
+  }
+  for (const root of document.querySelectorAll("[data-stepper]")) {
+    register(root).refresh();
+  }
   function announceOpening() {
     setTimeout(() => {
       loaded = true;
@@ -3140,11 +3621,11 @@ echarts.use([`+I+"]);");else Et("Unknown series "+D);return}if(c==="tooltip"){if
   }
   window.Steps = {
     refresh(el, step) {
-      const refresh = steppers.get(el);
-      if (!refresh) {
+      const stepper = steppers.get(el) ?? (el instanceof HTMLElement && el.matches("[data-stepper]") ? register(el) : undefined);
+      if (!stepper) {
         throw new Error("Steps.refresh needs an element with data-stepper");
       }
-      refresh(step);
+      stepper.refresh(step);
     }
   };
 })();
@@ -3858,282 +4339,6 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
   });
   sync();
 })();
-</script>
-<script>
-const PI = Math.PI;
-const MINUS = "\u2212";
-const $ = (id) => document.getElementById(id);
-
-/* ---- Maths in plain HTML ---- */
-const v = (name, sub) => `<i>${name}</i>${sub ? `<sub>${sub}</sub>` : ""}`;
-const frac = (top, bottom) => `<span class="frac"><span>${top}</span><span>${bottom}</span></span>`;
-const lim = (symbol, high, low) => `<span class="lim"><span>${high}</span><span class="sym">${symbol}</span><span>${low}</span></span>`;
-const integral = (low, high) => lim("\u222b", high, low);
-const sum = (low, high) => lim("\u03a3", high, low);
-const an = v("a", v("n")), bn = v("b", v("n"));
-const f = `<i>f</i>(<i>x</i>)`, nx = `<i>nx</i>`, dx = ` d<i>x</i>`;
-const alt = `(${MINUS}1)<sup><i>n</i></sup>`;
-
-/* ---- The two waves, defined once ----
- * harmonic(k): frequency (a multiple of the base) of the k-th nonzero term
- * coef(n): the sine amplitude b_n at that frequency
- * yLim, yStep: the chart's vertical range and tick step
- * jumpAt: x of a jump, top: the value the signal reaches just before it, jump: its height
- * bumpAt(k): distance of the highest point of the k-term sum from the jump (known analytic maximum) */
-const WAVES = {
-	square: {
-		name: "Square wave", harmonic: (k) => 2 * k - 1, coef: (n) => 4 / (PI * n),
-		top: 1, jump: 2, jumpAt: 0, bumpAt: (k) => PI / (2 * k), side: 1, yLim: 1.5, yStep: 0.5,
-		target: [[-2 * PI, 1], [-PI, 1], [-PI, -1], [0, -1], [0, 1], [PI, 1], [PI, -1], [2 * PI, -1]],
-	},
-	saw: {
-		name: "Sawtooth", harmonic: (k) => k, coef: (n) => (2 * (n % 2 ? 1 : -1)) / n,
-		top: PI, jump: 2 * PI, jumpAt: PI, bumpAt: (k) => PI / (k + 1), side: -1, yLim: 4, yStep: 2,
-		target: [[-2 * PI, 0], [-PI, PI], [-PI, -PI], [PI, PI], [PI, -PI], [2 * PI, 0]],
-	},
-};
-
-const partial = (wave, k, x) => {
-	let s = 0;
-	for (let j = 1; j <= k; j++) { const n = wave.harmonic(j); s += wave.coef(n) * Math.sin(n * x); }
-	return s;
-};
-/** Highest value of the k-term sum next to the wave's jump, evaluated at the analytic maximum. */
-const peak = (wave, k) => partial(wave, k, wave.jumpAt + wave.side * wave.bumpAt(k));
-const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + ((b - a) * i) / (n - 1));
-const piLabel = (x) => {
-	const m = Math.round(x / PI);
-	return m === 0 ? "0" : `${m < 0 ? MINUS : ""}${Math.abs(m) === 1 ? "" : Math.abs(m)}\u03c0`;
-};
-const fixed = (x, d = 2) => x.toFixed(d).replace("-", MINUS);
-const pct = (x) => `${(x * 100).toFixed(1)}%`;
-
-/* ---- 1. Hero: build a wave from sines ---- */
-const PARTS_SHOWN = 8;
-const heroGrid = linspace(-2 * PI, 2 * PI, 1400);
-const heroLegend = { top: 8, left: 8 };
-const hero = Charts.make($("hero-chart"), {
-	grid: { top: 44, left: 8, right: 24, bottom: 8 },
-	legend: heroLegend,
-	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 3), axisPointer: { label: { formatter: (p) => `${fixed(p.value / PI)}\u03c0` } } },
-	xAxis: { type: "value", min: -2 * PI, max: 2 * PI, interval: PI, axisLabel: { formatter: piLabel } },
-	yAxis: { type: "value", min: -1.5, max: 1.5, interval: 0.5 },
-	dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none" }],
-	series: [],
-});
-
-function showHero() {
-	const wave = WAVES[document.querySelector('input[name="wave"]:checked').value];
-	const k = +$("terms").value, withParts = $("parts").checked;
-	const topHarmonic = wave.harmonic(k), sumName = `Sum of ${k} ${k === 1 ? "term" : "terms"}`;
-	const best = peak(wave, k);
-	$("terms-out").textContent = k;
-	$("h-top").innerHTML = `${topHarmonic}\u00d7 <small>base frequency</small>`;
-	$("h-peak").innerHTML = `${fixed(best, 3)} <small>target ${fixed(wave.top, wave === WAVES.saw ? 2 : 0)}</small>`;
-	const above = (best - wave.top) / wave.jump;
-	$("h-over").textContent = `${above < 0 ? MINUS : "+"}${pct(Math.abs(above))}`;
-	$("hero-cap").textContent = `Dashed: the ${wave.name.toLowerCase()} to build. Solid: the sum. ${withParts ? `Thin lines: the first ${Math.min(k, PARTS_SHOWN)} sines of the sum, each at its own amplitude. ` : ""}Horizontal axis in radians, one period is 2\u03c0. Scroll or pinch to zoom.`;
-	const parts = withParts ? Array.from({ length: Math.min(k, PARTS_SHOWN) }, (_, j) => {
-		const n = wave.harmonic(j + 1);
-		return { id: `part${j}`, name: `${n}\u00d7 sine`, type: "line", showSymbol: false, silent: true, lineStyle: { width: 1.2, opacity: 0.75 }, z: 1,
-			data: heroGrid.map((x) => [x, wave.coef(n) * Math.sin(n * x)]) };
-	}) : [];
-	hero.set({
-		legend: { ...heroLegend, data: ["Target", sumName] },
-		yAxis: { min: -wave.yLim, max: wave.yLim, interval: wave.yStep },
-		series: [
-			{ id: "target", name: "Target", type: "line", showSymbol: false, silent: true, color: Charts.color("muted"), lineStyle: { type: "dashed", width: 1.6 }, data: wave.target, z: 2 },
-			...parts,
-			{ id: "sum", name: sumName, type: "line", showSymbol: false, color: Charts.color("accent"), lineStyle: { width: 2.6 }, z: 3, data: heroGrid.map((x) => [x, partial(wave, k, x)]) },
-		],
-	}, ["series"]);
-}
-for (const id of ["terms", "parts"]) $(id).addEventListener("input", showHero);
-document.querySelectorAll('input[name="wave"]').forEach((r) => r.addEventListener("change", showHero));
-showHero();
-
-$("eq-series").innerHTML = `${f} = ${frac(v("a", "0"), "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an} cos ${nx} + ${bn} sin ${nx})`;
-
-/* ---- 2. Coefficients: a derivation to step through, with the resulting b_n ---- */
-const lineEq = (html) => `<p class="eq" data-step="STEP">${html}</p>`;
-const half = (low) => integral(low, "\u03c0");
-const DERIVATIONS = {
-	square: [
-		[`${an} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} ${f} cos ${nx}${dx} = 0`,
-			`Cosine coefficients first. The square wave is odd and cos <i>nx</i> is even, so the integrand is odd and its integral over a symmetric interval is zero. The same argument gives <i>a</i><sub>0</sub> = 0.`],
-		[`${bn} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} ${f} sin ${nx}${dx}`,
-			`The sine coefficient uses the same recipe with sin <i>nx</i>. Here <i>f</i> = ${MINUS}1 on the left half of the period and +1 on the right half.`],
-		[`= ${frac("2", "\u03c0")} ${half("0")} sin ${nx}${dx}`,
-			`<i>f</i> and sin <i>nx</i> are both odd, so their product is even: integrate over half the period and double. On (0, \u03c0) the square wave is 1.`],
-		[`= ${frac("2", "\u03c0")} [ ${MINUS}${frac("cos " + nx, "<i>n</i>")} ]<sub>0</sub><sup>\u03c0</sup> = ${frac("2", "<i>n</i>\u03c0")} (1 ${MINUS} cos <i>n</i>\u03c0)`,
-			`Integrate sin <i>nx</i> and put in the limits. cos 0 = 1 supplies the 1.`],
-		[`= ${frac("2", "<i>n</i>\u03c0")} (1 ${MINUS} ${alt}) = ${frac("4", "<i>n</i>\u03c0")} for odd <i>n</i>, and 0 for even <i>n</i>`,
-			`cos <i>n</i>\u03c0 is ${MINUS}1 or +1 as <i>n</i> is odd or even. Even harmonics cancel; odd ones keep 4/(<i>n</i>\u03c0).`],
-		[`${f} = ${frac("4", "\u03c0")} ( sin <i>x</i> + ${frac("1", "3")} sin 3<i>x</i> + ${frac("1", "5")} sin 5<i>x</i> + \u2026 )`,
-			`Put the coefficients back into the series. This is the sum being built at the top of the page.`],
-	],
-	saw: [
-		[`${an} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} <i>x</i> cos ${nx}${dx} = 0`,
-			`Cosine coefficients first. <i>x</i> is odd and cos <i>nx</i> is even, so the integrand is odd and integrates to zero over (${MINUS}\u03c0, \u03c0). So does <i>a</i><sub>0</sub>.`],
-		[`${bn} = ${frac("1", "\u03c0")} ${integral(MINUS + "\u03c0", "\u03c0")} <i>x</i> sin ${nx}${dx}`,
-			`The sine coefficient with <i>f</i>(<i>x</i>) = <i>x</i> on one period.`],
-		[`= ${frac("2", "\u03c0")} ${half("0")} <i>x</i> sin ${nx}${dx}`,
-			`<i>x</i> and sin <i>nx</i> are both odd, so the product is even: integrate over (0, \u03c0) and double.`],
-		[`= ${frac("2", "\u03c0")} [ ${MINUS}${frac("<i>x</i> cos " + nx, "<i>n</i>")} + ${frac("sin " + nx, "<i>n</i><sup>2</sup>")} ]<sub>0</sub><sup>\u03c0</sup> = ${frac("2", "\u03c0")} \u00b7 ${MINUS}${frac("\u03c0 cos <i>n</i>\u03c0", "<i>n</i>")}`,
-			`Integration by parts. At both limits sin <i>nx</i> is 0, and the <i>x</i> cos <i>nx</i> term is 0 at <i>x</i> = 0, so only ${MINUS}\u03c0 cos <i>n</i>\u03c0/<i>n</i> remains.`],
-		[`= ${MINUS}${frac("2" + alt, "<i>n</i>")} = ${frac("2(" + MINUS + "1)<sup><i>n</i>+1</sup>", "<i>n</i>")}`,
-			`With cos <i>n</i>\u03c0 = ${alt}: +2/<i>n</i> for odd <i>n</i> and ${MINUS}2/<i>n</i> for even <i>n</i>. Every harmonic is present, with alternating signs.`],
-		[`${f} = 2 ( sin <i>x</i> ${MINUS} ${frac("1", "2")} sin 2<i>x</i> + ${frac("1", "3")} sin 3<i>x</i> ${MINUS} \u2026 )`,
-			`Put the coefficients back into the series. This is the sawtooth being built at the top of the page.`],
-	],
-};
-const derivFig = $("deriv-fig");
-const coefPlot = Plot.make($("coef-plot"), { series: [], x: { min: 0, max: 13, step: 1, name: "harmonic n" }, legend: false });
-
-function showDerivation() {
-	const key = document.querySelector('input[name="coef-wave"]:checked').value, wave = WAVES[key];
-	const steps = DERIVATIONS[key];
-	$("coef-head").textContent = key === "square"
-		? "Square wave: only odd harmonics, amplitudes 4/(nπ)"
-		: "Sawtooth: every harmonic, amplitudes 2/n with alternating sign";
-	$("deriv").innerHTML = steps.map(([eq], i) => lineEq(eq).replace("STEP", i + 1)).join("");
-	derivFig.querySelector("[data-captions]").innerHTML = steps.map(([, caption]) => `<li>${caption}</li>`).join("");
-	Steps.refresh(derivFig, 1);
-	const data = Array.from({ length: 12 }, (_, i) => {
-		const n = i + 1, isPresent = key === "saw" || n % 2 === 1;
-		return [n, isPresent ? wave.coef(n) : 0];
-	});
-	const reach = key === "square" ? { min: 0, max: 1.6 } : { min: -1.4, max: 2.4 };
-	coefPlot.set({ series: [{ name: "b", type: "stem", data, color: "var(--accent)", label: (_, y) => (y === 0 ? "0" : fixed(y)) }], y: reach });
-}
-document.querySelectorAll('input[name="coef-wave"]').forEach((r) => r.addEventListener("change", showDerivation));
-showDerivation();
-
-/* ---- 3. Gibbs: the bump keeps its height ---- */
-const LIMIT = (2 / PI) * 1.8519370519824662; // (2/pi) Si(pi): the peak of a +-1 square wave as terms grow
-const gWave = WAVES.square;
-const gGrid = linspace(-1.6, 1.6, 2400);
-const gibbs = Charts.make($("gibbs-chart"), {
-	grid: { top: 24, left: 8, right: 24, bottom: 8 },
-	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 3), axisPointer: { label: { formatter: (p) => `x = ${fixed(p.value, 3)}` } } },
-	xAxis: { type: "value", min: -1.6, max: 1.6, interval: 0.4, axisLabel: { formatter: (x) => fixed(x, 1).replace(".0", "") } },
-	yAxis: { type: "value", min: -1.4, max: 1.4 },
-	series: [],
-});
-const peakKs = Array.from({ length: 200 }, (_, i) => i + 1);
-const peakData = peakKs.map((k) => [k, peak(gWave, k)]);
-const peaks = Charts.make($("peak-chart"), {
-	grid: { top: 24, left: 8, right: 24, bottom: 36 },
-	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 4) },
-	xAxis: { type: "log", min: 1, max: 200, name: "terms in the sum", nameLocation: "middle", nameGap: 28, axisLabel: { formatter: "{value}" } },
-	yAxis: { type: "value", min: 0.9, max: 1.3 },
-	series: [],
-});
-const rule = (y, label, type) => ({ yAxis: y, lineStyle: { type, color: Charts.color("muted") }, label: { formatter: label, position: "insideEndTop", color: Charts.color("muted") } });
-
-function showGibbs() {
-	const k = +$("gk").value, best = peak(gWave, k), at = gWave.bumpAt(k), zoom = $("gzoom").checked;
-	// Parseval: the mean-square error is what the unused terms would carry.
-	let used = 0;
-	for (let j = 1; j <= k; j++) used += gWave.coef(gWave.harmonic(j)) ** 2 / 2;
-	$("gk-out").textContent = k;
-	$("g-peak").innerHTML = `${fixed(best, 3)} <small>wave is 1</small>`;
-	$("g-at").innerHTML = `${fixed(at, 3)} <small>radians from the jump</small>`;
-	$("g-rms").textContent = fixed(Math.sqrt(Math.max(0, 1 - used)), 3);
-	$("gibbs-head").textContent = `With ${k} ${k === 1 ? "term" : "terms"} the sum peaks at ${fixed(best, 3)}; as the number of terms grows, the peak approaches 1.179`;
-	gibbs.set({
-		xAxis: zoom ? { min: 0, max: 1.6 } : { min: -1.6, max: 1.6 },
-		yAxis: zoom ? { min: 0.8, max: 1.3 } : { min: -1.4, max: 1.4 },
-		series: [
-			{ id: "target", name: "Square wave", type: "line", showSymbol: false, silent: true, color: Charts.color("muted"), lineStyle: { type: "dashed", width: 1.6 }, data: [[-1.6, -1], [0, -1], [0, 1], [1.6, 1]] },
-			{ id: "sum", name: `Sum of ${k} terms`, type: "line", showSymbol: false, color: Charts.color("accent"), lineStyle: { width: 2.4 }, z: 3,
-				data: gGrid.map((x) => [x, partial(gWave, k, x)]),
-				markLine: { silent: true, symbol: "none", data: [rule(LIMIT, "limit 1.179", "dotted")] },
-				markPoint: { symbol: "circle", symbolSize: 11, itemStyle: { color: Charts.color("accent") }, label: { show: false }, data: [{ coord: [at, best] }] } },
-		],
-	}, ["series"]);
-	peaks.set({
-		series: [{ id: "peak", name: "Highest point", type: "line", showSymbol: false, color: Charts.color("accent"), lineStyle: { width: 2.4 }, data: peakData,
-			markLine: { silent: true, symbol: "none", data: [rule(1, "square wave = 1", "dashed"), rule(LIMIT, "limit 1.179", "dotted")] },
-			markPoint: { symbol: "circle", symbolSize: 12, itemStyle: { color: Charts.color("accent") }, label: { show: false }, data: [{ coord: [k, best] }] } }],
-	}, ["series"]);
-}
-for (const id of ["gk", "gzoom"]) $(id).addEventListener("input", showGibbs);
-showGibbs();
-
-/* ---- 4. Symmetry: which coefficients survive ---- */
-const SYMS = {
-	even: { name: "The triangle |x|", fn: (x) => Math.abs(x) },
-	odd: { name: "The square wave", fn: (x) => Math.sign(x) },
-	none: { name: "The half ramp", fn: (x) => Math.max(0, x) },
-};
-const symGrid = Array.from({ length: 1000 }, (_, i) => -PI + ((i + 0.5) * 2 * PI) / 1000);
-/** Fourier coefficient by midpoint rule: kind is Math.cos or Math.sin. */
-const coefficient = (fn, kind, n) => symGrid.reduce((s, x) => s + fn(x) * kind(n * x), 0) * (2 / 1000);
-const tidy = (x) => (Math.abs(x) < 1e-9 ? 0 : x);
-const sym = Charts.make($("sym-chart"), {
-	grid: { top: 44, left: 8, right: 24, bottom: 8 },
-	legend: { top: 8, left: 8 },
-	tooltip: { trigger: "axis", valueFormatter: (y) => fixed(y, 3) },
-	xAxis: { type: "value", min: -PI, max: PI, interval: PI / 2, axisLabel: { formatter: (x) => ["\u2212\u03c0", "\u2212\u03c0/2", "0", "\u03c0/2", "\u03c0"][Math.round(x / (PI / 2)) + 2] } },
-	yAxis: { type: "value", min: -1, max: 4, interval: 1 },
-	series: [],
-});
-const symA = Plot.make($("sym-a"), { series: [], x: { min: -0.5, max: 9.5, step: 1, name: "a\u2099 : cosine coefficients" }, legend: false });
-const symB = Plot.make($("sym-b"), { series: [], x: { min: 0.5, max: 9.5, step: 1, name: "b\u2099 : sine coefficients" }, legend: false });
-const survivors = (name, list) => {
-	const kept = list.filter(([, y]) => y !== 0).map(([n]) => `${name}${String.fromCodePoint(0x2080 + n)}`);
-	return kept.length === 0 ? "none" : kept.length > 6 ? `${kept.slice(0, 5).join(", ")}, \u2026` : kept.join(", ");
-};
-
-function showSymmetry() {
-	const key = document.querySelector('input[name="sym"]:checked').value, shape = SYMS[key];
-	const aList = Array.from({ length: 10 }, (_, n) => [n, tidy(coefficient(shape.fn, Math.cos, n))]);
-	const bList = Array.from({ length: 9 }, (_, i) => [i + 1, tidy(coefficient(shape.fn, Math.sin, i + 1))]);
-	const noCos = aList.every(([, y]) => y === 0), noSin = bList.every(([, y]) => y === 0);
-	$("sym-head").textContent = noSin ? `${shape.name} is even, so every sine coefficient is zero`
-		: noCos ? `${shape.name} is odd, so a\u2080 and every cosine coefficient are zero`
-			: `${shape.name} is neither even nor odd, so it needs sines and cosines`;
-	$("s-a").textContent = survivors("a", aList);
-	$("s-b").textContent = survivors("b", bList);
-	const reach = Math.max(...aList.map(([, y]) => Math.abs(y)), ...bList.map(([, y]) => Math.abs(y))) * 1.2;
-	const label = (_, y) => (y === 0 ? "0" : fixed(y));
-	symA.set({ series: [{ name: "a", type: "stem", data: aList, color: "var(--c1)", label }], y: { min: -reach, max: reach } });
-	symB.set({ series: [{ name: "b", type: "stem", data: bList, color: "var(--c2)", label }], y: { min: -reach, max: reach } });
-	const line = (id, name, color, fn) => ({ id, name, type: "line", showSymbol: false, color: Charts.color(color), lineStyle: id === "f" ? { width: 3 } : { width: 1.8, type: "dashed" }, data: symGrid.map((x) => [x, fn(x)]) });
-	const g = shape.fn;
-	sym.set({
-		yAxis: key === "odd" ? { min: -1.5, max: 1.5, interval: 0.5 } : { min: -1, max: 4, interval: 1 },
-		series: [
-			line("f", "f(x)", "accent", g),
-			line("even", "Even part", "c2", (x) => (g(x) + g(-x)) / 2),
-			line("odd", "Odd part", "c3", (x) => (g(x) - g(-x)) / 2),
-		],
-	}, ["series"]);
-}
-document.querySelectorAll('input[name="sym"]').forEach((r) => r.addEventListener("change", showSymmetry));
-showSymmetry();
-
-/* ---- Formula sheet ---- */
-const rep = v("T");
-const ft = `<i>f</i>(<i>t</i>)`, wt = `<i>n\u03c9t</i>`;
-const piInt = (low, high) => integral(low, high);
-const sym2 = `${integral(MINUS + "\u03c0", "\u03c0")}`;
-// Each entry: a name and a list of formulas, one per line.
-const SHEET = [
-	["Series, period 2\u03c0", [`${f} = ${frac(v("a", "0"), "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an} cos ${nx} + ${bn} sin ${nx})`]],
-	["Coefficients", [`${an} = ${frac("1", "\u03c0")} ${sym2} ${f} cos ${nx}${dx} &emsp; (<i>n</i> \u2265 0)`, `${bn} = ${frac("1", "\u03c0")} ${sym2} ${f} sin ${nx}${dx} &emsp; (<i>n</i> \u2265 1)`]],
-	["Period T, \u03c9 = 2\u03c0/T", [`${ft} = ${frac(v("a", "0"), "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an} cos ${wt} + ${bn} sin ${wt})`, `${an} = ${frac("2", rep)} ${piInt("0", rep)} ${ft} cos ${wt} d<i>t</i>, &emsp; ${bn} = ${frac("2", rep)} ${piInt("0", rep)} ${ft} sin ${wt} d<i>t</i>`]],
-	["Orthogonality", [`${sym2} sin <i>mx</i> sin ${nx}${dx} = ${sym2} cos <i>mx</i> cos ${nx}${dx} = \u03c0 if <i>m</i> = <i>n</i>, else 0 &emsp; (<i>m</i>, <i>n</i> = 1, 2, 3, \u2026)`, `${sym2} sin <i>mx</i> cos ${nx}${dx} = 0 for all <i>m</i>, <i>n</i> &emsp; ${sym2} cos ${nx}${dx} = 0 (<i>n</i> \u2265 1) &emsp; ${sym2} 1${dx} = 2\u03c0`]],
-	["Even <i>f</i>", [`${bn} = 0, &emsp; ${an} = ${frac("2", "\u03c0")} ${piInt("0", "\u03c0")} ${f} cos ${nx}${dx}`]],
-	["Odd <i>f</i>", [`<i>a</i><sub>0</sub> = ${an} = 0, &emsp; ${bn} = ${frac("2", "\u03c0")} ${piInt("0", "\u03c0")} ${f} sin ${nx}${dx}`]],
-	["Square wave, \u00b11, odd", [`${bn} = ${frac("4", "<i>n</i>\u03c0")} for odd <i>n</i>, 0 for even <i>n</i>`, `${f} = ${frac("4", "\u03c0")} ${sum("<i>n</i> odd", "")} ${frac("sin " + nx, "<i>n</i>")}`]],
-	[`Sawtooth, <i>f</i> = <i>x</i> on (${MINUS}\u03c0, \u03c0)`, [`${bn} = ${frac("2(" + MINUS + "1)<sup><i>n</i>+1</sup>", "<i>n</i>")}`, `${f} = 2 ( sin <i>x</i> ${MINUS} ${frac("sin 2<i>x</i>", "2")} + ${frac("sin 3<i>x</i>", "3")} ${MINUS} \u2026 )`]],
-	["At a jump", [`The series gives the midpoint of the two one-sided limits: ${frac("<i>f</i>(<i>x</i><sup>+</sup>) + <i>f</i>(<i>x</i><sup>" + MINUS + "</sup>)", "2")}`]],
-	["Gibbs overshoot", [`Square wave \u00b11: the <i>k</i>-term sum peaks at <i>x</i> = ${frac("\u03c0", "2<i>k</i>")}, and the peak tends to ${frac("2", "\u03c0")} Si(\u03c0) \u2248 1.179`, `Overshoot \u2192 0.0895 \u00d7 the jump, where Si(\u03c0) = ${piInt("0", "\u03c0")} ${frac("sin <i>t</i>", "<i>t</i>")} d<i>t</i> \u2248 1.852`]],
-	["Parseval", [`${frac("1", "\u03c0")} ${sym2} ${f}<sup>2</sup>${dx} = ${frac("<i>a</i><sub>0</sub><sup>2</sup>", "2")} + ${sum("<i>n</i> = 1", "\u221e")} (${an}<sup>2</sup> + ${bn}<sup>2</sup>)`, `After <i>N</i> terms the mean-square error is half the sum of the squared omitted coefficients.`]],
-];
-$("sheet-rows").innerHTML = SHEET.map(([name, eqs]) => `<div class="sheet-row"><h3>${name}</h3><div>${eqs.map((eq) => `<div class="eq">${eq}</div>`).join("")}</div></div>`).join("");
 </script>
 </body>
 </html>
