@@ -9,6 +9,7 @@ const FORM = (checks: Record<string, string>) => `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1"></head><body><h1>Form</h1>
 <input id="q" value="old"><input id="note" name="note"><textarea id="t">draft</textarea>
 <input id="a[1]"><input data-label="a]=b">
+<input id="off" value="off" disabled><input id="ro" value="ro" readonly><input id="gone" value="gone" style="display:none">
 <input id="r" type="range" min="0" max="10" value="2">
 <select id="s"><option value="a">A</option><option value="b">B</option><option value="c">C</option></select>
 <script>
@@ -57,6 +58,25 @@ test("check --do type: types a multi-line text into a textarea, a newline as Ent
 	expect(
 		await packAndRun(dir, "multiline", page, { steps: ["type:#t=line one\nline two"] }),
 	).toEqual([]);
+}, 60_000);
+
+test("check --do type: on a disabled, read-only or unfocusable field is a problem, and the focused field gets no keys", async () => {
+	const page = FORM({
+		"the field focused before keeps its text and heard nothing":
+			'document.getElementById("q").value === "old" && of("q").length === 0',
+	});
+
+	const failures = await packAndRun(dir, "type-blocked", page, {
+		steps: ["focus:#q", "type:#off=x", "type:#ro=x", "type:#gone=x"],
+	});
+
+	expect(failures).toEqual(
+		[1440, 390].flatMap((width) => [
+			`${width}: type:#off=x: input#off is disabled, so a reader cannot type in it`,
+			`${width}: type:#ro=x: input#ro is read-only, so a reader cannot type in it`,
+			`${width}: type:#gone=x: input#gone did not take focus (hidden, inert or behind a modal dialog), so nothing was typed`,
+		]),
+	);
 }, 60_000);
 
 test("check --do set: moves a range and chooses a select option, firing input then change", async () => {

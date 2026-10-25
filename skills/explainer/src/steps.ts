@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { type Cdp, settle } from "./chrome.ts";
-import { SHOWN_JS } from "./page-js.ts";
+import { ELEMENT_NAME_JS, SHOWN_JS } from "./page-js.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
 const KEYS: Record<string, [number, string]> = {
@@ -276,12 +276,19 @@ async function mouseStep(
 	return {};
 }
 
-/** Page-side body (with `el`): focuses a text field and selects its text, so typing replaces it; returns what the element is when it is not one, else "". */
+/**
+ * Page-side body (with `el`): focuses a text field and selects its text, so typing replaces it. Returns why the reader could not type
+ * there (not a text field, disabled, read-only, or focus did not land on it, so keys would reach whatever had it before), else "".
+ */
 const TYPE_READY_JS = `
-	const editable = el.isContentEditable || el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && ${JSON.stringify(TEXT_TYPES)}.includes(el.type));
-	if (!editable) return el.tagName.toLowerCase() + (el instanceof HTMLInputElement ? "[type=" + el.type + "]" : "");
+	const name = (${ELEMENT_NAME_JS})(el);
+	const field = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && ${JSON.stringify(TEXT_TYPES)}.includes(el.type));
+	if (!field && !el.isContentEditable) return name + (el instanceof HTMLInputElement ? "[type=" + el.type + "]" : "") + " is not a text field; ${VALUE_FORMS.set} sets ranges, selects and dates";
+	if (field && el.disabled) return name + " is disabled, so a reader cannot type in it";
+	if (field && el.readOnly) return name + " is read-only, so a reader cannot type in it";
 	el.scrollIntoView({ block: "center" });
 	el.focus();
+	if (document.activeElement !== el) return name + " did not take focus (hidden, inert or behind a modal dialog), so nothing was typed";
 	if (el.isContentEditable) getSelection().selectAllChildren(el); else el.select();
 	return "";`;
 
@@ -291,11 +298,9 @@ const TYPE_READY_JS = `
  */
 async function typeStep(cdp: Cdp, step: string, target: Target, text: string): Promise<StepResult> {
 	for (const i of target.indices) {
-		const other = await valueOnNth<string>(cdp, target.selector, i, TYPE_READY_JS);
-		if (other) {
-			return {
-				problem: `${step}: ${other} is not a text field; ${VALUE_FORMS.set} sets ranges, selects and dates`,
-			};
+		const problem = await valueOnNth<string>(cdp, target.selector, i, TYPE_READY_JS);
+		if (problem) {
+			return { problem: `${step}: ${problem}` };
 		}
 		if (text) {
 			for (const character of text) {
