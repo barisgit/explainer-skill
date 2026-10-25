@@ -14,64 +14,101 @@
    Its # and the paragraphs right under it are the view's head (the first one its lede), and each ## starts a section, as on
    the page. pack puts every View after the overview wherever the page renders it, so one View per record works from data:
    {people.map((p) => <View name="person" param={p.id} back="Team"><h1>{p.name}</h1><p>{p.role}</p><section>...</section></View>)}
+   That is a static view: its markup is in the page once per record, and it prints. For a dozen records or more, fill one view instead:
+   <View name="item" records={items} render={Item} back="Plan" />
+     records  the records, each with an id: #item/<id> opens it. They reach the browser as JSON, once
+     render   a function component from your "use client" module, given { record }. It returns the view's content: an <h1>, the
+              paragraphs of its head, then <section>s, each with its <h2>
+   Only the open record is drawn, so a filled view prints only while it is open. A control in it is kept like any other when its id
+   names the record: id={`note-${record.id}`}.
    Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it
    briefly ("Ana", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the
    view's heading. Previous and next walk the views of its kind (the ones the view it was opened from links to, else all of
    them); a page with views inside views (two or more view names) gets a contents rail of its sections. A section with two or
-   more folds gets Expand all. A View is static: put client components inside it, not a View inside a client component. */
-import { type ComponentChildren, cloneElement, h, toChildArray, type VNode } from "preact";
+   more folds gets Expand all. A View belongs to the page: put client components inside it, not a View inside a client component. */
+import { type ComponentChildren, h } from "preact";
+import { type FillProps, viewBody } from "./view-body.ts";
 
-export interface ViewProps {
+/** A record of a filled view: its id is the param that opens it. */
+export interface ViewRecord {
+	id: string | number;
+}
+
+interface Common {
 	name: string;
-	param?: string;
 	back?: string;
 	id?: string;
+}
+
+/** A static view: its content is written in the page. */
+export interface StaticViewProps extends Common {
+	param?: string;
 	children?: ComponentChildren;
+}
+
+/** A filled view: `render` draws the open record of `records` in the browser. */
+export interface FilledViewProps<T extends ViewRecord> extends Common {
+	records: readonly T[];
+	render: (props: { record: T }) => ComponentChildren;
+}
+
+export type ViewProps<T extends ViewRecord = ViewRecord> = StaticViewProps | FilledViewProps<T>;
+
+/**
+ * What kit/islands/server.ts adds to a client component for a filled View: `fill` records the island that draws `view` from
+ * `props` in the browser. A component without it is not a client component.
+ */
+export interface Fillable {
+	fill(view: string, props: FillProps): void;
 }
 
 /** The element pack moves, with its content, after the overview (hoistViews in src/mdx/page.ts); it never reaches the page. */
 const VIEW_MARKER = "explainer-view";
 
-const isElement = (node: unknown, tag: string): node is VNode<{ class?: string }> =>
-	typeof node === "object" && node !== null && "type" in node && node.type === tag;
-
-/**
- * The view's head as views.js and the theme expect it: the Back link, the leading `#` and the paragraphs right under it, the
- * first marked `.lede` and later ones `.meta` (a class the author gave a paragraph stays). Returns the head and the rest.
- */
-function splitHead(children: ComponentChildren, back: string | undefined) {
-	const nodes = toChildArray(children);
-	const head: ComponentChildren[] = back
-		? [
-				// biome-ignore lint/a11y/useValidAnchor: an empty hash is the overview's address in views.js, the v0.8 Back link
-				<a class="back" href="#">
-					{back}
-				</a>,
-			]
-		: [];
-	let next = 0;
-	const heading = nodes[0];
-	if (isElement(heading, "h1")) {
-		head.push(heading);
-		next = 1;
-		for (let node = nodes[next]; isElement(node, "p"); node = nodes[++next]) {
-			head.push(
-				node.props.class ? node : cloneElement(node, { class: next === 1 ? "lede" : "meta" }),
+/** The records by param, failing on a record without an id or an id two records share. */
+function byParam(name: string, records: readonly ViewRecord[]): Record<string, unknown> {
+	const found: Record<string, unknown> = {};
+	for (const [i, record] of records.entries()) {
+		const id: unknown = record?.id;
+		if (typeof id !== "string" && typeof id !== "number") {
+			throw new Error(
+				`<View name="${name}" records>: record ${i} has no id; give each record an id, the param that opens it (#${name}/<id>)`,
 			);
 		}
+		if (String(id) in found) {
+			throw new Error(`<View name="${name}" records>: two records have the id "${id}"`);
+		}
+		found[String(id)] = record;
 	}
-	return { head, rest: nodes.slice(next) };
+	return found;
 }
 
-/** Renders `<section class="view" data-view="name[/param]">` with its `.view-head`, inside the marker pack hoists by. */
-export function View({ name, param, back, id, children }: ViewProps) {
-	const { head, rest } = splitHead(children, back);
+/** The section of a filled view: empty in the page, drawn by its island when the reader opens a record. */
+function filledView<T extends ViewRecord>({ name, records, render, back, id }: FilledViewProps<T>) {
+	const fill = (render as Partial<Fillable>).fill;
+	if (typeof fill !== "function") {
+		throw new Error(
+			`<View name="${name}" render>: render must be a component from a module whose first line is "use client", since it draws in the browser`,
+		);
+	}
+	fill(name, { records: byParam(name, records), ...(back === undefined ? {} : { back }) });
+	return <section class="view" data-view={name} data-fill="" id={id} />;
+}
+
+/**
+ * Renders `<section class="view" data-view="name[/param]">` with its `.view-head`, inside the marker pack hoists by; with
+ * `records`, the empty `section.view[data-fill]` its island fills.
+ */
+export function View<T extends ViewRecord>(props: ViewProps<T>) {
+	if ("records" in props) {
+		return h(VIEW_MARKER, null, filledView(props));
+	}
+	const { name, param, back, id, children } = props;
 	return h(
 		VIEW_MARKER,
 		null,
 		<section class="view" data-view={param === undefined ? name : `${name}/${param}`} id={id}>
-			{head.length > 0 && <div class="view-head">{head}</div>}
-			{rest}
+			{viewBody(children, back)}
 		</section>,
 	);
 }

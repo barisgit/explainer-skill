@@ -4,14 +4,19 @@
  * `<!--/island-->`; it is hydrated in place with the props in `<script type="application/json" id="explainer-islands">`,
  * with no wrapper element, so the theme's child selectors still match.
  */
-import { type ComponentType, type ContainerNode, h, hydrate } from "preact";
+import { type ComponentType, type ContainerNode, h, hydrate, render } from "preact";
+import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
 
-/** One island as pack writes it: the index of its module in hydrateIslands' list, its export name and its props. */
+/**
+ * One island as pack writes it: the index of its module in hydrateIslands' list, its export name and its props; `v` names the
+ * filled View it draws, for an island without markup.
+ */
 interface IslandData {
 	m: number;
 	e: string;
 	p: Record<string, unknown>;
+	v?: string;
 }
 
 /**
@@ -68,6 +73,31 @@ function markers(): Map<number, [Comment, Comment]> {
 	return found;
 }
 
+/**
+ * Draws the open record of the filled View `view` with `draw`. kit views.js loads after this bundle, so the handler is
+ * registered once the page's scripts have run, before views.js routes. It renders synchronously, so views.js finds the record's
+ * heading and links as it builds the crumbs, previous/next and rail; the key gives each record its own state.
+ */
+function fill(view: string, draw: DrawRecord, props: FillProps) {
+	const start = () =>
+		Views.on(view, (el, param) =>
+			render(
+				h(FilledRecord, {
+					key: param,
+					render: draw,
+					record: props.records[param],
+					back: props.back,
+				}),
+				el,
+			),
+		);
+	if (document.readyState === "loading") {
+		addEventListener("DOMContentLoaded", start, { once: true });
+	} else {
+		start();
+	}
+}
+
 /** Hydrates every prerendered island with the component its module exports. `modules` are in the order pack numbered them. */
 export function hydrateIslands(modules: Record<string, unknown>[]): void {
 	const data: IslandData[] = JSON.parse(
@@ -75,9 +105,14 @@ export function hydrateIslands(modules: Record<string, unknown>[]): void {
 	);
 	// All markers are found before any island renders, since rendering changes the DOM between them.
 	const found = markers();
-	for (const [n, { m, e, p }] of data.entries()) {
+	for (const [n, { m, e, p, v }] of data.entries()) {
 		const component = modules[m]?.[e];
 		const pair = found.get(n);
+		if (typeof component === "function" && v !== undefined) {
+			// pack wrote these props for a filled View (kit/islands/server.ts).
+			fill(v, component as DrawRecord, p as unknown as FillProps);
+			continue;
+		}
 		if (typeof component !== "function" || !pair) {
 			throw new Error(`island ${n} (${e}) is missing from the page`);
 		}
