@@ -93,7 +93,7 @@ interface KeepApi {
 	selector: string;
 	/** A label's text without the controls inside it. */
 	ownText(label: HTMLLabelElement): string;
-	/** After any change: adopts new controls, saves, returns whether anything is kept. */
+	/** After any change: adopts new controls, saves, returns whether anything for the reply is kept (a self-check's choice is not). */
 	update(): boolean;
 	/** Every control back to its default (with input and change events), saved state dropped; notes are the owner's to empty. */
 	clear(): void;
