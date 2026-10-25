@@ -71,12 +71,37 @@ function components(): { name: string; file: string; summary: string }[] {
 		});
 }
 
-/** The kit scripts a page using a component carries, for the sizes `kit` lists: those its compiled code can need, as pack decides. */
-const componentScripts = (file: string): string[] => [
-	...scriptsInCode(
-		new Bun.Transpiler({ loader: "tsx" }).transformSync(readFileSync(kitPath(file), "utf8")),
-	),
-];
+/** A kit module and every kit module it imports, directly or not, by absolute path. */
+function moduleTree(path: string, found = new Set<string>()): Set<string> {
+	found.add(path);
+	const source = readFileSync(path, "utf8");
+	for (const { path: imported } of new Bun.Transpiler({ loader: "tsx" }).scan(source).imports) {
+		const next = resolve(dirname(path), imported);
+		if (imported.startsWith(".") && !found.has(next)) {
+			moduleTree(next, found);
+		}
+	}
+	return found;
+}
+
+/**
+ * The size `kit` lists for a component: the kit scripts a page using it carries, as pack decides from the compiled code of the
+ * component and the kit modules it imports. A component that draws a Plot or a Chart (Explore) is listed with the Plot's, and a
+ * "+" for the more a chart brings.
+ */
+function componentSize(file: string): string {
+	const transpiler = new Bun.Transpiler({ loader: "tsx" });
+	const scripts = new Set(
+		[...moduleTree(kitPath(file))].flatMap((path) => [
+			...scriptsInCode(transpiler.transformSync(readFileSync(path, "utf8"))),
+		]),
+	);
+	const either = scripts.has("plot.js") && scripts.has("charts.js");
+	const files = [...scripts].filter(
+		(script) => !(either && (script === "charts.js" || script === "echarts.js")),
+	);
+	return either ? kitSize(files).replace(" KB", "+ KB") : kitSize(files);
+}
 
 /** The size of kit files as a page carries them, e.g. "16 KB". */
 const kitSize = (files: string[]) =>
@@ -165,12 +190,12 @@ const labelsBlock = (): string =>
 
 /** What `kit` prints: one line per component and feature, and how to read one. */
 function kitListing(): string {
-	const line = (name: string, files: string[], text: string) =>
-		`${name.padEnd(9)} ${(files.length ? kitSize(files) : "").padStart(6)}  ${text}`;
+	const line = (name: string, size: string, text: string) =>
+		`${name.padEnd(9)} ${size.padStart(6)}  ${text}`;
 	return [
 		'An .mdx page imports components from "kit" (import { Chart, View } from "kit"); pack adds the theme and the kit scripts it uses.',
-		...components().map((c) => line(c.name, componentScripts(c.file), c.summary)),
-		...FEATURES.map((f) => line(f.name, f.files, f.line)),
+		...components().map((c) => line(c.name, componentSize(c.file), c.summary)),
+		...FEATURES.map((f) => line(f.name, f.files.length ? kitSize(f.files) : "", f.line)),
 		`Read one: ${CLI} kit <name>. The kit's texts are English: kit labels prints them to translate.`,
 	].join("\n");
 }

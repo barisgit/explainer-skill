@@ -1,4 +1,4 @@
-/* Explore: a slider, choice or toggles switching a plot or chart and its readout, each frame computed by your function.
+/* Explore: a slider, choice or toggles switching a plot or chart and readout through your function.
    <Explore label="Envelope against g(t)" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
      frame={envelope} />
      controls  one or more, each with a label and an id (its value is kept across reloads):
