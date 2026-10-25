@@ -2,7 +2,7 @@
 /* The page's interactive parts. Each section whose heading follows its controls renders that heading too; everything else on
    the page is rendered once when it packs (page.mdx). */
 import { Chart, Plot, Stepper } from "kit";
-import { useLayoutEffect, useMemo, useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import { Seg, Slider, Toggle } from "./controls.tsx";
 import { DERIVATIONS } from "./derivations.tsx";
 import {
@@ -186,13 +186,6 @@ export function Coefficients() {
 	const [name, setName] = useState<WaveName>("square");
 	const steps = DERIVATIONS[name];
 	const option = useMemo(() => coefOption(name), [name]);
-	// Another wave is another derivation: start it from its first line. Before steps.js has loaded (hydration) there is nothing to restart.
-	useLayoutEffect(() => {
-		const figure = document.getElementById("deriv-fig");
-		if (figure && typeof Steps !== "undefined") {
-			Steps.refresh(figure, 1);
-		}
-	}, [name]);
 	return (
 		<>
 			<h2>
@@ -207,6 +200,7 @@ export function Coefficients() {
 			<Stepper
 				id="deriv-fig"
 				start={1}
+				restartOn={name}
 				label="Derivation of the Fourier coefficients, step by step"
 			>
 				<div class="controls">

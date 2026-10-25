@@ -3,7 +3,7 @@ import { Stepper } from "kit";
 /* The page's two step-through explorers. Each reruns the algorithm when its controls change and draws the graph, queue,
    table and pseudocode for the step the Stepper reports. */
 import type { ComponentChildren } from "preact";
-import { useLayoutEffect, useMemo, useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import { num, run, type Step } from "./dijkstra.tsx";
 import { type Graph, type GraphNode, MAPS, mapGraph, negGraph } from "./graphs.ts";
 
@@ -240,6 +240,8 @@ interface ExplorerProps {
 	steps: Step[];
 	step: number;
 	onStep: (step: number) => void;
+	/** Names the run: a new value (another map or start) goes back to step 1. */
+	restartOn?: string;
 	/** Dijkstra's settled check in the pseudocode; off when settled nodes may be re-opened. */
 	guard: boolean;
 	/** The "True" column, and red for a node settled at a wrong distance once a caption has said why. */
@@ -262,7 +264,14 @@ function Explorer(p: ExplorerProps) {
 		(s.kind === "done" || s.exposed.has(n));
 	const painted = { id: p.id, graph: p.graph, step: s, wrong, label: p.graphLabel };
 	return (
-		<Stepper id={p.id} class="fig wide" start={1} label={p.label} onStep={p.onStep}>
+		<Stepper
+			id={p.id}
+			class="fig wide"
+			start={1}
+			restartOn={p.restartOn}
+			label={p.label}
+			onStep={p.onStep}
+		>
 			<div class="controls">{p.controls}</div>
 			{/* The captions come before the graph, so steps.js puts Back/Play/Next under the controls. */}
 			<ol data-captions="">
@@ -323,8 +332,6 @@ const KEY_STATES: [NodeState, string][] = [
 	["settled", "settled: distance is final"],
 ];
 
-const MAIN = "main";
-
 /** The main explorer: Dijkstra on a chosen map from a chosen start. A new map or start goes back to step 1. */
 export function RoadMap() {
 	const [mapId, setMapId] = useState("towns");
@@ -332,13 +339,6 @@ export function RoadMap() {
 	const [step, setStep] = useState(1);
 	const graph = mapGraph(mapId);
 	const steps = useMemo(() => run(graph, start, false), [graph, start]);
-	// The Stepper keeps its step when the steps change; this explorer restarts instead. Runs after the Stepper's own refresh.
-	useLayoutEffect(() => {
-		const figure = document.getElementById(MAIN);
-		if (figure && typeof Steps !== "undefined") {
-			Steps.refresh(figure, 1);
-		}
-	}, [steps]);
 	const chooseMap = (id: string) => {
 		const { nodes } = mapGraph(id);
 		setMapId(id);
@@ -389,13 +389,14 @@ export function RoadMap() {
 	);
 	return (
 		<Explorer
-			id={MAIN}
+			id="main"
 			label="Dijkstra's algorithm on a small road map, step by step"
 			graphLabel="The map: towns joined by roads with distances"
 			graph={graph}
 			steps={steps}
 			step={step}
 			onStep={setStep}
+			restartOn={`${mapId} ${start}`}
 			guard={false}
 			showTruth={false}
 			controls={controls}
