@@ -1,0 +1,47 @@
+---
+title: Explainer examples
+---
+import { Card } from "./card.tsx";
+import "./page.css";
+
+# Four pages an agent built with the explainer skill
+
+Each one is a single HTML file that works offline. An agent wrote it in MDX from the skill's guide, `pack` made it self-contained, and `check` screenshotted it in light and dark at desktop and phone width.
+
+[Install the skill on GitHub](https://github.com/barisgit/explainer-skill) · [Page sources](https://github.com/barisgit/explainer-skill/tree/main/examples)
+
+<section class="gallery" aria-label="Examples">
+
+<Card name="fourier-series" alt="Fourier series study page: a square wave built from three sines, with a terms slider">
+
+## Fourier series
+
+Study page. Drag the terms slider to build a square wave, try each question before opening its answer, and find your own answers still there after a reload.
+
+</Card>
+
+<Card name="dijkstra" alt="Dijkstra step-through: a weighted graph, the priority queue and the distance table">
+
+## Dijkstra's algorithm
+
+Step-through. Four maps and any start node, with the queue and distance table at each step, and what one negative edge breaks.
+
+</Card>
+
+<Card name="electricity-mix" alt="Electricity mix explorer: world generation by source from 2000 to 2024">
+
+## World electricity mix
+
+Data explorer. 223 places from Our World in Data: see how each source changed since 2000, rank who left coal fastest over a period you choose, and click a bar to open that country.
+
+</Card>
+
+<Card name="password-hashing" alt="Password hashing decision page: deployment presets, memory sliders and the OWASP setting that fits">
+
+## Choosing a password hash
+
+Decision page. Set memory, concurrent logins and FIPS needs, and see which OWASP setting fits, or that none does.
+
+</Card>
+
+</section>
