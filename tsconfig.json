@@ -23,5 +23,7 @@
 		"isolatedModules": true,
 		"erasableSyntaxOnly": true
 	},
-	"include": ["skills/explainer/cli.ts", "skills/explainer/src", "build", "test"]
+	"include": ["skills/explainer/cli.ts", "skills/explainer/src", "build", "test"],
+	// The fixture pages are browser code, checked with the kit (tsconfig.kit.json).
+	"exclude": ["test/fixtures"]
 }

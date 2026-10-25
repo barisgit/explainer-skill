@@ -9,7 +9,7 @@
 		// Off for the kit only: element.dataset is typed with an index signature, so every dataset.ref would need dataset["ref"],
 		// which Biome's useLiteralKeys rejects. The two rules contradict each other for browser code.
 		"noPropertyAccessFromIndexSignature": false,
-		// The example pages' components (skill example, examples/mdx-all) import the kit as pages do; pack resolves "kit" to the same file.
+		// The example pages' components (skill example, test/fixtures/mdx-all) import the kit as pages do; pack resolves "kit" to the same file.
 		"paths": { "kit": ["./skills/explainer/kit/components/index.ts"] }
 	},
 	"include": [
@@ -18,7 +18,7 @@
 		"skills/explainer/kit/components",
 		"skills/explainer/kit/islands",
 		"skills/explainer/example",
-		"examples/mdx-all",
+		"test/fixtures/mdx-all",
 		"kit-types"
 	]
 }
