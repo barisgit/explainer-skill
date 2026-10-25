@@ -47,6 +47,18 @@ test("check --do type: types over a field key by key, then leaves it, so input l
 	expect(failures).toEqual([]);
 }, 60_000);
 
+test("check --do type: types a multi-line text into a textarea, a newline as Enter", async () => {
+	const page = FORM({
+		"the textarea holds both lines": 'document.getElementById("t").value === "line one\\nline two"',
+		"an input event per character, newline included, and one change":
+			'of("t").filter((h) => h.includes(" input ")).length === 17 && of("t").filter((h) => h.includes(" change ")).length === 1',
+	});
+
+	expect(
+		await packAndRun(dir, "multiline", page, { steps: ["type:#t=line one\nline two"] }),
+	).toEqual([]);
+}, 60_000);
+
 test("check --do set: moves a range and chooses a select option, firing input then change", async () => {
 	const page = FORM({
 		"the range holds the value and its listeners heard it":

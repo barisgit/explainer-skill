@@ -19,7 +19,8 @@ const KEYS: Record<string, [number, string]> = {
 /** The `--do` step kinds, each written `<kind>:<arg>`; `reload` is the one step without an argument. */
 const KINDS = ["click", "key", "hover", "focus", "type", "set", "shot"] as const;
 type StepKind = (typeof KINDS)[number];
-const STEP = new RegExp(`^(${KINDS.join("|")}):(.+)$`);
+/** Dot-all, so the text of a type: step may span lines. */
+const STEP = new RegExp(`^(${KINDS.join("|")}):(.+)$`, "s");
 const POINT = /^(\d+),(\d+)$/;
 const NTH = /@(all|\d+)$/;
 const RELOAD = "reload";
@@ -284,7 +285,10 @@ const TYPE_READY_JS = `
 	if (el.isContentEditable) getSelection().selectAllChildren(el); else el.select();
 	return "";`;
 
-/** Types over a text field as a reader would: select its text, press a key per character (Backspace for none), then leave it so change fires. */
+/**
+ * Types over a text field as a reader would: select its text, press a key per character (Enter for a newline, Backspace for no
+ * text), then leave it so change fires.
+ */
 async function typeStep(cdp: Cdp, step: string, target: Target, text: string): Promise<StepResult> {
 	for (const i of target.indices) {
 		const other = await valueOnNth<string>(cdp, target.selector, i, TYPE_READY_JS);
@@ -295,7 +299,7 @@ async function typeStep(cdp: Cdp, step: string, target: Target, text: string): P
 		}
 		if (text) {
 			for (const character of text) {
-				await typeCharacter(cdp, character);
+				await (character === "\n" ? keyStep(cdp, "Enter") : typeCharacter(cdp, character));
 			}
 		} else {
 			await keyStep(cdp, "Backspace");
