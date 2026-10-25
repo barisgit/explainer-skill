@@ -195,6 +195,41 @@ describe("Explore", () => {
 	}, 30_000);
 });
 
+/** A range written in steps of 1e-7, as `String` writes them: its frame from a client module (#client), then computed in pack (#packed). */
+const TINY = `import { Explore } from "kit";
+import { tiny } from "./tiny.tsx";
+
+# Tiny
+
+<Explore id="client" label="Tiny" controls={[{ id: "client-v", label: "v", range: [0, 0.0000003, 0.0000001] }]} frame={tiny} />
+
+<Explore id="packed" label="Tiny" controls={[{ id: "packed-v", label: "v", range: [0, 0.0000003, 0.0000001] }]}
+  frame={(v) => ({ readout: \`Value \${v}\` })} />
+`;
+
+describe("Explore ranges", () => {
+	test("a range in steps too small for plain decimals moves through its values, in frames the browser or pack computes", async () => {
+		dir.write(
+			"tiny.tsx",
+			`"use client";\nexport const tiny = (v: number) => ({ readout: "Value " + v });\n`,
+		);
+		const { output } = await pack("tiny", TINY);
+		const seen = (id: string) =>
+			`[document.querySelector("output[for=${id}-v]").textContent, document.querySelector("#${id} > p").textContent]`;
+		const moved = (id: string) =>
+			`const v = document.getElementById("${id}-v"); v.value = "0.0000002"; v.dispatchEvent(new Event("input", { bubbles: true }))`;
+		const state = await inPage(output, async (cdp) => ({
+			client: [await cdp.evaluate(seen("client")), await act(cdp, moved("client"), seen("client"))],
+			packed: [await cdp.evaluate(seen("packed")), await act(cdp, moved("packed"), seen("packed"))],
+		}));
+		const expected = [
+			["0.0000000", "Value 0"],
+			["0.0000002", "Value 2e-7"],
+		];
+		expect(state).toEqual({ client: expected, packed: expected });
+	}, 30_000);
+});
+
 describe("client exports as props", () => {
 	test("a function a client module exports reaches a client component from the page; one from another module fails the pack", async () => {
 		const volts = 'export const volts = (v: number) => v + " V";\n';
