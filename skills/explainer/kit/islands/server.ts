@@ -255,12 +255,16 @@ const hasContent = (children: ComponentChildren): boolean =>
  * vnode just before running the component, which is how messages name the component that wrote a handler.
  */
 type RenderHook = { __r?: (vnode: VNode) => void };
+
+/** How messages name a vnode's type: an element by its tag, a component by its name. */
+const tagOf = (type: VNode["type"]): string =>
+	typeof type === "string" ? type : type.displayName || type.name || "a component";
+
 const hooks: Options & RenderHook = options;
 const previousRender = hooks.__r;
 hooks.__r = (vnode) => {
 	if (typeof vnode.type === "function" && depth === 0) {
-		const type = vnode.type as ComponentType;
-		rendering = type.displayName || type.name || "a component";
+		rendering = tagOf(vnode.type);
 	}
 	previousRender?.(vnode);
 };
@@ -281,8 +285,7 @@ function staticHandler(vnode: VNode): string | undefined {
 	if (!handler) {
 		return undefined;
 	}
-	const tag = typeof type === "string" ? type : type.displayName || type.name || "a component";
-	return `<${tag} ${handler[0]}>`;
+	return `<${tagOf(type)} ${handler[0]}>`;
 }
 
 /**
@@ -296,7 +299,7 @@ function misusedRef(vnode: VNode): string | undefined {
 	}
 	const written = typeof ref === "string" ? `"${ref}"` : `{${String(ref)}}`;
 	const element = typeof type === "string";
-	const tag = element ? type : type.displayName || type.name || "a component";
+	const tag = tagOf(type);
 	const place = rendering === "MDXContent" ? "the page" : rendering;
 	return `<${tag} ref=${written}> in ${place}: ref is Preact's handle to ${element ? "the element" : "a component"} (a function or useRef()) and never reaches the page${element ? "" : ` or ${tag}'s props`}; to link the part with others, write data-ref=${written}${element ? "" : `, or give ${tag}'s prop another name`}`;
 }
