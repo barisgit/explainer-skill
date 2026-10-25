@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
-import { relative } from "node:path";
 import type { Element, Nodes as HastNodes, Root as HastRoot } from "hast";
 import type { Root } from "mdast";
 import { remarkMath } from "../../vendor/math.js";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
 import { kitLabels } from "../kit.ts";
 import { PackError } from "../pack-error.ts";
+import { shownPath } from "../paths.ts";
 import { mathToMathml } from "./math.ts";
 import { structurePage } from "./structure.ts";
 
@@ -229,7 +229,7 @@ const isMdxMessage = (e: unknown): e is MdxMessage =>
  * throws PackError with file:line:column.
  */
 export async function compileMdx(path: string, page: boolean): Promise<CompiledMdx> {
-	const file = relative(process.cwd(), path) || path;
+	const file = shownPath(path);
 	const value = readFileSync(path, "utf8");
 	const front = frontmatter(value, file);
 	let h1: string | undefined;

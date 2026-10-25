@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
-import { dirname, extname, join, relative } from "node:path";
+import { dirname, extname, join } from "node:path";
 import { PackError } from "../pack-error.ts";
+import { shownPath } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
 
 /** The module types a typechecker reads; data (.json) and styles (.css) come in through these. */
@@ -13,9 +14,7 @@ function resolveImport(specifier: string, page: string): string {
 	try {
 		return Bun.resolveSync(specifier, dirname(page));
 	} catch {
-		throw new PackError(
-			`${relative(process.cwd(), page) || page} imports ${specifier}, which does not exist`,
-		);
+		throw new PackError(`${shownPath(page)} imports ${specifier}, which does not exist`);
 	}
 }
 

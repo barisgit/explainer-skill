@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import { basename, dirname, extname, relative } from "node:path";
 import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
+import { shownPath } from "../paths.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
 import { compileMdx, type Frontmatter, frontmatterWarnings } from "./compile.ts";
 import {
@@ -116,8 +117,7 @@ export async function mdxPage(
 	const prerendered = await prerender(compiled, css, page.front.labels);
 	const clashes = await answerClashes(prerendered.html);
 	if (clashes.length) {
-		const where = relative(process.cwd(), path) || path;
-		throw new PackError(clashes.map((clash) => `${where}: ${clash}`).join("\n"));
+		throw new PackError(clashes.map((clash) => `${shownPath(path)}: ${clash}`).join("\n"));
 	}
 	const html = await drawDiagrams(prerendered.html);
 	const islands = prerendered.islands;
@@ -157,7 +157,7 @@ export async function mdxPage(
 		...links,
 		"</head>",
 		"<body>",
-		`<main class="page">${hoistViews(html, relative(process.cwd(), path) || path)}</main>`,
+		`<main class="page">${hoistViews(html, shownPath(path))}</main>`,
 		...(islands.length
 			? [
 					`<script type="application/json" id="explainer-islands">${scriptJson(islandData)}</script>`,

@@ -1,10 +1,10 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, relative, sep } from "node:path";
+import { dirname, extname, join, sep } from "node:path";
 import type { BuildConfig, BunPlugin, JavaScriptLoader } from "bun";
 import type { Island, renderPage } from "../../kit/islands/server.ts";
 import { PackError } from "../pack-error.ts";
-import { KIT_DIR, SKILL_ROOT } from "../paths.ts";
+import { KIT_DIR, SKILL_ROOT, shownPath } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
 import { QUESTION_IMPORT, QUESTION_MODULE } from "./kit-scripts.ts";
 
@@ -124,11 +124,9 @@ function located(log: BuildMessage | ResolveMessage): string {
 	const at = log.position;
 	// In an .mdx file the position is in the compiled module, not the source the author sees; the message names the import.
 	if (at?.file.endsWith(".mdx")) {
-		return `${relative(process.cwd(), at.file) || at.file}: ${log.message}`;
+		return `${shownPath(at.file)}: ${log.message}`;
 	}
-	return at
-		? `${relative(process.cwd(), at.file) || at.file}:${at.line}:${at.column}: ${log.message}`
-		: log.message;
+	return at ? `${shownPath(at.file)}:${at.line}:${at.column}: ${log.message}` : log.message;
 }
 
 /** Builds one in-memory entry (its path need not exist) with the page plugin and returns the single output's text; a failed build is a PackError. */
@@ -222,7 +220,7 @@ export function render(labels) {
 		throw new PackError(
 			e instanceof Error && e.name === "IslandError"
 				? message
-				: `${relative(process.cwd(), page.path)}: the page threw while rendering: ${message}`,
+				: `${shownPath(page.path)}: the page threw while rendering: ${message}`,
 		);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
