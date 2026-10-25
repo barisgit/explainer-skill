@@ -1,0 +1,73 @@
+---
+title: How the world's electricity mix changed since 2000
+---
+import { View } from "kit";
+import { CoalRanking } from "./coal.tsx";
+import { ChangeExplorer, WorldMix } from "./figures.tsx";
+import { cell, fmtT, raw, SOURCES, total, WORLD, YEARS } from "./model.ts";
+import { PlaceFigure, PlaceLede, PlaceName } from "./place.tsx";
+import "./page.css";
+
+# The world generates twice the electricity it did in 2000. Wind and solar grew from 0.2% of it to 15%, but *coal still supplies about a third*.
+
+Explore any country or region, and see who left coal fastest.
+
+<WorldMix />
+
+{/* No control changes these values, so the page renders them when it packs. */}
+
+<details>
+<summary>Values, world, every year (TWh, rounded)</summary>
+<div class="scroll table-box">
+<table class="compare table">
+<thead><tr><th>Year</th>{SOURCES.map((s) => <th class="num">{s.name}</th>)}<th class="num">Total</th></tr></thead>
+<tbody>
+{YEARS.map((y) => (
+	<tr>
+		<th scope="row">{y}</th>
+		{SOURCES.map((s) => <td class="num">{cell(raw(WORLD, s, y), fmtT)}</td>)}
+		<td class="num">{cell(total(WORLD, y), fmtT)}</td>
+	</tr>
+))}
+</tbody>
+</table>
+</div>
+</details>
+
+{/* These sections' headings state what their controls show, so the components render them. */}
+
+<section>
+<ChangeExplorer />
+</section>
+
+<section>
+<CoalRanking />
+
+<p class="caveat"><b>Reading it</b>Shares in a single year move with weather and demand: a wet year can lift hydro and lower coal's share without any policy change. Over a short period that can overstate or understate the underlying trend.</p>
+</section>
+
+<section class="minor">
+
+## Where the numbers come from
+
+- **Dataset.** Our World in Data, [Energy dataset](https://github.com/owid/energy-data) (`owid-energy-data.csv`), downloaded 22 October 2026. Authors: Pablo Rosado, Hannah Ritchie, Edouard Mathieu and Max Roser. The dataset page marks this release as legacy and no longer updated.
+- **Underlying sources and licences.** The electricity columns come from [Ember, Yearly Electricity Data](https://ember-energy.org/data/yearly-electricity-data/) (published under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), per [Ember's API documentation](https://api.ember-energy.org/v1/docs)) and, for some places and years, the [Energy Institute, Statistical Review of World Energy](https://www.energyinst.org/statistical-review/). Our World in Data licenses its own visualisations, data and code under CC BY 4.0, but states that third-party data stays under the original provider's terms. The Energy Institute's terms are its own, not CC BY: attribution is required and extensive reproduction needs its permission, so check them before reusing the extract.
+- **What was kept.** Electricity generation in terawatt-hours (TWh) for nine sources and OWID's reported total, 2000 to 2024, for the world, seven regions, the European Union and every country with data: 215 countries and territories. 2025 is left out because the release covers it for only 106 places.
+- **Missing values.** Blank cells stay blank and show as "–" in tables. Where the listed sources add up to less than the reported total (Europe and the EU, 2000 to 2003, where wind is blank) the difference is drawn as "Not itemised". Where a source is blank but the others already add up to the total, the charts count it as zero.
+- **Source definitions.** "Oil and other fossil" is OWID's oil column, which draws on Ember's "Other fossil": oil and petroleum products, manufactured gases and waste. "Other renewables" excludes bioenergy and, in [Ember's definition](https://api.ember-energy.org/v1/docs), includes geothermal, tidal and wave generation.
+- **Generation, not consumption.** Shares are of electricity generated inside a place, so imports and exports are not counted. A place with no data for a chosen year (Ukraine after 2022, for example), or that generated nothing in it, is left out of rankings that use that year and has no shares for it.
+- **Rankings.** Change in coal's share is the end-year share minus the start-year share, in percentage points of that place's own generation. Any change counts, however small; countries with no change are not listed. The size cut-off uses electricity generated in the end year.
+
+</section>
+
+{/* One view for every place: its heading, lede and figure read the place from the address (#place/china). */}
+
+<View name="place" back="All places">
+
+# <PlaceName />
+
+<p><PlaceLede /></p>
+
+<PlaceFigure />
+
+</View>
