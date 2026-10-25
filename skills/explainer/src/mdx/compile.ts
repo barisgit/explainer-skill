@@ -224,9 +224,8 @@ const isMdxMessage = (e: unknown): e is MdxMessage =>
 
 /**
  * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), TeX math
- * as MathML (math.ts), Mermaid fences and the page
- * layout (structure.ts) when `page` is set, the page's own file; an imported .mdx file is compiled as a fragment. A syntax error
- * throws PackError with file:line:column.
+ * as MathML (math.ts), Mermaid fences and, when `page` is set (the page's own file), the page layout (structure.ts); an
+ * imported .mdx file is compiled as a fragment. A syntax error throws PackError with file:line:column.
  */
 export async function compileMdx(path: string, page: boolean): Promise<CompiledMdx> {
 	const file = shownPath(path);

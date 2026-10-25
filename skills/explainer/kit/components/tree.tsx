@@ -115,7 +115,10 @@ function Row({ built, columns }: { built: Built; columns: number }) {
 	);
 }
 
-/** Renders `<div class="tree">` of nested `<details>`, one per record, all closed, under a `.tree-head` when `head` is given. */
+/**
+ * Renders `<div class="tree">` with one row per record, nested: a closed `<details>`, or an `<a>` for a record with an href;
+ * under a `.tree-head` when `head` is given.
+ */
 export function Tree<Item>(props: TreeProps<Item>) {
 	const rows = props.row ? build(props.items, props.row) : build(props.items, (item) => item);
 	const [label, ...names] = props.head ?? [];

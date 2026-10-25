@@ -62,8 +62,8 @@ const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u0
 
 /**
  * Questions that would mix up the reader's answers: one option name in two questions (data-reply or self-check fieldsets),
- * whose radios would form one group. A Question's option ids are its name and values, so two such Questions also repeat ids, which pack refuses for any page
- * (ids.ts). Controls a client component renders later are not seen.
+ * whose radios would form one group. Two Questions of one name with a value in common also repeat an option id (`name-value`),
+ * which pack refuses on any page (ids.ts). Controls a client component renders later are not seen.
  */
 async function answerClashes(html: string): Promise<string[]> {
 	const groups = new Map<string, Set<number>>();
@@ -101,8 +101,8 @@ async function kitScripts(html: string, scan: string, front: Frontmatter): Promi
 /**
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
- * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
- * scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError;
+ * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client
+ * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError;
  * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
  */
 export async function mdxPage(

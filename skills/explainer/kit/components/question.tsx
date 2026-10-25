@@ -44,7 +44,7 @@ const kitText = (key: keyof typeof LABELS) =>
 
 /**
  * Text as part of an id, case kept: letters, digits and `-` stay, every other character (`_` included) becomes `_<hex code
- * point>_`, so distinct texts give distinct parts and the id needs no escaping in a CSS selector ("Ship now" is "Ship_20_now").
+ * point>_`, so distinct texts give distinct parts and the id holds no space or punctuation ("Ship now" is "Ship_20_now").
  */
 const idPart = (text: string) =>
 	text.replace(/[^\p{L}\p{N}-]/gu, (c) => `_${(c.codePointAt(0) ?? 0).toString(16)}_`);
