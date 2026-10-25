@@ -9,7 +9,15 @@
  * Requires `caplet` on PATH or CAPLET=/path/to/caplet.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -120,18 +128,18 @@ type Scenario = {
 /**
  * The skill directory inside the Claude Code plugin Caplet installed: the `installPath` that
  * `~/.claude/plugins/installed_plugins.json` records for `explainer@<marketplace>`, which is the copy Claude Code reads.
- * Its version directory carries a content hash, so it is looked up rather than written here.
+ * Its version directory carries a content hash, so it is looked up rather than written here. Undefined when none is registered.
  */
-function claudePluginSkill(home: string): string {
+function claudePluginSkill(home: string): string | undefined {
 	const registry = join(home, ".claude/plugins/installed_plugins.json");
 	if (!existsSync(registry)) {
-		return registry;
+		return undefined;
 	}
 	const { plugins } = JSON.parse(readFileSync(registry, "utf8")) as {
 		plugins: Record<string, { installPath: string }[]>;
 	};
 	const entry = Object.entries(plugins).find(([name]) => name.startsWith("explainer@"))?.[1][0];
-	return entry ? join(entry.installPath, "skills/explainer") : registry;
+	return entry && join(entry.installPath, "skills/explainer");
 }
 
 const scenarios: Scenario[] = [
@@ -181,13 +189,22 @@ function runScenario(scenario: Scenario, expected: string[]): void {
 	}
 	const dirs = scenario.installed.map((dir) => join(root, dir));
 	if (scenario.claudePlugin) {
-		dirs.push(claudePluginSkill(home));
+		const plugin = claudePluginSkill(home);
+		if (plugin) {
+			dirs.push(plugin);
+		} else {
+			record(
+				false,
+				"Claude Code plugin",
+				"no explainer@ entry in ~/.claude/plugins/installed_plugins.json",
+			);
+		}
 	}
 	for (const installed of dirs) {
 		const dir = installed.slice(root.length + 1);
 		console.log(` ${dir}`);
-		if (!existsSync(installed)) {
-			record(false, "installed", `${installed} does not exist`);
+		if (!(existsSync(installed) && statSync(installed).isDirectory())) {
+			record(false, "installed", `${installed} is not a directory`);
 			continue;
 		}
 		verifyFiles(installed, expected);
