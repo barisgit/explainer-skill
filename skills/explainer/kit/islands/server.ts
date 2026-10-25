@@ -17,6 +17,7 @@ import {
 import { renderToString } from "preact-render-to-string";
 import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
+import { CLIENT_REFERENCE, isClientExport, notJson } from "./props.ts";
 
 /** A function a client module exports, found at `path` in an island's props: the browser takes it from that module's exports. */
 export interface ClientRef {
@@ -37,12 +38,6 @@ export interface Island {
 	refs?: ClientRef[];
 	view?: string;
 }
-
-/**
- * Where a function a client module exports is defined, on the function itself, so a prop holding it can reach the browser as a
- * reference (clientRefs) and kit components can tell it from a function that exists only in pack (Explore's frame).
- */
-const CLIENT_REFERENCE = Symbol.for("explainer.clientReference");
 
 /** What the page would do wrong in the browser; the message is for the page's author. pack finds it by name, not by class. */
 export class IslandError extends Error {
@@ -74,7 +69,7 @@ export function island(module: string, name: string, value: unknown, kit = false
 	}
 	if (!(name === "default" || /^[A-Z]/.test(name))) {
 		// A module that re-exports another client module's function: the first module to export it is where the browser finds it.
-		if (!(CLIENT_REFERENCE in value)) {
+		if (!isClientExport(value)) {
 			Object.defineProperty(value, CLIENT_REFERENCE, { value: { module, name } });
 		}
 		return value;
@@ -222,7 +217,7 @@ function clientRefs(props: Record<string, unknown>): {
 } {
 	const refs: ClientRef[] = [];
 	const walk = (value: unknown, path: (string | number)[]): unknown => {
-		if (typeof value === "function" && CLIENT_REFERENCE in value) {
+		if (isClientExport(value)) {
 			refs.push({ path, ...(value[CLIENT_REFERENCE] as Omit<ClientRef, "path">) });
 			return null;
 		}
@@ -248,56 +243,6 @@ const hasContent = (children: ComponentChildren): boolean =>
 	Array.isArray(children)
 		? children.some(hasContent)
 		: !(children == null || typeof children === "boolean" || /^\s*$/.test(String(children)));
-
-/** The first part of `value` that JSON would not carry over unchanged, with its path (`.option.series[0].label`). */
-function notJson(value: unknown, path: string): { path: string; what: string } | undefined {
-	switch (typeof value) {
-		case "string":
-		case "boolean":
-			return undefined;
-		case "number":
-			return Number.isFinite(value) ? undefined : { path, what: String(value) };
-		case "object":
-			return value === null ? undefined : notJsonObject(value, path);
-		default:
-			return { path, what: `a ${typeof value}` };
-	}
-}
-
-function notJsonObject(value: object, path: string): { path: string; what: string } | undefined {
-	if (Array.isArray(value)) {
-		return firstProblem(
-			value.map((item, i) => [`${path}[${i}]`, item] as const),
-			"an undefined item",
-		);
-	}
-	if ("type" in value && "props" in value) {
-		return { path, what: "JSX" };
-	}
-	const proto: unknown = Object.getPrototypeOf(value);
-	if (proto !== Object.prototype && proto !== null) {
-		return { path, what: `a ${value.constructor.name}` };
-	}
-	// JSON leaves out an undefined property, which the component then reads as undefined again.
-	return firstProblem(
-		Object.entries(value).map(([key, item]) => [`${path}.${key}`, item] as const),
-	);
-}
-
-/** The first problem among `[path, value]` entries; an undefined value is `undefinedIs`, or fine when that is not given. */
-function firstProblem(
-	entries: (readonly [string, unknown])[],
-	undefinedIs?: string,
-): { path: string; what: string } | undefined {
-	for (const [path, item] of entries) {
-		const problem =
-			item === undefined ? undefinedIs && { path, what: undefinedIs } : notJson(item, path);
-		if (problem) {
-			return problem;
-		}
-	}
-	return undefined;
-}
 
 /**
  * Preact's render hook under its mangled name (`_render` in preact's mangle.json): render-to-string calls it with each component

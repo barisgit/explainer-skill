@@ -19,6 +19,7 @@
    Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
+import { isClientExport, notJson } from "../islands/props.ts";
 import { Explore as ExploreChart } from "./parts/explore-chart.tsx";
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
 import { Explore as ExploreText } from "./parts/explore-text.tsx";
@@ -33,7 +34,7 @@ import {
 	withBase,
 } from "./parts/explore-view.tsx";
 import { numberText } from "./parts/format.ts";
-import { diff, type Json } from "./parts/frames.ts";
+import { diff, isPoint, type Json } from "./parts/frames.ts";
 
 export type { ExploreFrame, ExploreValue };
 
@@ -73,10 +74,6 @@ const fail = (message: string): never => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
-
-/** True for a function a "use client" module exports, which the browser can call (kit/islands/server.ts marks them). */
-const isClientExport = (value: unknown) =>
-	typeof value === "function" && Symbol.for("explainer.clientReference") in value;
 
 /** Decimals a number is written with: 2 for 0.05. */
 const decimals = (n: number) => (String(n).split(".")[1] ?? "").length;
@@ -159,32 +156,6 @@ function called(frame: FrameFunction, values: ExploreValue[]): [string, ExploreF
 	return [call, result];
 }
 
-/** The first part of an option that JSON would not carry to the browser, as `path`. */
-function notJson(value: unknown, path: string): string | undefined {
-	if (typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
-		return path;
-	}
-	if (typeof value === "number") {
-		return Number.isFinite(value) ? undefined : path;
-	}
-	if (value === null || typeof value !== "object") {
-		return undefined;
-	}
-	if (
-		!Array.isArray(value) &&
-		("props" in value || Object.getPrototypeOf(value) !== Object.prototype)
-	) {
-		return path;
-	}
-	for (const [key, item] of Object.entries(value)) {
-		const found = notJson(item, Array.isArray(value) ? `${path}[${key}]` : `${path}.${key}`);
-		if (found) {
-			return found;
-		}
-	}
-	return undefined;
-}
-
 /** Text or JSX as HTML, rendered now: the island shows it as it is. */
 const toHtml = (content: ComponentChildren) => renderToString(h(Fragment, null, content));
 
@@ -193,7 +164,7 @@ function shownFrame([call, frame]: [string, ExploreFrame], kind: "plot" | "chart
 	const shown: Shown = {};
 	const option = kind && frame[kind];
 	if (kind && option !== undefined) {
-		const bad = notJson(option, `${call}.${kind}`);
+		const bad = notJson(option, `${call}.${kind}`)?.path;
 		if (bad) {
 			fail(
 				`${bad} is not JSON: write formats and labels as JSON ({ digits: 1, unit: "kHz" }), or export frame from a "use client" module`,
@@ -253,9 +224,6 @@ function extent(values: Iterable<number>): [number, number] {
 	}
 	return [lo, hi];
 }
-
-const isPoint = (p: unknown): p is [number, number] =>
-	Array.isArray(p) && p.length === 2 && typeof p[0] === "number" && typeof p[1] === "number";
 
 /**
  * Line points rounded to 1/10000 of the x and y ranges every frame's lines span, a tenth of a pixel on a 1000-pixel plot: computed
@@ -338,7 +306,7 @@ export function Explore({ controls, frame, base = {}, label, class: extra, id }:
 	if (kind && !label) {
 		fail(`needs a label: the accessible name of its ${kind}`);
 	}
-	const baseProblem = live ? notJson(base, "base") : undefined;
+	const baseProblem = live ? notJson(base, "base")?.path : undefined;
 	if (baseProblem) {
 		fail(
 			`${baseProblem} is not JSON: with frame computed in the browser, base reaches it as JSON; return the rest from frame`,

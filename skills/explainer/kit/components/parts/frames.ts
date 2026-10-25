@@ -24,7 +24,8 @@ const isPlain = (value: unknown): value is Record<string, unknown> =>
 	isObject(value) && Object.getPrototypeOf(value) === Object.prototype && !("props" in value);
 const size = (value: unknown) => JSON.stringify(value).length;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const isPoint = (value: unknown): value is [number, number] =>
+/** A line point as Plot data holds it: `[x, y]`. */
+export const isPoint = (value: unknown): value is [number, number] =>
 	Array.isArray(value) && value.length === 2 && value.every((v) => typeof v === "number");
 
 /** `a` with `patch` applied; `a` is not changed, and the parts the patch does not touch are shared. */
