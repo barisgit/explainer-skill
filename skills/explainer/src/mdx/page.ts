@@ -52,16 +52,16 @@ const escapeHtml = (text: string) =>
 const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 
 /**
- * Questions that would mix up the reader's answers: one option name in two data-reply fieldsets, whose radios would form one
- * group. A Question's option ids are its name and values, so two such Questions also repeat ids, which pack refuses for any page
+ * Questions that would mix up the reader's answers: one option name in two questions (data-reply or self-check fieldsets),
+ * whose radios would form one group. A Question's option ids are its name and values, so two such Questions also repeat ids, which pack refuses for any page
  * (ids.ts). Controls a client component renders later are not seen.
  */
 async function answerClashes(html: string): Promise<string[]> {
 	const groups = new Map<string, Set<number>>();
 	let fieldsets = 0;
 	await new HTMLRewriter()
-		.on("fieldset[data-reply]", { element: () => void fieldsets++ })
-		.on("fieldset[data-reply] input[name]", {
+		.on("fieldset[data-reply], fieldset.self-check", { element: () => void fieldsets++ })
+		.on("fieldset[data-reply] input[name], fieldset.self-check input[name]", {
 			element(el) {
 				const name = el.getAttribute("name") ?? "";
 				groups.set(name, (groups.get(name) ?? new Set()).add(fieldsets));
