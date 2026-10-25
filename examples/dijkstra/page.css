@@ -1,0 +1,275 @@
+/* Page-specific: everything else comes from the kit's theme.css. */
+:root {
+	--accent: light-dark(#1f5fbf, #7fb0ff);
+}
+
+/* ---- the graph ---- */
+.gsvg {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+}
+.edge line {
+	stroke: var(--rule-strong);
+	stroke-width: 3;
+}
+.edge[data-state="tent"] line {
+	stroke: var(--accent);
+	stroke-dasharray: 7 6;
+}
+.edge[data-state="tree"] line {
+	stroke: var(--ink);
+	stroke-width: 6;
+}
+.edge[data-state="improved"] line {
+	stroke: var(--accent);
+	stroke-width: 6;
+}
+.edge[data-state="kept"] line {
+	stroke: var(--muted);
+	stroke-dasharray: 2 7;
+	stroke-linecap: round;
+}
+.edge[data-state="missed"] line {
+	stroke: var(--bad);
+	stroke-width: 6;
+}
+.edge text,
+.node .dist {
+	font: 700 18px var(--font);
+	text-anchor: middle;
+	paint-order: stroke;
+	stroke: var(--surface);
+	stroke-width: 7px;
+	stroke-linejoin: round;
+}
+.edge text {
+	fill: var(--ink);
+	dominant-baseline: central;
+}
+.node .dist {
+	dominant-baseline: central;
+}
+.edge[data-state="missed"] text {
+	fill: var(--bad);
+}
+.arrow {
+	fill: var(--rule-strong);
+}
+.arrow[data-state="tent"],
+.arrow[data-state="improved"] {
+	fill: var(--accent);
+}
+.arrow[data-state="tree"] {
+	fill: var(--ink);
+}
+.arrow[data-state="kept"] {
+	fill: var(--muted);
+}
+.arrow[data-state="missed"] {
+	fill: var(--bad);
+}
+.node circle {
+	fill: var(--surface);
+	stroke: var(--rule-strong);
+	stroke-width: 3;
+}
+.node .name {
+	font: 700 22px var(--font);
+	text-anchor: middle;
+	dominant-baseline: central;
+	fill: var(--muted);
+}
+.node .dist {
+	fill: var(--muted);
+}
+.node[data-state="queued"] circle {
+	fill: var(--accent-soft);
+	stroke: var(--accent);
+}
+.node[data-state="queued"] .name,
+.node[data-state="queued"] .dist {
+	fill: var(--accent);
+}
+.node[data-state="current"] circle {
+	fill: var(--accent);
+	stroke: var(--accent);
+}
+.node[data-state="current"] .name {
+	fill: #fff;
+}
+.node[data-state="current"] .dist {
+	fill: var(--accent);
+}
+.node[data-state="settled"] circle {
+	fill: var(--ink);
+	stroke: var(--ink);
+}
+.node[data-state="settled"] .name {
+	fill: var(--surface);
+}
+.node[data-state="settled"] .dist {
+	fill: var(--ink);
+}
+.node[data-wrong] circle {
+	stroke: var(--bad);
+	stroke-width: 6;
+}
+.node[data-wrong] .dist {
+	fill: var(--bad);
+}
+.node.changed .dist {
+	fill: var(--accent);
+}
+.node[data-wrong].changed .dist {
+	fill: var(--bad);
+}
+
+.key {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 1.2rem;
+}
+.key span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+.key svg {
+	inline-size: 1.3rem;
+	block-size: 1.3rem;
+}
+.key .node circle {
+	stroke-width: 4;
+}
+
+/* ---- queue and table ---- */
+.side {
+	display: grid;
+	gap: 1rem;
+	align-content: start;
+	padding: 1rem var(--inset);
+}
+.queue {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	min-block-size: 2.2rem;
+	align-items: center;
+}
+.queue li {
+	padding: 0.2rem 0.65rem;
+	border: 1.5px solid var(--accent);
+	border-radius: 999px;
+	background: var(--accent-soft);
+	font-variant-numeric: tabular-nums;
+}
+.queue li b {
+	margin-inline-end: 0.35em;
+}
+.queue li.changed {
+	background: var(--accent);
+	color: #fff;
+}
+.queue li.popped {
+	background: var(--ink);
+	border-color: var(--ink);
+	color: var(--surface);
+}
+.queue li.none {
+	border: 0;
+	background: none;
+	color: var(--muted);
+	padding-inline: 0;
+}
+.queue .sep {
+	color: var(--muted);
+}
+.dist-table {
+	inline-size: 100%;
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+}
+.dist-table th,
+.dist-table td {
+	padding: 0.3rem 0.5rem;
+	text-align: start;
+	border-block-end: 1px solid var(--rule);
+}
+.dist-table thead th {
+	font-weight: 500;
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+.dist-table tr.changed {
+	background: var(--accent-soft);
+}
+.dist-table .bad {
+	color: var(--bad);
+	font-weight: 700;
+}
+.dist-table .dim {
+	color: var(--muted);
+}
+
+/* ---- pseudocode ---- */
+.code {
+	margin: 0;
+	padding: 0.7rem 0;
+	background: var(--sunken);
+	font: 0.8rem / 1.55 var(--mono);
+	overflow-x: auto;
+}
+.code span {
+	display: block;
+	padding: 0 var(--inset);
+	border-inline-start: 3px solid transparent;
+	white-space: pre;
+}
+.code span.on {
+	background: var(--accent-soft);
+	border-inline-start-color: var(--accent);
+}
+.code i {
+	color: var(--muted);
+	font-style: normal;
+}
+
+/* ---- captions ---- */
+.relax {
+	margin: 0.4rem 0 0;
+	padding-inline-start: 1.2rem;
+}
+.relax li {
+	margin-block: 0.15rem;
+}
+.relax .bad {
+	color: var(--bad);
+}
+.slider-field output {
+	min-inline-size: 2.5rem;
+}
+li a {
+	overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+	.code {
+		font-size: 0.72rem;
+	}
+	.edge text,
+	.node .dist {
+		font-size: 24px;
+		stroke-width: 8px;
+	}
+	.node .name {
+		font-size: 28px;
+	}
+}
+@media (min-width: 900px) {
+	[data-captions] {
+		min-block-size: 6.5rem;
+	}
+}

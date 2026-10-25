@@ -2037,719 +2037,293 @@ dialog.reply-dialog[open] {
 }
 /* end features */
 }</style>
-<style>
-	/* Page-specific: everything else comes from kit:theme.css. */
-	:root { --accent: light-dark(#1f5fbf, #7fb0ff); }
+<style>/* Page-specific: everything else comes from the kit's theme.css. */
+:root {
+	--accent: light-dark(#1f5fbf, #7fb0ff);
+}
 
-	/* ---- the graph ---- */
-	.gsvg { display: block; inline-size: 100%; block-size: auto; }
-	.edge line { stroke: var(--rule-strong); stroke-width: 3; }
-	.edge[data-state="tent"] line { stroke: var(--accent); stroke-dasharray: 7 6; }
-	.edge[data-state="tree"] line { stroke: var(--ink); stroke-width: 6; }
-	.edge[data-state="improved"] line { stroke: var(--accent); stroke-width: 6; }
-	.edge[data-state="kept"] line { stroke: var(--muted); stroke-dasharray: 2 7; stroke-linecap: round; }
-	.edge[data-state="missed"] line { stroke: var(--bad); stroke-width: 6; }
-	.edge text, .node .dist { font: 700 18px var(--font); text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 7px; stroke-linejoin: round; }
-	.edge text { fill: var(--ink); dominant-baseline: central; }
-	.node .dist { dominant-baseline: central; }
-	.edge[data-state="missed"] text { fill: var(--bad); }
-	.arrow { fill: var(--rule-strong); }
-	.arrow[data-state="tent"], .arrow[data-state="improved"] { fill: var(--accent); }
-	.arrow[data-state="tree"] { fill: var(--ink); }
-	.arrow[data-state="kept"] { fill: var(--muted); }
-	.arrow[data-state="missed"] { fill: var(--bad); }
-	.node circle { fill: var(--surface); stroke: var(--rule-strong); stroke-width: 3; }
-	.node .name { font: 700 22px var(--font); text-anchor: middle; dominant-baseline: central; fill: var(--muted); }
-	.node .dist { fill: var(--muted); }
-	.node[data-state="queued"] circle { fill: var(--accent-soft); stroke: var(--accent); }
-	.node[data-state="queued"] .name, .node[data-state="queued"] .dist { fill: var(--accent); }
-	.node[data-state="current"] circle { fill: var(--accent); stroke: var(--accent); }
-	.node[data-state="current"] .name { fill: #fff; }
-	.node[data-state="current"] .dist { fill: var(--accent); }
-	.node[data-state="settled"] circle { fill: var(--ink); stroke: var(--ink); }
-	.node[data-state="settled"] .name { fill: var(--surface); }
-	.node[data-state="settled"] .dist { fill: var(--ink); }
-	.node[data-wrong] circle { stroke: var(--bad); stroke-width: 6; }
-	.node[data-wrong] .dist { fill: var(--bad); }
-	.node.changed .dist { fill: var(--accent); }
-	.node[data-wrong].changed .dist { fill: var(--bad); }
+/* ---- the graph ---- */
+.gsvg {
+	display: block;
+	inline-size: 100%;
+	block-size: auto;
+}
+.edge line {
+	stroke: var(--rule-strong);
+	stroke-width: 3;
+}
+.edge[data-state="tent"] line {
+	stroke: var(--accent);
+	stroke-dasharray: 7 6;
+}
+.edge[data-state="tree"] line {
+	stroke: var(--ink);
+	stroke-width: 6;
+}
+.edge[data-state="improved"] line {
+	stroke: var(--accent);
+	stroke-width: 6;
+}
+.edge[data-state="kept"] line {
+	stroke: var(--muted);
+	stroke-dasharray: 2 7;
+	stroke-linecap: round;
+}
+.edge[data-state="missed"] line {
+	stroke: var(--bad);
+	stroke-width: 6;
+}
+.edge text,
+.node .dist {
+	font: 700 18px var(--font);
+	text-anchor: middle;
+	paint-order: stroke;
+	stroke: var(--surface);
+	stroke-width: 7px;
+	stroke-linejoin: round;
+}
+.edge text {
+	fill: var(--ink);
+	dominant-baseline: central;
+}
+.node .dist {
+	dominant-baseline: central;
+}
+.edge[data-state="missed"] text {
+	fill: var(--bad);
+}
+.arrow {
+	fill: var(--rule-strong);
+}
+.arrow[data-state="tent"],
+.arrow[data-state="improved"] {
+	fill: var(--accent);
+}
+.arrow[data-state="tree"] {
+	fill: var(--ink);
+}
+.arrow[data-state="kept"] {
+	fill: var(--muted);
+}
+.arrow[data-state="missed"] {
+	fill: var(--bad);
+}
+.node circle {
+	fill: var(--surface);
+	stroke: var(--rule-strong);
+	stroke-width: 3;
+}
+.node .name {
+	font: 700 22px var(--font);
+	text-anchor: middle;
+	dominant-baseline: central;
+	fill: var(--muted);
+}
+.node .dist {
+	fill: var(--muted);
+}
+.node[data-state="queued"] circle {
+	fill: var(--accent-soft);
+	stroke: var(--accent);
+}
+.node[data-state="queued"] .name,
+.node[data-state="queued"] .dist {
+	fill: var(--accent);
+}
+.node[data-state="current"] circle {
+	fill: var(--accent);
+	stroke: var(--accent);
+}
+.node[data-state="current"] .name {
+	fill: #fff;
+}
+.node[data-state="current"] .dist {
+	fill: var(--accent);
+}
+.node[data-state="settled"] circle {
+	fill: var(--ink);
+	stroke: var(--ink);
+}
+.node[data-state="settled"] .name {
+	fill: var(--surface);
+}
+.node[data-state="settled"] .dist {
+	fill: var(--ink);
+}
+.node[data-wrong] circle {
+	stroke: var(--bad);
+	stroke-width: 6;
+}
+.node[data-wrong] .dist {
+	fill: var(--bad);
+}
+.node.changed .dist {
+	fill: var(--accent);
+}
+.node[data-wrong].changed .dist {
+	fill: var(--bad);
+}
 
-	.key { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
-	.key span { display: inline-flex; align-items: center; gap: 0.4rem; }
-	.key svg { inline-size: 1.3rem; block-size: 1.3rem; }
-	.key .node circle { stroke-width: 4; }
+.key {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 1.2rem;
+}
+.key span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+.key svg {
+	inline-size: 1.3rem;
+	block-size: 1.3rem;
+}
+.key .node circle {
+	stroke-width: 4;
+}
 
-	/* ---- queue and table ---- */
-	.side { display: grid; gap: 1rem; align-content: start; padding: 1rem var(--inset); }
-	.queue { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; min-block-size: 2.2rem; align-items: center; }
-	.queue li { padding: 0.2rem 0.65rem; border: 1.5px solid var(--accent); border-radius: 999px; background: var(--accent-soft); font-variant-numeric: tabular-nums; }
-	.queue li b { margin-inline-end: 0.35em; }
-	.queue li.changed { background: var(--accent); color: #fff; }
-	.queue li.popped { background: var(--ink); border-color: var(--ink); color: var(--surface); }
-	.queue li.none { border: 0; background: none; color: var(--muted); padding-inline: 0; }
-	.queue .sep { color: var(--muted); }
-	.dist-table { inline-size: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-	.dist-table th, .dist-table td { padding: 0.3rem 0.5rem; text-align: start; border-block-end: 1px solid var(--rule); }
-	.dist-table thead th { font-weight: 500; color: var(--muted); font-size: 0.85rem; }
-	.dist-table tr.changed { background: var(--accent-soft); }
-	.dist-table .bad { color: var(--bad); font-weight: 700; }
-	.dist-table .dim { color: var(--muted); }
+/* ---- queue and table ---- */
+.side {
+	display: grid;
+	gap: 1rem;
+	align-content: start;
+	padding: 1rem var(--inset);
+}
+.queue {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	min-block-size: 2.2rem;
+	align-items: center;
+}
+.queue li {
+	padding: 0.2rem 0.65rem;
+	border: 1.5px solid var(--accent);
+	border-radius: 999px;
+	background: var(--accent-soft);
+	font-variant-numeric: tabular-nums;
+}
+.queue li b {
+	margin-inline-end: 0.35em;
+}
+.queue li.changed {
+	background: var(--accent);
+	color: #fff;
+}
+.queue li.popped {
+	background: var(--ink);
+	border-color: var(--ink);
+	color: var(--surface);
+}
+.queue li.none {
+	border: 0;
+	background: none;
+	color: var(--muted);
+	padding-inline: 0;
+}
+.queue .sep {
+	color: var(--muted);
+}
+.dist-table {
+	inline-size: 100%;
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+}
+.dist-table th,
+.dist-table td {
+	padding: 0.3rem 0.5rem;
+	text-align: start;
+	border-block-end: 1px solid var(--rule);
+}
+.dist-table thead th {
+	font-weight: 500;
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+.dist-table tr.changed {
+	background: var(--accent-soft);
+}
+.dist-table .bad {
+	color: var(--bad);
+	font-weight: 700;
+}
+.dist-table .dim {
+	color: var(--muted);
+}
 
-	/* ---- pseudocode ---- */
-	.code { margin: 0; padding: 0.7rem 0; background: var(--sunken); font: 0.8rem/1.55 var(--mono); overflow-x: auto; }
-	.code span { display: block; padding: 0 var(--inset); border-inline-start: 3px solid transparent; white-space: pre; }
-	.code span.on { background: var(--accent-soft); border-inline-start-color: var(--accent); }
-	.code i { color: var(--muted); font-style: normal; }
+/* ---- pseudocode ---- */
+.code {
+	margin: 0;
+	padding: 0.7rem 0;
+	background: var(--sunken);
+	font: 0.8rem / 1.55 var(--mono);
+	overflow-x: auto;
+}
+.code span {
+	display: block;
+	padding: 0 var(--inset);
+	border-inline-start: 3px solid transparent;
+	white-space: pre;
+}
+.code span.on {
+	background: var(--accent-soft);
+	border-inline-start-color: var(--accent);
+}
+.code i {
+	color: var(--muted);
+	font-style: normal;
+}
 
-	/* ---- captions ---- */
-	.relax { margin: 0.4rem 0 0; padding-inline-start: 1.2rem; }
-	.relax li { margin-block: 0.15rem; }
-	.relax .bad { color: var(--bad); }
-	.slider-field output { min-inline-size: 2.5rem; }
-	li a { overflow-wrap: anywhere; }
-	@media (max-width: 480px) {
-		.code { font-size: 0.72rem; }
-		.edge text, .node .dist { font-size: 24px; stroke-width: 8px; }
-		.node .name { font-size: 28px; }
+/* ---- captions ---- */
+.relax {
+	margin: 0.4rem 0 0;
+	padding-inline-start: 1.2rem;
+}
+.relax li {
+	margin-block: 0.15rem;
+}
+.relax .bad {
+	color: var(--bad);
+}
+.slider-field output {
+	min-inline-size: 2.5rem;
+}
+li a {
+	overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+	.code {
+		font-size: 0.72rem;
 	}
-	@media (min-width: 900px) { [data-captions] { min-block-size: 6.5rem; } }
+	.edge text,
+	.node .dist {
+		font-size: 24px;
+		stroke-width: 8px;
+	}
+	.node .name {
+		font-size: 28px;
+	}
+}
+@media (min-width: 900px) {
+	[data-captions] {
+		min-block-size: 6.5rem;
+	}
+}
 </style>
 </head>
 <body>
-<main class="page">
-	<header class="masthead">
-		<h1>Dijkstra settles the <em>nearest</em> node first, and non-negative edges are what make that safe.</h1>
-		<p class="lede">Press Next. Each round the queue gives up its smallest entry, and the caption says why that node is final.</p>
-	</header>
-
-	<!-- The explorer: kit:steps.js owns Back/Play/Next and the scrubber; the page rebuilds captions, graph, queue and table whenever the map or start changes. -->
-	<figure class="fig wide" id="main" data-stepper data-start="1" aria-label="Dijkstra's algorithm on a small road map, step by step">
-		<div class="controls">
-			<div class="field"><span>Map</span>
-				<div class="seg" role="radiogroup" aria-label="Map">
-					<label><input type="radio" name="graph" value="towns" checked><span>Seven towns</span></label>
-					<label><input type="radio" name="graph" value="grid"><span>Street grid</span></label>
-					<label><input type="radio" name="graph" value="islands"><span>Two islands</span></label>
-					<label><input type="radio" name="graph" value="equal"><span>All roads equal</span></label>
-				</div>
-			</div>
-			<div class="field"><span>Start at</span>
-				<div class="seg" role="radiogroup" aria-label="Start node" id="starts"></div>
-			</div>
-		</div>
-		<ol data-captions></ol>
-		<div class="split">
-			<div class="stage"><svg class="gsvg" data-role="svg" role="img" aria-label="The map: towns joined by roads with distances"></svg></div>
-			<div class="side">
-				<div>
-					<p class="label">Priority queue, smallest first</p>
-					<ol class="queue" data-role="queue" aria-live="polite"></ol>
-				</div>
-				<div class="scroll">
-					<table class="dist-table">
-						<thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>State</th></tr></thead>
-						<tbody data-role="table"></tbody>
-					</table>
-				</div>
-			</div>
-		</div>
-		<pre class="code" data-role="code" aria-label="The algorithm in pseudocode; the lines in use at this step are highlighted"></pre>
-		<figcaption>
-			<span class="key">
-				<span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="unseen"><circle r="24"/></g></svg>not reached (∞)</span>
-				<span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="queued"><circle r="24"/></g></svg>in the queue, distance so far</span>
-				<span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="current"><circle r="24"/></g></svg>being settled now</span>
-				<span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="settled"><circle r="24"/></g></svg>settled: distance is final</span>
-			</span><br>
-			Roads work in both directions. Bold lines are the routes found to settled nodes; dashed blue lines are the best known routes to queued ones. Ties go to the alphabetically first node.
-		</figcaption>
-	</figure>
-
-	<section>
-		<h2>The nearest queued node cannot be beaten</h2>
-		<p>A queue entry is an upper bound: a route with that length exists, though a shorter one might not have been found yet. Take the smallest entry, say <b>X</b> at <i>d</i>. Suppose a route to X shorter than <i>d</i> existed, and let <b>Y</b> be the first node on it that is not settled (possibly X itself). Y's predecessor on the route is settled, and settling it relaxed the road into Y, so Y's entry is at most the route's cost up to Y. X was the smallest entry, so Y's entry is at least <i>d</i>. The rest of the route adds roads of length zero or more, so the whole route costs at least <i>d</i>, a contradiction. X is final.</p>
-		<p>Two things follow. Each reachable node is settled exactly once, which is why the algorithm is fast. And the argument leans on one fact: <b>roads never shorten a route</b>, which is what lets the last step conclude. The next section removes that fact.</p>
-	</section>
-
-	<section>
-		<h2 id="neg-head"></h2>
-		<p>Here the roads are one-way, and road B→A has a weight you can change. A negative weight means taking that road <em>reduces</em> the total, like a toll rebate. Drag it below −1 and watch which step breaks.</p>
-		<figure class="fig wide" id="neg" data-stepper data-start="1" aria-label="Dijkstra's algorithm on a graph with one negative edge, step by step">
-			<div class="controls">
-				<label class="field slider-field"><span>Weight of road B→A</span><input type="range" id="neg-w" min="-5" max="3" value="-2" step="1"><output id="neg-w-out" for="neg-w">−2</output></label>
-				<div class="field"><span>A settled node</span>
-					<div class="seg" role="radiogroup" aria-label="What happens to a settled node that could be improved">
-						<label><input type="radio" name="reopen" value="no" checked><span>stays final (Dijkstra)</span></label>
-						<label><input type="radio" name="reopen" value="yes"><span>is re-opened</span></label>
-					</div>
-				</div>
-			</div>
-			<ol data-captions></ol>
-			<div class="split">
-				<div class="stage"><svg class="gsvg" data-role="svg" role="img" aria-label="A directed graph with nodes S, A, B and C and one-way roads"></svg></div>
-				<div class="side">
-					<div>
-						<p class="label">Priority queue, smallest first</p>
-						<ol class="queue" data-role="queue" aria-live="polite"></ol>
-					</div>
-					<div class="scroll">
-						<table class="dist-table">
-							<thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>State</th><th>True</th></tr></thead>
-							<tbody data-role="table"></tbody>
-						</table>
-					</div>
-				</div>
-			</div>
-			<pre class="code" data-role="code" aria-label="The algorithm in pseudocode; the lines in use at this step are highlighted"></pre>
-			<figcaption>Arrows show the direction a road can be driven. “True” is the real shortest distance, computed separately with the Bellman–Ford algorithm; a red node was settled with a distance that is too large.</figcaption>
-		</figure>
-		<p>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p>
-	</section>
-
-	<section class="minor">
-		<h2>Where the claims come from</h2>
-		<ul>
-			<li>E. W. Dijkstra, “A note on two problems in connexion with graphs”, <i>Numerische Mathematik</i> 1, 269–271 (1959): the original algorithm.</li>
-			<li>T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, <i>Introduction to Algorithms</i>: single-source shortest paths, with Bellman–Ford (section 24.1) and the correctness proof for Dijkstra on non-negative weights (section 24.3) in the 2nd and 3rd editions; the chapter is 22 in the 4th.</li>
-			<li>M. L. Fredman, R. E. Tarjan, “Fibonacci heaps and their uses in improved network optimization algorithms”, <i>Journal of the ACM</i> 34(3), 1987: running time O(E + V log V) with a Fibonacci heap; a binary heap gives O((E + V) log V).</li>
-			<li><a href="https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm">Wikipedia: Dijkstra's algorithm</a>, used to cross-check the history and the step list.</li>
-			<li>The maps and numbers on this page are invented for illustration. This implementation keeps one queue entry per node and lowers it when a better route is found; many programs instead push a duplicate entry and skip stale ones, which gives the same distances.</li>
-		</ul>
-	</section>
-</main>
-
-<script>/* views folds: Expand all for kit:views.js, not referenced from pages: pack joins it in front of views.js, which calls it once with
-   its kitText(key) for the button's texts (expandAll, collapseAll) and then the returned refresh() after every route change.
-   A section (an overview section or a view) with two or more <details> of its own (at any depth, not inside a nested section)
-   gets one button just above the block holding its first fold, or at the end of the section's .toolbar when one comes before
-   that fold: Expand all, which opens every level of nested folds (a .tree), or Collapse all once every fold is open, which closes
-   them all; it is kept in step when the reader opens folds one at a time.
-   Folds a view handler draws count from its next refresh. */
-window.ViewsFolds = (kitText) => {
-  const buttons = new Map;
-  function foldsOf(section) {
-    return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section);
-  }
-  function sync(section) {
-    const button = buttons.get(section);
-    if (!button) {
-      return;
-    }
-    const all = foldsOf(section).every((d) => d.open);
-    button.setAttribute("aria-expanded", String(all));
-    button.textContent = kitText(all ? "collapseAll" : "expandAll");
-  }
-  function create(section) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "expand fold-all";
-    button.addEventListener("click", () => {
-      const folds = foldsOf(section);
-      const opening = !folds.every((d) => d.open);
-      for (const d of folds) {
-        d.open = opening;
-      }
-      sync(section);
-    });
-    section.addEventListener("toggle", () => sync(section), true);
-    buttons.set(section, button);
-    return button;
-  }
-  function toolbarBefore(fold, section) {
-    return [...section.querySelectorAll(".toolbar")].find((bar) => bar.closest("section") === section && Boolean(bar.compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING));
-  }
-  function place(button, fold, section) {
-    const toolbar = toolbarBefore(fold, section);
-    if (toolbar) {
-      if (toolbar.lastElementChild !== button) {
-        toolbar.append(button);
-      }
-      return;
-    }
-    const block = blockOf(fold, section);
-    if (button.nextElementSibling !== block) {
-      block.before(button);
-    }
-  }
-  function blockOf(el, section) {
-    let block = el;
-    while (block.parentElement && block.parentElement !== section) {
-      block = block.parentElement;
-    }
-    return block;
-  }
-  return () => {
-    for (const section of document.querySelectorAll("section")) {
-      const [first, second] = foldsOf(section);
-      if (!(first && second)) {
-        buttons.get(section)?.remove();
-        continue;
-      }
-      place(buttons.get(section) ?? create(section), first, section);
-      sync(section);
-    }
-  };
-};
-
-/* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
-   views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
-   every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
-   was left from.
-   All of it is derived from markup the page already has:
-     siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
-               its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
-               ("Open", "→") is passed over for the view's heading, else its param.
-     trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
-               that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
-               view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
-               every sibling. Steps live in the history entry (its Navigation API state; history.state stays the page's), so Back,
-               Forward and reload keep them; a link opened fresh starts a new trail.
-     .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
-               listener or selector the page gave it), with previous and next on the right.
-     .toc      on a page with two or more view names, a contents rail: the overview, its sections by their data-nav or else
-               their h2 (ids added when missing), and under the section that first links to a view name, each trail step's
-               siblings (only the step itself past 12). The current section follows scrolling; 07-nav.css places the rail. */
-window.ViewsNav = ({ views, decode, canonical, kitText }) => {
-  const STATE_KEY = "viewTrail";
-  const AT_KEY = "viewTrailAt";
-  const RAIL_LIST_MAX = 12;
-  const KIT_NAV = ".trail, .toc";
-  const overview = document.querySelector("[data-overview]");
-  const overviewName = () => clean(document.querySelector(".back")?.textContent) || kitText("overview");
-  const nameOf = (hash) => hash.split("/")[0] ?? "";
-  const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
-  const drawn = new Map;
-  let steps = [];
-  function clean(text) {
-    return (text ?? "").replace(/\s+/g, " ").trim();
-  }
-  function make(tag, attrs = {}, text = "") {
-    const el = document.createElement(tag);
-    for (const [key, value] of Object.entries(attrs)) {
-      el.setAttribute(key, value);
-    }
-    el.textContent = text;
-    return el;
-  }
-  function item(child) {
-    const li = make("li");
-    li.append(child);
-    return li;
-  }
-  function linksTo(name, scope = document) {
-    const selector = `a[href^=${JSON.stringify(`#${name}/`)}]`;
-    return [...scope.querySelectorAll(selector)].filter((a) => !a.closest(KIT_NAV));
-  }
-  const hashOf = (a) => canonical((a.getAttribute("href") ?? "").slice(1));
-  const unique = (hashes) => [...new Set(hashes)];
-  const viewDrawnFor = (hash) => [...drawn].find(([, h]) => h === hash)?.[0];
-  function allSiblings(name) {
-    const statics = views.map((v) => v.dataset.view ?? "").filter((claim) => claim.startsWith(`${name}/`)).map(canonical);
-    return unique([...linksTo(name).map(hashOf), ...statics]);
-  }
-  const siblingsOf = (step) => step.list ?? allSiblings(nameOf(step.hash));
-  const linkText = (a) => {
-    const row = a.parentElement?.matches(".tree, .tree details");
-    return clean((row && a.firstElementChild || a).textContent);
-  };
-  function linkLabels(name) {
-    const texts = new Map;
-    const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
-    for (const { hash, text } of links) {
-      texts.set(text, (texts.get(text) ?? new Set).add(hash));
-    }
-    const found = new Map;
-    for (const { hash, text } of links) {
-      if (text && texts.get(text)?.size === 1 && !found.has(hash)) {
-        found.set(hash, text);
-      }
-    }
-    return found;
-  }
-  function label(hash, known = linkLabels(nameOf(hash))) {
-    return known.get(hash) || clean(viewDrawnFor(hash)?.querySelector("h1, h2")?.textContent) || decode(hash.split("/").slice(1).join("/"));
-  }
-  function savedTrail() {
-    const trail = entryState()[STATE_KEY];
-    return Array.isArray(trail) ? trail.filter((s) => typeof s?.hash === "string") : null;
-  }
-  function entryState() {
-    const state = "navigation" in window ? navigation.currentEntry?.getState() : undefined;
-    return state && typeof state === "object" ? state : {};
-  }
-  const locationHash = () => canonical(location.hash.slice(1));
-  function inheritedList(hash, parent, replaced) {
-    if (replaced?.list?.includes(hash)) {
-      return replaced.list;
-    }
-    const view = parent && viewDrawnFor(parent.hash);
-    const list = view ? unique(linksTo(nameOf(hash), view).map(hashOf)) : [];
-    return list.includes(hash) ? list : undefined;
-  }
-  function extended(hash) {
-    const cut = steps.findIndex((s) => nameOf(s.hash) === nameOf(hash));
-    const before = cut < 0 ? steps : steps.slice(0, cut);
-    const list = inheritedList(hash, before.at(-1), steps[cut]);
-    return [...before, { hash, label: label(hash), ...list ? { list } : {} }];
-  }
-  function stamp(hash, redrawn) {
-    const kept = savedTrail();
-    const last = kept?.at(-1);
-    if (kept && last?.hash === hash) {
-      steps = redrawn ? [...kept.slice(0, -1), { ...last, label: label(hash) }] : kept;
-    } else {
-      steps = hash ? extended(hash) : [];
-    }
-    try {
-      navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
-    } catch {}
-  }
-  function crumbs(here, back) {
-    const list = make("ol", { class: "crumbs" });
-    list.append(item(back ?? make("a", { href: "#" }, overviewName())));
-    for (const step of steps.slice(0, -1)) {
-      list.append(item(make("a", { href: `#${step.hash}` }, step.label)));
-    }
-    list.append(item(make("span", { "aria-current": "page" }, here.label)));
-    return list;
-  }
-  function neighbours(here) {
-    const list = siblingsOf(here);
-    const at = list.indexOf(here.hash);
-    if (at < 0 || list.length < 2) {
-      return [];
-    }
-    const known = linkLabels(nameOf(here.hash));
-    const link = (hash, rel) => hash ? make("a", { href: `#${hash}`, rel }, label(hash, known)) : make("span");
-    const box = make("div", { class: "sibs" });
-    box.append(link(list[at - 1], "prev"), make("span", { class: "count" }, `${at + 1} / ${list.length}`), link(list[at + 1], "next"));
-    return [box];
-  }
-  function trailBar(view) {
-    let bar = view.querySelector(".trail");
-    if (!bar) {
-      bar = make("nav", { class: "trail", "aria-label": kitText("breadcrumb") });
-      const back = view.querySelector(".back");
-      if (back) {
-        back.before(bar);
-      } else {
-        (view.querySelector(".view-head") ?? view).prepend(bar);
-      }
-    }
-    return bar;
-  }
-  const freeId = (id) => id !== "" && !names.has(id) && !document.getElementById(id);
-  function sectionId(section, text, n) {
-    if (!section.id) {
-      let id = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
-      for (let k = n;!freeId(id); k++) {
-        id = `section-${k}`;
-      }
-      section.id = id;
-    }
-    return section.id;
-  }
-  function entry(section, heading, n, claimed) {
-    const text = clean(section.dataset.nav) || clean(heading.textContent);
-    const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
-    const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
-    for (const name of owns) {
-      claimed.add(name);
-    }
-    return { section, li: item(link), link, owns };
-  }
-  function buildRail(page, overview) {
-    const sections = [...overview.querySelectorAll(":scope > section")];
-    const headed = sections.flatMap((section) => {
-      const heading = section.querySelector(":scope > h2");
-      return heading ? [{ section, heading }] : [];
-    });
-    const claimed = new Set;
-    const entries = headed.map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
-    const home = make("a", { href: "#" }, overviewName());
-    const list = make("ol", { id: "toc-list" });
-    list.append(item(home), ...entries.map((e) => e.li));
-    const nav = make("nav", { class: "toc", "aria-label": kitText("contents") });
-    const toggle = make("button", { type: "button", class: "toc-toggle", "aria-expanded": "false", "aria-controls": list.id }, kitText("contents"));
-    const setOpen = (on) => {
-      nav.classList.toggle("is-open", on);
-      toggle.setAttribute("aria-expanded", String(on));
-    };
-    toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
-    list.addEventListener("click", (e) => {
-      if (e.target instanceof Element && e.target.closest("a")) {
-        setOpen(false);
-      }
-    });
-    nav.append(toggle, list);
-    page.prepend(nav);
-    const rail = { nav, home, entries };
-    addEventListener("scroll", () => spySoon(rail), { passive: true });
-    return rail;
-  }
-  function stepList(step, hash) {
-    const all = siblingsOf(step);
-    const shown = all.length > RAIL_LIST_MAX ? [step.hash] : all;
-    const known = linkLabels(nameOf(step.hash));
-    const sub = make("ol");
-    for (const h of shown) {
-      const text = h === step.hash ? step.label : label(h, known);
-      const a = make("a", { href: `#${h}` }, text);
-      a.classList.toggle("is-trail", h === step.hash && h !== hash);
-      if (h === hash) {
-        a.setAttribute("aria-current", "page");
-      }
-      sub.append(item(a));
-    }
-    return sub;
-  }
-  function updateRail(rail, hash) {
-    for (const { li, owns } of rail.entries) {
-      for (const old of li.querySelectorAll("ol")) {
-        old.remove();
-      }
-      li.append(...steps.filter((s) => owns.includes(nameOf(s.hash))).map((s) => stepList(s, hash)));
-    }
-    const current = rail.nav.querySelector('[aria-current="page"]');
-    if (current && rail.nav.scrollHeight > rail.nav.clientHeight) {
-      rail.nav.scrollTop = current.offsetTop - rail.nav.clientHeight / 3;
-    }
-    spy(rail);
-  }
-  let spyQueued = false;
-  function spySoon(rail) {
-    if (!spyQueued) {
-      spyQueued = true;
-      requestAnimationFrame(() => spy(rail));
-    }
-  }
-  function spy(rail) {
-    spyQueued = false;
-    const inView = document.documentElement.classList.contains("in-view");
-    const passed = rail.entries.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3).at(-1);
-    const here = inView ? null : passed?.link ?? rail.home;
-    for (const a of [rail.home, ...rail.entries.map((e) => e.link)]) {
-      a.removeAttribute("aria-current");
-    }
-    here?.setAttribute("aria-current", "location");
-  }
-  const page = overview?.parentElement;
-  const railHost = page && overview && names.size > 1 ? { page, overview } : null;
-  document.documentElement.classList.toggle("has-toc", Boolean(railHost));
-  let toc = null;
-  let shownHash = null;
-  const revisited = () => entryState()[AT_KEY] === locationHash();
-  return {
-    revisited,
-    savedHash: () => revisited() ? savedTrail()?.at(-1)?.hash ?? null : null,
-    show(view, routeHash) {
-      const hash = canonical(routeHash);
-      const redrawn = hash === shownHash;
-      shownHash = hash;
-      if (railHost && !toc) {
-        toc = buildRail(railHost.page, railHost.overview);
-      }
-      if (view) {
-        drawn.set(view, hash);
-      }
-      const current = view ? hash : "";
-      stamp(current, redrawn);
-      const here = steps.at(-1);
-      if (view && here) {
-        const back = view.querySelector(".back");
-        trailBar(view).replaceChildren(crumbs(here, back), ...neighbours(here));
-      }
-      if (toc) {
-        updateRail(toc, current);
-      }
-    }
-  };
-};
-
-/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
-   `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
-   no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
-   on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to.
-   A static view may claim one param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for
-   its param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
-   Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
-   (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
-   (an async callback) runs its handler at once if the current hash is its view.
-   Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it briefly
-   ("Blaž", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the view's
-   heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
-   breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
-   was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
-   its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
-   data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
-   link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
-   opens them at every level, at the end of the section's .toolbar when one comes before them.
-   Trees: one complete list of hierarchical records (phases > groups > items) on the page, opened level by level. Nest <details>
-   in a .tree; a row is a <summary>, or a link to the item's view in place of a fold, and its children are cells: the label, then
-   its numbers, which line up in columns across rows and levels. --tree-cols on the .tree gives one width per number column
-   (unset, each is 5rem, narrower where a deep row on a phone has no room); a .tree-head first in the tree names the label and
-   each column over the rows. On phones a row with two or more numbers puts them on a line under its label, in the same columns:
-   at the third level a 360-pixel phone leaves about 16rem for them and their 0.5rem gaps, and a width written as minmax(0, 4rem)
-   gives way where they do not fit. A leaf opens to its full text. Give every row the same cells in the same order, units
-   included; an empty <span></span> keeps a column:
-     <div class="tree" style="--tree-cols: 4rem 4rem">
-       <div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
-       <details id="spike"><summary><span>1.1 Spike boards</span><span>70 h</span><span></span></summary>
-         <details><summary><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Full text.</p></details>
-         <a href="#task/1.1.2"><span>1.1.2 Power stage</span><span>24 h</span><span>Ana</span></a>
-       </details>
-     </div>
-   A link to an id inside it (<a href="#spike">Spike boards: 4 tasks, 70 h</a>) opens that branch. A row link's label names its view
-   in the navigation. With kit:link.js, data-ref on a row lights it, and a closed fold that holds a lit row is tinted too. Trees
-   print fully open.
-   Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
-   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
-   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
-   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
-   .back link names it). A key left out stays English. */
-(() => {
-  const root = document.documentElement;
-  const views = [...document.querySelectorAll("[data-view]")];
-  const handlers = {};
-  let started = false;
-  let overviewY = 0;
-  const LABELS = {
-    contents: "Contents",
-    breadcrumb: "Breadcrumb",
-    expandAll: "Expand all",
-    collapseAll: "Collapse all",
-    overview: "Overview"
-  };
-  const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
-  const nav = window.ViewsNav({ views, decode, canonical, kitText });
-  const refreshFolds = window.ViewsFolds(kitText);
-  function decode(text) {
-    try {
-      return decodeURIComponent(text);
-    } catch {
-      return text;
-    }
-  }
-  function canonical(hash) {
-    return new URL(`#${hash}`, "file:///").hash.slice(1);
-  }
-  const OVERVIEW = { name: "", view: undefined, param: "", hash: "" };
-  let shown = OVERVIEW;
-  function claim(hash) {
-    const [name = "", ...rest] = hash.split("/");
-    const view = views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ?? views.find((v) => v.dataset.view === name);
-    return view ? { name, view, param: decode(rest.join("/")), hash } : OVERVIEW;
-  }
-  const targetOf = (hash) => hash ? document.getElementById(decode(hash)) : null;
-  function route() {
-    const hash = canonical(location.hash.slice(1));
-    const claimed = claim(hash);
-    if (claimed.view) {
-      return claimed;
-    }
-    if (nav.revisited()) {
-      const saved = nav.savedHash();
-      if (!saved) {
-        return OVERVIEW;
-      }
-      return shown.view && saved === shown.hash ? shown : claim(saved);
-    }
-    return shown.view?.contains(targetOf(hash)) ? shown : OVERVIEW;
-  }
-  function reveal(target) {
-    for (let d = target.closest("details");d; d = d.parentElement?.closest("details") ?? null) {
-      d.open = true;
-    }
-  }
-  function shownTarget(at) {
-    const hash = canonical(location.hash.slice(1));
-    const target = hash === at.hash ? null : targetOf(hash);
-    const inView = target?.closest("[data-view]");
-    return target && (at.view ? at.view.contains(target) : !inView) ? target : null;
-  }
-  function draw(at, again = false) {
-    if (at.view && !again) {
-      handlers[at.name]?.(at.view, at.param);
-    }
-    shown = at;
-    nav.show(at.view ?? null, at.hash);
-    refreshFolds();
-  }
-  function show() {
-    const revisited = nav.revisited();
-    const at = route();
-    const { view } = at;
-    const again = started && at === shown && Boolean(view);
-    const wasInView = root.classList.contains("in-view");
-    if (view && !wasInView) {
-      overviewY = scrollY;
-    }
-    for (const v of views) {
-      v.classList.toggle("active", v === view);
-    }
-    root.classList.toggle("in-view", Boolean(view));
-    if (!started) {
-      return;
-    }
-    draw(at, again);
-    land(at, { wasInView, again, revisited });
-  }
-  function land(at, { wasInView, again, revisited }) {
-    const target = shownTarget(at);
-    if (target) {
-      reveal(target);
-    }
-    if (target && (at.view || !revisited)) {
-      target.scrollIntoView();
-    } else if (!at.view) {
-      if (wasInView) {
-        scrollTo(0, overviewY);
-      }
-    } else if (!again) {
-      scrollTo(0, 0);
-      const heading = at.view.querySelector("h1, h2");
-      heading?.setAttribute("tabindex", "-1");
-      heading?.focus({ preventScroll: true });
-    }
-  }
-  window.Views = {
-    on(name, fn) {
-      handlers[name] = fn;
-      if (!started) {
-        return;
-      }
-      const at = route();
-      if (at.view && at.name === name) {
-        draw(at);
-        const target = shownTarget(at);
-        if (target) {
-          reveal(target);
-          target.scrollIntoView();
-        }
-      }
-    }
-  };
-  root.classList.add("js-views");
-  addEventListener("hashchange", show);
-  document.addEventListener("click", (e) => {
-    const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
-    const hash = canonical((link?.getAttribute("href") ?? "").slice(1));
-    const target = hash === canonical(location.hash.slice(1)) && shownTarget(shown);
-    if (target) {
-      reveal(target);
-    }
-  });
-  show();
-  const start = () => {
-    started = true;
-    show();
-  };
-  if (document.readyState === "loading") {
-    addEventListener("DOMContentLoaded", start);
-  } else {
-    start();
-  }
-})();
+<main class="page"><div data-overview><header class="masthead"><h1>Dijkstra settles the <em>nearest</em> node first, and non-negative edges are what make that safe.</h1><p class="lede">Press Next. Each round the queue gives up its smallest entry, and the caption says why that node is final.</p></header><!--island:0--><figure class="fig wide" id="main" data-stepper data-start="1" aria-label="Dijkstra's algorithm on a small road map, step by step"><div class="controls"><div class="field"><span>Map</span><div class="seg" role="radiogroup" aria-label="Map"><label><input type="radio" name="graph" value="towns" checked/><span>Seven towns</span></label><label><input type="radio" name="graph" value="grid"/><span>Street grid</span></label><label><input type="radio" name="graph" value="islands"/><span>Two islands</span></label><label><input type="radio" name="graph" value="equal"/><span>All roads equal</span></label></div></div><div class="field"><span>Start at</span><div class="seg" role="radiogroup" aria-label="Start node"><label><input type="radio" name="start" value="A" checked/><span>A</span></label><label><input type="radio" name="start" value="B"/><span>B</span></label><label><input type="radio" name="start" value="C"/><span>C</span></label><label><input type="radio" name="start" value="D"/><span>D</span></label><label><input type="radio" name="start" value="E"/><span>E</span></label><label><input type="radio" name="start" value="F"/><span>F</span></label><label><input type="radio" name="start" value="G"/><span>G</span></label></div></div></div><ol data-captions><li>Start at <b>A</b>: distance 0. Every other node is ∞ (no route known yet), and only A is in the queue.</li><li>Settle <b>A</b> at 0. It is the only node in the queue, and the start is 0 away from itself, so its distance is final.</li><li>Relax the roads out of <b>A</b>: distance of A plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>A–B</b>: 0 + 4 = 4 beats ∞, so B = 4 via A.</li><li><b>A–C</b>: 0 + 2 = 2 beats ∞, so C = 2 via A.</li></ul></li><li>Settle <b>C</b> at 2. It is the smallest entry (the next is B at 4). Suppose a shorter route to C existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least 2 (C is the smallest), and the rest of the route adds nothing negative, so the route costs at least 2. C's distance is final.</li><li>Relax the roads out of <b>C</b>: distance of C plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>C–B</b>: 2 + 1 = 3 beats 4, so B = 3 via C.</li><li><b>C–D</b>: 2 + 8 = 10 beats ∞, so D = 10 via C.</li><li><b>C–F</b>: 2 + 10 = 12 beats ∞, so F = 12 via C.</li></ul> Already settled, nothing to do: A.</li><li>Settle <b>B</b> at 3. It is the smallest entry (the next is D at 10). Suppose a shorter route to B existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least 3 (B is the smallest), and the rest of the route adds nothing negative, so the route costs at least 3. B's distance is final.</li><li>Relax the roads out of <b>B</b>: distance of B plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>B–D</b>: 3 + 5 = 8 beats 10, so D = 8 via B.</li></ul> Already settled, nothing to do: A, C.</li><li>Settle <b>D</b> at 8. It is the smallest entry (the next is F at 12). Suppose a shorter route to D existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least 8 (D is the smallest), and the rest of the route adds nothing negative, so the route costs at least 8. D's distance is final.</li><li>Relax the roads out of <b>D</b>: distance of D plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>D–E</b>: 8 + 2 = 10 beats ∞, so E = 10 via D.</li><li><b>D–F</b>: 8 + 6 = 14 does not beat F's 12. Keep 12.</li></ul> Already settled, nothing to do: B, C.</li><li>Settle <b>E</b> at 10. It is the smallest entry (the next is F at 12). Suppose a shorter route to E existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least 10 (E is the smallest), and the rest of the route adds nothing negative, so the route costs at least 10. E's distance is final.</li><li>Relax the roads out of <b>E</b>: distance of E plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>E–G</b>: 10 + 3 = 13 beats ∞, so G = 13 via E.</li></ul> Already settled, nothing to do: D.</li><li>Settle <b>F</b> at 12. It is the smallest entry (the next is G at 13). Suppose a shorter route to F existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least 12 (F is the smallest), and the rest of the route adds nothing negative, so the route costs at least 12. F's distance is final.</li><li>Relax the roads out of <b>F</b>: distance of F plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>F–G</b>: 12 + 2 = 14 does not beat G's 13. Keep 13.</li></ul> Already settled, nothing to do: C, D.</li><li>Settle <b>G</b> at 13. It is the last entry in the queue, and every road out of the settled nodes has been tried, so nothing can improve it.</li><li>Relax the roads out of <b>G</b>: none lead to an unsettled node. Already settled, nothing to do: E, F.</li><li>Queue empty. Every reachable node is settled, and each distance was final the moment it was settled. Follow the Via column back to read off a route.</li></ol><div class="split"><div class="stage"><svg class="gsvg" viewBox="-8 12 661 316" role="img" aria-label="The map: towns joined by roads with distances"><g class="edge" data-state><line x1="50" y1="170" x2="180" y2="70"></line><text x="115" y="120">4</text></g><g class="edge" data-state><line x1="50" y1="170" x2="180" y2="270"></line><text x="115" y="220">2</text></g><g class="edge" data-state><line x1="180" y1="70" x2="180" y2="270"></line><text x="180" y="170">1</text></g><g class="edge" data-state><line x1="180" y1="70" x2="330" y2="170"></line><text x="255" y="120">5</text></g><g class="edge" data-state><line x1="180" y1="270" x2="330" y2="170"></line><text x="255" y="220">8</text></g><g class="edge" data-state><line x1="180" y1="270" x2="470" y2="270"></line><text x="325" y="270">10</text></g><g class="edge" data-state><line x1="330" y1="170" x2="470" y2="70"></line><text x="400" y="120">2</text></g><g class="edge" data-state><line x1="330" y1="170" x2="470" y2="270"></line><text x="400" y="220">6</text></g><g class="edge" data-state><line x1="470" y1="70" x2="595" y2="170"></line><text x="532.5" y="120">3</text></g><g class="edge" data-state><line x1="470" y1="270" x2="595" y2="170"></line><text x="532.5" y="220">2</text></g><g class="node changed" data-state="queued" transform="translate(50 170)"><circle r="26"></circle><text class="name">A</text><text class="dist" x="-41" y="0">0</text></g><g class="node" data-state="unseen" transform="translate(180 70)"><circle r="26"></circle><text class="name">B</text><text class="dist" x="0" y="-41">∞</text></g><g class="node" data-state="unseen" transform="translate(180 270)"><circle r="26"></circle><text class="name">C</text><text class="dist" x="0" y="41">∞</text></g><g class="node" data-state="unseen" transform="translate(330 170)"><circle r="26"></circle><text class="name">D</text><text class="dist" x="0" y="-41">∞</text></g><g class="node" data-state="unseen" transform="translate(470 70)"><circle r="26"></circle><text class="name">E</text><text class="dist" x="0" y="-41">∞</text></g><g class="node" data-state="unseen" transform="translate(470 270)"><circle r="26"></circle><text class="name">F</text><text class="dist" x="0" y="41">∞</text></g><g class="node" data-state="unseen" transform="translate(595 170)"><circle r="26"></circle><text class="name">G</text><text class="dist" x="41" y="0">∞</text></g></svg></div><div class="side"><div><p class="label">Priority queue, smallest first</p><ol class="queue" aria-live="polite"><li><b>A</b>0</li></ol></div><div class="scroll"><table class="dist-table"><thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>State</th></tr></thead><tbody><tr class="changed"><th scope="row">A</th><td>0</td><td>–</td><td>in queue</td></tr><tr><th scope="row">B</th><td>∞</td><td>–</td><td class="dim">not reached</td></tr><tr><th scope="row">C</th><td>∞</td><td>–</td><td class="dim">not reached</td></tr><tr><th scope="row">D</th><td>∞</td><td>–</td><td class="dim">not reached</td></tr><tr><th scope="row">E</th><td>∞</td><td>–</td><td class="dim">not reached</td></tr><tr><th scope="row">F</th><td>∞</td><td>–</td><td class="dim">not reached</td></tr><tr><th scope="row">G</th><td>∞</td><td>–</td><td class="dim">not reached</td></tr></tbody></table></div></div></div><pre class="code"><span class="on">dist[all] = ∞;  dist[start] = 0</span><span class="on">queue = {start}</span><span>while queue is not empty:</span><span>  u = pop smallest dist        <i>// settle</i></span><span>  for each road u→v, weight w: <i>// relax</i></span><span>    if dist[u]+w &lt; dist[v]:</span><span>      dist[v] = dist[u] + w</span><span>      via[v] = u;  queue.update(v)</span></pre><figcaption><span class="key"><span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="unseen"><circle r="24"></circle></g></svg>not reached (∞)</span><span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="queued"><circle r="24"></circle></g></svg>in the queue, distance so far</span><span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="current"><circle r="24"></circle></g></svg>being settled now</span><span><svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="node" data-state="settled"><circle r="24"></circle></g></svg>settled: distance is final</span></span><br/>Roads work in both directions. Bold lines are the routes found to settled nodes; dashed blue lines are the best known routes to queued ones. Ties go to the alphabetically first node.</figcaption></figure><!--/island--><section><h2>The nearest queued node cannot be beaten</h2><p>A queue entry is an upper bound: a route with that length exists, though a shorter one might not have been found yet. Take the smallest entry, say <strong>X</strong> at <em>d</em>. Suppose a route to X shorter than <em>d</em> existed, and let <strong>Y</strong> be the first node on it that is not settled (possibly X itself). Y's predecessor on the route is settled, and settling it relaxed the road into Y, so Y's entry is at most the route's cost up to Y. X was the smallest entry, so Y's entry is at least <em>d</em>. The rest of the route adds roads of length zero or more, so the whole route costs at least <em>d</em>, a contradiction. X is final.</p><p>Two things follow. Each reachable node is settled exactly once, which is why the algorithm is fast. And the argument leans on one fact: <strong>roads never shorten a route</strong>, which is what lets the last step conclude. The next section removes that fact.</p></section><section><!--island:1--><h2>With B→A = −2, Dijkstra ends with A = 3 and C = 5; the real shortest distances are A = 2 and C = 4</h2><p>Here the roads are one-way, and road B→A has a weight you can change. A negative weight means taking that road <em>reduces</em> the total, like a toll rebate. Drag it below −1 and watch which step breaks.</p><figure class="fig wide" id="neg" data-stepper data-start="1" aria-label="Dijkstra's algorithm on a graph with one negative edge, step by step"><div class="controls"><label class="field slider-field"><span>Weight of road B→A</span><input type="range" id="neg-w" min="-5" max="3" step="1" value="-2"/><output for="neg-w">−2</output></label><div class="field"><span>A settled node</span><div class="seg" role="radiogroup" aria-label="What happens to a settled node that could be improved"><label><input type="radio" name="reopen" value="no" checked/><span>stays final (Dijkstra)</span></label><label><input type="radio" name="reopen" value="yes"/><span>is re-opened</span></label></div></div></div><ol data-captions><li>Start at <b>S</b>: distance 0. Every other node is ∞ (no route known yet), and only S is in the queue.</li><li>Settle <b>S</b> at 0. It is the only node in the queue, and the start is 0 away from itself, so its distance is final.</li><li>Relax the roads out of <b>S</b>: distance of S plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>S→A</b>: 0 + 3 = 3 beats ∞, so A = 3 via S.</li><li><b>S→B</b>: 0 + 4 = 4 beats ∞, so B = 4 via S.</li></ul></li><li>Settle <b>A</b> at 3. It is the smallest entry in the queue, so Dijkstra now treats A as final. That is only guaranteed when no edge is negative.</li><li>Relax the roads out of <b>A</b>: distance of A plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li><b>A→C</b>: 3 + 2 = 5 beats ∞, so C = 5 via A.</li></ul></li><li>Settle <b>B</b> at 4. It is the smallest entry in the queue, so Dijkstra now treats B as final. That is only guaranteed when no edge is negative.</li><li>Relax the roads out of <b>B</b>: distance of B plus the road's weight, compared with what the neighbour has now.<ul class="relax"><li class="bad"><b>B→A</b>: 4 + −2 = 2 would beat A's 3, but A is settled and Dijkstra never looks at a settled node again. A stays at 3, and so does everything reached through A.</li></ul></li><li>Settle <b>C</b> at 5. It is the smallest entry in the queue, so Dijkstra now treats C as final. That is only guaranteed when no edge is negative.</li><li>Relax the roads out of <b>C</b>: none lead to an unsettled node.</li><li>Queue empty, but A and C are wrong. The “True” column shows the real shortest distances. A was settled before the cheaper route through B had been found, and a settled node is never revisited.</li></ol><div class="split"><div class="stage"><svg class="gsvg" viewBox="12 12 586 316" role="img" aria-label="A directed graph with nodes S, A, B and C and one-way roads"><defs><marker id="neg-arrow-base" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="base" d="M0 0 10 5 0 10z"></path></marker><marker id="neg-arrow-tent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="tent" d="M0 0 10 5 0 10z"></path></marker><marker id="neg-arrow-tree" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="tree" d="M0 0 10 5 0 10z"></path></marker><marker id="neg-arrow-improved" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="improved" d="M0 0 10 5 0 10z"></path></marker><marker id="neg-arrow-kept" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="kept" d="M0 0 10 5 0 10z"></path></marker><marker id="neg-arrow-missed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="missed" d="M0 0 10 5 0 10z"></path></marker></defs><g class="edge" data-state><line x1="70" y1="170" x2="272.48789831240293" y2="81.9617833424335" marker-end="url(#neg-arrow-base)"></line><text x="185" y="120">3</text></g><g class="edge" data-state><line x1="70" y1="170" x2="272.48789831240293" y2="258.0382166575665" marker-end="url(#neg-arrow-base)"></line><text x="185" y="220">4</text></g><g class="edge" data-state><line x1="300" y1="270" x2="300" y2="100" marker-end="url(#neg-arrow-base)"></line><text x="300" y="170">−2</text></g><g class="edge" data-state><line x1="300" y1="70" x2="510" y2="70" marker-end="url(#neg-arrow-base)"></line><text x="420" y="70">2</text></g><g class="node changed" data-state="queued" transform="translate(70 170)"><circle r="26"></circle><text class="name">S</text><text class="dist" x="-41" y="0">0</text></g><g class="node" data-state="unseen" transform="translate(300 70)"><circle r="26"></circle><text class="name">A</text><text class="dist" x="0" y="-41">∞</text></g><g class="node" data-state="unseen" transform="translate(300 270)"><circle r="26"></circle><text class="name">B</text><text class="dist" x="29" y="29">∞</text></g><g class="node" data-state="unseen" transform="translate(540 70)"><circle r="26"></circle><text class="name">C</text><text class="dist" x="41" y="0">∞</text></g></svg></div><div class="side"><div><p class="label">Priority queue, smallest first</p><ol class="queue" aria-live="polite"><li><b>S</b>0</li></ol></div><div class="scroll"><table class="dist-table"><thead><tr><th>Node</th><th>Distance</th><th>Via</th><th>State</th><th>True</th></tr></thead><tbody><tr class="changed"><th scope="row">S</th><td>0</td><td>–</td><td>in queue</td><td class="dim">0</td></tr><tr><th scope="row">A</th><td>∞</td><td>–</td><td class="dim">not reached</td><td class="dim">2</td></tr><tr><th scope="row">B</th><td>∞</td><td>–</td><td class="dim">not reached</td><td class="dim">4</td></tr><tr><th scope="row">C</th><td>∞</td><td>–</td><td class="dim">not reached</td><td class="dim">4</td></tr></tbody></table></div></div></div><pre class="code"><span class="on">dist[all] = ∞;  dist[start] = 0</span><span class="on">queue = {start}</span><span>while queue is not empty:</span><span>  u = pop smallest dist        <i>// settle</i></span><span>  for each road u→v, weight w: <i>// relax</i></span><span>    if v unsettled and dist[u]+w &lt; dist[v]:</span><span>      dist[v] = dist[u] + w</span><span>      via[v] = u;  queue.update(v)</span></pre><figcaption>Arrows show the direction a road can be driven. “True” is the real shortest distance, computed separately with the Bellman–Ford algorithm; a red node was settled with a distance that is too large.</figcaption></figure><!--/island--><p>Re-opening repairs this small graph, but it gives up the promise that each node is processed once, which is what made the algorithm fast. For graphs with negative edges the standard tool is Bellman–Ford. If a loop of roads adds up to a negative total and the start can reach it, no shortest route exists to any node reachable from that loop, because every extra trip round the loop shortens the route; Bellman–Ford detects such a loop and reports it instead of an answer. Adding the same number to every weight does not repair a negative edge: routes with more roads are penalised more, so the best route can change.</p></section><section class="minor"><h2>Where the claims come from</h2><ul>
+<li>E. W. Dijkstra, “A note on two problems in connexion with graphs”, <em>Numerische Mathematik</em> 1, 269–271 (1959): the original algorithm.</li>
+<li>T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, <em>Introduction to Algorithms</em>: single-source shortest paths, with Bellman–Ford (section 24.1) and the correctness proof for Dijkstra on non-negative weights (section 24.3) in the 2nd and 3rd editions; the chapter is 22 in the 4th.</li>
+<li>M. L. Fredman, R. E. Tarjan, “Fibonacci heaps and their uses in improved network optimization algorithms”, <em>Journal of the ACM</em> 34(3), 1987: running time O(E + V log V) with a Fibonacci heap; a binary heap gives O((E + V) log V).</li>
+<li><a href="https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm">Wikipedia: Dijkstra's algorithm</a>, used to cross-check the history and the step list.</li>
+<li>The maps and numbers on this page are invented for illustration. This implementation keeps one queue entry per node and lowers it when a better route is found; many programs instead push a duplicate entry and skip stale ones, which gives the same distances.</li>
+</ul></section></div></main>
+<script type="application/json" id="explainer-islands">[{"m":0,"e":"RoadMap","p":{}},{"m":0,"e":"NegativeEdge","p":{}}]</script>
+<script>(()=>{var st=Object.defineProperty;var it=(e)=>e;function at(e,t){this[e]=it.bind(null,t)}var lt=(e,t)=>{for(var n in t)st(e,n,{get:t[n],enumerable:!0,configurable:!0,set:at.bind(t,n)})};var we={};lt(we,{NegativeEdge:()=>Ut,RoadMap:()=>Wt});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var K,m,Ee,ut,A,ke,Te,Ne,re,L,H,Pe,ie,oe,se,dt,Q={},z=[],ct=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,X=Array.isArray;function N(e,t){for(var n in t)e[n]=t[n];return e}function ae(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function Y(e,t,n){var r,o,s,a={};for(s in t)s=="key"?r=t[s]:s=="ref"?o=t[s]:a[s]=t[s];if(arguments.length>2&&(a.children=arguments.length>3?K.call(arguments,2):n),typeof e=="function"&&e.defaultProps!=null)for(s in e.defaultProps)a[s]===void 0&&(a[s]=e.defaultProps[s]);return U(e,a,r,o,null)}function U(e,t,n,r,o){var s={type:e,props:t,key:n,ref:r,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:o==null?++Ee:o,__i:-1,__u:0};return o==null&&m.vnode!=null&&m.vnode(s),s}function b(e){return e.children}function V(e,t){this.props=e,this.context=t}function I(e,t){if(t==null)return e.__?I(e.__,e.__i+1):null;for(var n;t<e.__k.length;t++)if((n=e.__k[t])!=null&&n.__e!=null)return n.__e;return typeof e.type=="function"?I(e):null}function pt(e){if(e.__P&&e.__d){var t=e.__v,n=t.__e,r=[],o=[],s=N({},t);s.__v=t.__v+1,m.vnode&&m.vnode(s),le(e.__P,s,t,e.__n,e.__P.namespaceURI,32&t.__u?[n]:null,r,n==null?I(t):n,!!(32&t.__u),o),s.__v=t.__v,s.__.__k[s.__i]=s,De(r,s,o),t.__e=t.__=null,s.__e!=n&&Ae(s)}}function Ae(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(t){if(t!=null&&t.__e!=null)return e.__e=e.__c.base=t.__e}),Ae(e)}function Ce(e){(!e.__d&&(e.__d=!0)&&A.push(e)&&!J.__r++||ke!=m.debounceRendering)&&((ke=m.debounceRendering)||Te)(J)}function J(){try{for(var e,t=1;A.length;)A.length>t&&A.sort(Ne),e=A.shift(),t=A.length,pt(e)}finally{A.length=J.__r=0}}function Me(e,t,n,r,o,s,a,i,c,u,_){var f,l,p,g,C,w,x=r&&r.__k||z,h=t.length;for(c=ft(n,t,x,c,h),f=0;f<h;f++)(p=n.__k[f])!=null&&(l=p.__i!=-1&&x[p.__i]||Q,p.__i=f,w=le(e,p,l,o,s,a,i,c,u,_),g=p.__e,p.ref&&l.ref!=p.ref&&(l.ref&&ue(l.ref,null,p),_.push(p.ref,p.__c||g,p)),C==null&&g!=null&&(C=g),4&p.__u?(c=Ie(p,c,e),l.__e&&(l.__e=null)):typeof p.type=="function"&&w!==void 0?c=w:g&&(c=g.nextSibling),p.__u&=-7);return n.__e=C,c}function ft(e,t,n,r,o){var s,a,i,c,u,_=n.length,f=_,l=0;for(e.__k=Array(o),s=0;s<o;s++)(a=t[s])!=null&&typeof a!="boolean"&&typeof a!="function"?(typeof a=="string"||typeof a=="number"||typeof a=="bigint"||a.constructor==String?a=e.__k[s]=U(null,a,null,null,null):X(a)?a=e.__k[s]=U(b,{children:a},null,null,null):a.constructor===void 0&&a.__b>0?a=e.__k[s]=U(a.type,a.props,a.key,a.ref?a.ref:null,a.__v):e.__k[s]=a,c=s+l,a.__=e,a.__b=e.__b+1,i=null,(u=a.__i=_t(a,n,c,f))!=-1&&(f--,(i=n[u])&&(i.__u|=2)),i==null||i.__v==null?(u==-1&&(o>_?l--:o<_&&l++),typeof a.type!="function"&&(a.__u|=4)):u!=c&&(u==c-1?l--:u==c+1?l++:(u>c?l--:l++,a.__u|=4))):e.__k[s]=null;if(f)for(s=0;s<_;s++)(i=n[s])!=null&&(2&i.__u)==0&&(i.__e==r&&(r=I(i)),He(i,i));return r}function Ie(e,t,n){var r,o;if(typeof e.type=="function"){for(r=e.__k,o=0;r&&o<r.length;o++)r[o]&&(r[o].__=e,t=Ie(r[o],t,n));return t}e.__e!=t&&(t&&e.type&&!t.parentNode&&(t=I(e)),t=n.insertBefore(e.__e,t||null));do t=t&&t.nextSibling;while(t!=null&&t.nodeType==8);return t}function _t(e,t,n,r){var o,s,a,{key:i,type:c}=e,u=t[n],_=u!=null&&(2&u.__u)==0;if(u===null&&i==null||_&&i==u.key&&c==u.type)return n;if(r>(_?1:0)){for(o=n-1,s=n+1;o>=0||s<t.length;)if((u=t[a=o>=0?o--:s++])!=null&&(2&u.__u)==0&&i==u.key&&c==u.type)return a}return-1}function Se(e,t,n){t[0]=="-"?e.setProperty(t,n==null?"":n):e[t]=n==null?"":typeof n!="number"||ct.test(t)?n:n+"px"}function W(e,t,n,r,o){var s,a;e:if(t=="style")if(typeof n=="string")e.style.cssText=n;else{if(typeof r=="string"&&(e.style.cssText=r=""),r)for(t in r)n&&t in n||Se(e.style,t,"");if(n)for(t in n)r&&n[t]==r[t]||Se(e.style,t,n[t])}else if(t[0]=="o"&&t[1]=="n")s=t!=(t=t.replace(Pe,"$1")),a=t.toLowerCase(),t=a in e||t=="onFocusOut"||t=="onFocusIn"?a.slice(2):t.slice(2),e.l||(e.l={}),e.l[t+s]=n,n?r?n[H]=r[H]:(n[H]=ie,e.addEventListener(t,s?se:oe,s)):e.removeEventListener(t,s?se:oe,s);else{if(o=="http://www.w3.org/2000/svg")t=t.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(t!="width"&&t!="height"&&t!="href"&&t!="list"&&t!="form"&&t!="tabIndex"&&t!="download"&&t!="rowSpan"&&t!="colSpan"&&t!="role"&&t!="popover"&&t in e)try{e[t]=n==null?"":n;break e}catch(i){}typeof n=="function"||(n==null||n===!1&&t[4]!="-"?e.removeAttribute(t):e.setAttribute(t,t=="popover"&&n==1?"":n))}}function $e(e){return function(t){if(this.l){var n=this.l[t.type+e];if(t[L]==null)t[L]=ie++;else if(t[L]<n[H])return;return n(m.event?m.event(t):t)}}}function le(e,t,n,r,o,s,a,i,c,u){var _,f,l,p,g,C,w,x,h,S,P,T,M,xe,j,ne,E=t.type;if(t.constructor!==void 0)return null;128&n.__u&&(c=!!(32&n.__u),s=[i=t.__e=n.__e]),(_=m.__b)&&_(t);e:if(typeof E=="function"){f=a.length;try{if(h=t.props,S=E.prototype&&E.prototype.render,P=(_=E.contextType)&&r[_.__c],T=_?P?P.props.value:_.__:r,n.__c?x=(l=t.__c=n.__c).__=l.__E:(S?t.__c=l=new E(h,T):(t.__c=l=new V(h,T),l.constructor=E,l.render=mt),P&&P.sub(l),l.state||(l.state={}),l.__n=r,p=l.__d=!0,l.__h=[],l._sb=[]),S&&l.__s==null&&(l.__s=l.state),S&&E.getDerivedStateFromProps!=null&&(l.__s==l.state&&(l.__s=N({},l.__s)),N(l.__s,E.getDerivedStateFromProps(h,l.__s))),g=l.props,C=l.state,l.__v=t,p)S&&E.getDerivedStateFromProps==null&&l.componentWillMount!=null&&l.componentWillMount(),S&&l.componentDidMount!=null&&l.__h.push(l.componentDidMount);else{if(S&&E.getDerivedStateFromProps==null&&h!==g&&l.componentWillReceiveProps!=null&&l.componentWillReceiveProps(h,T),t.__v==n.__v||!l.__e&&l.shouldComponentUpdate!=null&&l.shouldComponentUpdate(h,l.__s,T)===!1){t.__v!=n.__v&&(l.props=h,l.state=l.__s,l.__d=!1),t.__e=n.__e,t.__k=n.__k,t.__k.some(function(D){D&&(D.__=t)}),z.push.apply(l.__h,l._sb),l._sb=[],l.__h.length&&a.push(l),i=I(n);break e}l.componentWillUpdate!=null&&l.componentWillUpdate(h,l.__s,T),S&&l.componentDidUpdate!=null&&l.__h.push(function(){l.componentDidUpdate(g,C,w)})}if(l.context=T,l.props=h,l.__P=e,l.__e=!1,M=m.__r,xe=0,S)l.state=l.__s,l.__d=!1,M&&M(t),_=l.render(l.props,l.state,l.context),z.push.apply(l.__h,l._sb),l._sb=[];else do l.__d=!1,M&&M(t),_=l.render(l.props,l.state,l.context),l.state=l.__s;while(l.__d&&++xe<25);l.state=l.__s,l.getChildContext!=null&&(r=N(N({},r),l.getChildContext())),S&&!p&&l.getSnapshotBeforeUpdate!=null&&(w=l.getSnapshotBeforeUpdate(g,C)),j=_!=null&&_.type===b&&_.key==null?Be(_.props.children):_,i=Me(e,X(j)?j:[j],t,n,r,o,s,a,i,c,u),l.base=t.__e,t.__u&=-161,l.__h.length&&a.push(l),x&&(l.__E=l.__=null)}catch(D){if(a.length=f,t.__v=null,c||s!=null){if(D.then){for(t.__u|=c?160:128;i&&i.nodeType==8&&i.nextSibling;)i=i.nextSibling;s!=null&&(s[s.indexOf(i)]=null),t.__e=i}else if(s!=null)for(ne=s.length;ne--;)ae(s[ne])}else t.__e=n.__e;t.__k==null&&(t.__k=n.__k||[]),D.then||Re(t),m.__e(D,t,n)}}else s==null&&t.__v==n.__v?(t.__k=n.__k,t.__e=n.__e):i=t.__e=ht(n.__e,t,n,r,o,s,a,c,u);return(_=m.diffed)&&_(t),128&t.__u?void 0:i}function Re(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(Re))}function De(e,t,n){for(var r=0;r<n.length;r++)ue(n[r],n[++r],n[++r]);m.__c&&m.__c(t,e),e.some(function(o){try{e=o.__h,o.__h=[],e.some(function(s){s.call(o)})}catch(s){m.__e(s,o.__v)}})}function Be(e){return typeof e!="object"||e==null||e.__b>0?e:X(e)?e.map(Be):e.constructor!==void 0?null:N({},e)}function ht(e,t,n,r,o,s,a,i,c){var u,_,f,l,p,g,C,w=n.props||Q,{props:x,type:h}=t;if(h=="svg"?o="http://www.w3.org/2000/svg":h=="math"?o="http://www.w3.org/1998/Math/MathML":o||(o="http://www.w3.org/1999/xhtml"),s!=null){for(u=0;u<s.length;u++)if((p=s[u])&&"setAttribute"in p==!!h&&(h?p.localName==h:p.nodeType==3)){e=p,s[u]=null;break}}if(e==null){if(h==null)return document.createTextNode(x);e=document.createElementNS(o,h,x.is&&x),i&&(m.__m&&m.__m(t,s),i=!1),s=null}if(h==null)w===x||i&&e.data==x||(e.data=x);else{if(s=h=="textarea"&&x.defaultValue!=null?null:s&&K.call(e.childNodes),!i&&s!=null)for(w={},u=0;u<e.attributes.length;u++)w[(p=e.attributes[u]).name]=p.value;for(u in w)p=w[u],u=="dangerouslySetInnerHTML"?f=p:u=="children"||(u in x)||u=="value"&&("defaultValue"in x)||u=="checked"&&("defaultChecked"in x)||W(e,u,null,p,o);for(u in x)p=x[u],u=="children"?l=p:u=="dangerouslySetInnerHTML"?_=p:u=="value"?g=p:u=="checked"?C=p:i&&typeof p!="function"||w[u]===p||W(e,u,p,w[u],o);if(_)i||f&&(_.__html==f.__html||_.__html==e.innerHTML)||(e.innerHTML=_.__html),t.__k=[];else if(f&&(e.innerHTML=""),Me(t.type=="template"?e.content:e,X(l)?l:[l],t,n,r,h=="foreignObject"?"http://www.w3.org/1999/xhtml":o,s,a,s?s[0]:n.__k&&I(n,0),i,c),s!=null)for(u=s.length;u--;)ae(s[u]);i&&h!="textarea"||(u="value",h=="progress"&&g==null?e.removeAttribute("value"):g!=null&&(g!==e[u]||h=="progress"&&!g||h=="option"&&g!=w[u])&&W(e,u,g,w[u],o),u="checked",C!=null&&C!=e[u]&&W(e,u,C,w[u],o))}return e}function ue(e,t,n){try{if(typeof e=="function"){var r=typeof e.__u=="function";r&&e.__u(),r&&t==null||(e.__u=e(t))}else e.current=t}catch(o){m.__e(o,n)}}function He(e,t,n){var r,o;if(m.unmount&&m.unmount(e),(r=e.ref)&&(r.current&&r.current!=e.__e||ue(r,null,t)),(r=e.__c)!=null){if(r.componentWillUnmount)try{r.componentWillUnmount()}catch(s){m.__e(s,t)}r.base=r.__P=r.__n=null}if(r=e.__k)for(o=0;o<r.length;o++)r[o]&&He(r[o],t,n||typeof e.type!="function");n||ae(e.__e),e.__c=e.__=e.__e=void 0}function mt(e,t,n){return this.constructor(e,n)}function gt(e,t,n){var r,o,s,a;t==document&&(t=document.documentElement),m.__&&m.__(e,t),o=(r=typeof n=="function")?null:n&&n.__k||t.__k,s=[],a=[],le(t,e=(!r&&n||t).__k=Y(b,null,[e]),o||Q,Q,t.namespaceURI,!r&&n?[n]:o?null:t.firstChild?K.call(t.childNodes):null,s,!r&&n?n:o?o.__e:t.firstChild,r,a),De(s,e,a),e.props.children=null}function de(e,t){gt(e,t,de)}K=z.slice,m={__e:function(e,t,n,r){for(var o,s,a;t=t.__;)if((o=t.__c)&&!o.__)try{if((s=o.constructor)&&s.getDerivedStateFromError!=null&&(o.setState(s.getDerivedStateFromError(e)),a=o.__d),o.componentDidCatch!=null&&(o.componentDidCatch(e,r||{}),a=o.__d),a)return o.__E=o}catch(i){e=i}throw e}},Ee=0,ut=function(e){return e!=null&&e.constructor===void 0},V.prototype.setState=function(e,t){var n;n=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=N({},this.state),typeof e=="function"&&(e=e(N({},n),this.props)),e&&N(n,e),e!=null&&this.__v&&(t&&this._sb.push(t),Ce(this))},V.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),Ce(this))},V.prototype.render=b,A=[],Te=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,Ne=function(e,t){return e.__v.__b-t.__v.__b},J.__r=0,re=Math.random().toString(8),L="__d"+re,H="__a"+re,Pe=/(PointerCapture)$|Capture$/i,ie=0,oe=$e(!1),se=$e(!0),dt=0;var vt=m.vnode;m.vnode=(e)=>{if(typeof e.type==="string"){let t=e.props;for(let n of Object.keys(t))if(n.startsWith("data-")&&t[n]===!0)t[n]=""}vt?.(e)};function yt(e,t){let n=t.parentNode;if(!n)throw Error("island marker without a parent");let r=()=>{let s=[];for(let a=e.nextSibling;a&&a!==t;a=a.nextSibling)s.push(a);return s},o=(s)=>s;return{nodeType:1,parentNode:n,get firstChild(){return r()[0]??null},get childNodes(){return r()},contains:(s)=>r().some((a)=>s!==null&&a.contains(o(s))),insertBefore:(s,a)=>n.insertBefore(o(s),a?o(a):t),appendChild:(s)=>n.insertBefore(o(s),t),removeChild:(s)=>n.removeChild(o(s))}}function bt(){let e=new Map,t=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),n;for(let r=t.nextNode();r;r=t.nextNode()){if(!(r instanceof Comment))continue;let o=/^island:(\d+)$/.exec(r.data);if(o)n={n:Number(o[1]),start:r};else if(r.data==="/island"&&n)e.set(n.n,[n.start,r]),n=void 0}return e}function Oe(e){let t=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),n=bt();for(let[r,{m:o,e:s,p:a}]of t.entries()){let i=e[o]?.[s],c=n.get(r);if(typeof i!=="function"||!c)throw Error(`island ${r} (${s}) is missing from the page`);de(Y(i,a),yt(...c))}}/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var O,y,ce,qe,ee=0,Qe=[],k=m,{__b:Ge,__r:Fe,diffed:je,__c:We,unmount:Le,__:Ue}=k;function fe(e,t){k.__h&&k.__h(y,e,ee||t),ee=0;var n=y.__H||(y.__H={__:[],__h:[]});return e>=n.__.length&&n.__.push({}),n.__[e]}function R(e){return ee=1,wt(Je,e)}function wt(e,t,n){var r=fe(O++,2);if(r.t=e,!r.__c&&(r.__=[n?n(t):Je(void 0,t),function(i){var c=r.__N?r.__N[0]:r.__[0],u=r.t(c,i);c!==u&&(r.__N=[u,r.__[1]],r.__c.setState({}))}],r.__c=y,!y.__f)){var o=function(i,c,u){if(!r.__c.__H)return!0;var _=!1,f=r.__c.props!==i;if(r.__c.__H.__.some(function(p){if(p.__N){_=!0;var g=p.__[0];p.__=p.__N,p.__N=void 0,g!==p.__[0]&&(f=!0)}}),s){var l=s.call(this,i,c,u);return _?l||f:l}return!_||f};y.__f=!0;var s=y.shouldComponentUpdate,a=y.componentWillUpdate;y.componentWillUpdate=function(i,c,u){if(this.__e){var _=s;s=void 0,o(i,c,u),s=_}a&&a.call(this,i,c,u)},y.shouldComponentUpdate=o}return r.__N||r.__}function q(e,t){var n=fe(O++,4);!k.__s&&ze(n.__H,t)&&(n.__=e,n.u=t,y.__h.push(n))}function G(e){return ee=5,F(function(){return{current:e}},[])}function F(e,t){var n=fe(O++,7);return ze(n.__H,t)&&(n.__=e(),n.__H=t,n.__h=e),n.__}function xt(){for(var e;e=Qe.shift();){var t=e.__H;if(e.__P&&t)try{t.__h.some(Z),t.__h.some(pe),t.__h=[]}catch(n){t.__h=[],k.__e(n,e.__v)}}}k.__b=function(e){y=null,Ge&&Ge(e)},k.__=function(e,t){e&&t.__k&&t.__k.__m&&(e.__m=t.__k.__m),Ue&&Ue(e,t)},k.__r=function(e){Fe&&Fe(e),O=0;var t=(y=e.__c).__H;t&&(ce===y?(t.__h=[],y.__h=[],t.__.some(function(n){n.__N&&(n.__=n.__N),n.u=n.__N=void 0})):(t.__h.some(Z),t.__h.some(pe),t.__h=[],O=0)),ce=y},k.diffed=function(e){je&&je(e);var t=e.__c;t&&t.__H&&(t.__H.__h.length&&(Qe.push(t)!==1&&qe===k.requestAnimationFrame||((qe=k.requestAnimationFrame)||kt)(xt)),t.__H.__.some(function(n){n.u&&(n.__H=n.u,n.u=void 0)})),ce=y=null},k.__c=function(e,t){t.some(function(n){try{n.__h.some(Z),n.__h=n.__h.filter(function(r){return!r.__||pe(r)})}catch(r){t.some(function(o){o.__h&&(o.__h=[])}),t=[],k.__e(r,n.__v)}}),We&&We(e,t)},k.unmount=function(e){Le&&Le(e);var t,n=e.__c;n&&n.__H&&(n.__H.__.some(function(r){try{Z(r)}catch(o){t=o}}),n.__H=void 0,t&&k.__e(t,n.__v))};var Ve=typeof requestAnimationFrame=="function";function kt(e){var t,n=function(){clearTimeout(r),Ve&&cancelAnimationFrame(t),setTimeout(e)},r=setTimeout(n,35);Ve&&(t=requestAnimationFrame(n))}function Z(e){var t=y,n=e.__c;typeof n=="function"&&(e.__c=void 0,n()),y=t}function pe(e){var t=y;e.__c=e.__(),y=t}function ze(e,t){return!e||e.length!==t.length||t.some(function(n,r){return n!==e[r]})}function Je(e,t){return typeof t=="function"?t(e):t}/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var Ct=0;function d(e,t,n,r,o,s){t||(t={});var a,i,c=t;if("ref"in c)for(i in c={},t)i=="ref"?a=t[i]:c[i]=t[i];var u={type:e,props:c,key:n,ref:a,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--Ct,__i:-1,__u:0,__source:o,__self:s};if(typeof e=="function"&&(a=e.defaultProps))for(i in a)c[i]===void 0&&(c[i]=a[i]);return m.vnode&&m.vnode(u),u}var $t=(e)=>e instanceof CustomEvent&&typeof e.detail?.step==="number";function _e({children:e,captions:t,start:n,label:r,class:o="fig",id:s,onStep:a}){let i=G(null),c=G(a);return c.current=a,q(()=>{let u=i.current,_=(f)=>{if($t(f)&&f.target===u)c.current?.(f.detail.step,f.detail.steps)};return u?.addEventListener("stepchange",_),()=>u?.removeEventListener("stepchange",_)},[]),q(()=>{if(i.current&&typeof Steps<"u")Steps.refresh(i.current)}),d("figure",{ref:i,class:o,id:s,"data-stepper":"","data-start":n,"aria-label":r,children:[e,t&&d("ol",{"data-captions":"",children:t.map((u)=>d("li",{children:u}))})]})}var v=(e)=>e===1/0?"∞":String(e).replace("-","−"),Ke=(e,t)=>e.edges.flatMap(([n,r,o],s)=>n===t?[{v:r,w:o,i:s}]:!e.directed&&r===t?[{v:n,w:o,i:s}]:[]).sort((n,r)=>n.v<r.v?-1:1),Et=(e,t,n)=>`${t}${e.directed?"→":"–"}${n}`,Xe=(e,t)=>Object.fromEntries(e.nodes.map((n)=>[n.id,t]));function Tt(e,t){let n=Xe(e,1/0);n[t]=0;for(let r of e.nodes)for(let o of e.nodes)for(let{v:s,w:a}of Ke(e,o.id))n[s]=Math.min(n[s]??1/0,(n[o.id]??1/0)+a);return n}function Nt({u:e,d:t,rest:n,first:r,negative:o,again:s,reopen:a}){let i=d(b,{children:["Settle ",d("b",{children:e})," at ",v(t),s?" (again)":"","."," "]}),[c]=n,u;if(r)u="It is the only node in the queue, and the start is 0 away from itself, so its distance is final.";else if(s)u="It came back into the queue with a smaller distance, so its roads are tried again with the new value.";else if(o)u=a?"It is the smallest entry in the queue, but with a negative edge that no longer proves it is final, so it may be re-opened later.":`It is the smallest entry in the queue, so Dijkstra now treats ${e} as final. That is only guaranteed when no edge is negative.`;else if(!c)u="It is the last entry in the queue, and every road out of the settled nodes has been tried, so nothing can improve it.";else u=`It is the smallest entry (${c[1]===t?`tied with ${c[0]}, and ties go to the alphabetically first`:`the next is ${c[0]} at ${v(c[1])}`}). Suppose a shorter route to ${e} existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least ${v(t)} (${e} is the smallest), and the rest of the route adds nothing negative, so the route costs at least ${v(t)}. ${e}'s distance is final.`;return d(b,{children:[i,u]})}function Pt(e,t,n){let r=n.length?` Already settled, nothing to do: ${n.join(", ")}.`:"";if(!t.length)return d(b,{children:["Relax the roads out of ",d("b",{children:e}),": none lead to an unsettled node.",r]});return d(b,{children:["Relax the roads out of ",d("b",{children:e}),": distance of ",e," plus the road's weight, compared with what the neighbour has now.",d("ul",{class:"relax",children:t.map((o)=>d("li",{class:o.verdict==="missed"?"bad":void 0,children:[d("b",{children:o.road}),": ",o.text]}))}),r]})}function At(e,t,n,r,o){let s=e.nodes.map((c)=>c.id);if(r){let c=s.filter((u)=>n.dist[u]!==n.wanted[u]);if(c.length)return`Queue empty, but ${c.join(" and ")} ${c.length>1?"are":"is"} wrong. The “True” column shows the real shortest distances. ${c[0]} was settled before the cheaper route through B had been found, and a settled node is never revisited.`;return`Queue empty, and every distance matches the “True” column. ${o?"Re-opening kept the answer correct.":"No settled node was ever improved afterwards, so the settled-is-final rule held and nothing had to be re-opened."}`}let a=s.filter((c)=>n.dist[c]===1/0),i="Queue empty. Every reachable node is settled, and each distance was final the moment it was settled. Follow the Via column back to read off a route.";if(!a.length)return i;return`${i} ${a.join(", ")} stayed at ∞: no route from ${t} reaches ${a.length>1?"them":"it"}, which is different from a long route.`}var B=(e,t)=>e.dist[t]??1/0,he=(e)=>[...e.queued].sort((t,n)=>B(e,t)-B(e,n)||(t<n?-1:1)).map((t)=>[t,B(e,t)]);function Mt(e,t,n,r,o,s,a,i){let c=B(e,r)+s,u=B(e,o),_=`${v(B(e,r))} + ${v(s)} = ${v(c)}`;if(c>=u)if(e.settled.has(o))t.skips.push(o);else t.edges[a]="kept",t.notes.push({verdict:"kept",road:n,text:`${_} does not beat ${o}'s ${v(u)}. Keep ${v(u)}.`});else if(e.settled.has(o)&&!i)t.edges[a]="missed",e.exposed.add(o),t.notes.push({verdict:"missed",road:n,text:`${_} would beat ${o}'s ${v(u)}, but ${o} is settled and Dijkstra never looks at a settled node again. ${o} stays at ${v(u)}, and so does everything reached through ${o}.`});else{let f=e.settled.has(o)?`${o}'s settled ${v(u)}, so ${o} goes back in the queue at ${v(c)}`:`${v(u)}, so ${o} = ${v(c)} via ${r}`;t.notes.push({verdict:"improved",road:n,text:`${_} beats ${f}.`}),e.dist[o]=c,e.prev[o]=r,e.settled.delete(o),e.queued.add(o),t.edges[a]="improved",t.changed.add(o)}}function me(e,t,n){let r={dist:{...Xe(e,1/0),[t]:0},prev:{},settled:new Set,queued:new Set([t]),exposed:new Set},o=e.edges.some(([,,f])=>f<0),s=Tt(e,t),a=[],i=(f)=>{let l={dist:{...r.dist},prev:{...r.prev},settled:new Set(r.settled),exposed:new Set(r.exposed),queue:he(r),wanted:s,current:null,edges:{},changed:new Set,...f};return a.push(l),l};i({kind:"init",lines:[1,2],changed:new Set([t]),caption:d(b,{children:["Start at ",d("b",{children:t}),": distance 0. Every other node is ∞ (no route known yet), and only"," ",t," is in the queue."]})});let c=new Set;for(let[f,...l]=he(r);f;[f,...l]=he(r)){let[p,g]=f,C=c.has(p),w=c.size===0;r.queued.delete(p),r.settled.add(p),c.add(p),i({kind:"settle",lines:[3,4],current:p,changed:new Set([p]),caption:Nt({u:p,d:g,rest:l,first:w,negative:o,again:C,reopen:n})});let h={notes:[],edges:{},changed:new Set,skips:[]};for(let{v:P,w:T,i:M}of Ke(e,p))Mt(r,h,Et(e,p,P),p,P,T,M,n);let S=Pt(p,h.notes,h.skips);i({kind:"relax",lines:[5,6,7,8],current:p,edges:h.edges,changed:h.changed,caption:S})}let u=c.size<a.filter((f)=>f.kind==="settle").length,_=i({kind:"done",lines:[3],caption:""});return _.caption=At(e,t,_,o,u),a}var ge=(e)=>e.map(([t,n,r])=>({id:t,x:n,y:r})),Ye=ge([["A",50,170],["B",180,70],["C",180,270],["D",330,170],["E",470,70],["F",470,270],["G",595,170]]),Ze=[["A","B",4],["A","C",2],["B","C",1],["B","D",5],["C","D",8],["C","F",10],["D","E",2],["D","F",6],["E","G",3],["F","G",2]],et={nodes:Ye,edges:Ze},ve=[{id:"towns",name:"Seven towns",graph:et},{id:"grid",name:"Street grid",graph:{nodes:["ABC","DEF","GHI"].flatMap((e,t)=>[...e].map((n,r)=>({id:n,x:110+r*210,y:50+t*120}))),edges:[["A","B",3],["B","C",2],["D","E",6],["E","F",1],["G","H",2],["H","I",4],["A","D",1],["D","G",5],["B","E",2],["E","H",7],["C","F",4],["F","I",1]]}},{id:"islands",name:"Two islands",graph:{nodes:ge([["A",70,170],["B",200,80],["C",200,260],["D",440,80],["E",440,260],["F",570,170]]),edges:[["A","B",3],["A","C",5],["B","C",1],["D","E",2],["D","F",4],["E","F",3]]}},{id:"equal",name:"All roads equal",graph:{nodes:Ye,edges:Ze.map(([e,t])=>[e,t,1])}}],ye=(e)=>ve.find((t)=>t.id===e)?.graph??et,tt=(e)=>({directed:!0,nodes:ge([["S",70,170],["A",300,70],["B",300,270],["C",540,70]]),edges:[["S","A",3],["S","B",4],["B","A",e],["A","C",2]]});var te=26,It=["base","tent","tree","improved","kept","missed"],Rt={unseen:"not reached",queued:"in queue",current:"settled now",settled:"settled"};function rt(e,t){if(e.current===t)return"current";if(e.settled.has(t))return"settled";return e.queue.some(([n])=>n===t)?"queued":"unseen"}function Dt(e,t,n){let r=e.edges[n],o=t.edges[n];if(o||!r)return o??"";let s=(c,u)=>t.prev[u]===c?t.settled.has(u)?"tree":"tent":"",[a,i]=r;return s(a,i)||(e.directed?"":s(i,a))}function Bt(e,t){let n=t.map((i)=>Math.atan2(i.y-e.y,i.x-e.x)),r=(i,c)=>Math.abs(Math.atan2(Math.sin(i-c),Math.cos(i-c))),o=-Math.PI/2,s=-1;for(let i of[0,1,-1,2,-2,3,-3,4]){let c=-Math.PI/2+i*Math.PI/4,u=Math.min(Math.PI,...n.map((_)=>r(c,_)));if(u>s+0.000001)[o,s]=[c,u]}let a=te+15;return[Math.round(Math.cos(o)*a),Math.round(Math.sin(o)*a)]}function Ht({nodes:e}){let t=e.map((a)=>a.x),n=e.map((a)=>a.y),r=te+32,o=Math.min(...t)-r,s=Math.min(...n)-r;return`${o} ${s} ${Math.max(...t)+r-o} ${Math.max(...n)+r-s}`}function Ot({id:e,graph:t,step:n,wrong:r,label:o}){let s=new Map(t.nodes.map((i)=>[i.id,i])),a=(i)=>t.edges.flatMap(([c,u])=>c===i?[u]:u===i?[c]:[]).flatMap((c)=>s.get(c)??[]);return d("svg",{class:"gsvg",viewBox:Ht(t),role:"img","aria-label":o,children:[t.directed&&d("defs",{children:It.map((i)=>d("marker",{id:`${e}-arrow-${i}`,viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"14",markerHeight:"14",markerUnits:"userSpaceOnUse",orient:"auto",children:d("path",{class:"arrow","data-state":i,d:"M0 0 10 5 0 10z"})}))}),t.edges.map(([i,c,u],_)=>{let f=s.get(i),l=s.get(c);if(!f||!l)return null;let p=t.directed?(te+4)/Math.hypot(l.x-f.x,l.y-f.y):0,g=Dt(t,n,_);return d("g",{class:"edge","data-state":g,children:[d("line",{x1:f.x,y1:f.y,x2:l.x-(l.x-f.x)*p,y2:l.y-(l.y-f.y)*p,"marker-end":t.directed?`url(#${e}-arrow-${g||"base"})`:void 0}),d("text",{x:(f.x+l.x)/2,y:(f.y+l.y)/2,children:v(u)})]})}),t.nodes.map((i)=>{let[c,u]=Bt(i,a(i.id));return d("g",{class:n.changed.has(i.id)?"node changed":"node","data-state":rt(n,i.id),"data-wrong":r(i.id)?"":void 0,transform:`translate(${i.x} ${i.y})`,children:[d("circle",{r:te}),d("text",{class:"name",children:i.id}),d("text",{class:"dist",x:c,y:u,children:v(n.dist[i.id]??1/0)})]})})]})}function qt({step:e}){let t=e.current&&e.kind!=="done"?e.current:null;return d("ol",{class:"queue","aria-live":"polite",children:[t&&d(b,{children:[d("li",{class:"popped",children:[d("b",{children:t}),v(e.dist[t]??1/0)]}),d("li",{class:"none sep",children:"taken out"})]}),e.queue.map(([n,r])=>d("li",{class:e.changed.has(n)&&e.kind==="relax"?"changed":void 0,children:[d("b",{children:n}),v(r)]})),!e.queue.length&&d("li",{class:"none",children:"empty"})]})}function Gt({graph:e,step:t,wrong:n,showTruth:r}){return d("table",{class:"dist-table",children:[d("thead",{children:d("tr",{children:[d("th",{children:"Node"}),d("th",{children:"Distance"}),d("th",{children:"Via"}),d("th",{children:"State"}),r&&d("th",{children:"True"})]})}),d("tbody",{children:e.nodes.map(({id:o})=>{let s=rt(t,o),a=n(o)?"bad":void 0;return d("tr",{class:t.changed.has(o)?"changed":void 0,children:[d("th",{scope:"row",children:o}),d("td",{class:a,children:v(t.dist[o]??1/0)}),d("td",{children:t.prev[o]??"–"}),d("td",{class:s==="unseen"?"dim":void 0,children:Rt[s]}),r&&d("td",{class:a??"dim",children:v(t.wanted[o]??1/0)})]})})})]})}function Ft({step:e,guard:t}){return d("pre",{class:"code",children:["dist[all] = ∞;  dist[start] = 0","queue = {start}","while queue is not empty:",d(b,{children:["  u = pop smallest dist        ",d("i",{children:"// settle"})]}),d(b,{children:["  for each road u→v, weight w: ",d("i",{children:"// relax"})]}),`    if ${t?"v unsettled and ":""}dist[u]+w < dist[v]:`,"      dist[v] = dist[u] + w","      via[v] = u;  queue.update(v)"].map((r,o)=>d("span",{class:e.lines.includes(o+1)?"on":void 0,children:r}))})}function ot(e){let t=e.steps[Math.min(e.step,e.steps.length)-1]??e.steps[0];if(!t)return null;let n=(o)=>e.showTruth&&t.settled.has(o)&&t.dist[o]!==t.wanted[o]&&(t.kind==="done"||t.exposed.has(o)),r={id:e.id,graph:e.graph,step:t,wrong:n,label:e.graphLabel};return d(_e,{id:e.id,class:"fig wide",start:1,label:e.label,onStep:e.onStep,children:[d("div",{class:"controls",children:e.controls}),d("ol",{"data-captions":"",children:e.steps.map((o)=>d("li",{children:o.caption}))}),d("div",{class:"split",children:[d("div",{class:"stage",children:d(Ot,{...r})}),d("div",{class:"side",children:[d("div",{children:[d("p",{class:"label",children:"Priority queue, smallest first"}),d(qt,{step:t})]}),d("div",{class:"scroll",children:d(Gt,{...r,showTruth:e.showTruth})})]})]}),d(Ft,{step:t,guard:e.guard}),d("figcaption",{children:e.caption})]})}function be(e){return d("div",{class:"seg",role:"radiogroup","aria-label":e.label,children:e.options.map((t)=>d("label",{children:[d("input",{type:"radio",name:e.name,value:t.value,checked:t.value===e.value,onChange:()=>e.onChange(t.value)}),d("span",{children:t.text})]}))})}var jt=[["unseen","not reached (∞)"],["queued","in the queue, distance so far"],["current","being settled now"],["settled","settled: distance is final"]],nt="main";function Wt(){let[e,t]=R("towns"),[n,r]=R("A"),[o,s]=R(1),a=ye(e),i=F(()=>me(a,n,!1),[a,n]);q(()=>{let f=document.getElementById(nt);if(f&&typeof Steps<"u")Steps.refresh(f,1)},[i]);let c=(f)=>{let{nodes:l}=ye(f);t(f),r((p)=>l.some((g)=>g.id===p)?p:l[0]?.id??p)},u=d(b,{children:[d("div",{class:"field",children:[d("span",{children:"Map"}),d(be,{name:"graph",label:"Map",options:ve.map((f)=>({value:f.id,text:f.name})),value:e,onChange:c})]}),d("div",{class:"field",children:[d("span",{children:"Start at"}),d(be,{name:"start",label:"Start node",options:a.nodes.map((f)=>({value:f.id,text:f.id})),value:n,onChange:r})]})]}),_=d(b,{children:[d("span",{class:"key",children:jt.map(([f,l])=>d("span",{children:[d("svg",{viewBox:"-30 -30 60 60","aria-hidden":"true",children:d("g",{class:"node","data-state":f,children:d("circle",{r:"24"})})}),l]}))}),d("br",{}),"Roads work in both directions. Bold lines are the routes found to settled nodes; dashed blue lines are the best known routes to queued ones. Ties go to the alphabetically first node."]});return d(ot,{id:nt,label:"Dijkstra's algorithm on a small road map, step by step",graphLabel:"The map: towns joined by roads with distances",graph:a,steps:i,step:o,onStep:s,guard:!1,showTruth:!1,controls:u,caption:_})}function Lt(e,t){let n=t.at(-1),r=n?Object.keys(n.dist).filter((i)=>n.dist[i]!==n.wanted[i]):[],o=t.filter((i)=>i.kind==="settle").map((i)=>i.current),s=[...new Set(o.filter((i,c)=>o.indexOf(i)!==c))],a=(i)=>r.map((c)=>`${c} = ${v(i[c]??1/0)}`).join(" and ");if(n&&r.length)return`With B→A = ${v(e)}, Dijkstra ends with ${a(n.dist)}; the real shortest distances are ${a(n.wanted)}`;if(s.length)return`With B→A = ${v(e)} and re-opening, the answer is right again, at the price of settling ${s.join(" and ")} twice`;return e<0?`With B→A = ${v(e)} the answer is still right: the negative road never beats a distance that was already settled, so nothing needs to change`:`With B→A = ${v(e)}, Dijkstra is still right: no negative edge means no wrong answer`}function Ut(){let[e,t]=R(-2),[n,r]=R("no"),[o,s]=R(1),a=F(()=>tt(e),[e]),i=F(()=>me(a,"S",n==="yes"),[a,n]),c=d(b,{children:[d("label",{class:"field slider-field",children:[d("span",{children:"Weight of road B→A"}),d("input",{type:"range",id:"neg-w",min:"-5",max:"3",step:"1",value:e,onInput:(u)=>t(Number(u.currentTarget.value))}),d("output",{for:"neg-w",children:v(e)})]}),d("div",{class:"field",children:[d("span",{children:"A settled node"}),d(be,{name:"reopen",label:"What happens to a settled node that could be improved",options:[{value:"no",text:"stays final (Dijkstra)"},{value:"yes",text:"is re-opened"}],value:n,onChange:r})]})]});return d(b,{children:[d("h2",{children:Lt(e,i)}),d("p",{children:["Here the roads are one-way, and road B→A has a weight you can change. A negative weight means taking that road ",d("em",{children:"reduces"})," the total, like a toll rebate. Drag it below −1 and watch which step breaks."]}),d(ot,{id:"neg",label:"Dijkstra's algorithm on a graph with one negative edge, step by step",graphLabel:"A directed graph with nodes S, A, B and C and one-way roads",graph:a,steps:i,step:o,onStep:s,guard:n==="no",showTruth:!0,controls:c,caption:"Arrows show the direction a road can be driven. “True” is the real shortest distance, computed separately with the Bellman–Ford algorithm; a red node was settled with a distance that is too large."})]})}Oe([we]);})();
 </script>
 <script>/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts (HTML or hand-built SVG), <ol data-captions>; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
    <figure class="fig" data-stepper>             any element; the controls are added before the captions (else at its end)
@@ -2774,6 +2348,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
    captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
    have different lengths. Position: it stays on the current step (clamped to the new count), or on the new last step if it was on the last;
    Steps.refresh(el, 1) restarts. A stepper left with fewer than 2 steps hides its controls and shows everything; they return when it grows.
+   A [data-stepper] the page adds after load starts with Steps.refresh(el).
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
    replacing content, whether or not the event fires. The opening step is announced once the page has loaded (after its scripts and
    DOMContentLoaded handlers), so a listener added while loading hears it, also with data-start; one added after load misses it.
@@ -2970,12 +2545,16 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
       this.show(wanted ?? (opening ? Number(this.root.dataset.start) || this.total : stay));
     }
   }
-  const all = [...document.querySelectorAll("[data-stepper]")].map((root) => {
+  const all = [];
+  function register(root) {
     const stepper = new Stepper(root);
-    steppers.set(root, (step) => stepper.refresh(step));
-    stepper.refresh();
+    steppers.set(root, stepper);
+    all.push(stepper);
     return stepper;
-  });
+  }
+  for (const root of document.querySelectorAll("[data-stepper]")) {
+    register(root).refresh();
+  }
   function announceOpening() {
     setTimeout(() => {
       loaded = true;
@@ -2992,293 +2571,14 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
   }
   window.Steps = {
     refresh(el, step) {
-      const refresh = steppers.get(el);
-      if (!refresh) {
+      const stepper = steppers.get(el) ?? (el instanceof HTMLElement && el.matches("[data-stepper]") ? register(el) : undefined);
+      if (!stepper) {
         throw new Error("Steps.refresh needs an element with data-stepper");
       }
-      refresh(step);
+      stepper.refresh(step);
     }
   };
 })();
-</script>
-<script>
-const INF = Infinity;
-const num = (x) => (x === INF ? "∞" : String(x).replace("-", "−"));
-const R = 26; // node radius in SVG units
-
-/* ---- graphs: undirected unless `directed`. Edges are [from, to, weight]. ---- */
-const TOWNS_NODES = [["A", 50, 170], ["B", 180, 70], ["C", 180, 270], ["D", 330, 170], ["E", 470, 70], ["F", 470, 270], ["G", 595, 170]];
-const TOWNS_EDGES = [["A", "B", 4], ["A", "C", 2], ["B", "C", 1], ["B", "D", 5], ["C", "D", 8], ["C", "F", 10], ["D", "E", 2], ["D", "F", 6], ["E", "G", 3], ["F", "G", 2]];
-const asNodes = (list) => list.map(([id, x, y]) => ({ id, x, y }));
-const GRAPHS = {
-	towns: { nodes: asNodes(TOWNS_NODES), edges: TOWNS_EDGES },
-	grid: {
-		nodes: asNodes(["ABC", "DEF", "GHI"].flatMap((row, r) => [...row].map((id, c) => [id, 110 + c * 210, 50 + r * 120]))),
-		edges: [["A", "B", 3], ["B", "C", 2], ["D", "E", 6], ["E", "F", 1], ["G", "H", 2], ["H", "I", 4], ["A", "D", 1], ["D", "G", 5], ["B", "E", 2], ["E", "H", 7], ["C", "F", 4], ["F", "I", 1]],
-	},
-	islands: {
-		nodes: asNodes([["A", 70, 170], ["B", 200, 80], ["C", 200, 260], ["D", 440, 80], ["E", 440, 260], ["F", 570, 170]]),
-		edges: [["A", "B", 3], ["A", "C", 5], ["B", "C", 1], ["D", "E", 2], ["D", "F", 4], ["E", "F", 3]],
-	},
-	equal: { nodes: asNodes(TOWNS_NODES), edges: TOWNS_EDGES.map(([a, b]) => [a, b, 1]) },
-};
-
-/** The one-way graph of the negative-edge section; only road B→A changes. */
-const negGraph = (w) => ({
-	directed: true,
-	nodes: asNodes([["S", 70, 170], ["A", 300, 70], ["B", 300, 270], ["C", 540, 70]]),
-	edges: [["S", "A", 3], ["S", "B", 4], ["B", "A", w], ["A", "C", 2]],
-});
-
-/* ---- the algorithm: returns one snapshot per step, each with its own caption ---- */
-const outRoads = (g, u) => g.edges
-	.flatMap(([a, b, w], i) => (a === u ? [{ v: b, w, i }] : !g.directed && b === u ? [{ v: a, w, i }] : []))
-	.sort((x, y) => (x.v < y.v ? -1 : 1));
-const road = (g, u, v) => `${u}${g.directed ? "→" : "–"}${v}`;
-
-/** Shortest distances by Bellman–Ford: slow but valid with negative edges. Used only as the reference answer. */
-function truth(g, start) {
-	const dist = Object.fromEntries(g.nodes.map((n) => [n.id, INF]));
-	dist[start] = 0;
-	for (let k = 0; k < g.nodes.length; k++) {
-		for (const n of g.nodes) for (const { v, w } of outRoads(g, n.id)) if (dist[n.id] + w < dist[v]) dist[v] = dist[n.id] + w;
-	}
-	return dist;
-}
-
-function settleCaption({ u, d, rest, first, negative, again, reopen }) {
-	const head = `Settle <b>${u}</b> at ${num(d)}${again ? " (again)" : ""}.`;
-	if (first) return `${head} It is the only node in the queue, and the start is 0 away from itself, so its distance is final.`;
-	if (again) return `${head} It came back into the queue with a smaller distance, so its roads are tried again with the new value.`;
-	if (negative && reopen) return `${head} It is the smallest entry in the queue, but with a negative edge that no longer proves it is final, so it may be re-opened later.`;
-	if (negative) return `${head} It is the smallest entry in the queue, so Dijkstra now treats ${u} as final. That is only guaranteed when no edge is negative.`;
-	if (!rest.length) return `${head} It is the last entry in the queue, and every road out of the settled nodes has been tried, so nothing can improve it.`;
-	const [next] = rest, tie = next[1] === d;
-	const place = tie ? `tied with ${next[0]}, and ties go to the alphabetically first` : `the next is ${next[0]} at ${num(next[1])}`;
-	return `${head} It is the smallest entry (${place}). Suppose a shorter route to ${u} existed. Its first unsettled node already holds a distance no larger than the route's cost up to there, because the settled node before it relaxed that road. That entry is at least ${num(d)} (${u} is the smallest), and the rest of the route adds nothing negative, so the route costs at least ${num(d)}. ${u}'s distance is final.`;
-}
-
-function relaxCaption(g, u, notes, settledSkips) {
-	const items = notes.map((n) => `<li${n.verdict === "missed" ? ' class="bad"' : ""}>${n.text}</li>`).join("");
-	const skip = settledSkips.length ? ` Already settled, nothing to do: ${settledSkips.join(", ")}.` : "";
-	if (!notes.length) return `Relax the roads out of <b>${u}</b>: none lead to an unsettled node.${skip}`;
-	return `Relax the roads out of <b>${u}</b>: distance of ${u} plus the road's weight, compared with what the neighbour has now.<ul class="relax">${items}</ul>${skip}`;
-}
-
-function run(g, start, reopen) {
-	const dist = Object.fromEntries(g.nodes.map((n) => [n.id, INF]));
-	const prev = {}, settled = new Set(), queued = new Set([start]), exposed = new Set(); // exposed: settled nodes whose error has surfaced
-	const negative = g.edges.some(([, , w]) => w < 0);
-	const wanted = truth(g, start);
-	dist[start] = 0;
-	const sorted = () => [...queued].sort((a, b) => dist[a] - dist[b] || (a < b ? -1 : 1)).map((n) => [n, dist[n]]);
-	const steps = [];
-	const snap = (extra) => steps.push({ dist: { ...dist }, prev: { ...prev }, settled: new Set(settled), exposed: new Set(exposed), queue: sorted(), wanted, current: null, edges: {}, changed: new Set(), ...extra });
-
-	snap({ kind: "init", lines: [1, 2], caption: `Start at <b>${start}</b>: distance 0. Every other node is ∞ (no route known yet), and only ${start} is in the queue.`, changed: new Set([start]) });
-	const seen = new Set();
-	let reopenedAny = false;
-	while (queued.size) {
-		const [[u, d], ...rest] = sorted();
-		queued.delete(u);
-		const again = seen.has(u);
-		reopenedAny ||= again;
-		seen.add(u);
-		settled.add(u);
-		snap({ kind: "settle", lines: [3, 4], current: u, changed: new Set([u]), caption: settleCaption({ u, d, rest, first: settled.size === 1 && u === start && !again, negative, again, reopen }) });
-
-		const notes = [], edges = {}, changed = new Set(), settledSkips = [];
-		for (const { v, w, i } of outRoads(g, u)) {
-			const cand = dist[u] + w, sum = `${num(dist[u])} + ${num(w)} = ${num(cand)}`, rd = road(g, u, v);
-			if (settled.has(v) && !(reopen && cand < dist[v])) {
-				if (cand >= dist[v]) { settledSkips.push(v); continue; }
-				edges[i] = "missed";
-				exposed.add(v);
-				notes.push({ verdict: "missed", text: `<b>${rd}</b>: ${sum} would beat ${v}'s ${num(dist[v])}, but ${v} is settled and Dijkstra never looks at a settled node again. ${v} stays at ${num(dist[v])}, and so does everything reached through ${v}.` });
-			} else if (cand < dist[v]) {
-				const was = settled.has(v);
-				notes.push({ verdict: "improved", text: `<b>${rd}</b>: ${sum} beats ${was ? `${v}'s settled ${num(dist[v])}, so ${v} goes back in the queue at ${num(cand)}` : `${num(dist[v])}, so ${v} = ${num(cand)} via ${u}`}.` });
-				dist[v] = cand;
-				prev[v] = u;
-				settled.delete(v);
-				queued.add(v);
-				edges[i] = "improved";
-				changed.add(v);
-			} else {
-				edges[i] = "kept";
-				notes.push({ verdict: "kept", text: `<b>${rd}</b>: ${sum} does not beat ${v}'s ${num(dist[v])}. Keep ${num(dist[v])}.` });
-			}
-		}
-		snap({ kind: "relax", lines: [5, 6, 7, 8], current: u, edges, changed, caption: relaxCaption(g, u, notes, settledSkips) });
-	}
-	const unreached = g.nodes.filter((n) => dist[n.id] === INF).map((n) => n.id);
-	const wrong = g.nodes.filter((n) => dist[n.id] !== wanted[n.id]).map((n) => n.id);
-	let caption = "Queue empty. Every reachable node is settled, and each distance was final the moment it was settled. Follow the Via column back to read off a route.";
-	if (unreached.length) caption += ` ${unreached.join(", ")} stayed at ∞: no route from ${start} reaches ${unreached.length > 1 ? "them" : "it"}, which is different from a long route.`;
-	if (negative) caption = wrong.length
-		? `Queue empty, but ${wrong.join(" and ")} ${wrong.length > 1 ? "are" : "is"} wrong. The “True” column shows the real shortest distances. ${wrong[0]} was settled before the cheaper route through B had been found, and a settled node is never revisited.`
-		: `Queue empty, and every distance matches the “True” column. ${reopenedAny ? "Re-opening kept the answer correct." : "No settled node was ever improved afterwards, so the settled-is-final rule held and nothing had to be re-opened."}`;
-	snap({ kind: "done", lines: [3], caption });
-	return steps;
-}
-
-/* ---- drawing ---- */
-/** Where a node's distance label goes: the 45° direction (up first) farthest from every road at the node, so it never sits on a line. */
-function labelOffset(n, neighbours) {
-	const roads = neighbours.map((q) => Math.atan2(q.y - n.y, q.x - n.x));
-	const gap = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-	let best = -Math.PI / 2, room = -1;
-	for (const k of [0, 1, -1, 2, -2, 3, -3, 4]) {
-		const angle = -Math.PI / 2 + (k * Math.PI) / 4, free = Math.min(Math.PI, ...roads.map((r) => gap(angle, r)));
-		if (free > room + 1e-6) [best, room] = [angle, free];
-	}
-	const reach = R + 15;
-	return [Math.round(Math.cos(best) * reach), Math.round(Math.sin(best) * reach)];
-}
-
-function drawGraph(g, markerId) {
-	const pos = Object.fromEntries(g.nodes.map((n) => [n.id, n]));
-	const edges = g.edges.map(([a, b, w], i) => {
-		const p = pos[a], q = pos[b], len = Math.hypot(q.x - p.x, q.y - p.y), ux = (q.x - p.x) / len, uy = (q.y - p.y) / len;
-		const trim = g.directed ? R + 4 : 0;
-		const x2 = q.x - ux * trim, y2 = q.y - uy * trim;
-		const arrow = g.directed ? ` marker-end="url(#${markerId}-base)"` : "";
-		return `<g class="edge" data-edge="${i}"><line x1="${p.x}" y1="${p.y}" x2="${x2}" y2="${y2}"${arrow}/><text x="${(p.x + q.x) / 2}" y="${(p.y + q.y) / 2}">${num(w)}</text></g>`;
-	});
-	const nodes = g.nodes.map((n) => {
-		const [dx, dy] = labelOffset(n, g.edges.flatMap(([a, b]) => (a === n.id ? [pos[b]] : b === n.id ? [pos[a]] : [])));
-		return `<g class="node" data-node="${n.id}" transform="translate(${n.x} ${n.y})"><circle r="${R}"/><text class="name">${n.id}</text><text class="dist" x="${dx}" y="${dy}"></text></g>`;
-	});
-	// One arrowhead per road state: a marker cannot take its colour from the line it sits on.
-	const marker = (state) => `<marker id="${markerId}-${state}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path class="arrow" data-state="${state}" d="M0 0 10 5 0 10z"/></marker>`;
-	return `<defs>${ROAD_STATES.map(marker).join("")}</defs>` + edges.join("") + nodes.join("");
-}
-
-/** Tight viewBox around the nodes, with room for the distance labels beside them. */
-function viewBox({ nodes }) {
-	const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y), pad = R + 32;
-	const x = Math.min(...xs) - pad, y = Math.min(...ys) - pad;
-	return `${x} ${y} ${Math.max(...xs) + pad - x} ${Math.max(...ys) + pad - y}`;
-}
-
-const CODE = (guard) => [
-	"dist[all] = ∞;  dist[start] = 0",
-	"queue = {start}",
-	"while queue is not empty:",
-	"  u = pop smallest dist        <i>// settle</i>",
-	"  for each road u→v, weight w: <i>// relax</i>",
-	`    if ${guard ? "v unsettled and " : ""}dist[u]+w < dist[v]:`,
-	"      dist[v] = dist[u] + w",
-	"      via[v] = u;  queue.update(v)",
-].map((line, i) => `<span data-line="${i + 1}">${line}</span>`).join("");
-
-const ROAD_STATES = ["base", "tent", "tree", "improved", "kept", "missed"];
-const STATE_TEXT = { unseen: "not reached", queued: "in queue", current: "settled now", settled: "settled" };
-
-/**
- * One stepper figure: rebuilds its graph, captions, code and tables from `config()`
- * and repaints queue, table and graph from the snapshot of the step steps.js reports.
- */
-function createExplorer(root, config) {
-	const part = (role) => root.querySelector(`[data-role="${role}"]`);
-	let steps = [], cur = 1, cfg = config();
-
-	function stateOf(s, n) {
-		if (s.current === n) return "current";
-		if (s.settled.has(n)) return "settled";
-		return s.queue.some(([q]) => q === n) ? "queued" : "unseen";
-	}
-
-	function paint() {
-		cur = Math.min(cur, steps.length);
-		const s = steps[cur - 1], g = cfg.graph, showTruth = cfg.showTruth;
-		// A wrong distance turns red once the page has shown the reader why, not before.
-		const wrongNode = (n) => showTruth && s.settled.has(n) && s.dist[n] !== s.wanted[n] && (s.kind === "done" || s.exposed.has(n));
-		root.querySelectorAll("[data-node]").forEach((el) => {
-			const n = el.dataset.node, d = s.dist[n];
-			el.dataset.state = stateOf(s, n);
-			el.classList.toggle("changed", s.changed.has(n));
-			el.toggleAttribute("data-wrong", wrongNode(n));
-			el.querySelector(".dist").textContent = num(d);
-		});
-		const treeKey = new Set(Object.entries(s.prev).map(([v, u]) => `${u}>${v}`));
-		g.edges.forEach(([a, b], i) => {
-			const settledVia = (u, v) => treeKey.has(`${u}>${v}`) && s.prev[v] === u;
-			const kind = (u, v) => (settledVia(u, v) ? (s.settled.has(v) ? "tree" : "tent") : "");
-			const el = root.querySelector(`[data-edge="${i}"]`);
-			const state = s.edges[i] ?? (kind(a, b) || (g.directed ? "" : kind(b, a)));
-			el.dataset.state = state;
-			if (g.directed) el.querySelector("line").setAttribute("marker-end", `url(#${root.id}-arrow-${state || "base"})`);
-		});
-		part("queue").innerHTML = [
-			s.current && s.kind !== "done" ? `<li class="popped"><b>${s.current}</b>${num(s.dist[s.current])}</li><li class="none sep">taken out</li>` : "",
-			...s.queue.map(([n, d]) => `<li class="${s.changed.has(n) && s.kind === "relax" ? "changed" : ""}"><b>${n}</b>${num(d)}</li>`),
-			s.queue.length ? "" : `<li class="none">empty</li>`,
-		].join("");
-		part("table").innerHTML = g.nodes.map(({ id }) => {
-			const state = stateOf(s, id), bad = wrongNode(id);
-			const trueCell = showTruth ? `<td class="${bad ? "bad" : "dim"}">${num(s.wanted[id])}</td>` : "";
-			return `<tr class="${s.changed.has(id) ? "changed" : ""}"><th scope="row">${id}</th><td class="${bad ? "bad" : ""}">${num(s.dist[id])}</td><td>${s.prev[id] ?? "–"}</td><td class="${state === "unseen" ? "dim" : ""}">${STATE_TEXT[state]}</td>${trueCell}</tr>`;
-		}).join("");
-		part("code").querySelectorAll("[data-line]").forEach((el) => el.classList.toggle("on", s.lines.includes(+el.dataset.line)));
-	}
-
-	/** Recompute everything from the config. `keepStep` stays on the same step number instead of restarting. */
-	function rebuild(keepStep = false) {
-		cfg = config();
-		steps = run(cfg.graph, cfg.start, cfg.reopen);
-		const svg = part("svg");
-		svg.setAttribute("viewBox", viewBox(cfg.graph));
-		svg.innerHTML = drawGraph(cfg.graph, `${root.id}-arrow`);
-		part("code").innerHTML = CODE(cfg.guard);
-		root.querySelector("[data-captions]").innerHTML = steps.map((s) => `<li>${s.caption}</li>`).join("");
-		if (!keepStep) cur = 1;
-		Steps.refresh(root, keepStep ? undefined : 1);
-		paint();
-		return steps;
-	}
-	root.addEventListener("stepchange", (e) => { cur = e.detail.step; paint(); });
-	return { rebuild };
-}
-
-/* ---- main explorer: map and start node ---- */
-const checked = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
-const startsEl = document.getElementById("starts");
-let startNode = "A";
-
-function fillStarts() {
-	const g = GRAPHS[checked("graph")];
-	if (!g.nodes.some((n) => n.id === startNode)) startNode = g.nodes[0].id;
-	startsEl.innerHTML = g.nodes.map((n) => `<label><input type="radio" name="start" value="${n.id}"${n.id === startNode ? " checked" : ""}><span>${n.id}</span></label>`).join("");
-}
-const main = createExplorer(document.getElementById("main"), () => ({ graph: GRAPHS[checked("graph")], start: startNode, reopen: false, guard: false, showTruth: false }));
-document.querySelectorAll('input[name="graph"]').forEach((r) => r.addEventListener("change", () => { fillStarts(); main.rebuild(); }));
-startsEl.addEventListener("change", () => { startNode = checked("start"); main.rebuild(); });
-fillStarts();
-main.rebuild();
-
-/* ---- negative-edge explorer: weight slider and re-open switch ---- */
-const wInput = document.getElementById("neg-w");
-const neg = createExplorer(document.getElementById("neg"), () => ({ graph: negGraph(+wInput.value), start: "S", reopen: checked("reopen") === "yes", guard: checked("reopen") === "no", showTruth: true }));
-
-function showNeg() {
-	const w = +wInput.value, steps = neg.rebuild(true), last = steps[steps.length - 1];
-	document.getElementById("neg-w-out").textContent = num(w);
-	const wrong = Object.keys(last.dist).filter((n) => last.dist[n] !== last.wanted[n]);
-	const settles = steps.filter((x) => x.kind === "settle").map((x) => x.current);
-	const reopened = [...new Set(settles.filter((n, i) => settles.indexOf(n) !== i))];
-	const list = (key) => wrong.map((n) => `${n} = ${num(last[key][n])}`).join(" and ");
-	document.getElementById("neg-head").textContent = wrong.length
-		? `With B→A = ${num(w)}, Dijkstra ends with ${list("dist")}; the real shortest distances are ${list("wanted")}`
-		: reopened.length
-			? `With B→A = ${num(w)} and re-opening, the answer is right again, at the price of settling ${reopened.join(" and ")} twice`
-			: w < 0
-				? `With B→A = ${num(w)} the answer is still right: the negative road never beats a distance that was already settled, so nothing needs to change`
-				: `With B→A = ${num(w)}, Dijkstra is still right: no negative edge means no wrong answer`;
-}
-wInput.addEventListener("input", showNeg);
-document.querySelectorAll('input[name="reopen"]').forEach((r) => r.addEventListener("change", showNeg));
-showNeg();
 </script>
 </body>
 </html>
