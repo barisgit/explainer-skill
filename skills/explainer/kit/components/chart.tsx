@@ -8,6 +8,8 @@
      setup   (chart) => void, run after every (re)mount: chart.on("click", ...). A function, so only from your own "use client" component.
    Colours: write "var(--accent)" or "color-mix(in srgb, var(--accent) 20%, transparent)" in any colour option (color, borderColor,
      fill, colorStops[].color, ...); they are resolved when the chart mounts, so they follow light/dark.
+   Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
+     { currency: "EUR", compact: true } (written for the page's lang), or one text per data item or tick: ["Low", "", "Peak"].
    Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
