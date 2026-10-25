@@ -1,0 +1,62 @@
+# Changelog
+
+## v0.9.0
+
+Pages are MDX. An agent writes `page.mdx`: Markdown prose, the kit's components, and the `.ts` or `.json` data and `.css` it imports. `pack` renders it once to static HTML with Preact and ships code only for client components. Packed v0.8 files still open offline, and `check` still takes them.
+
+### What an author does differently
+
+- Write `page.mdx` instead of `page.html`; `pack` refuses any other input. There are no `kit:` references to write: `pack` adds the theme and the kit scripts the page uses.
+- Prose, lists, tables and formulas are Markdown. A `#` and the paragraphs under it are the masthead; each `##` starts a section; a Markdown table is a `table.compare`.
+- Figures and interactions are components imported from `"kit"`. Behaviour no component covers goes in your own `.tsx` component whose first line is `"use client"`.
+- Page settings move into frontmatter: `lang` instead of `<html lang>`, `labels` instead of `var kitLabels`, `scheme` instead of `<html data-scheme>`.
+- Controls with ids are kept across reloads without `reply.js`. Ids repeated on one page fail `pack`.
+- `example.html` is now `example/` (`page.mdx` and the model it imports).
+
+Before (v0.8.2), a step-through figure:
+
+```html
+<link rel="stylesheet" href="kit:theme.css">
+<figure class="fig" data-stepper data-start="1">
+  <svg viewBox="0 0 90 20"><rect data-step="1" width="20" height="20" /><rect data-step="2" x="35" width="20" height="20" /></svg>
+  <ol data-captions><li>The queue is empty</li><li>A burst arrives</li></ol>
+</figure>
+<script src="kit:steps.js"></script>
+```
+
+After (v0.9.0):
+
+```mdx
+import { Stepper } from "kit";
+
+<Stepper start={1} captions={["The queue is empty", "A burst arrives"]}>
+  <svg viewBox="0 0 90 20"><rect data-step="1" width="20" height="20" /><rect data-step="2" x="35" width="20" height="20" /></svg>
+</Stepper>
+```
+
+### New public names
+
+Components, imported from `"kit"` (`kit <Name>` documents each):
+
+- `Chart`: `option`, `label`, `class`, `setup`. Formatters and labels may be JSON (`{ digits: 1, unit: "min" }`, `{ percent: true }`, `{ currency: "EUR", compact: true }`, or one text per item).
+- `Plot`: `option` (`series`, `categories`, `horizontal`, `stack`, `x`, `y`, `legend`), `label`, `class`. Axis `format` and series `label` take the same JSON formats; numbers follow the page's `lang`.
+- `Explore`: `controls` (each `{ id, label }` with `range: [min, max, step]`, `choice` or `toggle: true`, and `value`, `format`), `frame`, `base`, `label`, `class`. A slider, switch or toggles changing a plot or chart, readout, `stats` and caption; `frame` runs in the browser when a `"use client"` module exports it, else `pack` computes every frame.
+- `Stepper`: `captions`, `captionsFirst`, `start`, `label`, `class`, `onStep`, `restartOn` (back to step 1 when it changes).
+- `View`: `name`, `param`, `back` for a static view per record; `records` and `render` fill one view from data.
+- `Tree`: `items`, `row`, `cols`, `head`; types `TreeItem`, `TreeRow`.
+- `Table`: `rows`, `cols` (each `head`, `value`, `format`, `link`, `note`), `state`.
+- `Question`: `name`, `legend`, `options`, `multiple`, `checked`, `answer` (a self-check that marks the choice and opens the explanation written inside). Without `options` it takes a written answer.
+
+Frontmatter keys: `title`, `lang`, `labels`, `reply: true`, `scheme: light | dark`.
+
+Math: `$...$` in a sentence and `$$` on lines of their own render to MathML when the page packs (`kit math.css`, with the formula sheet pattern).
+
+Slots: Markdown between a client component's tags is its `children`, rendered once and placed with `{children}`.
+
+CLI: `pack page.mdx -o out.html`; `kit` lists components and features, `kit <Name>` documents one, `kit page` the page conventions, `kit labels` prints every kit text as a frontmatter `labels` block to translate, `kit types > tsconfig.json` then `bun check` typechecks the page's `.ts` and `.tsx` with nothing to install.
+
+### Removed
+
+- HTML as `pack` input, and the `kit:` file references in a page.
+- `kit <file>` for the kit scripts that components now write for you (`views.js`, `steps.js`, `charts.js`, `plot.js`); `kit link`, `kit reply` and `kit keep` document the attributes that stay.
+- `var kitLabels` in a page script; use the frontmatter `labels`.
