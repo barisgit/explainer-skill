@@ -14,19 +14,22 @@
 (() => {
 	const refsOf = (el: Part | null) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
 	const NATIVE = "a[href], button, input, select, textarea, summary, [tabindex]";
-	/** Refs whose elements sit in two places or more, and the elements carrying one of them; refresh keeps both current. */
+
+	// What links, kept current by refresh: the refs whose elements sit in two places or more, and the elements carrying one of them.
 	let linked = new Set<string>();
 	let linkedParts: Part[] = [];
 	/** Elements this script made focusable, so it can undo that when they stop linking. */
 	const madeFocusable = new WeakSet<Part>();
+
+	// The active part is the hovered one, else the focused one, else the pinned one.
 	let hovered: Part | null = null;
 	let focused: Part | null = null;
 	let pinned: Part | null = null;
-	let litKey = "";
+
+	// What paint last did: the refs it lit (space separated, as the ref event last announced them), and the elements it lit and dimmed.
+	let litRefs = "";
 	let lit: Part[] = [];
 	let dimmed: SVGSVGElement[] = [];
-	const partOf = (e: Event) =>
-		e.target instanceof Element ? e.target.closest<Part>(".is-linked") : null;
 
 	/** The place an element sits in: its outermost SVG, or the element itself. pack's dark copy of an SVG file sits with its light copy. */
 	function placeOf(el: Part): Element {
@@ -35,11 +38,25 @@
 		while (svg?.ownerSVGElement) {
 			svg = svg.ownerSVGElement;
 		}
+		if (svg) {
+			return svg;
+		}
 		const twin = el.previousElementSibling;
-		return svg ?? (el.matches("img.dark") && twin?.matches("img.light") ? twin : el);
+		return el.matches("img.dark") && twin?.matches("img.light") ? twin : el;
 	}
 
-	/** Marks an element as linked or not. Prose terms and rows are keyboard-reachable; diagram parts are not (a diagram has dozens, prose links to the same refs). */
+	/** The refs among `parts` whose elements sit in two places or more. */
+	function linkingRefs(parts: Part[]): Set<string> {
+		const places = new Map<string, Set<Element>>();
+		for (const el of parts) {
+			for (const ref of refsOf(el)) {
+				places.set(ref, (places.get(ref) ?? new Set()).add(placeOf(el)));
+			}
+		}
+		return new Set([...places].filter(([, where]) => where.size > 1).map(([ref]) => ref));
+	}
+
+	/** Sets or clears is-linked. Prose terms and rows become keyboard-reachable; diagram parts do not (a diagram has dozens, prose links to the same refs). */
 	function mark(el: Part, on: boolean) {
 		el.classList.toggle("is-linked", on);
 		if (on && !el.matches(NATIVE) && !el.closest("svg")) {
@@ -52,36 +69,34 @@
 
 	/** Recounts the places of every ref, re-marks the elements and repaints, since the lit part may have gained or lost its partners. */
 	function refresh() {
-		const places = new Map<string, Set<Element>>();
 		const parts = [...document.querySelectorAll<Part>("[data-ref]")];
-		for (const el of parts) {
-			for (const ref of refsOf(el)) {
-				places.set(ref, (places.get(ref) ?? new Set()).add(placeOf(el)));
-			}
-		}
-		linked = new Set([...places].filter(([, where]) => where.size > 1).map(([ref]) => ref));
-		const was = linkedParts;
-		linkedParts = parts.filter((el) => refsOf(el).some((ref) => linked.has(ref)));
-		for (const el of was) {
+		linked = linkingRefs(parts);
+		// Unmark the previous set, then mark the new one (the sets overlap, so the order matters). The previous set also holds
+		// elements removed from the page or stripped of their data-ref, which the query no longer finds.
+		for (const el of linkedParts) {
 			mark(el, false);
 		}
+		linkedParts = parts.filter((el) => refsOf(el).some((ref) => linked.has(ref)));
 		for (const el of linkedParts) {
 			mark(el, true);
 		}
 		paint(true);
 	}
 
-	/** Lights the linked refs of the active part and announces them when they changed; `force` relights unchanged refs too. */
+	/**
+	 * Lights the linked refs of the active part and announces them when they changed. `force` relights unchanged refs too, for
+	 * refresh: the elements carrying them may have changed.
+	 */
 	function paint(force = false) {
 		const active = hovered ?? focused ?? pinned;
 		const refs = active?.isConnected ? refsOf(active).filter((ref) => linked.has(ref)) : [];
-		const key = refs.join(" ");
-		if (key === litKey && !force) {
+		const joined = refs.join(" ");
+		if (joined === litRefs && !force) {
 			return;
 		}
 		light(refs);
-		if (key !== litKey) {
-			litKey = key;
+		if (joined !== litRefs) {
+			litRefs = joined;
 			document.dispatchEvent(new CustomEvent("ref", { detail: { refs } }));
 		}
 	}
@@ -111,15 +126,14 @@
 		}
 	}
 
-	const holdsParts = (nodes: NodeList) =>
-		[...nodes].some(
-			(n) =>
-				n instanceof Element && (n.matches("[data-ref]") || n.querySelector("[data-ref]") !== null),
-		);
+	// A refresh reads every data-ref on the page, so it runs only for a changed data-ref (the one observed attribute) or an added or
+	// removed node that holds one, not for every DOM change a page script or another kit script makes.
+	const holdsRef = (n: Node) =>
+		n instanceof Element && (n.matches("[data-ref]") || n.querySelector("[data-ref]") !== null);
 	new MutationObserver((records) => {
 		if (
 			records.some(
-				(r) => r.type === "attributes" || holdsParts(r.addedNodes) || holdsParts(r.removedNodes),
+				(r) => r.type === "attributes" || [...r.addedNodes, ...r.removedNodes].some(holdsRef),
 			)
 		) {
 			refresh();
@@ -131,6 +145,9 @@
 	});
 	refresh();
 
+	/** The linked part an event happened in, if any: unlinked parts take no hover, focus or click. */
+	const partOf = (e: Event) =>
+		e.target instanceof Element ? e.target.closest<Part>(".is-linked") : null;
 	document.addEventListener("pointerover", (e) => {
 		if (e.pointerType === "touch") {
 			return;
