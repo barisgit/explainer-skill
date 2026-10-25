@@ -59,6 +59,19 @@ test("check --do set: to a value the field cannot hold is a problem naming what 
 	]);
 }, 60_000);
 
+test("check --do key: types a punctuation character, which shares its code point with another key's code (. is Delete)", async () => {
+	const page = FORM({
+		"3.5% typed one key at a time": 'document.getElementById("q").value === "old3.5%"',
+	});
+	const keys = ["3", ".", "5", "%"].map((key) => `key:${key}`);
+
+	const failures = await packAndRun(dir, "key-chars", page, {
+		steps: ["focus:#q", "key:End", ...keys],
+	});
+
+	expect(failures).toEqual([]);
+}, 60_000);
+
 test("check --do type: or set: without =<value> is a usage error that shows the form", async () => {
 	const file = dir.write("no-value.html", FORM({}));
 

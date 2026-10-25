@@ -119,13 +119,44 @@ export interface StepResult {
 	note?: string;
 }
 
+/**
+ * The key code and DOM code of a letter or digit, whose code point is its own key code. Other characters get none: their code
+ * point is another key's ("." is 46, Delete; "(" is 40, ArrowDown), which Chrome would act on instead of typing them.
+ */
+function characterCodes(character: string): { windowsVirtualKeyCode?: number; code?: string } {
+	const upper = character.toUpperCase();
+	if (/^[A-Z]$/.test(upper)) {
+		return { windowsVirtualKeyCode: upper.charCodeAt(0), code: `Key${upper}` };
+	}
+	return /^\d$/.test(character)
+		? { windowsVirtualKeyCode: character.charCodeAt(0), code: `Digit${character}` }
+		: {};
+}
+
+/** Types one character as a key press that carries its text. */
+async function typeCharacter(cdp: Cdp, character: string) {
+	const codes = characterCodes(character);
+	await cdp.send("Input.dispatchKeyEvent", {
+		type: "keyDown",
+		key: character,
+		text: character,
+		...codes,
+	});
+	await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: character, ...codes });
+}
+
+/** Presses a named key (KEYS) or types one character. */
 async function keyStep(cdp: Cdp, name: string): Promise<StepResult> {
-	const upper = name.toUpperCase();
-	const [vk, code] = KEYS[name] ?? [upper.charCodeAt(0), `Key${upper}`];
+	const named = KEYS[name];
+	if (!named) {
+		await typeCharacter(cdp, name);
+		return {};
+	}
+	const [vk, code] = named;
 	const key = name === "Space" ? " " : name;
 	let text: string | undefined;
-	if (key.length === 1) {
-		text = key;
+	if (name === "Space") {
+		text = " ";
 	} else if (name === "Enter") {
 		text = "\r";
 	}
@@ -210,12 +241,6 @@ async function mouseStep(
 		}
 	}
 	return {};
-}
-
-/** Types one character as a key press with its text; no key code, since a character's code point is another key's ("." is 46, Delete). */
-async function typeCharacter(cdp: Cdp, character: string) {
-	await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: character, text: character });
-	await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: character });
 }
 
 /** Page-side body (with `el`): focuses a text field and selects its text, so typing replaces it; returns what the element is when it is not one, else "". */
