@@ -946,6 +946,10 @@ output {
 	font-weight: 600;
 	box-shadow: inset 0 0 0 2px var(--ok);
 }
+/* Written answer (a Question without options): the question, its box and the model answer keep the measure of the text. */
+.written {
+	max-inline-size: 66ch;
+}
 
 /* theme part: readouts, chips, ranking rows, comparison tables. */
 /* Readouts: plain numbers in a row, no tiles. <small> is a second line under the number. */
@@ -1832,7 +1836,8 @@ details > :last-child:not(summary) {
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
-   To force one scheme instead of following the system: <html data-scheme="dark"> (or "light"); charts and diagrams follow it too.
+   To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
+   <html data-scheme="dark">; charts and diagrams follow it too.
    Colour what the reader compares, each compared thing (a phase, an option, a series) in the same --c1..--c6 on every chart and
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
