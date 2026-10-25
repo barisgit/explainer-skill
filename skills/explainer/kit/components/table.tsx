@@ -1,4 +1,4 @@
-/* Table: a comparison table computed from records, its numbers formatted and aligned, as a Markdown table renders.
+/* Table: a comparison table computed from records, numbers formatted and aligned as in a Markdown table.
    <Table rows={fixes} cols={[{ head: "Fix", value: "name", link: (f) => `#fix/${f.id}` }, { head: "Wait", value: "wait", format: { digits: 1, unit: "min" } }]} />
      rows   the records, one row each
      cols   one per column; the first one names the rows
