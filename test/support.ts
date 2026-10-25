@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
+import { runStep } from "../skills/explainer/src/steps.ts";
 
 /** The skill directory as an installer would copy it. */
 export const SKILL_DIR = join(import.meta.dir, "..", "skills", "explainer");
@@ -81,11 +82,12 @@ export const SETTLED = `const settled = new Promise((loaded) => addEventListener
 	.then(() => new Promise(requestAnimationFrame));`;
 
 /**
- * Page script for packAndRun: once the page has `settled`, evaluates each check in order (one may act, such as a click, for the
- * next) and resolves `contract` with the names of those that are false.
+ * Page script for packAndRun: once the page has `settled` and packAndRun's `steps` have run (`stepsDone`, defined only when there
+ * are steps), evaluates each check in order (one may act, such as a click, for the next) and resolves `contract` with the names of
+ * those that are false.
  */
 export const pageContract = (checks: Record<string, string>) => `${SETTLED}
-var contract = settled.then(() => [${Object.entries(checks)
+var contract = settled.then(() => window.stepsDone).then(() => [${Object.entries(checks)
 	.map(([name, body]) => `(${body}) ? "" : ${JSON.stringify(name)}`)
 	.join(",\n")}].filter(Boolean));`;
 
@@ -117,19 +119,38 @@ export interface RunOptions {
 	media?: "screen" | "print";
 	/** The window sizes, in order; default the two `check` uses. */
 	widths?: Viewport[];
+	/** `check --do` steps, run in order at each width once the page has `settled`, before its pageContract checks. */
+	steps?: string[];
+}
+
+/** Defines `stepsDone` before any page script runs, so a pageContract waits until `finishSteps()` says the steps have run. */
+const AWAIT_STEPS = "window.stepsDone = new Promise((done) => { window.finishSteps = done; });";
+
+/** Runs `steps` in the open page once it has `settled`, then lets its contract go on; returns the problems the steps reported. */
+async function runSteps(cdp: Cdp, steps: string[]): Promise<string[]> {
+	await cdp.evaluate("settled", true);
+	const problems: string[] = [];
+	for (const step of steps) {
+		const { problem } = await runStep(cdp, step);
+		if (problem) {
+			problems.push(problem);
+		}
+	}
+	await cdp.evaluate("finishSteps()");
+	return problems;
 }
 
 /**
  * Packs `page` and opens it in headless Chrome at each of `widths`, with reduced motion, the CPU slowed `slowdown` times, as the
  * screen or as it prints. The page's global `contract` is a promise of the failures it found, and the run waits for it, however long
- * the page takes: a page that never settles fails on the test's timeout, never by passing early. Returns those failures and every
- * uncaught page error, prefixed with the width; an empty list is a pass.
+ * the page takes: a page that never settles fails on the test's timeout, never by passing early. Returns those failures, the
+ * problems of any `steps` and every uncaught page error, prefixed with the width; an empty list is a pass.
  */
 export async function packAndRun(
 	dir: ReturnType<typeof scratch>,
 	name: string,
 	page: string,
-	{ slowdown = 1, media = "screen", widths = WIDTHS }: RunOptions = {},
+	{ slowdown = 1, media = "screen", widths = WIDTHS, steps = [] }: RunOptions = {},
 ): Promise<string[]> {
 	const output = dir.path(`${name}.out.html`);
 	const packed = await runCli(["pack", dir.write(`${name}.html`, page), "-o", output]);
@@ -142,6 +163,9 @@ export async function packAndRun(
 			failures.push(`${width}: ${(d.exception?.description ?? d.text).split("\n")[0]}`),
 		);
 		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		if (steps.length) {
+			await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: AWAIT_STEPS });
+		}
 		await cdp.send("Emulation.setCPUThrottlingRate", { rate: slowdown });
 		await cdp.send("Emulation.setEmulatedMedia", {
 			media,
@@ -157,6 +181,9 @@ export async function packAndRun(
 				storageTypes: "local_storage",
 			});
 			await open(cdp, `file://${output}`);
+			if (steps.length) {
+				failures.push(...(await runSteps(cdp, steps)).map((problem) => `${width}: ${problem}`));
+			}
 			const found = await cdp.evaluate<string[]>("contract", true);
 			failures.push(...found.map((failure) => `${width}: ${failure}`));
 		}
