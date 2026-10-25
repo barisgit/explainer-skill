@@ -33,13 +33,13 @@ const MERMAID_DOC = `\`\`\`mermaid fences hold Mermaid source: flowchart (graph)
 pack renders each one to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
 It draws a subset of each type and fails on any line, or part of one, it cannot read (notes, titles, cross and circle edge ends, new-style shapes), naming the line.
 Labels wrap at about 30 characters into tall boxes: keep them to a few words, or break one with <br>. Markdown strings ("\`...\`") are not supported; **bold** and *italic* work in plain labels.
-Pack gives every part of the diagram a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
+Pack gives each node, group, edge and sequence part a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
   flowchart / state / class / ER   nodes and subgraphs: the node id (cache in "api --> cache[(Cache)]")
   edges                            the edge id: name one with "api e1@--> cache" (otherwise Mermaid's, e.g. L_api_cache_0)
   sequence                         participants and lifelines: the participant id; messages: m1, m2, ... in order
 Use the ids from prose and replies:
   <span data-ref="cache">the cache</span>                  hover or focus lights the node (kit link)
-  clicking a node offers a note on it (kit reply)
+  clicking a node offers a note on it (kit reply, on a page that has it)
 Diagrams do not step. To walk through one, show it whole and give each step's text the data-ref of its parts.
 Keep ids short and meaningful: they are what you type here.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.

@@ -12,9 +12,10 @@
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
    state and handlers work. Props from the page into such a component must be JSON, or functions a "use client" module exports
    (a formatter, Explore's frame). Markdown written between its tags is its children, rendered once as static HTML that it
-   places with {children}, so a section's prose stays in the page; a ## first in them starts the section the component is in.
-   A control with an id keeps its value across
-   reloads (kit keep); in such a component, set its state in onInput or onChange, which the restore and Clear fire too. */
+   places with {children} exactly once, so a section's prose stays in the page; a ## first in them starts the section the
+   component is in. Chart and Plot may sit in them; your own client components go inside the component instead.
+   A control with an id keeps its value across reloads (kit keep); in such a component, set its state in onInput or onChange
+   with a functional update (setState((s) => ...)), which the restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
 export { Explore } from "./explore.tsx";
 export { Plot } from "./plot.tsx";
