@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
-import { runCli, scratch } from "./support.ts";
+import { packAndRun, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -265,7 +265,8 @@ const pngColours = (file: string, points: Array<[number, number]>) =>
 
 test("check --do shot: saves a PNG of the element's box at each width, below the fold, taller than the viewport, and per match with @all", async () => {
 	const body = `<style>@media (max-width: 500px) { #wide-only { display: none } }</style>
-<p id="wide-only" style="width:200px;height:40px"></p><div style="height:1300px"></div>
+<p id="wide-only" style="width:200px;height:40px"></p>
+<div style="height:1300px"></div>
 <div id="box" style="width:300px;height:200px;margin-left:40px;background:rgb(255,0,0)"></div>
 <div id="tall" style="width:120px;height:1400px;background:rgb(0,0,255)"></div>
 ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}px;margin:0;background:rgb(0,128,0)"></p>`).join("")}`;
@@ -326,4 +327,33 @@ ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}
 	expect(result.stdout).toContain(
 		"--do shot:#wide-only: no PNG at 390 px wide: its match is not shown",
 	);
+}, 60_000);
+
+test("check --do shot: measures the element after the scroll that brings it into view has settled", async () => {
+	const body = `<div id="spacer" style="height:1300px"></div>
+<div id="grows" style="width:300px;height:100px;background:rgb(255,0,0)"></div><div style="height:2000px"></div>
+<script>
+addEventListener("scroll", () => {
+	document.getElementById("spacer").style.height = "600px";
+	document.getElementById("grows").style.height = "1200px";
+}, { once: true });
+${pageContract({})}
+</script>`;
+
+	const failures = await packAndRun(dir, "grows", page("").replace("</h1>", `</h1>${body}`), {
+		steps: ["shot:#grows"],
+	});
+
+	expect(failures).toEqual([]);
+	for (const width of [1440, 390]) {
+		const png = dir.path(`grows-${width}-0.png`);
+		expect(pngSize(png)).toEqual([300, 1200]);
+		const corners = await pngColours(png, [
+			[1, 1],
+			[298, 1],
+			[1, 1198],
+			[298, 1198],
+		]);
+		expect(new Set(corners)).toEqual(new Set(["255,0,0"]));
+	}
 }, 60_000);

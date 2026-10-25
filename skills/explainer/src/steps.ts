@@ -320,31 +320,56 @@ async function setStep(cdp: Cdp, step: string, target: Target, value: string): P
 	return {};
 }
 
-/** An element's box in document coordinates, whether it fits the viewport, and whether it had to be scrolled into view. */
+/** An element's box in document coordinates, and whether it lies wholly in the viewport. */
 interface Box {
 	x: number;
 	y: number;
 	width: number;
 	height: number;
-	fits: boolean;
-	scrolled: boolean;
+	inView: boolean;
+}
+
+/** Page-side expression (with `el`): true when the element has a box of some size. */
+const HAS_BOX_JS = `((r) => r.width > 0 && r.height > 0)(el.getBoundingClientRect())`;
+/** Page-side expression (with `el`): true when the element lies wholly in the viewport. */
+const IN_VIEW_JS = `((r) => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth)(el.getBoundingClientRect())`;
+
+/**
+ * Page-side body (with `el`): "hidden" when the element has no box, "scrolled" when it was not wholly in view and has been
+ * scrolled to (centred if it fits the viewport, else its top), "" when it is in view already and is left where it is, so a hover
+ * tooltip stays.
+ */
+const BRING_INTO_VIEW_JS = `
+	if (!(${HAS_BOX_JS})) return "hidden";
+	if (${IN_VIEW_JS}) return "";
+	const r = el.getBoundingClientRect();
+	el.scrollIntoView({ block: r.height <= innerHeight && r.width <= innerWidth ? "center" : "start" });
+	return "scrolled";`;
+
+/** Page-side body (with `el`): the element's box now (null when it is no longer shown). */
+const BOX_JS = `
+	if (!(${HAS_BOX_JS})) return null;
+	const r = el.getBoundingClientRect();
+	return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, inView: ${IN_VIEW_JS} };`;
+
+/**
+ * The box of the `index`-th match once it is in view and what scrolling to it set off (scroll handlers, observers that load or
+ * resize content) has settled, so the geometry is the one the capture sees; null when the match has no box.
+ */
+async function settledBox(cdp: Cdp, target: Target, index: number): Promise<Box | null> {
+	const brought = await valueOnNth<string>(cdp, target.selector, index, BRING_INTO_VIEW_JS);
+	if (brought === "hidden" || brought === null) {
+		return null;
+	}
+	if (brought === "scrolled") {
+		await settle(SETTLE_MS);
+	}
+	return valueOnNth<Box>(cdp, target.selector, index, BOX_JS);
 }
 
 /**
- * Page-side body (with `el`): the element's box (null when it has none, as when hidden at this width). An element not wholly in view
- * is scrolled to it first, so what draws on scroll has drawn; one that fits the viewport is left where it is, so a hover tooltip stays.
- */
-const BOX_JS = `
-	let r = el.getBoundingClientRect();
-	if (!r.width || !r.height) return null;
-	const fits = r.height <= innerHeight && r.width <= innerWidth;
-	const scrolled = r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth;
-	if (scrolled) { el.scrollIntoView({ block: fits ? "center" : "start" }); r = el.getBoundingClientRect(); }
-	return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, fits, scrolled };`;
-
-/**
- * Saves a PNG of each targeted element's box as the page is now. One that fits the viewport is captured from the screen as it is;
- * a taller or wider one beyond the viewport, which relays the page out as the full-page shots do. Matches without a box are a note.
+ * Saves a PNG of each targeted element's box as the page is now. One wholly in the viewport is captured from the screen as it is;
+ * any other beyond the viewport, which relays the page out as the full-page shots do. Matches without a box are a note.
  */
 async function shotStep(
 	cdp: Cdp,
@@ -355,18 +380,15 @@ async function shotStep(
 	const pngs: string[] = [];
 	const hidden: number[] = [];
 	for (const i of target.indices) {
-		const box = await valueOnNth<Box>(cdp, target.selector, i, BOX_JS);
+		const box = await settledBox(cdp, target, i);
 		if (!box) {
 			hidden.push(i);
 			continue;
 		}
-		if (box.scrolled) {
-			await settle(SETTLE_MS);
-		}
-		const { x, y, width, height, fits } = box;
+		const { x, y, width, height, inView } = box;
 		const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
 			format: "png",
-			captureBeyondViewport: !fits,
+			captureBeyondViewport: !inView,
 			clip: { x, y, width, height, scale: 1 },
 		});
 		const png = shotPath(target.selector, target.nth === undefined ? undefined : i);
