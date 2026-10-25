@@ -204,6 +204,19 @@ describe("pack rejects network dependencies", () => {
 		});
 	}
 
+	test("a video's src or a track's fails even for a file beside the page, which pack cannot embed", async () => {
+		dir.write("clip.mp4", "not really a video");
+		const input = dir.write(
+			"video.html",
+			page('<video src="clip.mp4"></video><video><track src="captions.vtt"></video>'),
+		);
+
+		const packed = await packHtml(input, dir.path("video.out.html"));
+
+		expect(packed.error).toContain("<video> loads a separate resource; embed its content instead");
+		expect(packed.error).toContain("<track> loads a separate resource; embed its content instead");
+	});
+
 	test("from an .mdx page, with exit 1 and nothing written", async () => {
 		const input = dir.write(
 			"remote.mdx",

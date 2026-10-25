@@ -195,7 +195,7 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 				}
 			},
 		})
-		.on("iframe[src], audio[src], embed[src], object[data]", {
+		.on("iframe[src], audio[src], video[src], track[src], embed[src], object[data]", {
 			element: (el) =>
 				void problems.push(`<${el.tagName}> loads a separate resource; embed its content instead`),
 		})
