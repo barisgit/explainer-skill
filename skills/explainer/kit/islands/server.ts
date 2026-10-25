@@ -173,7 +173,8 @@ function prerendered(
 
 /**
  * Draws every record of a filled view once, returning each one's HTML by param for pack to check: a record the component cannot
- * draw fails the pack, naming it, rather than leaving the reader an empty view.
+ * draw, or that draws a View (which only the page can hold: pack moves it after the overview, views.js finds it there), fails
+ * the pack, naming it, rather than leaving the reader an empty or broken view.
  */
 function drawEach(
 	view: string,
@@ -185,13 +186,21 @@ function drawEach(
 	depth++;
 	try {
 		for (const [param, record] of Object.entries(records)) {
+			let html: string;
 			try {
-				drawn[param] = renderToString(h(FilledRecord, { render, record, back }));
+				html = renderToString(h(FilledRecord, { render, record, back }));
 			} catch (e) {
 				throw new IslandError(
 					`<View name="${view}" render={${label}}> threw for #${view}/${param}: ${e instanceof Error ? e.message : String(e)}`,
 				);
 			}
+			// The element a View renders in (VIEW_MARKER in components/view.tsx).
+			if (html.includes("<explainer-view>")) {
+				throw new IslandError(
+					`<View name="${view}" render={${label}}> draws a View for #${view}/${param}, but a View belongs to the page: put it in the page and link to it from the record`,
+				);
+			}
+			drawn[param] = html;
 		}
 	} finally {
 		depth--;

@@ -37,9 +37,22 @@ ${ITEM_BODY}
 
 /** A client component that cannot draw one record. */
 const BOOM = `"use client";
+import { View } from "kit";
 export function Boom({ record }: { record: { id: string } }) {
 	if (record.id === "bad") throw new Error("no such task");
 	return <h1>{record.id}</h1>;
+}
+
+/** Records with ids of their own twice, and with the id of the filled view's section, which the page always holds. */
+export function Twice({ record }: { record: { id: string } }) {
+	return record.id === "own"
+		? <><h1>{record.id}</h1><input id="duplicate" aria-label="Note" /><div id="duplicate" /></>
+		: <><h1>{record.id}</h1><div id="items" /></>;
+}
+
+/** A record that draws a View. */
+export function Nested({ record }: { record: { id: string } }) {
+	return <View name="inner"><h1>{record.id}</h1></View>;
 }
 `;
 
@@ -222,20 +235,22 @@ describe("a filled view in pack and check", () => {
 		expect(checked.code).toBe(0);
 	}, 90_000);
 
-	test("fails the pack, naming the view, for records it could not open or draw, and for a render that is not a client component", async () => {
+	test("fails the pack, naming the view, for records it could not open or draw, ids a record repeats, a View in a record, and a render that is not a client component", async () => {
 		const failures = await Promise.all(
 			[
 				["no-id", "records={[{ name: 'x' }]} render={Item}"],
 				["same-id", "records={[{ id: 1 }, { id: '1' }]} render={Item}"],
 				["throws", "records={[{ id: 'ok' }, { id: 'bad' }]} render={Boom}"],
 				["static", "records={items} render={(p) => <h1>{p.record.name}</h1>}"],
+				["ids", 'id="items" records={[{ id: "own" }, { id: "page" }]} render={Twice}'],
+				["nested", "records={[{ id: 'a' }]} render={Nested}"],
 			].map(async ([name, props]) => {
 				const source = FILLED.replace("records={items} render={Item}", props ?? "").replace(
 					'import { Item } from "./item.tsx";',
-					'import { Item } from "./item.tsx";\nimport { Boom } from "./boom.tsx";',
+					'import { Item } from "./item.tsx";\nimport { Boom, Nested, Twice } from "./boom.tsx";',
 				);
 				const { result } = await pack(`bad-${name}`, source, { "boom.tsx": BOOM });
-				const message = result.stderr.trim().split("\n").at(-1) ?? "";
+				const message = result.stderr.trim().split("\n").slice(1).join("\n");
 				return `${result.code} ${message.split("the page threw while rendering: ").at(-1)}`;
 			}),
 		);
@@ -244,6 +259,8 @@ describe("a filled view in pack and check", () => {
 			'1 <View name="item" records>: two records have the id "1"',
 			'1 <View name="item" render={Boom}> threw for #item/bad: no such task',
 			'1 <View name="item" render>: render must be a component from a module whose first line is "use client", since it draws in the browser',
+			'1 - #item/own: the id "duplicate" is on 2 elements: <input> under "own", <div> under "own". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id\n- #item/page: the id "items" is on 2 elements: <section class="view"> under "Method", <div> under "page". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id',
+			'1 <View name="item" render={Nested}> draws a View for #item/a, but a View belongs to the page: put it in the page and link to it from the record',
 		]);
 	}, 60_000);
 });

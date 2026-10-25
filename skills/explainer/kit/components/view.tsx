@@ -20,12 +20,13 @@
      render   a function component from your "use client" module, given { record }. It returns the view's content: an <h1>, the
               paragraphs of its head, then <section>s, each with its <h2>
    Only the open record is drawn, so a filled view prints only while it is open. A control in it is kept like any other when its id
-   names the record: id={`note-${record.id}`}.
+   names the record: id={`note-${record.id}`}. pack draws every record once and fails on an id one repeats or shares with the page.
    Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it
    briefly ("Ana", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the
    view's heading. Previous and next walk the views of its kind (the ones the view it was opened from links to, else all of
    them); a page with views inside views (two or more view names) gets a contents rail of its sections. A section with two or
-   more folds gets Expand all. A View belongs to the page: put client components inside it, not a View inside a client component. */
+   more folds gets Expand all. A View belongs to the page: put client components inside it, not a View inside a client component
+   or a record. */
 import { type ComponentChildren, h } from "preact";
 import { type Fillable, viewBody } from "./view-body.ts";
 

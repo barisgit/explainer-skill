@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import { basename, dirname, extname, relative } from "node:path";
 import type { Island, IslandData } from "../../kit/islands/server.ts";
 import { safeScript } from "../escape.ts";
+import { idUses, recordIdProblems } from "../ids.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
@@ -88,6 +89,20 @@ async function answerClashes(html: string): Promise<string[]> {
 		);
 }
 
+/** The ids each filled View's record repeats while it is open, in itself or beside the page's own `html` (ids.ts). */
+async function recordIds(html: string, islands: Island[]): Promise<string[]> {
+	const filled = islands.flatMap(({ view, drawn = {} }) =>
+		Object.entries(drawn).map(([param, record]) => ({ place: `#${view}/${param}`, record })),
+	);
+	if (!filled.length) {
+		return [];
+	}
+	const page = await idUses(html);
+	return (
+		await Promise.all(filled.map(({ place, record }) => recordIdProblems(page, record, place)))
+	).flat();
+}
+
 /** The islands as the page carries them for kit/islands/client.ts, each module named by its index in `modules`. */
 const islandData = (islands: Island[], modules: string[]): IslandData[] =>
 	islands.map(({ module, name, props, refs, view }) => ({
@@ -145,6 +160,10 @@ export async function mdxPage(
 	const loads = await clientLoads(scan, islands);
 	if (loads.length) {
 		throw new PackError(`${loads.map((load) => `- ${load}`).join("\n")}\n${CLIENT_LOAD_FIX}`);
+	}
+	const repeated = await recordIds(html, islands);
+	if (repeated.length) {
+		throw new PackError(repeated.map((problem) => `- ${problem}`).join("\n"));
 	}
 	const needed = await kitScripts(html, scan, page.front);
 	const kit = (names: KitScript[]) =>
