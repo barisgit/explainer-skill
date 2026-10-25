@@ -95,7 +95,7 @@ async function kitScripts(
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
  * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
- * scripts it needs. Every error the author can fix is a PackError.
+ * scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError.
  */
 export async function mdxPage(
 	file: string,
@@ -129,9 +129,10 @@ export async function mdxPage(
 		p: props,
 		...(view === undefined ? {} : { v: view }),
 	}));
+	const scheme = page.front.scheme ? ` data-scheme="${page.front.scheme}"` : "";
 	return [
 		"<!doctype html>",
-		`<html lang="${escapeHtml(page.front.lang)}">`,
+		`<html lang="${escapeHtml(page.front.lang)}"${scheme}>`,
 		"<head>",
 		'<meta charset="utf-8">',
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',

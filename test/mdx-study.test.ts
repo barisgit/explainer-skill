@@ -224,3 +224,45 @@ export function Late() {
 		expect(summaries).toEqual(["Poka\u017ei odgovor", "Poka\u017ei odgovor"]);
 	}, 30_000);
 });
+
+/** Packs a page with `front` as its frontmatter body, expecting a failure; returns the exit code and the message. */
+async function frontFailure(name: string, front: string) {
+	const out = dir.path(`${name}.out.html`);
+	const result = await runCli([
+		"pack",
+		dir.write(`${name}.mdx`, `---\n${front}\n---\n\n# T\n`),
+		"-o",
+		out,
+	]);
+	return [result.code, result.stderr.trim()];
+}
+
+describe("frontmatter", () => {
+	test("scheme forces the colour scheme the system would pick; without it the page follows the system", async () => {
+		const schemeOf = async (name: string, front: string) => {
+			const { output } = await pack(name, `---\n${front}\n---\n\n# T\n\nText.\n`);
+			return withPage(async (cdp) => {
+				await cdp.send("Page.enable");
+				await cdp.send("Emulation.setEmulatedMedia", {
+					features: [{ name: "prefers-color-scheme", value: "light" }],
+				});
+				await load(cdp, `file://${output}`);
+				return cdp.evaluate<[string | null, string]>(
+					`[document.documentElement.getAttribute("data-scheme"), getComputedStyle(document.body).backgroundColor]`,
+				);
+			});
+		};
+		// The system asks for light throughout.
+		const [none, paper] = await schemeOf("scheme-system", "title: T");
+		const [dark, night] = await schemeOf("scheme-dark", "scheme: dark");
+		expect([none, dark]).toEqual([null, "dark"]);
+		expect(night).not.toBe(paper);
+		expect(await schemeOf("scheme-light", "scheme: light")).toEqual(["light", paper]);
+		expect(await frontFailure("scheme-auto", "scheme: auto")).toEqual([
+			1,
+			expect.stringContaining(
+				"scheme-auto.mdx frontmatter: scheme must be light or dark; leave it out to follow the reader's system",
+			),
+		]);
+	}, 30_000);
+});
