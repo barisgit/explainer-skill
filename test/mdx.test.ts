@@ -241,6 +241,16 @@ export function Refs() {
 		).toContain("or give Box's prop another name");
 	});
 
+	test("an id on two elements names the id and where each is", async () => {
+		const stderr = await failure(
+			"repeated-id",
+			'# Plan\n\n## Work list\n\n<details id="opt-O2"><summary>O2</summary>Tasks</details>\n\n## Options\n\n<label><input type="checkbox" id="opt-O2" /> O2</label>\n',
+		);
+		expect(stderr).toContain(
+			'the id "opt-O2" is on 2 elements: <details> under "Work list", <input type="checkbox"> under "Options". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id',
+		);
+	});
+
 	test("children from the page into a client component are refused", async () => {
 		const stderr = await failure(
 			"children",

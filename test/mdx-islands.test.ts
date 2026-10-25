@@ -518,11 +518,13 @@ describe("Question", () => {
 			expect.stringContaining('<Question name="pick"> has the option value "Yes" twice'),
 		]);
 		expect(
-			await failed(
-				"shared",
-				`${question("pick", '["Yes"]')}\n\n${question("pick", '["Yes", "No"]')}`,
+			await failed("shared", `${question("a-b", '["c"]')}\n\n${question("a", '["b-c"]')}`),
+		).toEqual([
+			1,
+			expect.stringContaining(
+				'the id "a-b-c" is on 2 elements: <input type="radio" name="a-b" value="c"> under "Ids", <input type="radio" name="a" value="b-c"> under "Ids". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id (a Question\'s option ids are its name and value, so give each Question its own name)',
 			),
-		).toEqual([1, expect.stringContaining('the id "pick-Yes" is on 2 controls')]);
+		]);
 		expect(
 			await failed("grouped", `${question("pick", '["Yes"]')}\n\n${question("pick", '["No"]')}`),
 		).toEqual([1, expect.stringContaining('2 questions use the name "pick"')]);

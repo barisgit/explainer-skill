@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { classCollisions } from "./collisions.ts";
 import { safeScript } from "./escape.ts";
+import { repeatedIdProblems } from "./ids.ts";
 import { kitFiles, kitPath, readKitText } from "./kit.ts";
 import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
@@ -295,7 +296,8 @@ function loadMessage({ origin, kind, target }: Load): string {
  * Returns the page as one HTML file with local CSS, scripts, images and fonts inlined. An `.mdx` page is first compiled and
  * prerendered to an HTML page (mdx/page.ts); everything after that is the same for both.
  * Mermaid blocks are pre-rendered in this process. Throws PackError listing every remaining network dependency
- * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render.
+ * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render,
+ * then, once those are fixed, every id the finished page has on more than one element.
  * `warnings` lists links that go nowhere and page classes the kit styles too (see classCollisions).
  */
 export async function pack(inputPath: string): Promise<{ html: string; warnings: string[] }> {
@@ -318,6 +320,10 @@ export async function pack(inputPath: string): Promise<{ html: string; warnings:
 		throw new PackError(
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and reference them relatively, or use kit: files." : ""}`,
 		);
+	}
+	const repeated = await repeatedIdProblems(html);
+	if (repeated.length) {
+		throw new PackError(repeated.map((p) => `- ${p}`).join("\n"));
 	}
 	const warnings = [
 		...loneRefs(original, diagramRefs).map(

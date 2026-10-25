@@ -52,21 +52,14 @@ const escapeHtml = (text: string) =>
 const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 
 /**
- * Problems that would mix up the reader's answers: a control id on two controls (reply.js keeps an answer by id, so it would
- * restore neither), or one option name in two data-reply fieldsets (their radios would form one group). A Question's ids are
- * its name and values, so two Questions meet when they share a name. Controls a client component renders later are not seen.
+ * Questions that would mix up the reader's answers: one option name in two data-reply fieldsets, whose radios would form one
+ * group. A Question's option ids are its name and values, so two such Questions also repeat ids, which pack refuses for any page
+ * (ids.ts). Controls a client component renders later are not seen.
  */
 async function answerClashes(html: string): Promise<string[]> {
-	const ids = new Map<string, number>();
 	const groups = new Map<string, Set<number>>();
 	let fieldsets = 0;
 	await new HTMLRewriter()
-		.on("input[id], select[id], textarea[id]", {
-			element(el) {
-				const id = el.getAttribute("id") ?? "";
-				ids.set(id, (ids.get(id) ?? 0) + 1);
-			},
-		})
 		.on("fieldset[data-reply]", { element: () => void fieldsets++ })
 		.on("fieldset[data-reply] input[name]", {
 			element(el) {
@@ -76,20 +69,12 @@ async function answerClashes(html: string): Promise<string[]> {
 		})
 		.transform(new Response(html))
 		.text();
-	return [
-		...[...groups]
-			.filter(([, inside]) => inside.size > 1)
-			.map(
-				([name, inside]) =>
-					`${inside.size} questions use the name "${name}", so their options would form one group: give each Question its own name`,
-			),
-		...[...ids]
-			.filter(([, count]) => count > 1)
-			.map(
-				([id, count]) =>
-					`the id "${id}" is on ${count} controls, and the reader's answers are kept by id: a Question's ids are its name and option values, so give each Question its own name and other controls ids of their own`,
-			),
-	];
+	return [...groups]
+		.filter(([, inside]) => inside.size > 1)
+		.map(
+			([name, inside]) =>
+				`${inside.size} questions use the name "${name}", so their options would form one group: give each Question its own name`,
+		);
 }
 
 /** The kit scripts the page needs: for the markup its HTML holds, the markup its client code can write later, and reply: true. */
