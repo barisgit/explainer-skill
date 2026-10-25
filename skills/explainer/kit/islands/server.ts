@@ -15,7 +15,12 @@ import {
 	type VNode,
 } from "preact";
 import { renderToString } from "preact-render-to-string";
-import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
+import {
+	type DrawRecord,
+	type Fillable,
+	FilledRecord,
+	type FillProps,
+} from "../components/view-body.ts";
 import "./bare-data.ts";
 import { CLIENT_REFERENCE, isClientExport, notJson } from "./props.ts";
 
@@ -105,7 +110,7 @@ export function island(module: string, name: string, value: unknown, kit = false
 		);
 	}
 	Island.displayName = label;
-	Island.fill = (view: string, props: FillProps) => {
+	const fill: Fillable["fill"] = (view, props) => {
 		const problem = notJson(props.records, "");
 		if (problem) {
 			throw new IslandError(
@@ -115,6 +120,7 @@ export function island(module: string, name: string, value: unknown, kit = false
 		drawEach(view, label, Component as DrawRecord, props);
 		islands.push({ module, name, props: { ...props }, view });
 	};
+	Island.fill = fill;
 	wrappers.add(Island);
 	return Island;
 }

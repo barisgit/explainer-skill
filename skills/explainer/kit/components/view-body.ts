@@ -21,6 +21,14 @@ export interface FillProps {
 	back?: string;
 }
 
+/**
+ * What kit/islands/server.ts adds to a client component for a filled View: `fill` records the island that draws `view` from
+ * `props` in the browser. A component without it is not a client component.
+ */
+export interface Fillable {
+	fill(view: string, props: FillProps): void;
+}
+
 const isElement = (node: unknown, tag: unknown): node is VNode<{ class?: string }> =>
 	typeof node === "object" && node !== null && "type" in node && node.type === tag;
 

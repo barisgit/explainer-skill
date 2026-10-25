@@ -27,7 +27,7 @@
    them); a page with views inside views (two or more view names) gets a contents rail of its sections. A section with two or
    more folds gets Expand all. A View belongs to the page: put client components inside it, not a View inside a client component. */
 import { type ComponentChildren, h } from "preact";
-import { type FillProps, viewBody } from "./view-body.ts";
+import { type Fillable, viewBody } from "./view-body.ts";
 
 /** A record of a filled view: its id is the param that opens it. */
 export interface ViewRecord {
@@ -53,14 +53,6 @@ export interface FilledViewProps<T extends ViewRecord> extends Common {
 }
 
 export type ViewProps<T extends ViewRecord = ViewRecord> = StaticViewProps | FilledViewProps<T>;
-
-/**
- * What kit/islands/server.ts adds to a client component for a filled View: `fill` records the island that draws `view` from
- * `props` in the browser. A component without it is not a client component.
- */
-export interface Fillable {
-	fill(view: string, props: FillProps): void;
-}
 
 /** The element pack moves, with its content, after the overview (hoistViews in src/mdx/page.ts); it never reaches the page. */
 const VIEW_MARKER = "explainer-view";
