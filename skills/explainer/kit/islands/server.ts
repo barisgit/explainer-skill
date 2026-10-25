@@ -18,16 +18,31 @@ import { renderToString } from "preact-render-to-string";
 import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
 
+/** A function a client module exports, found at `path` in an island's props: the browser takes it from that module's exports. */
+export interface ClientRef {
+	path: (string | number)[];
+	module: string;
+	name: string;
+}
+
 /**
- * One prerendered client component: the module that defines it, its export name and the JSON props it hydrates with. With
- * `view`, it has no markup: it draws the open record of that filled View in the browser, from props that are FillProps.
+ * One prerendered client component: the module that defines it, its export name and the JSON props it hydrates with, with
+ * `refs` put in place of the nulls at their paths. With `view`, it has no markup: it draws the open record of that filled View
+ * in the browser, from props that are FillProps.
  */
 export interface Island {
 	module: string;
 	name: string;
 	props: Record<string, unknown>;
+	refs?: ClientRef[];
 	view?: string;
 }
+
+/**
+ * Where a function a client module exports is defined, on the function itself, so a prop holding it can reach the browser as a
+ * reference (clientRefs) and kit components can tell it from a function that exists only in pack (Explore's frame).
+ */
+const CLIENT_REFERENCE = Symbol.for("explainer.clientReference");
 
 /** What the page would do wrong in the browser; the message is for the page's author. pack finds it by name, not by class. */
 export class IslandError extends Error {
@@ -54,7 +69,14 @@ let slotOf: string | undefined;
  * which may sit in another island's slot as islands of their own.
  */
 export function island(module: string, name: string, value: unknown, kit = false): unknown {
-	if (typeof value !== "function" || !(name === "default" || /^[A-Z]/.test(name))) {
+	if (typeof value !== "function") {
+		return value;
+	}
+	if (!(name === "default" || /^[A-Z]/.test(name))) {
+		// A module that re-exports another client module's function: the first module to export it is where the browser finds it.
+		if (!(CLIENT_REFERENCE in value)) {
+			Object.defineProperty(value, CLIENT_REFERENCE, { value: { module, name } });
+		}
 		return value;
 	}
 	// A client module's capitalised function export is a component by the islands contract.
@@ -72,13 +94,20 @@ export function island(module: string, name: string, value: unknown, kit = false
 				`<${label}> is in the children of <${slotOf}>, which pack renders once as static HTML, so ${label} would not share ${slotOf}'s state: render <${label}> inside ${slotOf}, or beside it in the page`,
 			);
 		}
-		const problem = notJson(props, "");
+		const { json, refs } = clientRefs(props);
+		const problem = notJson(json, "");
 		if (problem) {
 			throw new IslandError(
-				`<${label} ${problem.path.slice(1)}> is ${problem.what}, but props from the page to a client component must be JSON: move the code that makes it into your own "use client" component and render <${label}> there`,
+				`<${label} ${problem.path.slice(1)}> is ${problem.what}, but props from the page to a client component must be JSON or functions a "use client" module exports: export it from one, or render <${label}> in your own client component`,
 			);
 		}
-		return prerendered({ module, name, props }, Component, label, children);
+		return prerendered(
+			{ module, name, props: json, ...(refs.length ? { refs } : {}) },
+			props,
+			Component,
+			label,
+			children,
+		);
 	}
 	Island.displayName = label;
 	Island.fill = (view: string, props: FillProps) => {
@@ -95,9 +124,13 @@ export function island(module: string, name: string, value: unknown, kit = false
 	return Island;
 }
 
-/** Numbers `entry` and renders its component, with its slot when the page gave it children, as the marker element for renderPage. */
+/**
+ * Numbers `entry` and renders its component from `props` (entry.props with the client functions still in place), with its slot
+ * when the page gave it children, as the marker element for renderPage.
+ */
 function prerendered(
 	entry: Island,
+	props: Record<string, unknown>,
 	Component: ComponentType<Record<string, unknown>>,
 	label: string,
 	children: ComponentChildren,
@@ -108,9 +141,7 @@ function prerendered(
 	depth++;
 	let html: string;
 	try {
-		html = renderToString(
-			h(Component, slot ? { ...entry.props, children: slot.vnode } : entry.props),
-		);
+		html = renderToString(h(Component, slot ? { ...props, children: slot.vnode } : props));
 	} finally {
 		depth--;
 	}
@@ -180,6 +211,37 @@ const hasFunction = (children: unknown): boolean =>
 				children !== null &&
 				"props" in children &&
 				hasFunction((children.props as { children?: unknown }).children));
+
+/**
+ * `props` with each function a client module exports replaced by null, and where each was: JSON carries the rest to the browser,
+ * and the client bundle imports those modules and puts the functions back (islands/client.ts).
+ */
+function clientRefs(props: Record<string, unknown>): {
+	json: Record<string, unknown>;
+	refs: ClientRef[];
+} {
+	const refs: ClientRef[] = [];
+	const walk = (value: unknown, path: (string | number)[]): unknown => {
+		if (typeof value === "function" && CLIENT_REFERENCE in value) {
+			refs.push({ path, ...(value[CLIENT_REFERENCE] as Omit<ClientRef, "path">) });
+			return null;
+		}
+		if (Array.isArray(value)) {
+			return value.map((item, i) => walk(item, [...path, i]));
+		}
+		if (
+			value !== null &&
+			typeof value === "object" &&
+			Object.getPrototypeOf(value) === Object.prototype
+		) {
+			return Object.fromEntries(
+				Object.entries(value).map(([key, item]) => [key, walk(item, [...path, key])]),
+			);
+		}
+		return value;
+	};
+	return { json: walk(props, []) as Record<string, unknown>, refs };
+}
 
 /** True for children that render something; whitespace between tags does not count. */
 const hasContent = (children: ComponentChildren): boolean =>

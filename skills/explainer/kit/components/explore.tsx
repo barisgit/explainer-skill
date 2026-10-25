@@ -1,67 +1,71 @@
-/* Explore: a slider, choice or toggles switching a plot or chart and its readout between frames computed in pack.
+/* Explore: a slider, choice or toggles switching a plot or chart and readout through your function.
    <Explore label="Envelope against g(t)" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
-     frames={ms.map((m) => ({ plot: envelope(m), readout: `Envelope follows g(t): ${m <= 1 ? "yes" : "no"}` }))} />
-     controls  one or more, each with a label and an id (a page with reply keeps its value across reloads):
+     frame={envelope} />
+     controls  one or more, each with a label and an id (its value is kept across reloads):
        range: [min, max, step]   a slider; value is where it starts, format writes its readout ({ digits: 2 }, { unit: "%" })
-       choice: ["LC", "SC"]      one of the texts, as a segmented switch; value is the text it starts on
+       choice: ["LC", "SC"]      one of the texts, as a segmented switch ({ lc: "With carrier", ... } gives frame "lc");
+                                 value is the one it starts on
        toggle: true              a switch, off then on; value: true starts it on
-     frames    one frame per value of the first control; with more controls, a list per value nesting the next control's
-               (two toggles: [[offOff, offOn], [onOff, onOn]]). A frame holds any of
-       plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart): JSON, with formats as JSON
+     frame     (...values) => what the figure shows, given the controls' values in order (a number, a text, true or false):
+       plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart)
        readout  text or JSX in a live line over the figure; stats { "Carrier": "67%" }, text or JSX, are figures in a row
        caption  text or JSX under the figure
      base      what every frame shares (axes, colours, the caption); a frame's keys merge over it
      label     the figure's accessible name
      class     more classes on the plot or chart, e.g. "tall"
-   Frames are computed when the page packs; the page carries the first whole and each other one as its difference, with lines
-   kept to 1/10000 of their range: 31 frames of two 201-point lines take about 90 KB, of four 1001-point lines about 900 KB.
-   When that is too much, or the figure needs dragging, clicks or a simulation, write a client component. */
+   Where frame runs: exported from a module whose first line is "use client", it ships and runs in the browser on each change
+   (base is then JSON); use that for sliders over model curves. Otherwise pack calls it for every combination and the page
+   carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
+   Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { Explore as ExploreChart } from "./parts/explore-chart.tsx";
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
 import { Explore as ExploreText } from "./parts/explore-text.tsx";
-import { type ExploreControl, type ExploreData, valueCount } from "./parts/explore-view.tsx";
+import {
+	type ExploreControl,
+	type ExploreData,
+	type ExploreFrame,
+	type ExploreValue,
+	type FrameFunction,
+	valueAt,
+	valueCount,
+	withBase,
+} from "./parts/explore-view.tsx";
 import { numberText } from "./parts/format.ts";
 import { diff, type Json } from "./parts/frames.ts";
+
+export type { ExploreFrame, ExploreValue };
 
 /** One control as the page writes it. */
 export type ExploreControlProps = { id: string; label: string } & (
 	| { range: readonly [number, number, number]; value?: number; format?: NumberFormat }
-	| { choice: readonly string[]; value?: string }
+	| { choice: readonly string[] | Readonly<Record<string, string>>; value?: string }
 	| { toggle: true; value?: boolean }
 );
 
-/** One frame, or the shared base: what the figure shows for one combination of the controls' values. */
-export interface ExploreFrame {
-	plot?: PlotOption;
-	chart?: ChartOption;
-	readout?: ComponentChildren;
-	stats?: Record<string, ComponentChildren>;
-	caption?: ComponentChildren;
-}
-
-/** The frames, one list level per control. */
-export type ExploreFrames = readonly (ExploreFrame | ExploreFrames)[];
-
 export interface ExploreProps {
 	controls: readonly ExploreControlProps[];
-	frames: ExploreFrames;
+	/** The frame for the controls' values; `never[]` lets a function with narrower parameters ((kind: Kind, m: number)) through. */
+	frame: (...values: never[]) => ExploreFrame;
 	base?: ExploreFrame;
 	label?: string;
 	class?: string;
 	id?: string;
 }
 
-/** A frame as the island gets it (explore-view.tsx): the figure's option as JSON, and HTML for the rest. */
+/** A precomputed frame as the island gets it (explore-view.tsx): the figure's option as JSON, and HTML for the rest. */
 interface Shown {
-	figure?: Json;
+	plot?: Json;
+	chart?: Json;
 	readout?: string;
 	stats?: Record<string, string>;
 	caption?: string;
 }
 
 const FRAME_KEYS = new Set(["plot", "chart", "readout", "stats", "caption"]);
+/** The most precomputed frames may take in the page; past it, the browser computing them is the better trade. */
+const PRECOMPUTED_LIMIT = 100_000;
 
 const fail = (message: string): never => {
 	throw new Error(`<Explore> ${message}`);
@@ -69,6 +73,10 @@ const fail = (message: string): never => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
+
+/** True for a function a "use client" module exports, which the browser can call (kit/islands/server.ts marks them). */
+const isClientExport = (value: unknown) =>
+	typeof value === "function" && Symbol.for("explainer.clientReference") in value;
 
 /** Decimals a number is written with: 2 for 0.05. */
 const decimals = (n: number) => (String(n).split(".")[1] ?? "").length;
@@ -100,14 +108,20 @@ function control(spec: ExploreControlProps): { control: ExploreControl; start: n
 		const shown = rangeControl(id, spec.range, spec.format);
 		const { min, step, texts } = shown.range;
 		const at = Math.round(((spec.value ?? min) - min) / step);
-		return { control: { id, label, ...shown }, start: Math.min(Math.max(at, 0), texts.length - 1) };
+		return {
+			control: { id, label, ...shown },
+			start: Math.min(Math.max(at, 0), texts.length - 1),
+		};
 	}
 	if ("choice" in spec) {
-		const start = spec.value === undefined ? 0 : spec.choice.indexOf(spec.value);
-		if (spec.choice.length < 2 || start < 0) {
-			return fail(`control "${id}": choice needs two or more texts, and value one of them`);
+		const [values, texts] = Array.isArray(spec.choice)
+			? [[...spec.choice], [...spec.choice]]
+			: [Object.keys(spec.choice), Object.values(spec.choice)];
+		const start = spec.value === undefined ? 0 : values.indexOf(spec.value);
+		if (values.length < 2 || start < 0) {
+			return fail(`control "${id}": choice needs two or more values, and value one of them`);
 		}
-		return { control: { id, label, choice: [...spec.choice] }, start };
+		return { control: { id, label, choice: texts, values }, start };
 	}
 	if (spec.toggle !== true) {
 		return fail(`control "${id}" needs range, choice or toggle: true`);
@@ -115,31 +129,34 @@ function control(spec: ExploreControlProps): { control: ExploreControl; start: n
 	return { control: { id, label, toggle: true }, start: spec.value ? 1 : 0 };
 }
 
-/** The frames in row-major order with the path each has in the page's frames, checking one item per control value. */
-function flatten(
-	frames: unknown,
-	controls: readonly ExploreControlProps[],
-	counts: readonly number[],
-	path = "frames",
-): [string, ExploreFrame][] {
-	const level = path.split("[").length - 1;
-	const count = counts[level];
-	if (count === undefined) {
-		if (!isRecord(frames)) {
-			return fail(`${path} is not a frame: give { plot, chart, readout, stats, caption }`);
-		}
-		const unknown = Object.keys(frames).find((key) => !FRAME_KEYS.has(key));
-		return unknown
-			? fail(`${path} has "${unknown}": a frame holds plot, chart, readout, stats or caption`)
-			: [[path, frames]];
+/** Every combination of the controls' value indices, the first control outermost: the order explore-view.tsx indexes frames in. */
+const combinations = (controls: ExploreControl[]): number[][] =>
+	controls.reduce<number[][]>(
+		(combos, c) =>
+			combos.flatMap((combo) => Array.from({ length: valueCount(c) }, (_, i) => [...combo, i])),
+		[[]],
+	);
+
+/** frame's result for `values`, checked, with the call written as the author would (`frame(0.5)`) for messages. */
+function called(frame: FrameFunction, values: ExploreValue[]): [string, ExploreFrame] {
+	const call = `frame(${values.map((v) => JSON.stringify(v)).join(", ")})`;
+	let result: unknown;
+	try {
+		result = frame(...values);
+	} catch (e) {
+		return fail(`${call} threw: ${e instanceof Error ? e.message : String(e)}`);
 	}
-	if (!Array.isArray(frames) || frames.length !== count) {
-		const items = Array.isArray(frames) ? `${frames.length} items` : "no list";
-		return fail(
-			`${path} has ${items}, but control "${controls[level]?.id}" has ${count} values: give one item per value`,
-		);
+	if (!isRecord(result)) {
+		return fail(`${call} returned no frame: return { plot, chart, readout, stats, caption }`);
 	}
-	return frames.flatMap((frame, i) => flatten(frame, controls, counts, `${path}[${i}]`));
+	const unknown = Object.keys(result).find((key) => !FRAME_KEYS.has(key));
+	if (unknown) {
+		fail(`${call} returned "${unknown}": a frame holds plot, chart, readout, stats or caption`);
+	}
+	if (result.plot && result.chart) {
+		fail(`${call} returned a plot and a chart: an Explore draws one`);
+	}
+	return [call, result];
 }
 
 /** The first part of an option that JSON would not carry to the browser, as `path`. */
@@ -168,62 +185,40 @@ function notJson(value: unknown, path: string): string | undefined {
 	return undefined;
 }
 
-/** `patch` merged into `base`: objects key by key, anything else (arrays included) replaced. */
-function merge(base: unknown, patch: unknown): unknown {
-	if (!isRecord(base) || !isRecord(patch)) {
-		return patch === undefined ? base : patch;
-	}
-	const merged: Record<string, unknown> = { ...base };
-	for (const [key, value] of Object.entries(patch)) {
-		merged[key] = merge(base[key], value);
-	}
-	return merged;
-}
-
 /** Text or JSX as HTML, rendered now: the island shows it as it is. */
 const toHtml = (content: ComponentChildren) => renderToString(h(Fragment, null, content));
 
-/** One frame with the base under it, as the island shows it; `kind` is the figure every frame draws. */
-function shownFrame(
-	base: ExploreFrame,
-	[path, frame]: [string, ExploreFrame],
-	kind: "plot" | "chart" | undefined,
-) {
+/** A computed frame, with the base under it, as the island gets it; `kind` is the figure every frame draws. */
+function shownFrame([call, frame]: [string, ExploreFrame], kind: "plot" | "chart" | undefined) {
 	const shown: Shown = {};
-	const option = kind && merge(base[kind], frame[kind]);
-	if (option !== undefined) {
-		const bad = notJson(option, `${path}.${kind}`);
+	const option = kind && frame[kind];
+	if (kind && option !== undefined) {
+		const bad = notJson(option, `${call}.${kind}`);
 		if (bad) {
 			fail(
-				`${bad} is not JSON: write formats and labels as JSON ({ digits: 1, unit: "kHz" }), or use a client component`,
+				`${bad} is not JSON: write formats and labels as JSON ({ digits: 1, unit: "kHz" }), or export frame from a "use client" module`,
 			);
 		}
-		shown.figure = JSON.parse(JSON.stringify(option));
+		shown[kind] = JSON.parse(JSON.stringify(option));
 	}
-	const readout = frame.readout ?? base.readout;
-	const caption = frame.caption ?? base.caption;
-	const stats = { ...base.stats, ...frame.stats };
-	if (readout != null) {
-		shown.readout = toHtml(readout);
+	if (frame.readout != null) {
+		shown.readout = toHtml(frame.readout);
 	}
-	if (Object.keys(stats).length) {
+	if (frame.stats && Object.keys(frame.stats).length) {
 		shown.stats = Object.fromEntries(
-			Object.entries(stats).map(([term, value]) => [term, toHtml(value)]),
+			Object.entries(frame.stats).map(([term, value]) => [term, toHtml(value)]),
 		);
 	}
-	if (caption != null) {
-		shown.caption = toHtml(caption);
+	if (frame.caption != null) {
+		shown.caption = toHtml(frame.caption);
 	}
 	return shown;
 }
 
 /** The figure the frames draw, the same in every one. */
-function figureKind(
-	base: ExploreFrame,
-	frames: [string, ExploreFrame][],
-): "plot" | "chart" | undefined {
+function figureKind(frames: ExploreFrame[]): "plot" | "chart" | undefined {
 	const kinds = new Set(
-		[base, ...frames.map(([, frame]) => frame)].flatMap((f) => [
+		frames.flatMap((f) => [
 			...(f.plot ? ["plot" as const] : []),
 			...(f.chart ? ["chart" as const] : []),
 		]),
@@ -268,9 +263,7 @@ const isPoint = (p: unknown): p is [number, number] =>
  */
 function roundLines(frames: Shown[]) {
 	const lines = frames.flatMap((f) =>
-		((f.figure as PlotOption | undefined)?.series ?? []).filter(
-			(s) => (s.type ?? "line") === "line",
-		),
+		((f.plot as PlotOption | undefined)?.series ?? []).filter((s) => (s.type ?? "line") === "line"),
 	);
 	const points = lines.flatMap((s) => s.data.filter(isPoint));
 	const places = (k: 0 | 1) => {
@@ -285,7 +278,7 @@ function roundLines(frames: Shown[]) {
 }
 
 /** The first frame whole, each frame's patch against it (each distinct patch once), and which patch each frame takes. */
-function compact(frames: Shown[]): Pick<ExploreData, "first" | "patches" | "at"> {
+function compact(frames: Shown[]): { first: Json; patches: Json[]; at: number[] } {
 	const first = frames[0] as Json;
 	const patches: Json[] = [];
 	const seen = new Map<string, number>();
@@ -302,33 +295,62 @@ function compact(frames: Shown[]): Pick<ExploreData, "first" | "patches" | "at">
 	return { first, patches, at };
 }
 
-/**
- * Prepares the frames in pack (validated, merged with the base, readouts rendered to HTML, lines rounded, each frame a patch
- * against the first) and renders the island for the figure they draw, which hydrates in the browser.
- */
-export function Explore({ controls, frames, base = {}, label, class: extra, id }: ExploreProps) {
-	if (!controls.length) {
-		fail("needs controls: a range, a choice or a toggle");
-	}
-	const made = controls.map(control);
-	const counts = made.map((m) => valueCount(m.control));
-	const listed = flatten(frames, controls, counts);
-	const kind = figureKind(base, listed);
-	if (kind && !label) {
-		fail(`needs a label: the accessible name of its ${kind}`);
-	}
-	const shown = listed.map((frame) => shownFrame(base, frame, kind));
+/** The computed frames as the page carries them, failing when they would take more than PRECOMPUTED_LIMIT of it. */
+function precomputed(frames: [string, ExploreFrame][], kind: "plot" | "chart" | undefined) {
+	const shown = frames.map((frame) => shownFrame(frame, kind));
 	fillGaps(shown);
 	if (kind === "plot") {
 		roundLines(shown);
 	}
+	const carried = compact(shown);
+	const size = JSON.stringify(carried).length;
+	if (size > PRECOMPUTED_LIMIT) {
+		fail(
+			`frames would take ${Math.round(size / 1024)} KB of the page: export frame from a module whose first line is "use client", and the browser computes each frame instead`,
+		);
+	}
+	return carried;
+}
+
+/**
+ * Calls frame for every combination of the controls' values (in the browser, only for the starting ones), checks the results,
+ * and renders the island for the figure they draw: with the frame function when a client module exports it, else with the
+ * frames precomputed. Inside your own client component frame always runs in the browser.
+ */
+export function Explore({ controls, frame, base = {}, label, class: extra, id }: ExploreProps) {
+	if (!controls.length || typeof frame !== "function") {
+		fail("needs controls (a range, a choice or a toggle) and frame, a function of their values");
+	}
+	const made = controls.map(control);
+	const shown = made.map((m) => m.control);
+	const start = made.map((m) => m.start);
+	const live = isClientExport(frame) || typeof document !== "undefined";
+	const fn = frame as FrameFunction;
+	const combos = typeof document === "undefined" ? combinations(shown) : [start];
+	const frames = combos.map((combo) =>
+		called(
+			fn,
+			combo.map((i, c) => valueAt(shown[c] as ExploreControl, i)),
+		),
+	);
+	const merged = frames.map(([call, f]): [string, ExploreFrame] => [call, withBase(base, f)]);
+	const kind = figureKind(merged.map(([, f]) => f));
+	if (kind && !label) {
+		fail(`needs a label: the accessible name of its ${kind}`);
+	}
+	const baseProblem = live ? notJson(base, "base") : undefined;
+	if (baseProblem) {
+		fail(
+			`${baseProblem} is not JSON: with frame computed in the browser, base reaches it as JSON; return the rest from frame`,
+		);
+	}
 	const data: ExploreData = {
-		controls: made.map((m) => m.control),
-		start: made.map((m) => m.start),
-		...compact(shown),
+		controls: shown,
+		start,
 		label: label ?? "",
 		...(extra ? { class: extra } : {}),
 		...(id ? { id } : {}),
+		...(live ? { frame: fn, base } : precomputed(merged, kind)),
 	};
 	const Island = kind === "plot" ? ExplorePlot : kind === "chart" ? ExploreChart : ExploreText;
 	return <Island {...data} />;

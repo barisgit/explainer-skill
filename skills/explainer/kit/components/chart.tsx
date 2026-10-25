@@ -5,7 +5,7 @@
              series follow its list, other components merge into what the chart shows.
      label   the accessible name (role="img")
      class   more classes after "chart", e.g. "tall"
-     setup   (chart) => void, run after every (re)mount: chart.on("click", ...). A function, so only from your own "use client" component.
+     setup   (chart) => void, run after every (re)mount: chart.on("click", ...).
    Colours: write "var(--accent)" or "color-mix(in srgb, var(--accent) 20%, transparent)" in any colour option (color, borderColor,
      fill, colorStops[].color, ...); they are resolved when the chart mounts, so they follow light/dark.
    Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
@@ -14,8 +14,8 @@
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
    scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
-   From the page a Chart takes JSON props only. A slider, choice or toggle switching it between computed options is an Explore;
-   for anything more (a click, a simulation), render it in your own client component. */
+   From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
+   or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
 

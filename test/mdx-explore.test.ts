@@ -6,29 +6,32 @@ import { runCli, scratch } from "./support.ts";
 const dir = scratch();
 afterAll(dir.cleanup);
 
-/** Model code as an author writes it: 31 modulation indices and the envelope plot for each, 2 lines of 201 points. */
-const MODEL = `export const ms = Array.from({ length: 31 }, (_, i) => +(i * 0.05).toFixed(2));
-const ts = Array.from({ length: 201 }, (_, i) => i / 100);
-export function envelope(m: number): PlotOption {
+/**
+ * Model code as an author writes it: the envelope frame for a modulation index, `points` points per line, its readout JSX and
+ * its tick labels a function. As a "use client" module it runs in the browser; without the line, pack computes every frame.
+ */
+const model = (points: number, client: boolean) => `${client ? '"use client";\n' : ""}
+const ts = Array.from({ length: ${points} }, (_, i) => (2 * i) / ${points - 1});
+export function envelope(m: number) {
 	const g = (t: number) => 1 + m * Math.cos(2 * Math.PI * t);
-	return { series: [
-		{ name: "g(t)", type: "line", data: ts.map((t) => [t, g(t)]) },
-		{ name: "|g(t)|", type: "line", dash: true, data: ts.map((t) => [t, Math.abs(g(t))]) },
-	] };
+	return {
+		plot: { y: { format: ${client ? '(v: number) => v.toFixed(1) + " V"' : '{ digits: 1, unit: "V" }'} }, series: [
+			{ name: "g(t)", type: "line", data: ts.map((t) => [t, g(t)]) },
+			{ name: "|g(t)|", type: "line", dash: true, data: ts.map((t) => [t, Math.abs(g(t))]) },
+		] },
+		readout: <>Follows g(t): <strong>{m <= 1 ? "yes" : "no"}</strong></>,
+	};
 }
 `;
 
-const SLIDER = `---
-reply: true
----
-import { Explore } from "kit";
-import { envelope, ms } from "./model.ts";
+/** A slider over the envelope from `module`, its controls kept across reloads by keep.js with no reply: true. */
+const slider = (module: string) => `import { Explore } from "kit";
+import { envelope } from "./${module}";
 
 # Envelope
 
 <Explore id="env" label="Envelope" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
-  base={{ plot: { y: { min: -1, max: 2.6 } }, caption: "Two periods of the tone." }}
-  frames={ms.map((m) => ({ plot: envelope(m), readout: <>Follows g(t): <strong>{m <= 1 ? "yes" : "no"}</strong></> }))} />
+  base={{ plot: { y: { min: -1, max: 2.6 } }, caption: "Two periods of the tone." }} frame={envelope} />
 `;
 
 /** Two charts of hours by phase or person, with the reserve shown or hidden, and a stats row that toggles add to. */
@@ -39,17 +42,24 @@ export const bars = (names, reserve) => ({ xAxis: { type: "category", data: name
 
 # Plan
 
-<Explore id="plan" label="Hours" controls={[{ id: "by", label: "By", choice: ["Phase", "Person"], value: "Person" }, { id: "hide", label: "Hide the reserve", toggle: true }]}
-  frames={[["a", "b"], ["x", "y", "z"]].map((names) => [bars(names, true), bars(names, false)].map((chart) => ({ chart })))} />
+<Explore id="plan" label="Hours" controls={[{ id: "by", label: "By", choice: { phase: "Phase", person: "Person" }, value: "person" }, { id: "hide", label: "Hide the reserve", toggle: true }]}
+  frame={(by, hide) => ({ chart: bars(by === "phase" ? ["a", "b"] : ["x", "y", "z"], !hide) })} />
 
 <Explore id="sum" controls={[{ id: "a", label: "Option A", toggle: true }, { id: "b", label: "Option B", toggle: true, value: true }]}
   base={{ stats: { "Fits": "yes" } }}
-  frames={[0, 1].map((a) => [0, 1].map((b) => ({ stats: { "Total": \`\${100 + 20 * a + 35 * b} h\`, ...(a && b ? { "Fits": "no" } : {}) } })))} />
+  frame={(a, b) => ({ stats: { "Total": \`\${100 + 20 * a + 35 * b} h\`, ...(a && b ? { "Fits": "no" } : {}) } })} />
 `;
 
-/** Packs `source` as `<name>.mdx` beside the model; returns the output path and its HTML. */
+/** Writes the models: client.tsx runs in the browser, packed.tsx and dense.tsx (1001 points a line) in pack. */
+function writeModels() {
+	dir.write("client.tsx", model(201, true));
+	dir.write("packed.tsx", model(201, false));
+	dir.write("dense.tsx", model(1001, false));
+}
+
+/** Packs `source` as `<name>.mdx` beside the models; returns the output path and its HTML. */
 async function pack(name: string, source: string) {
-	dir.write("model.ts", MODEL);
+	writeModels();
 	const output = dir.path(`${name}.out.html`);
 	const result = await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", output]);
 	expect(result.stderr).toBe("");
@@ -59,8 +69,8 @@ async function pack(name: string, source: string) {
 
 /** The pack's exit code and message for a page with `body`. */
 async function failure(name: string, body: string) {
-	dir.write("model.ts", MODEL);
-	const source = `import { Explore } from "kit";\nimport { envelope, ms } from "./model.ts";\n\n# Fails\n\n${body}\n`;
+	writeModels();
+	const source = `import { Explore, Plot } from "kit";\n\n# Fails\n\n${body}\n`;
 	const result = await runCli([
 		"pack",
 		dir.write(`${name}.mdx`, source),
@@ -129,21 +139,23 @@ const SLIDER_STATE = `[document.getElementById("m").value, document.querySelecto
 	document.querySelector("#env svg path.line")?.getAttribute("d") === window.firstLine, document.querySelector("#env figcaption").textContent]`;
 
 describe("Explore", () => {
-	test("a slider switches the plot and readout by keyboard and pointer, on a phone too, and its value comes back after a reload", async () => {
-		const { output, html } = await pack("slider", SLIDER);
+	test("a slider whose frame a client module exports computes it in the browser: keyboard, pointer, a phone, kept across a reload", async () => {
+		const { output, html } = await pack("slider", slider("client.tsx"));
 		expect(html).toContain("plot: small line, stem and bar plots");
 		expect(html).not.toContain("Apache ECharts");
+		expect(html).toContain("keep: ");
+		expect(html).not.toContain("reply: ");
 		const islands =
 			/<script type="application\/json" id="explainer-islands">(.*?)<\/script>/s.exec(html)?.[1] ??
 			"";
-		// 31 frames of 2 × 201 points: kept to 1/10000 of the range and each a difference from the first, not 31 whole options.
-		expect(islands.length).toBeLessThan(100_000);
+		// The page carries the controls and a reference to envelope, not 31 frames of points.
+		expect(islands.length).toBeLessThan(2_000);
 		for (const mobile of [false, true]) {
 			const state = await inPage(output, mobile, async (cdp) => {
 				const first = await act(
 					cdp,
 					`window.firstLine = document.querySelector("#env svg path.line").getAttribute("d")`,
-					SLIDER_STATE,
+					`[...${SLIDER_STATE}, [...document.querySelectorAll("#env svg text")].some((t) => t.textContent === "1.0 V")]`,
 				);
 				await cdp.evaluate(`document.getElementById("m").focus()`);
 				await press(cdp, "ArrowRight", 39);
@@ -158,7 +170,7 @@ describe("Explore", () => {
 			});
 			const caption = "Two periods of the tone.";
 			expect(state).toEqual({
-				first: ["0.5", "0.50", "Follows g(t): yes", true, true, caption],
+				first: ["0.5", "0.50", "Follows g(t): yes", true, true, caption, true],
 				keyed: ["0.55", "0.55", "Follows g(t): yes", true, false, caption],
 				dragged: ["1.5", "1.50", "Follows g(t): no", true, false, caption],
 				reloaded: ["1.5", "1.50", "Follows g(t): no", true, false, caption],
@@ -166,7 +178,7 @@ describe("Explore", () => {
 		}
 	}, 60_000);
 
-	test("a choice and a toggle switch a chart between nested frames, and toggles alone switch a stats row", async () => {
+	test("a choice and a toggle switch a chart between frames computed in pack, and toggles alone switch a stats row", async () => {
 		const { output, html } = await pack("choices", CHOICES);
 		expect(html).toContain("Apache ECharts");
 		expect(html).not.toContain("plot: small line, stem and bar plots");
@@ -186,28 +198,62 @@ describe("Explore", () => {
 		});
 	}, 30_000);
 
-	test("frames that do not match the controls, or hold what JSON cannot carry, fail the pack saying where", async () => {
-		const slider = `controls={[{ id: "m", label: "m", range: [0, 1.5, 0.05] }]}`;
-		expect(
-			await failure(
-				"short",
-				`<Explore label="E" ${slider} frames={ms.slice(1).map((m) => ({ plot: envelope(m) }))} />`,
-			),
-		).toEqual([
+	test("frames pack computes are JSON and at most 100 KB, and a frame it cannot draw fails the pack, each saying what to change", async () => {
+		const controls = `controls={[{ id: "m", label: "m", range: [0, 1.5, 0.05] }]}`;
+		const explore = (module: string, frame: string) =>
+			`import { envelope } from "./${module}";\n\n<Explore label="E" ${controls} frame={${frame}} />`;
+		// 31 frames of two 201-point lines: rounded and kept as differences from the first, they fit.
+		expect(await failure("fits", explore("packed.tsx", "envelope"))).toEqual([0, ""]);
+		expect(await failure("dense", explore("dense.tsx", "envelope"))).toEqual([
 			1,
-			expect.stringContaining('<Explore> frames has 30 items, but control "m" has 31 values'),
+			expect.stringMatching(
+				/<Explore> frames would take \d+ KB of the page: export frame from a module whose first line is "use client"/,
+			),
+		]);
+		const formatted = `(m) => ({ plot: { ...envelope(m).plot, y: { format: (v) => v + " V" } } })`;
+		expect(await failure("function", explore("packed.tsx", formatted))).toEqual([
+			1,
+			expect.stringContaining("<Explore> frame(0).plot.y.format is not JSON"),
+		]);
+		const throws = `(m) => { if (m > 1) throw new Error("no envelope"); return envelope(m); }`;
+		expect(await failure("throws", explore("packed.tsx", throws))).toEqual([
+			1,
+			expect.stringContaining("<Explore> frame(1.05) threw: no envelope"),
 		]);
 		expect(
 			await failure(
-				"function",
-				`<Explore label="E" ${slider} frames={ms.map((m) => ({ plot: { ...envelope(m), y: { format: (v) => v + " V" } } }))} />`,
-			),
-		).toEqual([1, expect.stringContaining("<Explore> frames[0].plot.y.format is not JSON")]);
-		expect(
-			await failure(
 				"steps",
-				`<Explore controls={[{ id: "m", label: "m", range: [0, 1, 0.3] }]} frames={[]} />`,
+				`<Explore controls={[{ id: "m", label: "m", range: [0, 1, 0.3] }]} frame={() => ({})} />`,
 			),
 		).toEqual([1, expect.stringContaining("needs max to be min plus whole steps")]);
+	}, 30_000);
+});
+
+describe("client exports as props", () => {
+	test("a function a client module exports reaches a client component from the page; one from another module fails the pack", async () => {
+		const volts = 'export const volts = (v: number) => v + " V";\n';
+		dir.write("volts.ts", `"use client";\n${volts}`);
+		dir.write("plain.ts", volts);
+		const plot = (module: string) =>
+			`import { Plot } from "kit";\nimport { volts } from "./${module}";\n\n# Volts\n\n<Plot id="v" label="Volts" option={{ y: { format: volts }, series: [{ type: "line", data: [[0, 1], [1, 2]] }] }} />\n`;
+		const { output } = await pack("volts", plot("volts.ts"));
+		const ticks = await inPage(output, false, (cdp) =>
+			cdp.evaluate(
+				`[...document.querySelectorAll("#v svg text")].some((t) => t.textContent === "1.5 V")`,
+			),
+		);
+		expect(ticks).toBe(true);
+		const failed = await runCli([
+			"pack",
+			dir.write("plain.mdx", plot("plain.ts")),
+			"-o",
+			dir.path("plain.out.html"),
+		]);
+		expect([failed.code, failed.stderr]).toEqual([
+			1,
+			expect.stringContaining(
+				'<Plot option.y.format> is a function, but props from the page to a client component must be JSON or functions a "use client" module exports',
+			),
+		]);
 	}, 30_000);
 });

@@ -54,7 +54,7 @@ export function Figure({ start = first }: { start?: number }) {
   return <><button onClick={() => setCount(count + 1)}>{count}</button>
     <Chart option={chart} label="Values" setup={(instance) => instance.resize()} />
     <Plot option={option} label="Values" />
-    <Explore label="Values" controls={[{ id: "on", label: "On", toggle: true }]} frames={[{ plot: option }, { plot: option, readout: <b>On</b> }]} />
+    <Explore label="Values" controls={[{ id: "on", label: "On", toggle: true }]} frame={(on: boolean) => ({ plot: option, readout: on ? <b>On</b> : "Off" })} />
     <Question name="q" legend="Pick" options={["a", "b"]} />
     <Stepper captions={["One", "Two"]}><p data-step="1">One</p></Stepper>
     <Tree cols="4rem" head={["Task", "Hours"]} items={rows} />

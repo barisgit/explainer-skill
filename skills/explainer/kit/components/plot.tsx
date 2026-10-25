@@ -11,7 +11,7 @@
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
        x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
-              Range and step are automatic and round; format writes the tick labels and values in the page's lang:
+              Range and step are automatic and round; numbers follow the page's lang, and format sets how:
               { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
        legend false hides the legend (by default it shows when two or more series have a name)
      label   the accessible name (role="img")
@@ -21,9 +21,8 @@
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
    Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series.
-   A plot a slider, choice or toggle switches between computed options is an Explore. For anything more, render the plot in
-   your own client component; there format and label may also be functions:
-   format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
+   A plot a slider, choice or toggle switches is an Explore. format and label may also be functions, from your own client
+   component or exported by a "use client" module: format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
 

@@ -1,7 +1,8 @@
 /*
  * Explore's frames as the page carries them: the first frame whole, every other one as a patch against it, so a slider that
  * moves one series ships that series per frame and the rest once. Explore (explore.tsx) writes the patches while pack renders
- * the page; the island applies them in the browser.
+ * the page; the island applies them in the browser. merge lays a frame over Explore's base, in pack or, for a frame the browser
+ * computes, there.
  *
  * A patch is JSON. A plain object merges into an object, or into an array by index ({ "3": patch }); { "=": value } replaces
  * whatever was there; { "ys": [...] } gives an array of [x, y] points new y values over the same x; anything else (a number, a
@@ -18,6 +19,9 @@ type JsonObject = { [key: string]: Json };
 
 const isObject = (value: unknown): value is JsonObject =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
+/** An object written as `{ ... }`: an option's part, not JSX, an array or a class instance. */
+const isPlain = (value: unknown): value is Record<string, unknown> =>
+	isObject(value) && Object.getPrototypeOf(value) === Object.prototype && !("props" in value);
 const size = (value: unknown) => JSON.stringify(value).length;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const isPoint = (value: unknown): value is [number, number] =>
@@ -80,6 +84,18 @@ function arrayPatch(a: Json[], b: Json[]): Json {
 	return [b, byIndex, ...(ys === undefined ? [] : [ys])].reduce((best, next) =>
 		size(next) < size(best) ? next : best,
 	);
+}
+
+/** `patch` merged into `base`: plain objects key by key, anything else (arrays included) replaced; neither is changed. */
+export function merge(base: unknown, patch: unknown): unknown {
+	if (!isPlain(base) || !isPlain(patch)) {
+		return patch === undefined ? base : patch;
+	}
+	const merged: Record<string, unknown> = { ...base };
+	for (const [key, value] of Object.entries(patch)) {
+		merged[key] = merge(base[key], value);
+	}
+	return merged;
 }
 
 /** The patch that turns `a` into `b` (apply(a, diff(a, b)) is b), or undefined when they are the same. */
