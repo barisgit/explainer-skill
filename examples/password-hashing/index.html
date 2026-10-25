@@ -1873,7 +1873,7 @@ details > :last-child:not(summary) {
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
-   Scripts toggle the classes is-on, is-now and is-lit; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
+   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
 [data-live] [data-step] {
 	transition: opacity 0.3s var(--ease);
@@ -1899,8 +1899,9 @@ details > :last-child:not(summary) {
 	display: none;
 }
 
-/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill. */
-:is(span, b, strong, em, code, mark)[data-ref] {
+/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill.
+   Only a term that links (is-linked, set by kit:link.js) looks like one. */
+:is(span, b, strong, em, code, mark).is-linked {
 	text-decoration: underline dotted var(--muted) 1px;
 	text-underline-offset: 0.22em;
 	border-radius: 0.25rem;
@@ -1930,6 +1931,13 @@ body:has(> .reply-bar) {
 /* Focus and in-page links scroll their target clear of the strip. */
 :root:has(> body > .reply-bar:not([hidden])) {
 	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
+}
+/* A term that takes a note (is-annotatable, set by reply.js) and links nothing: a fainter underline than a link's and the menu
+   cursor, since a click offers a note rather than lighting anything. */
+:is(span, b, strong, em, code, mark).is-annotatable:not(.is-linked) {
+	text-decoration: underline dotted var(--rule-strong) 1px;
+	text-underline-offset: 0.22em;
+	cursor: context-menu;
 }
 .reply-bar {
 	position: fixed;
@@ -3162,46 +3170,126 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
      <p>The <span data-ref="cache">cache</span> answers most reads.</p>      a prose term (made focusable)
      <tr data-ref="cache">…</tr>   <div class="chart" data-ref="cache">…</div>   a table row, a chart panel, any element
      a ```mermaid fence                                                       pack gives every diagram part the data-ref of its Mermaid id
-   Refs are page-wide: a prose data-ref lights every element with that ref on the page, across figures (two diagrams sharing a node id light together).
-   One element may link several refs, space separated: data-ref="cache db". In a diagram that has a lit part, unlit parts dim.
-   A click pins the highlight until the next click elsewhere or Escape. Charts: document.addEventListener("ref", (e) => e.detail.refs)
-   fires with the refs now lit ([] when none), for dispatching a highlight to ECharts. Refs rendered later light up too, but only
-   those in the markup at load are made focusable: give a later one that is not a link or control tabIndex={0}. */
+   A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
+   too), so the parts of one diagram never link each other; the light and dark copies pack makes of an SVG file in <img> count
+   once; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
+   A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
+   to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
+   One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
+   A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
+   fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
+   Refs a client component renders or removes after load link and unlink at once. */
 (() => {
   const refsOf = (el) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
-  const NATIVE = "a[href], button, input, select, textarea, summary, [tabindex]";
+  const NATIVE = "a[href], button, input, select, textarea, summary";
+  let linked = new Set;
+  let linkedParts = [];
   let hovered = null;
   let focused = null;
   let pinned = null;
+  let litRefs = "";
   let lit = [];
   let dimmed = [];
-  const partOf = (e) => e.target instanceof Element ? e.target.closest("[data-ref]") : null;
-  for (const el of document.querySelectorAll("[data-ref]")) {
-    if (!el.matches(NATIVE) && !el.closest("svg")) {
+  function outermostSvg(el) {
+    let svg = el.closest("svg");
+    for (let up = svg?.parentElement?.closest("svg");up; up = up.parentElement?.closest("svg")) {
+      svg = up;
+    }
+    return svg;
+  }
+  function placeOf(el) {
+    const svg = outermostSvg(el);
+    if (svg) {
+      return svg;
+    }
+    const twin = el.previousElementSibling;
+    return el.matches("img.dark") && twin?.matches("img.light") ? twin : el;
+  }
+  function linkingRefs(parts) {
+    const places = new Map;
+    for (const el of parts) {
+      for (const ref of refsOf(el)) {
+        places.set(ref, (places.get(ref) ?? new Set).add(placeOf(el)));
+      }
+    }
+    return new Set([...places].filter(([, where]) => where.size > 1).map(([ref]) => ref));
+  }
+  function mark(el, on) {
+    el.classList.toggle("is-linked", on);
+    syncFocus(el);
+  }
+  function syncFocus(el) {
+    const wanted = el.matches(".is-linked, .is-annotatable") && !el.matches(NATIVE) && !el.closest("svg");
+    if (wanted && !el.hasAttribute("tabindex")) {
       el.tabIndex = 0;
+      el.dataset.kitFocusable = "";
+    } else if (!wanted && el.dataset.kitFocusable !== undefined) {
+      if (el.getAttribute("tabindex") === "0") {
+        el.removeAttribute("tabindex");
+      }
+      delete el.dataset.kitFocusable;
     }
   }
-  function paint() {
-    const refs = refsOf(hovered ?? focused ?? pinned);
-    const selector = refs.map((ref) => `[data-ref~="${CSS.escape(ref)}"]`).join(",");
+  function refresh() {
+    const parts = [...document.querySelectorAll("[data-ref]")];
+    linked = linkingRefs(parts);
+    for (const el of linkedParts) {
+      mark(el, false);
+    }
+    linkedParts = parts.filter((el) => refsOf(el).some((ref) => linked.has(ref)));
+    for (const el of linkedParts) {
+      mark(el, true);
+    }
+    if (pinned && !linkedParts.includes(pinned)) {
+      pinned = null;
+    }
+    paint(true);
+  }
+  function paint(force = false) {
+    const active = hovered ?? focused ?? pinned;
+    const refs = active?.isConnected ? refsOf(active).filter((ref) => linked.has(ref)) : [];
+    const joined = refs.join(" ");
+    if (joined === litRefs && !force) {
+      return;
+    }
+    light(refs);
+    if (joined !== litRefs) {
+      litRefs = joined;
+      document.dispatchEvent(new CustomEvent("ref", { detail: { refs } }));
+    }
+  }
+  function light(refs) {
     for (const el of lit) {
       el.classList.remove("is-lit");
     }
     for (const svg of dimmed) {
       svg.classList.remove("has-lit");
     }
+    const selector = refs.map((ref) => `[data-ref~="${CSS.escape(ref)}"]`).join(",");
     lit = selector ? [...document.querySelectorAll(selector)] : [];
     for (const el of lit) {
       el.classList.add("is-lit");
     }
-    dimmed = lit.length > 1 ? [
-      ...new Set(lit.map((el) => el instanceof SVGElement ? el.ownerSVGElement : null).filter((svg) => svg !== null))
-    ] : [];
+    dimmed = [...new Set(lit.map(outermostSvg).filter((svg) => svg !== null))];
     for (const svg of dimmed) {
       svg.classList.add("has-lit");
     }
-    document.dispatchEvent(new CustomEvent("ref", { detail: { refs } }));
   }
+  const holdsRef = (n) => n instanceof Element && (n.matches("[data-ref]") || n.querySelector("[data-ref]") !== null);
+  new MutationObserver((records) => {
+    if (records.some((r) => r.type === "attributes" || [...r.addedNodes, ...r.removedNodes].some(holdsRef))) {
+      refresh();
+    }
+  }).observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    attributeFilter: ["data-ref"]
+  });
+  refresh();
+  const partOf = (e) => {
+    const part = e.target instanceof Element ? e.target.closest("[data-ref]") : null;
+    return part?.classList.contains("is-linked") ? part : null;
+  };
   document.addEventListener("pointerover", (e) => {
     if (e.pointerType === "touch") {
       return;
@@ -3557,6 +3645,36 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     part: clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) || (part.dataset.ref?.split(" ")[0] ?? ""),
     ...located(part)
   });
+  const FOCUSABLE = "a[href], button, input, select, textarea, summary";
+  function syncFocus(el) {
+    const wanted = el.matches(".is-linked, .is-annotatable") && !el.matches(FOCUSABLE) && !el.closest("svg");
+    if (wanted && !el.hasAttribute("tabindex")) {
+      el.tabIndex = 0;
+      el.dataset.kitFocusable = "";
+    } else if (!wanted && el.dataset.kitFocusable !== undefined) {
+      if (el.getAttribute("tabindex") === "0") {
+        el.removeAttribute("tabindex");
+      }
+      delete el.dataset.kitFocusable;
+    }
+  }
+  function markTarget(el) {
+    const on = el.matches("[data-ref]") && root.contains(el) && !el.closest(NATIVE) && !el.closest("svg");
+    el.classList.toggle("is-annotatable", on);
+    syncFocus(el);
+  }
+  function markTargets() {
+    const partsIn = (n) => n instanceof HTMLElement || n instanceof SVGElement ? [n, ...n.querySelectorAll("[data-ref]")] : [];
+    for (const el of root.querySelectorAll("[data-ref]")) {
+      markTarget(el);
+    }
+    new MutationObserver((records) => {
+      const changed = records.flatMap((r) => r.type === "attributes" ? partsIn(r.target) : [...r.addedNodes, ...r.removedNodes].flatMap(partsIn));
+      for (const el of changed) {
+        markTarget(el);
+      }
+    }).observe(root, { subtree: true, childList: true, attributeFilter: ["data-ref"] });
+  }
   let timer;
   document.addEventListener("selectionchange", () => {
     clearTimeout(timer);
@@ -3599,6 +3717,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     const target = partTarget(part);
     showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
   });
+  markTargets();
   document.addEventListener("keydown", (e) => {
     const part = e.target instanceof Element ? e.target.closest("[data-ref]") : null;
     if (e.key !== "Enter" || !part || e.target !== part || part.matches(NATIVE) || !root.contains(part)) {
@@ -3622,7 +3741,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
    A control works alone too: <select data-reply="Region">…</select>. Radios and checkboxes group by name; a checkbox group answers with the
    checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A control the reader never touched
    is sent as "(default)", one with nothing chosen as "no answer". Notes come from selected text and clicks on [data-ref] parts
-   (kit link refs, Mermaid node ids); Enter on a focused ref opens its note.
+   (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
+   is-annotatable (a faint underline), also those rendered later.
    The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is

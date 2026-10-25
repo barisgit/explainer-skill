@@ -1873,7 +1873,7 @@ details > :last-child:not(summary) {
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
-   Scripts toggle the classes is-on, is-now and is-lit; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
+   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
 [data-live] [data-step] {
 	transition: opacity 0.3s var(--ease);
@@ -1899,8 +1899,9 @@ details > :last-child:not(summary) {
 	display: none;
 }
 
-/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill. */
-:is(span, b, strong, em, code, mark)[data-ref] {
+/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill.
+   Only a term that links (is-linked, set by kit:link.js) looks like one. */
+:is(span, b, strong, em, code, mark).is-linked {
 	text-decoration: underline dotted var(--muted) 1px;
 	text-underline-offset: 0.22em;
 	border-radius: 0.25rem;
@@ -1930,6 +1931,13 @@ body:has(> .reply-bar) {
 /* Focus and in-page links scroll their target clear of the strip. */
 :root:has(> body > .reply-bar:not([hidden])) {
 	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
+}
+/* A term that takes a note (is-annotatable, set by reply.js) and links nothing: a fainter underline than a link's and the menu
+   cursor, since a click offers a note rather than lighting anything. */
+:is(span, b, strong, em, code, mark).is-annotatable:not(.is-linked) {
+	text-decoration: underline dotted var(--rule-strong) 1px;
+	text-underline-offset: 0.22em;
+	cursor: context-menu;
 }
 .reply-bar {
 	position: fixed;
@@ -4445,6 +4453,36 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     part: clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) || (part.dataset.ref?.split(" ")[0] ?? ""),
     ...located(part)
   });
+  const FOCUSABLE = "a[href], button, input, select, textarea, summary";
+  function syncFocus(el) {
+    const wanted = el.matches(".is-linked, .is-annotatable") && !el.matches(FOCUSABLE) && !el.closest("svg");
+    if (wanted && !el.hasAttribute("tabindex")) {
+      el.tabIndex = 0;
+      el.dataset.kitFocusable = "";
+    } else if (!wanted && el.dataset.kitFocusable !== undefined) {
+      if (el.getAttribute("tabindex") === "0") {
+        el.removeAttribute("tabindex");
+      }
+      delete el.dataset.kitFocusable;
+    }
+  }
+  function markTarget(el) {
+    const on = el.matches("[data-ref]") && root.contains(el) && !el.closest(NATIVE) && !el.closest("svg");
+    el.classList.toggle("is-annotatable", on);
+    syncFocus(el);
+  }
+  function markTargets() {
+    const partsIn = (n) => n instanceof HTMLElement || n instanceof SVGElement ? [n, ...n.querySelectorAll("[data-ref]")] : [];
+    for (const el of root.querySelectorAll("[data-ref]")) {
+      markTarget(el);
+    }
+    new MutationObserver((records) => {
+      const changed = records.flatMap((r) => r.type === "attributes" ? partsIn(r.target) : [...r.addedNodes, ...r.removedNodes].flatMap(partsIn));
+      for (const el of changed) {
+        markTarget(el);
+      }
+    }).observe(root, { subtree: true, childList: true, attributeFilter: ["data-ref"] });
+  }
   let timer;
   document.addEventListener("selectionchange", () => {
     clearTimeout(timer);
@@ -4487,6 +4525,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     const target = partTarget(part);
     showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
   });
+  markTargets();
   document.addEventListener("keydown", (e) => {
     const part = e.target instanceof Element ? e.target.closest("[data-ref]") : null;
     if (e.key !== "Enter" || !part || e.target !== part || part.matches(NATIVE) || !root.contains(part)) {
@@ -4510,7 +4549,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
    A control works alone too: <select data-reply="Region">…</select>. Radios and checkboxes group by name; a checkbox group answers with the
    checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A control the reader never touched
    is sent as "(default)", one with nothing chosen as "no answer". Notes come from selected text and clicks on [data-ref] parts
-   (kit link refs, Mermaid node ids); Enter on a focused ref opens its note.
+   (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
+   is-annotatable (a faint underline), also those rendered later.
    The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
