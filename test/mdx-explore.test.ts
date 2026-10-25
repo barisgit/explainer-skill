@@ -257,4 +257,18 @@ describe("client exports as props", () => {
 			),
 		]);
 	}, 30_000);
+
+	test("a client export inside an object with no prototype reaches the client component, as JSON in one does", async () => {
+		dir.write("volts-bare.ts", '"use client";\nexport const volts = (v: number) => v + " V";\n');
+		const { output } = await pack(
+			"volts-bare",
+			`import { Plot } from "kit";\nimport { volts } from "./volts-bare.ts";\n\nexport const y = Object.assign(Object.create(null), { format: volts });\n\n# Volts\n\n<Plot id="v" label="Volts" option={{ y, series: [{ type: "line", data: [[0, 1], [1, 2]] }] }} />\n`,
+		);
+		const ticks = await inPage(output, (cdp) =>
+			cdp.evaluate(
+				`[...document.querySelectorAll("#v svg text")].some((t) => t.textContent === "1.5 V")`,
+			),
+		);
+		expect(ticks).toBe(true);
+	}, 30_000);
 });
