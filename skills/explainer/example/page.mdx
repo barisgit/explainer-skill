@@ -5,19 +5,13 @@ import { baseline, curve, fixes, fmt, loadFrame } from "./cafe.ts";
 
 # At 90% busy, one barista means an *18-minute* wait. A second barista cuts it to 30 seconds.
 
-Waiting barely grows until the last bit of slack disappears, then it explodes. A queueing model of a café whose orders take 2 minutes on average, for deciding what to change first.
+Waiting barely grows until the last bit of slack disappears, then it explodes. A queueing model of a café where customers arrive at random and orders take 2 minutes on average, some much longer, for deciding what to change first.
 
 Illustrative model, not measured in a real café
 
 {/* frame comes from a module without "use client", so pack computes every slider position and the page carries no model code. */}
 
 <Explore label="Average wait against how busy the barista is" controls={[{ id: "load", label: "Barista busy", range: [50, 95, 1], value: 90, format: { unit: "%" } }]} frame={loadFrame} />
-
-<Question name="at95" legend="Before you slide to 95%: about how long is the wait with one barista?" options={["20 min", "38 min", "9 min"]} answer="38 min">
-
-From 90% to 95% busy the spare time halves, from one minute in ten to one in twenty, so the backlog takes twice as long to clear: $\frac{0.95}{0.05} = 19$ orders ahead, 2 minutes each.
-
-</Question>
 
 <h2 data-nav="Clumps">Why one clump of customers costs an hour</h2>
 
@@ -59,6 +53,12 @@ $$W = \frac{\rho}{1 - \rho}\,S = \frac{0.9}{0.1} \cdot 2\,\text{min} = 18\,\text
 
 </div>
 </Stepper>
+
+<Question name="slower" legend="Orders take 3 minutes instead of 2, and the barista is still 90% busy. About how long is the wait?" options={["18 min", "27 min", "40 min"]} answer="27 min">
+
+Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ orders ahead; at 3 minutes each that is 27 minutes.
+
+</Question>
 
 <section class="band">
 
