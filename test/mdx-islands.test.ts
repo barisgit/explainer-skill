@@ -293,7 +293,7 @@ describe("Plot", () => {
 		expect(drawn).toBe("3,3,chart plot");
 	}, 30_000);
 
-	test("a Plot and a Chart from the page take formats and per-mark texts as JSON, written for the page's lang", async () => {
+	test("a Plot and a Chart from the page take formats and per-mark texts as JSON, written for the page's lang, as a Plot's numbers are without one", async () => {
 		const output = await pack(
 			"formats",
 			`---
@@ -321,7 +321,8 @@ import { Chart, Plot } from "kit";
 		}));
 		expect(state.lines).toEqual(expect.arrayContaining(["899\u00a0kHz", "0,5", "1,0", "½mA", "A"]));
 		expect(state.lines.filter((t) => t === "")).toEqual([]);
-		expect(state.shares).toEqual(expect.arrayContaining(["34\u00a0%", "100\u00a0%"]));
+		// Its axis has no format: the ticks are still written as the page's lang writes numbers.
+		expect(state.shares).toEqual(expect.arrayContaining(["34\u00a0%", "100\u00a0%", "0,2"]));
 		expect(state.chart).toEqual(["1,5\u00a0min", "12.345,50\u00a0€", "second"]);
 	}, 30_000);
 

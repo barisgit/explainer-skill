@@ -11,7 +11,7 @@
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
        x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
-              Range and step are automatic and round; format writes the tick labels and values in the page's lang:
+              Range and step are automatic and round; numbers follow the page's lang, and format sets how:
               { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
        legend false hides the legend (by default it shows when two or more series have a name)
      label   the accessible name (role="img")

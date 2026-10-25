@@ -121,8 +121,16 @@
 		const after = /^\p{L}/u.test(unit) ? `\u00a0${unit}` : unit;
 		return (v: number) => intl.format(v) + after;
 	}
+	/** Without a format, numbers are written in full, as String writes them, with the page's decimal mark, minus and grouping. */
+	function inFull() {
+		const intl = new Intl.NumberFormat(document.documentElement.lang || "en", {
+			useGrouping: "min2",
+			maximumFractionDigits: 20,
+		});
+		return (v: number) => intl.format(v);
+	}
 	const formatter = (format: AxisSpec["format"]): ((v: number) => string) =>
-		typeof format === "function" ? format : format ? numberText(format) : String;
+		typeof format === "function" ? format : format ? numberText(format) : inFull();
 	/** A mark's value text from its value, its index in the series and, for a stem, its x. */
 	type Labeller = (value: number, i: number, x: number) => string;
 	/** The series' label as a Labeller (`format` writes the value for label: true), or none when it asks for no labels. */
