@@ -16,6 +16,19 @@ export const isClientExport = (
 ): value is ((...args: never[]) => unknown) & { [CLIENT_REFERENCE]: unknown } =>
 	typeof value === "function" && CLIENT_REFERENCE in value;
 
+/**
+ * True for an object JSON carries as `{ ... }`: written as a literal, or made with Object.create(null); an array or a class
+ * instance is not one (JSX is, so notJson tells it apart first). Both walks over a client component's props (this JSON check, and server.ts finding client exports) go
+ * through this, so they agree on where a prop may hold a client export.
+ */
+export const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+	if (value === null || typeof value !== "object") {
+		return false;
+	}
+	const proto: unknown = Object.getPrototypeOf(value);
+	return proto === Object.prototype || proto === null;
+};
+
 /** The first part of a value that JSON would not carry over unchanged: where it is and what it is. */
 export interface JsonProblem {
 	path: string;
@@ -47,8 +60,7 @@ function notJsonObject(value: object, path: string): JsonProblem | undefined {
 	if ("type" in value && "props" in value) {
 		return { path, what: "JSX" };
 	}
-	const proto: unknown = Object.getPrototypeOf(value);
-	if (proto !== Object.prototype && proto !== null) {
+	if (!isPlainObject(value)) {
 		return { path, what: `a ${value.constructor.name}` };
 	}
 	// JSON leaves out an undefined property, which the component then reads as undefined again.

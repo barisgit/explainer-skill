@@ -88,6 +88,46 @@ A **kWh** is a kW for an hour.
 		expect(state.reloaded).toEqual(state.wrong);
 	}, 30_000);
 
+	test("a self-check a client component draws from its props shows no reply bar, chosen, reloaded or shown again", async () => {
+		// The answer comes from a prop, so pack cannot tell this Question is a self-check and ships reply.js to be safe.
+		dir.write(
+			"quiz.tsx",
+			`"use client";
+import { useState } from "preact/hooks";
+import { Question } from "kit";
+
+export function Quiz({ answer }: { answer: string }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div>
+			<button type="button" class="btn" id="reveal" onClick={() => setOpen(true)}>Show</button>
+			{open && <Question name="q" legend="Which is energy?" options={["kW", "kWh"]} answer={answer}>Power times time.</Question>}
+		</div>
+	);
+}
+`,
+		);
+		const output = await packedMdx(
+			dir,
+			"quiz",
+			'import { Quiz } from "./quiz.tsx";\n\n# Quiz\n\n<Quiz answer="kWh" />\n',
+		);
+		const reveal = `document.getElementById("reveal").click()`;
+		const seen = `[document.getElementById("q-kWh")?.checked ?? null, Boolean(document.querySelector(".reply-bar")?.checkVisibility())]`;
+		const state = await inPage(output, async (cdp) => {
+			await act(cdp, reveal, "0");
+			const chosen = await act(cdp, `document.getElementById("q-kWh").click()`, seen);
+			await load(cdp);
+			const reloaded = await cdp.evaluate(seen);
+			return { chosen, reloaded, shown: await act(cdp, reveal, seen) };
+		});
+		expect(state).toEqual({
+			chosen: [true, false],
+			reloaded: [null, false],
+			shown: [true, false],
+		});
+	}, 30_000);
+
 	test("a self-check with an answer that cannot be checked fails the pack, saying what to change", async () => {
 		const question = (props: string, inside = "") =>
 			`<Question name="q" legend="Which?" options={["a", "b"]} ${props}${inside ? `>${inside}</Question>` : " />"}`;

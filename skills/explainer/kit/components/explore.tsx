@@ -75,8 +75,11 @@ const fail = (message: string): never => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
 
-/** Decimals a number is written with: 2 for 0.05. */
-const decimals = (n: number) => (String(n).split(".")[1] ?? "").length;
+/** Decimals a number is written with: 2 for 0.05, 7 for 1e-7 (JavaScript writes small and large numbers with an exponent). */
+function decimals(n: number): number {
+	const [digits = "", exponent = "0"] = String(n).split("e");
+	return Math.max(0, (digits.split(".")[1] ?? "").length - Number(exponent));
+}
 
 /** The range's slider as the island gets it, its readout written in `format` for the page's lang. */
 function rangeControl(id: string, [min, max, step]: readonly number[], format?: NumberFormat) {

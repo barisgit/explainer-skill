@@ -22,7 +22,7 @@ import {
 	type FillProps,
 } from "../components/view-body.ts";
 import "./bare-data.ts";
-import { CLIENT_REFERENCE, isClientExport, notJson } from "./props.ts";
+import { CLIENT_REFERENCE, isClientExport, isPlainObject, notJson } from "./props.ts";
 
 /** A function a client module exports, found at `path` in an island's props: the browser takes it from that module's exports. */
 export interface ClientRef {
@@ -261,11 +261,7 @@ function clientRefs(props: Record<string, unknown>): {
 		if (Array.isArray(value)) {
 			return value.map((item, i) => walk(item, [...path, i]));
 		}
-		if (
-			value !== null &&
-			typeof value === "object" &&
-			Object.getPrototypeOf(value) === Object.prototype
-		) {
+		if (isPlainObject(value)) {
 			return Object.fromEntries(
 				Object.entries(value).map(([key, item]) => [key, walk(item, [...path, key])]),
 			);

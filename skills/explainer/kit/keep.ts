@@ -8,7 +8,7 @@
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept. With reply (kit reply) the reader's notes are kept too, and its Clear button puts every control back to its
-   default, again with events. */
+   default, again with events; a self-check's choice is kept but alone brings no Clear button. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const selector =
@@ -52,7 +52,11 @@
 	interface Saved {
 		value: unknown;
 		sig: string;
+		/** A self-check's choice: kept, but not an answer for the reply, so it alone shows no Clear button. Saved, since the control may not be shown yet. */
+		check?: true;
 	}
+	/** Where a kit Question that is a self-check keeps its options. */
+	const SELF_CHECK = "fieldset.self-check";
 	const isRadio = (c: Control): c is HTMLInputElement => c.type === "radio";
 	const isToggle = (c: Control): c is HTMLInputElement => isRadio(c) || c.type === "checkbox";
 	const isMultiSelect = (c: Control): c is HTMLSelectElement =>
@@ -249,16 +253,22 @@
 		}
 		const controls = { ...pending };
 		for (const u of present.filter(answered)) {
-			controls[u.key] = { value: readControl(u.el), sig: u.sig };
+			const check = u.el.closest(SELF_CHECK) ? { check: true as const } : {};
+			controls[u.key] = { value: readControl(u.el), sig: u.sig, ...check };
 		}
 		keptById = Object.fromEntries(Object.entries(controls).filter(([key]) => key.startsWith("#")));
 		return { controls, notes: notes.list() };
 	}
 
-	const empty = (state: { controls: object; notes: unknown[] }) =>
-		!state.notes.length && !Object.keys(state.controls).length;
+	/** What keep saves: the kept controls by key, and the notes. */
+	interface State {
+		controls: Record<string, Saved>;
+		notes: unknown[];
+	}
 
-	function persist(state: { controls: object; notes: unknown[] }) {
+	const empty = (state: State) => !state.notes.length && !Object.keys(state.controls).length;
+
+	function persist(state: State) {
 		try {
 			if (empty(state)) {
 				localStorage.removeItem(storeKey);
@@ -302,8 +312,9 @@
 	}
 
 	/**
-	 * Brings the saved copy in line with the page and says whether anything is kept: answers, answers waiting for a control that
-	 * is not shown yet, or notes. Before the restore only the notes are known, and nothing is written.
+	 * Brings the saved copy in line with the page and says whether anything for the reply is kept: answers, answers waiting for a
+	 * control that is not shown yet, or notes. A self-check's choice is saved but does not count. Before the restore only the notes
+	 * are known, and nothing is written.
 	 */
 	function update() {
 		if (!ready) {
@@ -314,7 +325,9 @@
 		}
 		const state = snapshot();
 		persist(state);
-		return !empty(state);
+		return (
+			state.notes.length > 0 || Object.values(state.controls).some((entry) => entry.check !== true)
+		);
 	}
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
