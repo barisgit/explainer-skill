@@ -6,6 +6,7 @@ import type { Island, renderPage } from "../../kit/islands/server.ts";
 import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
+import { QUESTION_IMPORT, QUESTION_MODULE } from "./kit-scripts.ts";
 
 /** The bare imports a page and the kit make, resolved to the skill's own files, so an installed skill needs no node_modules. */
 const BARE: Record<string, string> = {
@@ -61,14 +62,20 @@ export interface CompiledPage {
 }
 
 /**
+ * What a page build is for: the prerender (client modules swapped for their island wrappers), the browser's client bundle, or
+ * the scan of the client code for the kit scripts it needs (kit Question left as an import from QUESTION_IMPORT).
+ */
+type BuildFor = "prerender" | "browser" | "scan";
+
+/**
  * Resolution and loading for a page build: bare imports to the skill's files, `.mdx` through the MDX compiler, CSS recorded in
- * `css` for the page's `<link>`s instead of bundled, and, for the prerender, client modules swapped for their island wrappers.
+ * `css` for the page's `<link>`s instead of bundled, and the swaps `purpose` asks for.
  */
 function pagePlugin(
 	page: CompiledPage,
 	entry: { path: string; code: string },
 	css: Set<string>,
-	prerender: boolean,
+	purpose: BuildFor,
 ): BunPlugin {
 	return {
 		name: "explainer-page",
@@ -92,8 +99,11 @@ function pagePlugin(
 				if (path === entry.path) {
 					return { contents: entry.code, loader: "js" };
 				}
+				if (purpose === "scan" && path === QUESTION_MODULE) {
+					return { contents: `export { Question } from "${QUESTION_IMPORT}";`, loader: "js" };
+				}
 				const source = readFileSync(path, "utf8");
-				return prerender && USE_CLIENT.test(source)
+				return purpose === "prerender" && USE_CLIENT.test(source)
 					? { contents: islandModule(path, source), loader: "js" }
 					: { contents: source, loader: loaderOf(path) };
 			});
@@ -126,8 +136,8 @@ async function buildEntry(
 	page: CompiledPage,
 	entry: { path: string; code: string },
 	css: Set<string>,
-	options: Pick<BuildConfig, "target" | "format" | "minify">,
-	prerender: boolean,
+	options: Pick<BuildConfig, "target" | "format" | "minify" | "external">,
+	purpose: BuildFor,
 ): Promise<string> {
 	let built: Awaited<ReturnType<typeof Bun.build>>;
 	try {
@@ -136,7 +146,7 @@ async function buildEntry(
 			entrypoints: [entry.path],
 			// The entry exists only here; `files` lets Bun resolve it, and the plugin's loader returns it.
 			files: { [entry.path]: entry.code },
-			plugins: [pagePlugin(page, entry, css, prerender)],
+			plugins: [pagePlugin(page, entry, css, purpose)],
 			jsx: { runtime: "automatic", importSource: "preact", development: false },
 			throw: true,
 		});
@@ -195,7 +205,7 @@ export function render(labels) {
 		{ path: join(dirname(page.path), "explainer-prerender.ts"), code },
 		css,
 		{ target: "bun", format: "esm" },
-		true,
+		"prerender",
 	);
 	const dir = mkdtempSync(join(tmpdir(), "explainer-prerender-"));
 	try {
@@ -219,26 +229,49 @@ export function render(labels) {
 	}
 }
 
+/** The entry that hydrates the islands from `modules`, numbered in the order given, as the islands' JSON names them. */
+function islandsEntry(page: CompiledPage, modules: string[]): { path: string; code: string } {
+	const code = [
+		`import { hydrateIslands } from ${JSON.stringify(join(ISLANDS, "client.ts"))};`,
+		...modules.map((path, i) => `import * as m${i} from ${JSON.stringify(path)};`),
+		`hydrateIslands([${modules.map((_, i) => `m${i}`).join(", ")}]);`,
+	].join("\n");
+	return { path: join(dirname(page.path), "explainer-islands.ts"), code };
+}
+
 /**
  * The one classic script that hydrates the islands: Preact, the client modules as written (not wrapped) and
- * kit/islands/client.ts, minified. `modules` are numbered in the order given, as the islands' JSON names them. Tree shaking
- * leaves out the kit components the client modules do not use, so the bundle holds only markup they can write.
+ * kit/islands/client.ts, minified.
  */
 export function clientBundle(
 	page: CompiledPage,
 	modules: string[],
 	css: Set<string>,
 ): Promise<string> {
-	const code = [
-		`import { hydrateIslands } from ${JSON.stringify(join(ISLANDS, "client.ts"))};`,
-		...modules.map((path, i) => `import * as m${i} from ${JSON.stringify(path)};`),
-		`hydrateIslands([${modules.map((_, i) => `m${i}`).join(", ")}]);`,
-	].join("\n");
 	return buildEntry(
 		page,
-		{ path: join(dirname(page.path), "explainer-islands.ts"), code },
+		islandsEntry(page, modules),
 		css,
 		{ target: "browser", format: "iife", minify: true },
-		false,
+		"browser",
+	);
+}
+
+/**
+ * The client bundle's code as kit-scripts.ts's scriptsInCode reads it: not minified, so names and props stay as written, and
+ * with kit Question left as an import, so its calls rather than its code tell whether it writes a reply question. Tree shaking
+ * leaves out the kit components the client modules do not use, so the code holds only markup they can write.
+ */
+export function clientScan(
+	page: CompiledPage,
+	modules: string[],
+	css: Set<string>,
+): Promise<string> {
+	return buildEntry(
+		page,
+		islandsEntry(page, modules),
+		css,
+		{ target: "browser", format: "esm", external: [QUESTION_IMPORT] },
+		"scan",
 	);
 }

@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { basename, dirname, extname, relative } from "node:path";
 import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
-import { clientBundle, prerender } from "./bundle.ts";
+import { clientBundle, clientScan, prerender } from "./bundle.ts";
 import { compileMdx, type Frontmatter, frontmatterWarnings } from "./compile.ts";
 import {
 	AFTER_ISLANDS,
@@ -85,15 +85,14 @@ async function answerClashes(html: string): Promise<string[]> {
 		);
 }
 
-/** The kit scripts the page needs: for the markup its HTML holds, the markup its client code can write later, and reply: true. */
-async function kitScripts(
-	html: string,
-	bundle: string,
-	front: Frontmatter,
-): Promise<Set<KitScript>> {
+/**
+ * The kit scripts the page needs: for the markup its HTML holds, the markup its client code (`scan`, bundle.ts's clientScan) can
+ * write later, and reply: true.
+ */
+async function kitScripts(html: string, scan: string, front: Frontmatter): Promise<Set<KitScript>> {
 	return new Set([
 		...(await scriptsInHtml(html)),
-		...scriptsInCode(bundle),
+		...scriptsInCode(scan),
 		...(front.reply ? (["keep.js", "reply.js"] as const) : []),
 	]);
 }
@@ -128,8 +127,10 @@ export async function mdxPage(
 			islands.flatMap((island) => [island.module, ...(island.refs ?? []).map((ref) => ref.module)]),
 		),
 	];
-	const bundle = islands.length ? await clientBundle(compiled, modules, css) : "";
-	const needed = await kitScripts(html, bundle, page.front);
+	const [bundle, scan] = islands.length
+		? await Promise.all([clientBundle(compiled, modules, css), clientScan(compiled, modules, css)])
+		: ["", ""];
+	const needed = await kitScripts(html, scan, page.front);
 	const kit = (names: KitScript[]) =>
 		names.filter((name) => needed.has(name)).map((name) => `<script src="kit:${name}"></script>`);
 	const dir = dirname(path);

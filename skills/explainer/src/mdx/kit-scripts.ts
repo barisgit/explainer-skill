@@ -3,8 +3,13 @@
  * prerendered HTML holds that markup, or when its client code can write it later: the code is searched for the same markup as
  * it appears in compiled JSX and DOM calls (`"data-reply"`, `dataset.reply`, `Charts.make`). The kit components are markup
  * generators, so their code holds the markers too and needs no list of its own; a new attribute a kit script reads needs a row.
- * Markup a client component builds from computed names (`"data-" + kind`) is not found.
+ * Question is the exception: which markup it writes depends on its props (a self-check writes no data-reply), so the client
+ * code is scanned with Question left as an import, and its calls decide. Markup a client component builds from computed names
+ * (`"data-" + kind`) is not found.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { KIT_DIR } from "../paths.ts";
 
 /** A kit script's file name as pages reference it. */
 export type KitScript =
@@ -35,17 +40,18 @@ function stringEnd(code: string, start: number): number {
 	return i;
 }
 
-/** A property name as compiled code writes it, minified or not: `id`, `"data-x"`, or `...` for a spread. */
-const KEY = /\s*(\.\.\.|[\w$]+|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/y;
+/** A property name as compiled code writes it, minified or not (`id`, `"data-x"`, or `...` for a spread), and its colon. */
+const KEY = /\s*(\.\.\.|[\w$]+|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')(\s*:)?\s*/y;
 
 /**
- * The property names at the top level of the object literal that opens at `code[start]`, in compiled code, minified or not:
- * `id: x` and the shorthand `id` give "id", `"data-x": y` gives "data-x", and a spread gives "...". Strings, template literals and
- * brackets inside a value are skipped whole, so `style: { width: 3 }` or a handler's body before `id` do not end the object early.
- * A regular expression literal holding a quote or bracket would mislead it; compiled props rarely hold one.
+ * The properties at the top level of the object literal that opens at `code[start]`, in compiled code, minified or not, each
+ * with the index its value starts at: `id: x` and the shorthand `id` give "id" (a shorthand's value is its name), `"data-x": y`
+ * gives "data-x", and a spread gives "...". Strings, template literals and brackets inside a value are skipped whole, so
+ * `style: { width: 3 }` or a handler's body before `id` do not end the object early. A regular expression literal holding a
+ * quote or bracket would mislead it; compiled props rarely hold one.
  */
-function objectKeys(code: string, start: number): Set<string> {
-	const keys = new Set<string>();
+function objectProps(code: string, start: number): Map<string, number> {
+	const props = new Map<string, number>();
 	// The closers of the brackets open at i; "`" while i is in a template literal's text.
 	const open: string[] = [];
 	for (let i = start; i < code.length; i++) {
@@ -54,19 +60,25 @@ function objectKeys(code: string, start: number): Set<string> {
 		if (open.length === 0) {
 			break;
 		}
-		const key = nextKey && keyAt(code, i + 1);
-		if (key) {
-			keys.add(key);
+		const prop = nextKey && propAt(code, i + 1);
+		if (prop) {
+			props.set(...prop);
 		}
 	}
-	return keys;
+	return props;
 }
 
-/** The property name that starts at `code[i]` (after spaces), its quotes removed, if one does. */
-function keyAt(code: string, i: number): string | undefined {
+/** The property that starts at `code[i]` (after spaces), if one does: its name without quotes, and where its value starts. */
+function propAt(code: string, i: number): [string, number] | undefined {
 	KEY.lastIndex = i;
-	const key = KEY.exec(code)?.[1];
-	return key && /^["']/.test(key) ? key.slice(1, -1) : key;
+	const found = KEY.exec(code);
+	const [text, written, colon] = found ?? [];
+	if (!(found && text && written)) {
+		return undefined;
+	}
+	const name = /^["']/.test(written) ? written.slice(1, -1) : written;
+	const named = written !== "..." && !colon;
+	return [name, named ? found.index + text.indexOf(written) : KEY.lastIndex];
 }
 
 /** Reads `code[i]` in a template literal's text, tracking `open`; returns the last index read (an escape reads two). */
@@ -102,8 +114,8 @@ function codeStep(code: string, i: number, open: string[]): number {
  */
 function controlWithId(code: string): boolean {
 	for (const made of code.matchAll(/["'`](?:input|select|textarea)["'`],\s*\{/g)) {
-		const keys = objectKeys(code, made.index + made[0].length - 1);
-		if (keys.has("id") || keys.has("...")) {
+		const props = objectProps(code, made.index + made[0].length - 1);
+		if (props.has("id") || props.has("...")) {
 			return true;
 		}
 	}
@@ -157,9 +169,72 @@ export const AFTER_ISLANDS: KitScript[] = [
 	"reply.js",
 ];
 
-/** The kit scripts compiled JavaScript (a client bundle, a transpiled component) can need for the markup it writes. */
+/** The kit module whose markup depends on its props, and the import bundle.ts's clientScan leaves in its place. */
+export const QUESTION_MODULE = join(KIT_DIR, "components", "question.tsx");
+export const QUESTION_IMPORT = "kit-question";
+
+/** The kit scripts compiled JavaScript (a client scan, a transpiled component) can need for the markup it writes. */
 export function scriptsInCode(code: string): Set<KitScript> {
-	return new Set(MARKERS.filter((marker) => marker.code(code)).flatMap((m) => m.scripts));
+	return new Set([
+		...MARKERS.filter((marker) => marker.code(code)).flatMap((m) => m.scripts),
+		...questionScripts(code),
+	]);
+}
+
+/**
+ * The kit scripts the Questions in a client scan need. A self-check, called with options and an answer written as a string and
+ * no spread, needs keep.js alone; any other use of Question (other props, or the component passed on) needs what Question's own
+ * code does.
+ */
+function questionScripts(code: string): KitScript[] {
+	const imported = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*"${QUESTION_IMPORT}";?`).exec(
+		code,
+	);
+	if (!imported) {
+		return [];
+	}
+	// The bundler renames the import when the client code has a Question of its own.
+	const name = /\bQuestion\s+as\s+([\w$]+)/.exec(imported[1] ?? "")?.[1] ?? "Question";
+	const rest = code.slice(0, imported.index) + code.slice(imported.index + imported[0].length);
+	const uses = [
+		...rest.matchAll(new RegExp(`(?<![\\w$.])${name.replaceAll("$", "\\$")}(?![\\w$])`, "g")),
+	];
+	if (uses.length === 0) {
+		return [];
+	}
+	return uses.every((use) => selfCheckCall(rest, use.index, use.index + name.length))
+		? ["keep.js"]
+		: [...questionCodeScripts()];
+}
+
+/** Where a call's first argument ends and an object literal second one opens: `jsx(Question, {`. */
+const OBJECT_ARGUMENT = /\s*,\s*\{/y;
+
+/** Whether the use of Question at `code[start, end)` is a call such as jsx(Question, { options, answer: "b" }), a self-check. */
+function selfCheckCall(code: string, start: number, end: number): boolean {
+	OBJECT_ARGUMENT.lastIndex = end;
+	if (!(/\(\s*$/.test(code.slice(Math.max(0, start - 20), start)) && OBJECT_ARGUMENT.test(code))) {
+		return false;
+	}
+	const props = objectProps(code, OBJECT_ARGUMENT.lastIndex - 1);
+	const answer = props.get("answer");
+	return (
+		props.has("options") &&
+		!props.has("...") &&
+		answer !== undefined &&
+		/["'`]/.test(code[answer] ?? "")
+	);
+}
+
+let questionNeeds: Set<KitScript> | undefined;
+
+/** The kit scripts Question's own code needs for the markup it can write: every form's. */
+function questionCodeScripts(): Set<KitScript> {
+	if (!questionNeeds) {
+		const code = readFileSync(QUESTION_MODULE, "utf8");
+		questionNeeds = scriptsInCode(new Bun.Transpiler({ loader: "tsx" }).transformSync(code));
+	}
+	return questionNeeds;
 }
 
 /** The kit scripts an HTML page or fragment needs for the markup it holds. */

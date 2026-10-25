@@ -495,6 +495,21 @@ describe("kit scripts", () => {
 		expect(kept).toBe(true);
 	}, 30_000);
 
+	test("a self-check a client component renders later brings keep.js and no reply bar", async () => {
+		dir.write(
+			"check-later.tsx",
+			revealing(
+				"Question",
+				`<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>`,
+			),
+		);
+		const output = await pack(
+			"check-later",
+			'import { Reveal } from "./check-later.tsx";\n\n# Check\n\n<Reveal />\n',
+		);
+		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["keep"]);
+	});
+
 	test("a control a client component renders later brings keep.js when it has an id, however its props are written", async () => {
 		const later = (props: string) => `"use client";
 import { useState } from "preact/hooks";
