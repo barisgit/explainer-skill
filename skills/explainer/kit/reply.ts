@@ -1,18 +1,18 @@
-/* reply: reader notes and answers sent as one Markdown reply: data-reply on form controls, select text or click a data-ref part to add a note. Needs kit:theme.css and kit:keep.js before it.
+/* reply: reader notes and answers sent as one Markdown reply: data-reply on form controls, select text or click a data-ref part to add a note. pack includes it, with keep, for data-reply or reply: true in the frontmatter.
    Nothing shows until the reader selects text, clicks a data-ref part (a Note button appears), or changes an input (a Clear button
    appears), or the page has data-reply controls (a Reply button).
    Questions and state are plain form controls inside any element marked data-reply:
      <fieldset data-reply>                        a question: the legend is its label, the checked option its answer
        <legend>Where should sessions live?</legend>
-       <label><input type="radio" name="store" value="redis" checked> Redis</label> <label><input type="radio" name="store" value="pg"> Postgres</label>
+       <label><input type="radio" name="store" value="redis" checked /> Redis</label> <label><input type="radio" name="store" value="pg" /> Postgres</label>
      </fieldset>
      <div class="controls" data-reply="Requirements">   a panel: its controls' current values join the reply, one line per control
-       <label class="field"><span>Max latency</span><input type="range" min="1" max="50" value="10"><output>10 ms</output></label>
+       <label class="field"><span>Max latency</span><input type="range" min="1" max="50" value="10" /><output>10 ms</output></label>
      </div>
-   A control works alone too: <select data-reply="Region">. Radios and checkboxes group by name; a checkbox group answers with the
+   A control works alone too: <select data-reply="Region">…</select>. Radios and checkboxes group by name; a checkbox group answers with the
    checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A control the reader never touched
    is sent as "(default)", one with nothing chosen as "no answer". Notes come from selected text and clicks on [data-ref] parts
-   (kit:link.js refs, Mermaid node ids); Enter on a focused ref opens its note.
+   (kit link refs, Mermaid node ids); Enter on a focused ref opens its note.
    The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is

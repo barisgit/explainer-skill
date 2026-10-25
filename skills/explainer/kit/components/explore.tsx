@@ -2,9 +2,9 @@
    <Explore label="Envelope against g(t)" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
      frame={envelope} />
      controls  one or more, each with a label and an id (its value is kept across reloads):
-       range: [min, max, step]   a slider; value is where it starts, format writes its readout ({ digits: 2 }, { unit: "%" })
+       range: [min, max, step]   a slider; value is where it starts (default min), format writes its readout ({ digits: 2 }, { unit: "%" })
        choice: ["LC", "SC"]      one of the texts, as a segmented switch ({ lc: "With carrier", ... } gives frame "lc");
-                                 value is the one it starts on
+                                 value is the one it starts on (default the first)
        toggle: true              a switch, off then on; value: true starts it on
      frame     (...values) => what the figure shows, given the controls' values in order (a number, a text, true or false):
        plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart)

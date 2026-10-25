@@ -10,7 +10,7 @@
      checked   the value (or values) chosen to begin with
      answer    the right value: a self-check. Choosing marks the right option and a wrong choice, and opens the explanation
                written inside the Question; it is not part of the reply and brings no Reply button
-   Without options the reader writes the answer in a text box (its id is the name) that joins the reply; what is written inside
+   Without options the reader writes the answer in a text box (its id is the name, written as above) that joins the reply; what is written inside
    the Question is the model answer, behind a fold the reader opens when ready (kitLabels.showAnswer), which Expand all leaves shut.
    A reply question the reader never touched is sent as "(default)", one with nothing chosen as "no answer".
    For a panel whose controls' current values join the reply, put data-reply on any element around plain controls with ids:

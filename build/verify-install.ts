@@ -9,7 +9,15 @@
  * Requires `caplet` on PATH or CAPLET=/path/to/caplet.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -112,8 +120,27 @@ type Scenario = {
 	name: string;
 	/** Installed directories to verify, relative to the scenario folder: under `home/` (the sandbox HOME) or `proj/` (the project). */
 	installed: string[];
+	/** Also verify the copy Claude Code loads as a plugin (Caplet 0.1 gives Claude Code the skill that way). */
+	claudePlugin?: boolean;
 	steps: string[][];
 };
+
+/**
+ * The skill directory inside the Claude Code plugin Caplet installed: the `installPath` that
+ * `~/.claude/plugins/installed_plugins.json` records for `explainer@<marketplace>`, which is the copy Claude Code reads.
+ * Its version directory carries a content hash, so it is looked up rather than written here. Undefined when none is registered.
+ */
+function claudePluginSkill(home: string): string | undefined {
+	const registry = join(home, ".claude/plugins/installed_plugins.json");
+	if (!existsSync(registry)) {
+		return undefined;
+	}
+	const { plugins } = JSON.parse(readFileSync(registry, "utf8")) as {
+		plugins: Record<string, { installPath: string }[]>;
+	};
+	const entry = Object.entries(plugins).find(([name]) => name.startsWith("explainer@"))?.[1][0];
+	return entry && join(entry.installPath, "skills/explainer");
+}
 
 const scenarios: Scenario[] = [
 	{
@@ -132,14 +159,16 @@ const scenarios: Scenario[] = [
 	},
 	{
 		name: "caplet-user",
-		installed: ["home/.agents/skills/explainer", "home/.claude/skills/explainer"],
+		installed: ["home/.agents/skills/explainer"],
+		claudePlugin: true,
 		steps: [[caplet, "add", source, "--scope", "user", "-y"]],
 	},
 	{
 		// `init` first: without a project .agents directory caplet walks up from the project and can
 		// pick up the real ~/.agents when the sandbox lies below the real home.
 		name: "caplet-project",
-		installed: ["proj/.agents/skills/explainer", "proj/.claude/skills/explainer"],
+		installed: ["proj/.agents/skills/explainer"],
+		claudePlugin: true,
 		steps: [
 			[caplet, "init"],
 			[caplet, "add", source, "--scope", "project", "-y"],
@@ -158,11 +187,24 @@ function runScenario(scenario: Scenario, expected: string[]): void {
 		const result = run(step, proj, home);
 		record(result.code === 0, step.slice(0, 3).join(" "), result.out);
 	}
-	for (const dir of scenario.installed) {
+	const dirs = scenario.installed.map((dir) => join(root, dir));
+	if (scenario.claudePlugin) {
+		const plugin = claudePluginSkill(home);
+		if (plugin) {
+			dirs.push(plugin);
+		} else {
+			record(
+				false,
+				"Claude Code plugin",
+				"no explainer@ entry in ~/.claude/plugins/installed_plugins.json",
+			);
+		}
+	}
+	for (const installed of dirs) {
+		const dir = installed.slice(root.length + 1);
 		console.log(` ${dir}`);
-		const installed = join(root, dir);
-		if (!existsSync(installed)) {
-			record(false, "installed", `${installed} does not exist`);
+		if (!(existsSync(installed) && statSync(installed).isDirectory())) {
+			record(false, "installed", `${installed} is not a directory`);
 			continue;
 		}
 		verifyFiles(installed, expected);

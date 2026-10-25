@@ -16,8 +16,8 @@ An agent skill that turns "show me" into one interactive HTML page: charts to ex
 In order of priority:
 
 1. **The reader understands and takes in the subject.** This comes before everything else; looks and interactivity serve it. [`guide.md`](skills/explainer/guide.md) records what made generated pages better or worse for their readers, and the kit's house style keeps the eye on the content.
-2. **Agents write pages easily, and the source stays readable for the agent who edits it later.** Charts, steppers, linked highlighting, drill-down views and reader replies are a few HTML attributes each, so the agent writes the content and its data rather than the machinery.
-3. **The page is one portable file that works offline and stays small enough.** Necessary, but the least important of the three. `pack` inlines only the kit files the page references (ECharts, about 0.9 MB, only for pages that use it) and renders Mermaid diagrams to SVG, so no diagram library ships.
+2. **Agents write pages easily, and the source stays readable for the agent who edits it later.** A page is MDX: prose in Markdown, and charts, sliders, steppers, drill-down views and questions as one tag each over data the page imports, so the agent writes the content and its data rather than the machinery.
+3. **The page is one portable file that works offline and stays small enough.** Necessary, but the least important of the three. `pack` renders the page to static HTML, inlines only the kit scripts it uses (ECharts, about 0.9 MB, only for pages that use it), and draws Mermaid diagrams as SVG and formulas as MathML, so no diagram or math library ships.
 
 ## Install
 
@@ -31,17 +31,17 @@ npx skills add barisgit/explainer-skill --global --agent claude-code --agent cod
 
 Several agents share one copy in `~/.agents/skills/explainer` and the others get symlinks; add `--copy` to give each agent its own copy. Without `--global` the skill goes into the current project. A local checkout works too: pass its path instead of `barisgit/explainer-skill`.
 
-**Caplet** (verified with `caplet` v0.2.0)
+**Caplet** (verified with `caplet` 0.1.0)
 
 ```sh
 caplet add github:barisgit/explainer-skill --pin main --scope user
 ```
 
-Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.8.0` instead to hold a version.
+Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.9.0` instead to hold a version.
 
-Caplet copies the skill into `~/.agents/skills/explainer` and `~/.claude/skills/explainer` and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
+Caplet copies the skill into `~/.agents/skills/explainer`, gives it to Claude Code as a plugin, and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
-Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name. `bun ~/.claude/skills/explainer/cli.ts kit` checks an installed copy.
+Use one installer per machine: both write `~/.agents/skills/explainer`, and Caplet does not warn when another source already emits a skill of the same name. `bun ~/.agents/skills/explainer/cli.ts kit` checks an installed copy.
 
 **Requirements:** [Bun](https://bun.sh) (verified with 1.4.3), and Google Chrome or Chromium for `check` (`CHROME=/path/to/chrome` if it is not found; a build downloaded by agent-browser or Playwright also works). Nothing else is installed: the skill runs as copied.
 
@@ -57,7 +57,7 @@ npx skills remove explainer --global -y
 caplet remove explainer --scope user && caplet apply --scope user
 ```
 
-`npx skills update` cannot check a local path, and plain `caplet apply` reuses the snapshot of a local source, so use the commands above after changing a checkout. Caplet leaves empty `kit`, `src` and `vendor` folders under `skills/explainer/` after removal.
+`npx skills update` cannot check a local path, and plain `caplet apply` reuses the snapshot of a local source, so use the commands above after changing a checkout.
 
 </details>
 
@@ -65,44 +65,40 @@ caplet remove explainer --scope user && caplet apply --scope user
 
 The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, run as `bun <skill directory>/cli.ts`:
 
-1. **Write** `page.html`: plain HTML that references kit files with a `kit:` prefix and adds behaviour through attributes. `kit` lists what is available and `kit <file>` documents one file.
-2. **Pack**: `pack page.html -o out.html` inlines the kit, fonts and local assets and renders the Mermaid diagrams to SVG in-process (one per diagram, following light and dark), so the result is one offline file.
+1. **Write** `page.mdx`: Markdown prose, the kit's components (`Chart`, `Plot`, `Explore`, `Stepper`, `View`, `Tree`, `Table`, `Question`) and the `.ts` or `.json` data it imports. `kit` lists what is available and `kit <name>` documents one; a `.tsx` component whose first line is `"use client"` covers behaviour no component does.
+2. **Pack**: `pack page.mdx -o out.html` renders the page to static HTML, inlines the kit scripts it uses, the fonts and local assets, and draws the Mermaid diagrams (one SVG each, following light and dark) and TeX formulas, so the result is one offline file.
 3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it end to end, reports errors, network use and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` clicks and presses keys first, so the screenshots can show a later state.
 
 A diagram whose parts light up from the text, for illustration:
 
-```html
-<link rel="stylesheet" href="kit:theme.css">
-
-<figure class="fig">
-  <pre class="mermaid">flowchart TD; req --> cache --> db</pre>
-</figure>
-<ol>
-  <li><span data-ref="req">A request</span> arrives.</li>
-  <li><span data-ref="cache">The cache</span> misses.</li>
-  <li><span data-ref="db">The database</span> answers.</li>
-</ol>
-
-<script src="kit:link.js"></script>
+````mdx
+```mermaid
+flowchart TD
+  req["Request"] --> cache["Cache"] --> db["Database"]
 ```
+
+1. <span data-ref="req">A request</span> arrives.
+2. <span data-ref="cache">The cache</span> misses.
+3. <span data-ref="db">The database</span> answers.
+````
 
 ## What a page can use
 
-**Charts that redraw as the reader moves a control.** ECharts in the page theme, with zoom, legend toggles and click-to-drill, or the light `plot.js` for a few small plots.
+**Charts that redraw as the reader moves a control.** `Explore` puts a slider, switch or toggles over a plot or chart, from frames computed when the page packs; ECharts in the page theme has zoom, legend toggles and click-to-drill, and the light `Plot` draws a few small plots without it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/fourier-series-terms-dark.webp">
   <img alt="Fourier series page: dragging the terms slider sharpens the partial sum of a square wave" src="examples/media/fourier-series-terms-light.webp">
 </picture>
 
-**Step-through figures.** Back, Play, Next, a scrubber and arrow keys from a few attributes; HTML, hand-built SVG parts and captions step together.
+**Step-through figures.** Back, Play, Next, a scrubber and arrow keys from one `Stepper`; HTML, hand-built SVG parts and captions step together.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/dijkstra-steps-dark.webp">
   <img alt="Dijkstra page: stepping the algorithm on a street grid updates the graph, the queue and the distance table" src="examples/media/dijkstra-steps-light.webp">
 </picture>
 
-**Drill-down views.** A hash router inside the one file: a bar, row or link opens its own view, and Back returns with the scroll position kept. The page's links give each view breadcrumbs and previous and next, pages with views inside views a contents rail, and a section with several folds Expand all.
+**Drill-down views.** A hash router inside the one file, one `View` per record or one filled from data: a bar, row or link opens its own view, and Back returns with the scroll position kept. The page's links give each view breadcrumbs and previous and next, pages with views inside views a contents rail, and a section with several folds Expand all.
 
 **Record trees.** Nested records (phases, groups, items) as one complete list that opens level by level: a summary line per level with its numbers aligned, Expand all for every level, and links from the text that open the branch they name.
 
@@ -111,16 +107,16 @@ A diagram whose parts light up from the text, for illustration:
   <img alt="Electricity page: switching the coal ranking to TWh, then opening the United States view and going back" src="examples/media/electricity-mix-coal-ranking-light.webp">
 </picture>
 
-**Questions the reader answers.** Form controls marked `data-reply` become one Markdown reply the reader sends back to the agent, together with notes on selected text or diagram parts. Inputs and notes survive a reload, with a Clear button.
+**Questions the reader answers.** A `Question` checks a choice on the spot, takes a written answer, or joins one Markdown reply the reader sends back to the agent, together with notes on selected text or diagram parts. Inputs and notes survive a reload; a page with a reply also gets a Clear button.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/password-hashing-presets-dark.webp">
   <img alt="Password hashing page: deployment presets change the recommended OWASP setting, down to nothing fits" src="examples/media/password-hashing-presets-light.webp">
 </picture>
 
-Also in the kit: Mermaid diagrams written as `<pre class="mermaid">` and pre-rendered at pack time (flowchart, state, sequence, class, ER and xychart), linked highlighting between prose, table rows and diagram parts, a stylesheet that follows the system's light or dark setting, and the kit's own buttons and messages in the page's language through `kitLabels`.
+Also in the kit: Mermaid diagrams written as ```` ```mermaid ```` fences and drawn at pack time (flowchart, state, sequence, class, ER and xychart), TeX formulas drawn as MathML with no script, tables computed from data, linked highlighting between prose, table rows and diagram parts, a stylesheet that follows the system's light or dark setting, and the kit's own buttons and messages in the page's language (`kit labels` prints them to translate).
 
-[`skills/explainer/example/`](skills/explainer/example/page.mdx) (`page.mdx` and the files it imports) is one short page that uses each feature where it helps its subject.
+[`skills/explainer/example/`](skills/explainer/example/page.mdx) (`page.mdx` and the files it imports) is one short page that uses the kit where it helps its subject.
 
 ## Development
 
@@ -138,6 +134,8 @@ Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are pub
 - [visual-explainer](https://github.com/nicobailon/visual-explainer) by Nico Bailon (MIT): the look and the reply flow.
 - [Apache ECharts](https://echarts.apache.org) (Apache-2.0), bundled in the kit.
 - [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) by Craft Docs (MIT), patched, with [ELK](https://github.com/kieler/elkjs) (EPL-2.0) and [entities](https://github.com/fb55/entities) (BSD-2-Clause): the Mermaid renderer `pack` uses, not shipped in pages.
+- [Preact](https://preactjs.com) and preact-render-to-string (MIT): the components and their hydration; [MDX](https://mdxjs.com) (MIT) with its unified, remark and micromark packages (MIT, one ISC), used by `pack`, not shipped in pages.
+- [Temml](https://temml.org) by Ron Kok (MIT) with remark-math, micromark-extension-math and mdast-util-math (MIT): TeX to MathML in `pack`; `temml.woff2` is from the KaTeX fonts (MIT, Khan Academy).
 - [Geist and Geist Mono](https://vercel.com/font) by Vercel (SIL OFL 1.1).
 
 Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data).
