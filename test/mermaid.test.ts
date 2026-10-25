@@ -172,7 +172,10 @@ test("an edge between levels of a nested subgraph starts and ends at its nodes",
 		const [left = 0, top = 0, width = 0, height = 0] = boxes.get(id) ?? [];
 		return x >= left - 1 && x <= left + width + 1 && y >= top - 1 && y <= top + height + 1;
 	};
-	for (const [key, { start, end }] of edgeEnds(svg)) {
+	const ends = edgeEnds(svg);
+	// Without every edge, a pattern that matched none would leave the loop below nothing to check.
+	expect([...ends.keys()].sort()).toEqual(["emit>lex", "lex>parse", "opt>emit", "parse>opt"]);
+	for (const [key, { start, end }] of ends) {
 		const [from = "", to = ""] = key.split(">");
 		expect({ key, start: touches(from, start), end: touches(to, end) }).toEqual({
 			key,
