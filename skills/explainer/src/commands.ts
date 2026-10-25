@@ -55,11 +55,14 @@ function kitHeader(file: string): string {
 		.trim();
 }
 
-/** The kit's Preact components, by the name a page imports ("Chart"), each from the header of its file in kit/components. */
+/**
+ * The kit's Preact components, by the name a page imports ("Chart"), each from the header of its .tsx file in kit/components;
+ * the modules they share live in kit/components/parts.
+ */
 function components(): { name: string; file: string; summary: string }[] {
 	// A component file's header starts "Name: description"; a helper module beside them (view-body.ts) has no such line.
 	return readdirSync(kitPath("components"))
-		.filter((name) => name !== "index.ts")
+		.filter((name) => name.endsWith(".tsx"))
 		.sort()
 		.flatMap((name) => {
 			const file = `components/${name}`;

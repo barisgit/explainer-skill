@@ -21,12 +21,24 @@ interface ChartHandle {
 
 type ViewHandler = (view: HTMLElement, param: string) => void;
 
+/**
+ * A number format as JSON, written for the page's lang: digits fixes the decimals, percent writes 0.25 as 25%, currency ("EUR")
+ * and compact (12K) as Intl writes them, and unit follows the number ("min" gives 18 min, "%" gives 90%).
+ */
+interface NumberFormat {
+	digits?: number;
+	unit?: string;
+	percent?: boolean;
+	currency?: string;
+	compact?: boolean;
+}
+
 interface AxisSpec {
 	min?: number;
 	max?: number;
 	step?: number;
 	name?: string;
-	format?: (value: number) => string;
+	format?: ((value: number) => string) | NumberFormat;
 }
 
 /** A line or stem point, or a bar value. */
@@ -39,8 +51,8 @@ interface PlotSeries {
 	color?: string;
 	width?: number;
 	dash?: boolean;
-	/** true prints the value; a function writes the text: stem (x, y), bar (v). */
-	label?: boolean | ((...args: number[]) => string);
+	/** true prints the value; a format, one text per point or bar, or a function: stem (x, y, i), bar (v, i). */
+	label?: boolean | NumberFormat | readonly string[] | ((...args: number[]) => string);
 }
 
 interface PlotOption {

@@ -132,6 +132,7 @@ const declarations = [
 	"preact/src/dom.d.ts",
 	"preact/hooks/src/index.d.ts",
 	"preact/jsx-runtime/src/index.d.ts",
+	"preact-render-to-string/dist/index.d.ts",
 	"echarts/types/dist/echarts.d.ts",
 ];
 for (const file of declarations) {

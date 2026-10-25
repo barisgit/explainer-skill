@@ -7,11 +7,12 @@
          type "bar"    data [v, ...], one per category
          color  any CSS colour, default var(--c1)..var(--c6) in turn; "var(--accent)" and color-mix(...) work
          name   shown in the legend, whose entries switch the series on and off; a series without a name toggles with the named one before it
-         label  prints exact values on the marks: true, or a function: stem (x, y) => text, bar (v) => text
+         label  prints exact values on the marks: true, a format as below, or one text per point or bar: ["½mA", "A", "½mA"]
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
        x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
-              Range and step are automatic and round; format(v) => text writes the tick labels and values (decimal comma, units).
+              Range and step are automatic and round; format writes the tick labels and values in the page's lang:
+              { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
        legend false hides the legend (by default it shows when two or more series have a name)
      label   the accessible name (role="img")
      class   more classes after "chart plot", e.g. "tall"
@@ -20,8 +21,9 @@
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
    Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series.
-   From the page a Plot takes JSON props only; for format or label functions, or a plot drawn from state, render it in your own
-   client component. */
+   A plot a slider, choice or toggle switches between computed options is an Explore. For anything more, render the plot in
+   your own client component; there format and label may also be functions:
+   format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
 

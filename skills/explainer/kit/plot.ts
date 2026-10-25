@@ -9,11 +9,13 @@
          type "bar"    data [v, ...], one per category
          color  any CSS colour, default var(--c1)..var(--c6) in turn; "var(--accent)" and color-mix(...) work
          name   shown in the legend, whose entries switch the series on and off; a series without a name toggles with the named one before it
-         label  prints exact values on the marks: true, or a function: stem (x, y) => text, bar (v) => text
+         label  prints exact values on the marks: true, a format as below, one text per point or bar (["A", "", "C"]),
+                or a function: stem (x, y, i) => text, bar (v, i) => text
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
        x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
-              Range and step are automatic and round; format(v) => text writes the tick labels and values (decimal comma, units).
+              Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
+              { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
        legend false hides the legend (by default it shows when two or more series have a name)
      set(patch)  shallow-merges the patch into the option (x and y one level deeper) and redraws at once; series is replaced whole.
      dispose()   stops redrawing on resize, for code that takes the element away
@@ -97,9 +99,48 @@
 	/** Text centred vertically on y. */
 	const svgText = (cls: string, x: number, y: number, anchor: Anchor, s: unknown) =>
 		`<text class="${cls}" x="${px(x)}" y="${px(y)}" dy="0.35em" text-anchor="${anchor}">${esc(s)}</text>`;
-	/** The function that writes a mark's value text: `auto` for label: true, the series' own function, else none. */
-	const labeller = <F>(label: PlotSeries["label"], auto: F) =>
-		label === true ? auto : label || undefined;
+	/** The Intl options of a JSON number format (NumberFormat in kit-types/globals.d.ts). */
+	const intlOptions = ({
+		digits,
+		percent,
+		currency,
+		compact,
+	}: NumberFormat): Intl.NumberFormatOptions => ({
+		style: percent ? "percent" : currency ? "currency" : "decimal",
+		useGrouping: "min2", // 12 345, but a year stays 2024
+		...(currency ? { currency } : {}),
+		...(compact ? { notation: "compact" } : {}),
+		...(digits === undefined
+			? {}
+			: { minimumFractionDigits: digits, maximumFractionDigits: digits }),
+	});
+	/** Writes a number in a JSON format as the page's lang does. A word unit stands apart (18 min), a symbol joins it (90%). */
+	function numberText(format: NumberFormat) {
+		const intl = new Intl.NumberFormat(document.documentElement.lang || "en", intlOptions(format));
+		const { unit = "" } = format;
+		const after = /^\p{L}/u.test(unit) ? `\u00a0${unit}` : unit;
+		return (v: number) => intl.format(v) + after;
+	}
+	const formatter = (format: AxisSpec["format"]): ((v: number) => string) =>
+		typeof format === "function" ? format : format ? numberText(format) : String;
+	/** A mark's value text from its value, its index in the series and, for a stem, its x. */
+	type Labeller = (value: number, i: number, x: number) => string;
+	/** The series' label as a Labeller (`format` writes the value for label: true), or none when it asks for no labels. */
+	function labeller(label: PlotSeries["label"], format: (v: number) => string, stem: boolean) {
+		if (!label) {
+			return undefined;
+		}
+		if (typeof label === "function") {
+			return stem
+				? (v: number, i: number, x: number) => label(x, v, i)
+				: (v: number, i: number) => label(v, i);
+		}
+		if (isTexts(label)) {
+			return (_: number, i: number) => label[i] ?? "";
+		}
+		return label === true ? format : numberText(label);
+	}
+	const isTexts = (label: PlotSeries["label"]): label is readonly string[] => Array.isArray(label);
 	const seriesColor = (s: PlotSeries, i: number) => s.color ?? `var(--c${(i % 6) + 1})`;
 
 	/** 1, 2, 5 times a power of ten giving about `count` steps over `span`. */
@@ -135,7 +176,7 @@
 		for (let k = Math.ceil(lo / step - 1e-9); k * step <= hi + step * 1e-9; k++) {
 			ticks.push(+(k * step).toFixed(10));
 		}
-		const format = spec.format ?? ((v) => String(v));
+		const format = formatter(spec.format);
 		return {
 			lo,
 			hi,
@@ -188,13 +229,16 @@
 	function stemMark(s: PlotSeries, i: number, { X, Y, ya, W, textWidth }: PointCtx) {
 		const base = Y(clamp(0, ya.lo, ya.hi));
 		const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2.5}`;
-		const format = labeller(s.label, (_: number, y: number) => ya.format(y));
+		const format: Labeller | undefined = labeller(s.label, ya.format, true);
 		return s.data
-			.filter(finite)
-			.map(([x, y]) => {
+			.map((p, i) => {
+				if (!finite(p)) {
+					return "";
+				}
+				const [x, y] = p;
 				const cx = X(x);
 				const cy = Y(y);
-				const t = format?.(x, y);
+				const t = format?.(y, i, x);
 				const dot = `<circle class="dot" style="${style}" cx="${px(cx)}" cy="${px(cy)}" r="4.5"/>`;
 				const half = t ? textWidth(t) / 2 : 0;
 				const ty = cy <= base ? Math.max(cy - 14, FONT) : cy + 14;
@@ -291,7 +335,7 @@
 		return {
 			rect: `<rect class="bar" style="--c:${seriesColor(s, j)}" x="${px(x)}" y="${px(y)}" width="${px(w)}" height="${px(h)}">${title}</rect>`,
 			bar,
-			format: labeller(s.label, val.format),
+			format: labeller(s.label, val.format, false),
 		};
 	}
 
@@ -306,7 +350,7 @@
 		textWidth: TextWidth,
 	) {
 		const { rect, bar, format } = barRect(s, j, i, v, layout, option);
-		const t = format?.(v);
+		const t = format?.(v, i, 0);
 		return t ? rect + barLabel(t, bar, Boolean(option.stack), textWidth) : rect;
 	}
 

@@ -11,6 +11,8 @@
    Colours: write "var(--accent)", "color-mix(in srgb, var(--accent) 20%, transparent)" or Charts.color("accent") (the same var string)
      in any colour option (color, borderColor, fill, colorStops[].color, ...). They are resolved when the chart mounts, so they follow
      light/dark. Charts.color(token) is not a resolved rgb: do not use it in canvas code or alpha maths.
+   Formats as JSON: a formatter, valueFormatter or labelFormatter may be a format, { digits: 1, unit: "min" }, { percent: true },
+     { currency: "EUR", compact: true }, written for the page's lang, or one text per data item (series labels) or tick: ["Low", "", "Peak"].
    Layout: write grid: { top, left, right, bottom } as padding. Axis labels stay inside it (the theme sets outerBoundsMode "same" and
      outerBoundsContain "axisLabel", ECharts 6's form of containLabel), so margins of 8 to 24 px are enough and labels never clip.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
@@ -50,25 +52,94 @@
 		return `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`;
 	}
 
+	/** The Intl options of a JSON number format (NumberFormat in kit-types/globals.d.ts); plot.js writes formats the same way. */
+	const intlOptions = ({
+		digits,
+		percent,
+		currency,
+		compact,
+	}: NumberFormat): Intl.NumberFormatOptions => ({
+		style: percent ? "percent" : currency ? "currency" : "decimal",
+		useGrouping: "min2", // 12 345, but a year stays 2024
+		...(currency ? { currency } : {}),
+		...(compact ? { notation: "compact" } : {}),
+		...(digits === undefined
+			? {}
+			: { minimumFractionDigits: digits, maximumFractionDigits: digits }),
+	});
+	/** Writes a number in a JSON format as the page's lang does. A word unit stands apart (18 min), a symbol joins it (90%). */
+	function numberText(format: NumberFormat) {
+		const intl = new Intl.NumberFormat(document.documentElement.lang || "en", intlOptions(format));
+		const { unit = "" } = format;
+		const after = /^\p{L}/u.test(unit) ? `\u00a0${unit}` : unit;
+		return (v: number) => intl.format(v) + after;
+	}
+
+	const FORMAT_KEY = /^(formatter|valueFormatter|labelFormatter)$/;
+	const FORMAT_NAMES = new Set(["digits", "unit", "percent", "currency", "compact"]);
+
+	/** The number in what ECharts hands a formatter: a tick's value, the last of an [x, y] value, or a mark's params.value. */
+	function numberIn(arg: unknown): unknown {
+		if (Array.isArray(arg)) {
+			return numberIn(arg.at(-1));
+		}
+		return isObject(arg) && "value" in arg ? numberIn(arg.value) : arg;
+	}
+
+	/** The texts as a formatter: a series label takes the one of its dataIndex, an axis label the one of its index. */
+	const textsFormatter = (texts: string[]) => (arg: unknown, index: unknown) =>
+		texts[isObject(arg) && typeof arg.dataIndex === "number" ? arg.dataIndex : Number(index)] ?? "";
+
+	/** A NumberFormat as a formatter; text that is not a number, such as a category name, stays as it is. */
+	function numberFormatter(format: NumberFormat) {
+		const text = numberText(format);
+		return (arg: unknown) => {
+			const value = numberIn(arg);
+			return typeof value === "number" ? text(value) : String(value ?? "");
+		};
+	}
+
+	/** The function ECharts calls for a formatter written as JSON under a formatter key (texts, or a NumberFormat), else undefined. */
+	function jsonFormatter(key: string, value: unknown) {
+		if (!FORMAT_KEY.test(key)) {
+			return undefined;
+		}
+		if (Array.isArray(value)) {
+			const texts = value.filter((item): item is string => typeof item === "string");
+			return texts.length === value.length ? textsFormatter(texts) : undefined;
+		}
+		return isObject(value) && Object.keys(value).every((name) => FORMAT_NAMES.has(name))
+			? numberFormatter(value)
+			: undefined;
+	}
+
+	/** Items of an array resolved, or the array itself when it holds numbers only. */
+	const resolveItems = (items: unknown[], key: string) =>
+		items.every((item) => typeof item === "number")
+			? items
+			: items.map((item) => resolveOption(item, key));
+
 	/**
-	 * Copy of an option with every colour expression under a colour key resolved for the current scheme. Plain objects and arrays are
-	 * copied, everything else (functions, class instances, arrays of numbers only) is shared, so an item
-	 * in a data array that also holds numbers is resolved. Run at every mount so saved options stay token-based.
+	 * Copy of an option with every colour expression under a colour key resolved for the current scheme, and every JSON formatter
+	 * made a function. Plain objects and arrays are copied, everything else (functions, class instances, arrays of numbers only) is
+	 * shared, so an item in a data array that also holds numbers is resolved. Run at every mount so saved options stay token-based.
 	 */
-	function resolveColors<T>(value: T, key?: string): T;
-	function resolveColors(value: unknown, key = ""): unknown {
+	function resolveOption<T>(value: T, key?: string): T;
+	function resolveOption(value: unknown, key = ""): unknown {
 		if (typeof value === "string") {
 			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
 		}
+		const formatter = jsonFormatter(key, value);
+		if (formatter) {
+			return formatter;
+		}
 		if (Array.isArray(value)) {
-			return value.every((item) => typeof item === "number")
-				? value
-				: value.map((item) => resolveColors(item, key));
+			return resolveItems(value, key);
 		}
 		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
 			return value;
 		}
-		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveColors(v, k)]));
+		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveOption(v, k)]));
 	}
 
 	/** ECharts theme object built from the tokens, so every component starts in the page's look; `el` is the chart's element. */
@@ -246,7 +317,7 @@
 		const mount = () => {
 			chart?.dispose();
 			chart = echarts.init(el, theme(el));
-			chart.setOption(resolveColors(option));
+			chart.setOption(resolveOption(option));
 			setup?.(chart);
 		};
 		// Canvas text needs the web font loaded before the first draw.
@@ -285,7 +356,7 @@
 			set(patch, replace = []) {
 				mergeOption(option, patch, replace);
 				chart?.setOption(
-					resolveColors(patch),
+					resolveOption(patch),
 					replace.length ? { replaceMerge: replace } : undefined,
 				);
 			},

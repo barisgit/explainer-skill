@@ -293,6 +293,38 @@ describe("Plot", () => {
 		expect(drawn).toBe("3,3,chart plot");
 	}, 30_000);
 
+	test("a Plot and a Chart from the page take formats and per-mark texts as JSON, written for the page's lang", async () => {
+		const output = await pack(
+			"formats",
+			`---
+lang: sl
+---
+import { Chart, Plot } from "kit";
+
+# Spekter
+
+<Plot id="lines" label="Spekter" option={{ x: { min: 898, max: 902, step: 1, format: { unit: "kHz" } }, y: { min: 0, max: 1.25, step: 0.5, format: { digits: 1 } }, series: [{ type: "stem", data: [[899, 0.5], [900, 1], [901, 0.5]], label: ["½mA", "A", ""] }] }} />
+
+<Plot id="shares" label="Deleži" option={{ categories: ["LC", "SC"], series: [{ type: "bar", data: [0.335, 1], label: { percent: true } }] }} />
+
+<Chart id="waits" label="Čakanje" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: { axisLabel: { formatter: { digits: 1, unit: "min" } } }, tooltip: { valueFormatter: { currency: "EUR" } }, series: [{ type: "bar", data: [1, 2], label: { show: true, formatter: ["first", "second"] } }] }} />
+`,
+		);
+		const texts = (id: string) =>
+			`[...document.querySelectorAll("#${id} svg text")].map((t) => t.textContent)`;
+		const state = await inPage(output, async (cdp) => ({
+			lines: await cdp.evaluate<string[]>(texts("lines")),
+			shares: await cdp.evaluate<string[]>(texts("shares")),
+			chart: await cdp.evaluate(
+				`(() => { const o = echarts.getInstanceByDom(document.getElementById("waits")).getOption(); return [o.yAxis[0].axisLabel.formatter(1.5), o.tooltip[0].valueFormatter(12345.5), o.series[0].label.formatter({ dataIndex: 1, value: 2 })]; })()`,
+			),
+		}));
+		expect(state.lines).toEqual(expect.arrayContaining(["899\u00a0kHz", "0,5", "1,0", "½mA", "A"]));
+		expect(state.lines.filter((t) => t === "")).toEqual([]);
+		expect(state.shares).toEqual(expect.arrayContaining(["34\u00a0%", "100\u00a0%"]));
+		expect(state.chart).toEqual(["1,5\u00a0min", "12.345,50\u00a0€", "second"]);
+	}, 30_000);
+
 	test("a Plot in the author's client component brings plot.js alone, though kit also exports Chart", async () => {
 		const output = await pack(
 			"spark",
@@ -430,9 +462,11 @@ export function Reveal() {
 /** One use of each kit component, written so it needs every script the component can need (Tree: folds and refs). */
 const COMPONENT_USES: Record<string, string> = {
 	Chart: `<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />`,
+	Explore: `<Explore label="Bars" controls={[{ id: "n", label: "N", toggle: true }]} frames={[1, 2].map((n) => ({ plot: { categories: ["a"], series: [{ type: "bar", data: [n] }] } }))} />`,
 	Plot: `<Plot label="Bars" option={{ categories: ["a"], series: [{ type: "bar", data: [1] }] }} />`,
 	Question: `<Question name="pick" legend="Pick one" options={["yes", "no"]} />`,
 	Stepper: `<Stepper captions={["One", "Two"]}><p data-step="1">One</p><p data-step="2">Two</p></Stepper>`,
+	Table: `<Table rows={[{ name: "A", n: 1 }]} cols={[{ head: "Name", value: "name" }, { head: "N", value: "n" }]} />`,
 	Tree: `<Tree items={[{ label: "Plan", ref: "plan", items: [{ label: "Task", ref: "plan", text: "Do it" }] }]} />`,
 };
 

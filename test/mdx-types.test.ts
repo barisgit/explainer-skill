@@ -41,7 +41,7 @@ test("kit types checks an external page's own sources without installed dependen
 		'const probe: number = "not checked";\nconsole.log(probe, Bun.version);\n',
 	);
 	const good = `"use client";
-import { Chart, Plot, Question, Stepper, Tree, type TreeItem, type TreeRow, View } from "kit";
+import { Chart, Explore, Plot, Question, Stepper, Table, Tree, type TreeItem, type TreeRow, View } from "kit";
 import { useState } from "preact/hooks";
 import { start as first } from "./data.ts";
 const option: PlotOption = { series: [{ type: "line", data: [[0, 1]] }] };
@@ -54,10 +54,12 @@ export function Figure({ start = first }: { start?: number }) {
   return <><button onClick={() => setCount(count + 1)}>{count}</button>
     <Chart option={chart} label="Values" setup={(instance) => instance.resize()} />
     <Plot option={option} label="Values" />
+    <Explore label="Values" controls={[{ id: "on", label: "On", toggle: true }]} frames={[{ plot: option }, { plot: option, readout: <b>On</b> }]} />
     <Question name="q" legend="Pick" options={["a", "b"]} />
     <Stepper captions={["One", "Two"]}><p data-step="1">One</p></Stepper>
     <Tree cols="4rem" head={["Task", "Hours"]} items={rows} />
     <Tree items={[{ name: "B", hours: 2 }]} row={taskRow} />
+    <Table rows={[{ name: "A", share: 0.5 }]} cols={[{ head: "Name", value: "name", link: (r) => \`#\${r.name}\` }, { head: "Share", value: "share", format: { percent: true } }]} />
     <View name="detail"><h1>Detail</h1></View></>;
 }
 `;

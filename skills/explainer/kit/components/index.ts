@@ -12,8 +12,10 @@
    state and handlers work. Props from the page into such a component must be JSON. A control with an id keeps its value across
    reloads (kit keep); in such a component, set its state in onInput or onChange, which the restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
+export { Explore } from "./explore.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
 export { Stepper } from "./stepper.tsx";
+export { Table } from "./table.tsx";
 export { Tree, type TreeItem, type TreeRow } from "./tree.tsx";
 export { View } from "./view.tsx";

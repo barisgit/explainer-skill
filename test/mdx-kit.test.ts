@@ -208,6 +208,39 @@ var contract = settled.then(async () => {
 		expect(await runPacked(output)).toEqual([]);
 	}, 60_000);
 
+	test("a Table from records renders what the same Markdown table does, numbers written for the page's lang", async () => {
+		const { result, output } = await packMdx(
+			"table",
+			`---
+lang: sl
+---
+import { Table } from "kit";
+
+# Fixes
+
+| Fix | Busy | Wait | Cost |
+|---|---:|---:|---|
+| Second barista | 45,0&nbsp;% | 0,5 | 12.345&nbsp;€ |
+| Change nothing | 90,0&nbsp;% | 18,0 | none |
+
+<Table rows={[{ name: "Second barista", busy: 0.45, wait: 0.5, cost: 12345 }, { name: "Change nothing", busy: 0.9, wait: 18, cost: "none" }]} cols={[{ head: "Fix", value: "name" }, { head: "Busy", value: "busy", format: { percent: true, digits: 1 } }, { head: "Wait", value: (f) => f.wait, format: { digits: 1 } }, { head: "Cost", value: (f) => typeof f.cost === "number" ? \`\${f.cost.toLocaleString("sl")}\u00a0€\` : f.cost }]} />
+
+<Table id="linked" rows={[{ id: "second", name: "Second barista", why: "Halves the load", wait: 0.5 }, { id: "none", name: "Change nothing", why: "", wait: 18 }]} state={(f) => (f.id === "none" ? "out" : "fit")} cols={[{ head: "Fix", value: "name", link: (f) => \`#fix/\${f.id}\`, note: "why" }, { head: "Wait", value: "wait", format: { unit: "min" } }]} />
+`,
+		);
+		expect(result.stderr).toBe("");
+		const [markdown, table, linked] = mainOf(readFileSync(output, "utf8")).match(
+			/<table[\s\S]*?<\/table>/g,
+		) ?? [""];
+		expect(table).toBe(markdown);
+		expect(`<main>${linked}</main>`).toBe(
+			mainOf(`<main><table class="compare" id="linked"><thead><tr><th>Fix</th><th class="num">Wait</th></tr></thead><tbody>
+<tr data-state="fit"><th scope="row"><a href="#fix/second">Second barista</a><span class="why">Halves the load</span></th><td class="num" data-label="Wait">0,5\u00a0min</td></tr>
+<tr data-state="out"><th scope="row"><a href="#fix/none">Change nothing</a></th><td class="num" data-label="Wait">18\u00a0min</td></tr>
+</tbody></table></main>`),
+		);
+	});
+
 	test("a View inside another View fails the pack, saying where views go", async () => {
 		const { result } = await packMdx(
 			"nested",
