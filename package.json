@@ -33,6 +33,8 @@
 		"preact-render-to-string": "6.8.1",
 		"remark-frontmatter": "5.0.0",
 		"remark-gfm": "4.0.1",
+		"remark-math": "6.0.0",
+		"temml": "0.14.0",
 		"typescript": "7.0.2"
 	},
 	"patchedDependencies": {

@@ -11,6 +11,7 @@ import {
 	scriptsInCode,
 	scriptsInHtml,
 } from "./kit-scripts.ts";
+import { MATH_ELEMENT } from "./math.ts";
 
 /** Island markers, and the element a rendered View is wrapped in (VIEW_MARKER in kit/components/view.tsx) so pack can move it. */
 const VIEW = /<!--island:\d+-->|<!--\/island-->|<explainer-view>|<\/explainer-view>/g;
@@ -108,7 +109,7 @@ async function kitScripts(
 /**
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
- * into the page shell with the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
+ * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client bundle, kitLabels and the kit
  * scripts it needs. Every error the author can fix is a PackError.
  */
 export async function mdxPage(
@@ -150,6 +151,7 @@ export async function mdxPage(
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
 		`<title>${escapeHtml(page.title ?? basename(path, extname(path)))}</title>`,
 		'<link rel="stylesheet" href="kit:theme.css">',
+		...(MATH_ELEMENT.test(html) ? ['<link rel="stylesheet" href="kit:math.css">'] : []),
 		...links,
 		"</head>",
 		"<body>",

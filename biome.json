@@ -9,6 +9,8 @@
 			"!skills/explainer/kit/echarts.js",
 			"!skills/explainer/vendor/beautiful-mermaid.js",
 			"!skills/explainer/vendor/mdx.js",
+			"!skills/explainer/vendor/math.js",
+			"!skills/explainer/kit/parts/math/temml.css",
 			"!skills/explainer/vendor/preact",
 			"!skills/explainer/vendor/types",
 			"!examples/*/data.js"

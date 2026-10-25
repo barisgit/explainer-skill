@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import type { Element, Nodes as HastNodes, Root as HastRoot } from "hast";
 import type { Root } from "mdast";
+import { remarkMath } from "../../vendor/math.js";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
 import { PackError } from "../pack-error.ts";
+import { mathToMathml } from "./math.ts";
 import { structurePage } from "./structure.ts";
 
 /** What a page's YAML frontmatter sets; see MDX-ARM.md. */
@@ -185,7 +187,8 @@ const isMdxMessage = (e: unknown): e is MdxMessage =>
 	e instanceof Error && "reason" in e && typeof e.reason === "string";
 
 /**
- * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), Mermaid fences and the page
+ * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), TeX math
+ * as MathML (math.ts), Mermaid fences and the page
  * layout (structure.ts) when `page` is set, the page's own file; an imported .mdx file is compiled as a fragment. A syntax error
  * throws PackError with file:line:column.
  */
@@ -203,13 +206,14 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 				remarkPlugins: [
 					remarkFrontmatter,
 					remarkGfm,
+					remarkMath,
 					() => (tree: Root) => {
 						if (page) {
 							h1 = structurePage(tree);
 						}
 					},
 				],
-				rehypePlugins: [() => mermaidFences, () => compareTables],
+				rehypePlugins: [() => mermaidFences, () => compareTables, mathToMathml(file)],
 			},
 		);
 		return { js: String(compiled.value), front, title: front.title ?? h1 };
