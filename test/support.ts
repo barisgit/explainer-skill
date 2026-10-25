@@ -185,7 +185,7 @@ export async function packAndRun(
 			});
 			await open(cdp, `file://${output}`);
 			if (steps.length) {
-				const shotPath = (index: number | undefined) =>
+				const shotPath: ShotPath = (_selector, index) =>
 					dir.path(`${name}-${width}-${index ?? 0}.png`);
 				const problems = await runSteps(cdp, steps, shotPath);
 				failures.push(...problems.map((problem) => `${width}: ${problem}`));

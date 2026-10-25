@@ -124,8 +124,11 @@ export interface StepResult {
 	pngs?: string[];
 }
 
-/** The file a shot: step writes for one match: `index` is the match's 0-based position when the step names @all or @<n>, else undefined. */
-export type ShotPath = (index: number | undefined) => string;
+/**
+ * The file a shot: step writes for one match: `selector` is the one the step queries (without `@all` or `@<n>`, attribute values
+ * quoted), and `index` the match's 0-based position when the step names `@all` or `@<n>`, else undefined.
+ */
+export type ShotPath = (selector: string, index: number | undefined) => string;
 
 /**
  * The key code and DOM code of a letter or digit, whose code point is its own key code. Other characters get none: their code
@@ -364,7 +367,7 @@ async function shotStep(
 			captureBeyondViewport: !fits,
 			clip: { x, y, width, height, scale: 1 },
 		});
-		const png = shotPath(target.nth === undefined ? undefined : i);
+		const png = shotPath(target.selector, target.nth === undefined ? undefined : i);
 		writeFileSync(png, Buffer.from(data, "base64"));
 		pngs.push(png);
 	}

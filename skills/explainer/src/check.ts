@@ -409,9 +409,19 @@ async function capture(run: Run, png: string, screen: Screen): Promise<string[]>
 	];
 }
 
+/**
+ * The path of an overview PNG for one screen, `part` saying what it shows beyond the full page: `<stem>[-<part>]-<theme>-<size>.png`,
+ * or under --quick, whose one theme the name leaves out, `[<tag>-][<part>-]<size>.png`.
+ */
+function overviewPng(run: Run, { theme, name }: Screen, part = "") {
+	const { tag, quick } = run.opts;
+	const parts = quick ? [tag, part, name] : [run.stem, part, theme, name];
+	return join(run.outDir, `${parts.filter(Boolean).join("-")}.png`);
+}
+
 /** The first viewport before any step: PNG, headline and the figures in view. */
-async function firstScreen(run: Run, { theme, name }: Screen): Promise<FirstScreen> {
-	const png = join(run.outDir, `${run.stem}-first-${theme}-${name}.png`);
+async function firstScreen(run: Run, screen: Screen): Promise<FirstScreen> {
+	const png = overviewPng(run, screen, "first");
 	const { data } = await run.cdp.send<{ data: string }>("Page.captureScreenshot", {
 		format: "png",
 	});
@@ -436,25 +446,16 @@ async function discoverViews(run: Run) {
 }
 
 /**
- * The file of a `--do shot:` PNG: the shot's ordinal among the shot: steps, then the selector as a slug, then the match index when
- * the step names one (`example-shot2-card-0-light-desktop.png`; `--quick`: `shot2-card-0-desktop.png`, after the tag).
+ * The `part` of a `--do shot:` PNG's name: the shot's ordinal among the shot: steps, the selector as a slug, then the match index
+ * when the step names one (`shot2-card-0`, as in `example-shot2-card-0-light-desktop.png`).
  */
-function shotFile(run: Run, screen: Screen, ordinal: number, step: string, index?: number) {
+function shotPart(ordinal: number, selector: string, index: number | undefined) {
 	const slug =
-		step
-			.slice("shot:".length)
-			.replace(/@(all|\d+)$/, "")
+		selector
 			.replace(/[^\w-]+/g, "-")
 			.replace(/^-+|-+$/g, "")
 			.slice(0, 40) || "element";
-	const name = `shot${ordinal}-${slug}${index === undefined ? "" : `-${index}`}`;
-	const { tag, quick } = run.opts;
-	return join(
-		run.outDir,
-		quick
-			? `${tag ? `${tag}-` : ""}${name}-${screen.name}.png`
-			: `${run.stem}-${name}-${screen.theme}-${screen.name}.png`,
-	);
+	return `shot${ordinal}-${slug}${index === undefined ? "" : `-${index}`}`;
 }
 
 /** Runs the `--do` steps in order, recording their problems and notes; returns the PNGs the shot: steps wrote. */
@@ -463,8 +464,8 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 	let ordinal = 0;
 	for (const step of run.opts.steps) {
 		const shot = step.startsWith("shot:") ? ++ordinal : 0;
-		const result = await runStep(run.cdp, step, (index) =>
-			shotFile(run, screen, shot, step, index),
+		const result = await runStep(run.cdp, step, (selector, index) =>
+			overviewPng(run, screen, shotPart(shot, selector, index)),
 		);
 		if (result.problem) {
 			run.log.problems.push(`--do ${result.problem}`);
@@ -493,12 +494,7 @@ async function shootOverview(run: Run, screen: Screen) {
 	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
 	const stepperWarnings = firstPass ? await run.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
 	const elements = await runSteps(run, screen);
-	const png = join(
-		run.outDir,
-		opts.quick
-			? `${opts.tag ? `${opts.tag}-` : ""}${name}.png`
-			: `${run.stem}-${theme}-${name}.png`,
-	);
+	const png = overviewPng(run, screen);
 	const warnings = [...stepperWarnings, ...(await capture(run, png, screen))];
 	run.shots.push({
 		theme,
