@@ -2,6 +2,7 @@
 /* Section 3: every country with data for both years, ranked by how far it moved away from coal (or toward it). The heading,
    stats, bars, caption and table follow the period, direction, measure and size cut-off; a bar opens the country's view. */
 import { Chart } from "kit";
+import type { ComponentChildren } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { BAR_AXES, Seg } from "./figures.tsx";
 import { COAL, COUNTRIES, dP, dT, EPS, fmtT, num, total, twh, type Unit, Y0, Y1 } from "./model.ts";
@@ -278,8 +279,8 @@ function RankTable(props: { rows: Row[] }) {
 	);
 }
 
-/** Section 3: who left coal, and who turned to it. */
-export function CoalRanking() {
+/** Section 3: who left coal, and who turned to it; the intro under the heading is the children from the page. */
+export function CoalRanking({ children }: { children?: ComponentChildren }) {
 	const [s, set] = useState<Settings>({
 		from: Y0,
 		to: Y1,
@@ -291,11 +292,7 @@ export function CoalRanking() {
 	return (
 		<>
 			<h2>{view.title}</h2>
-			<p>
-				Every country with data for both years, ranked. Change the period or the size cut-off, flip
-				to the countries that moved toward coal, or switch from share to terawatt-hours: the order
-				changes, and for China the two tell opposite stories.
-			</p>
+			{children}
 			<figure class="fig">
 				<RankControls s={s} update={(change) => set((now) => ({ ...now, ...change(now) }))} />
 				<dl class="stats" aria-live="polite">
