@@ -82,3 +82,8 @@ export function Figure({ start = first }: { start?: number }) {
 	expect(failed.stdout + failed.stderr).not.toContain("prepare.ts");
 	expect(failed.stdout + failed.stderr).not.toContain("probe.ts");
 }, 30_000);
+
+test("the vendored kit declarations that kit types points authors at match kit-types/globals.d.ts (bun run vendor copies them)", async () => {
+	const source = await Bun.file(`${import.meta.dir}/../kit-types/globals.d.ts`).text();
+	expect(await Bun.file(`${SKILL_DIR}/vendor/types/globals.d.ts`).text()).toBe(source);
+});
