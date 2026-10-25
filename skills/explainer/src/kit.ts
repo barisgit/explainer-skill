@@ -21,21 +21,38 @@ export const kitFiles = (): string[] =>
 		.map((e) => (e.name.endsWith(".ts") ? `${e.name.slice(0, -3)}.js` : e.name))
 		.sort();
 
-/** A kit script's English texts: its `const LABELS = {` block, one `key: "Text",` line per kitLabels key. */
+/** A kit script's or component's English texts: its `const LABELS = {` block, one `key: "Text",` line per kitLabels key. */
 const LABELS_BLOCK = /^\s*const LABELS = \{\n([\s\S]*?)\n\s*\};$/m;
 const LABEL_LINE = /^\s*(\w+): ("(?:[^"\\]|\\.)*"),$/;
 
 /**
- * The texts the kit scripts add, by script ("reply.js"): each one's kitLabels keys with their English text, read from the
- * script's LABELS object, which is where the script itself takes its defaults from. A LABELS line in another form throws, so
+ * The kit sources that may add texts, by the name `kit <name>` documents them under: the scripts ("reply.js") and the
+ * components ("Question", from the header of its file).
+ */
+function labelSources(): { file: string; path: string }[] {
+	const scripts = kitFiles()
+		.map((file) => ({ file, path: kitPath(file) }))
+		.filter(({ path }) => path.endsWith(".ts"));
+	const dir = kitPath("components");
+	const components = readdirSync(dir)
+		.filter((name) => name.endsWith(".tsx"))
+		.sort()
+		.map((name) => {
+			const path = join(dir, name);
+			const component = /^\/\* ([A-Z]\w*):/.exec(readFileSync(path, "utf8"))?.[1];
+			return { file: component ?? name, path };
+		});
+	return [...scripts, ...components];
+}
+
+/**
+ * The texts the kit adds, by script ("reply.js") or component ("Question"): each one's kitLabels keys with their English text,
+ * read from its LABELS object, which is where it takes its defaults from. A LABELS line in another form throws, so
  * `kit labels` and pack's key check never miss a key silently.
  */
 export function kitLabels(): { file: string; labels: Record<string, string> }[] {
-	return kitFiles().flatMap((file) => {
-		const path = kitPath(file);
-		const block = path.endsWith(".ts")
-			? LABELS_BLOCK.exec(readFileSync(path, "utf8"))?.[1]
-			: undefined;
+	return labelSources().flatMap(({ file, path }) => {
+		const block = LABELS_BLOCK.exec(readFileSync(path, "utf8"))?.[1];
 		if (block === undefined) {
 			return [];
 		}

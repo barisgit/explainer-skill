@@ -156,25 +156,33 @@ async function buildEntry(
 	return output.text();
 }
 
-/** What the prerender bundle exports: kit/islands/server.ts's renderPage and the page's content component. */
+/** What the prerender bundle exports: the page rendered by kit/islands/server.ts's renderPage with `labels` as kitLabels. */
 interface Prerender {
-	renderPage: typeof renderPage;
-	Content: Parameters<typeof renderPage>[0];
+	render: (labels: Record<string, string> | undefined) => ReturnType<typeof renderPage>;
 }
 
 /**
  * Renders the page to static HTML in this process: the page, its imports and Preact are bundled into one module (so they share
  * one Preact), which is imported from a temporary file and run once. Returns the HTML (islands between comment markers) and
- * the islands, and adds the stylesheets the page's modules import to `css`. An error the author can fix (kit/islands/server.ts's
- * IslandError) or any error the page throws is a PackError.
+ * the islands, and adds the stylesheets the page's modules import to `css`. While it renders, the page's frontmatter `labels` are
+ * the global kitLabels, as in the browser, so the components that add text (Question) read the page's. An error the author can
+ * fix (kit/islands/server.ts's IslandError) or any error the page throws is a PackError.
  */
 export async function prerender(
 	page: CompiledPage,
 	css: Set<string>,
+	labels: Record<string, string> | undefined,
 ): Promise<{ html: string; islands: Island[] }> {
 	const code = `import Content from ${JSON.stringify(page.path)};
-export { Content };
-export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`;
+import { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};
+export function render(labels) {
+	globalThis.kitLabels = labels;
+	try {
+		return renderPage(Content);
+	} finally {
+		delete globalThis.kitLabels;
+	}
+}`;
 	const js = await buildEntry(
 		page,
 		{ path: join(dirname(page.path), "explainer-prerender.ts"), code },
@@ -187,7 +195,7 @@ export { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`;
 		const file = join(dir, "page.js");
 		writeFileSync(file, js);
 		const module: Prerender = await import(file);
-		return module.renderPage(module.Content);
+		return module.render(labels);
 	} catch (e) {
 		if (e instanceof PackError) {
 			throw e;

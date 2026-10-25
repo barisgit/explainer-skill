@@ -106,7 +106,7 @@ export async function mdxPage(
 	const page = await compileMdx(path, true);
 	const compiled = { path, js: page.js };
 	const css = new Set<string>();
-	const prerendered = await prerender(compiled, css);
+	const prerendered = await prerender(compiled, css, page.front.labels);
 	const clashes = await answerClashes(prerendered.html);
 	if (clashes.length) {
 		const where = relative(process.cwd(), path) || path;

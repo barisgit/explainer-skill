@@ -1,6 +1,7 @@
 ---
 title: "Fourier series: building signals from sines"
 ---
+import { Question } from "kit";
 import { Coefficients, Gibbs, Hero, Symmetry } from "./figures.tsx";
 import { A0, An, Bn, Dx, F, Frac, Int, Nx, Period, Series, Sum, SumN } from "./math.tsx";
 import "./page.css";
@@ -11,94 +12,51 @@ Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕,
 
 <Hero />
 
-{/* Study page: the reader answers first. Each textarea's data-reply names it in the reply; a reload keeps what was written. */}
-
 ## Six questions to answer before you read on
 
 Write what you think in the box, then open the answer.
 
-<ol class="questions">
-<li>
+<div class="questions">
 
-What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?
-
-<textarea id="a1" rows="3" data-reply="1. What a Fourier series says" placeholder="Your answer"></textarea>
-
-<details>
-<summary>Show answer</summary>
+<Question name="a1" legend="What does a Fourier series say, and why can sines and cosines, which are smooth, build a square wave with sharp corners?">
 
 A periodic signal can be written as a constant plus sines and cosines whose frequencies are whole multiples of the signal's own frequency. Each multiple, a harmonic, has one amplitude for its cosine and one for its sine.
 
 No finite sum of smooth waves has a corner, but each extra harmonic fixes more of the error, and the sum gets as close as you like to the square wave in the mean-square sense. The first section below shows why the amounts can be read off one at a time.
 
-</details>
-</li>
-<li>
+</Question>
 
-For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?
-
-<textarea id="a2" rows="3" data-reply="2. Square wave harmonics" placeholder="Your answer"></textarea>
-
-<details>
-<summary>Show answer</summary>
+<Question name="a2" legend="For a square wave that is −1 on the left half-period and +1 on the right half, which harmonics appear, and how fast do their amplitudes shrink?">
 
 Only sines with odd n: *b*<sub>*n*</sub> = 4/(*nπ*) for odd n, and zero for even n and for every cosine. The amplitudes fall like 1/n, so 4/π, 4/(3π), 4/(5π), …
 
-</details>
-</li>
-<li>
+</Question>
 
-The sawtooth *f*(*x*) = *x* on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?
-
-<textarea id="a3" rows="3" data-reply="3. Sawtooth versus square" placeholder="Your answer"></textarea>
-
-<details>
-<summary>Show answer</summary>
+<Question name="a3" legend={<>The sawtooth <i>f</i>(<i>x</i>) = <i>x</i> on (−π, π) also falls like 1/n. What is different about its coefficients compared with the square wave?</>}>
 
 *b*<sub>*n*</sub> = 2(−1)<sup>*n*+1</sup>/*n*. Every harmonic appears, not just the odd ones, and the signs alternate: +2, −1, +2/3, −1/2, … Both waves are odd, so both have only sines.
 
-</details>
-</li>
-<li>
+</Question>
 
-You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?
-
-<textarea id="a4" rows="3" data-reply="4. Overshoot with more terms" placeholder="Your answer"></textarea>
-
-<details>
-<summary>Show answer</summary>
+<Question name="a4" legend="You go from 9 to 99 harmonics of the square wave. Does the overshoot next to a jump get lower, stay the same, or get higher? Where does the bump move?">
 
 It stays about the same height: roughly 9% of the jump, a peak near 1.18 for a wave that jumps from −1 to +1. The bump gets narrower and moves closer to the jump, at *x* = π/(2k) for k terms. The section on the bump lets you check.
 
-</details>
-</li>
-<li>
+</Question>
 
-If the bump never shrinks, in what sense does the series converge to the square wave? What value does it give exactly at the jump?
-
-<textarea id="a5" rows="3" data-reply="5. Convergence at a jump" placeholder="Your answer"></textarea>
-
-<details>
-<summary>Show answer</summary>
+<Question name="a5" legend="If the bump never shrinks, in what sense does the series converge to the square wave? What value does it give exactly at the jump?">
 
 At every point away from a jump the sum converges to the signal, because the bump has moved past any fixed point. The mean-square error also goes to zero, since the bump gets narrower while its height stays put. What does not happen is uniform convergence. Just beside a jump the sum is still near 0 while the signal is near ±1, so the largest error stays large, close to half the jump. The overshoot above the plateau tends to about 9% of the jump rather than to zero. At the jump itself, the series gives the midpoint of the two sides, 0 for the square wave.
 
-</details>
-</li>
-<li>
+</Question>
 
-Without integrating: which coefficients are zero for *x*², for *x*³, and for *x*² + *x* on (−π, π)?
-
-<textarea id="a6" rows="3" data-reply="6. Symmetry without integrating" placeholder="Your answer"></textarea>
-
-<details>
-<summary>Show answer</summary>
+<Question name="a6" legend={<>Without integrating: which coefficients are zero for <i>x</i>², for <i>x</i>³, and for <i>x</i>² + <i>x</i> on (−π, π)?</>}>
 
 *x*² is even: all *b*<sub>*n*</sub> are zero, only cosines (and *a*<sub>0</sub>) remain. *x*³ is odd: *a*<sub>0</sub> and all *a*<sub>*n*</sub> are zero, only sines remain. *x*² + *x* is the sum of an even and an odd part, so it has both and no term is guaranteed to vanish. Its cosines come from *x*² and its sines from *x*.
 
-</details>
-</li>
-</ol>
+</Question>
+
+</div>
 
 ## Why sines and cosines are enough
 

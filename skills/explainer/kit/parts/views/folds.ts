@@ -3,14 +3,17 @@
    A section (an overview section or a view) with two or more <details> of its own (at any depth, not inside a nested section)
    gets one button just above the block holding its first fold, or at the end of the section's .toolbar when one comes before
    that fold: Expand all, which opens every level of nested folds (a .tree), or Collapse all once every fold is open, which closes
-   them all; it is kept in step when the reader opens folds one at a time.
+   them all; it is kept in step when the reader opens folds one at a time. An answer fold (details.answer) is none of these: a
+   study page would otherwise reveal every answer in one click.
    Folds a view handler draws count from its next refresh. */
 window.ViewsFolds = (kitText) => {
 	const buttons = new Map<HTMLElement, HTMLButtonElement>();
 
-	/** The section's own folds, nested ones included. */
+	/** The section's own folds, nested ones included, answers left out. */
 	function foldsOf(section: HTMLElement) {
-		return [...section.querySelectorAll("details")].filter((d) => d.closest("section") === section);
+		return [...section.querySelectorAll<HTMLDetailsElement>("details:not(.answer)")].filter(
+			(d) => d.closest("section") === section,
+		);
 	}
 
 	/** Sets the section's button to what a click would do: Collapse all once every fold is open, else Expand all. */

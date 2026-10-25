@@ -313,3 +313,7 @@ output {
 	font-weight: 600;
 	box-shadow: inset 0 0 0 2px var(--ok);
 }
+/* Written answer (a Question without options): the question, its box and the model answer keep the measure of the text. */
+.written {
+	max-inline-size: 66ch;
+}

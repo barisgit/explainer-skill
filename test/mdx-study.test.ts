@@ -47,6 +47,14 @@ function inPage<T>(output: string, fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	});
 }
 
+/** Packs `body` under a kit import as `<name>.mdx`, expecting a failure; returns the exit code and the message. */
+async function packFailure(name: string, body: string) {
+	const source = `import { Question } from "kit";\n\n# Fails\n\n${body}\n`;
+	const out = dir.path(`${name}.out.html`);
+	const result = await runCli(["pack", dir.write(`${name}.mdx`, source), "-o", out]);
+	return [result.code, result.stderr.trim()];
+}
+
 /** A client component as the gallery's explorers write one: a switch picks the wave, and the Stepper derives it from step 1. */
 const WAVES = `"use client";
 import { useState } from "preact/hooks";
@@ -94,5 +102,125 @@ describe("Stepper restartOn", () => {
 		expect(seen.saw).toEqual(["1 / 4", "1"]);
 		expect(seen.sawNext).toEqual(["2 / 4", "2"]);
 		expect(seen.square).toEqual(["1 / 3", "1"]);
+	}, 30_000);
+});
+
+/**
+ * A study page: a section of written answers only, and one where two written answers sit beside two plain folds. The answers'
+ * explanations are Markdown.
+ */
+const STUDY = `import { Question } from "kit";
+
+# Study
+
+## Before you read
+
+<Question name="q1" legend="Why do sines build a square wave?">
+
+Each harmonic fixes **more** of the error.
+
+</Question>
+
+<Question name="q2" legend={<>Which harmonics does <i>f</i> have?</>}>Only odd ones.</Question>
+
+## Folds and answers
+
+<details><summary>Notes</summary><p>One.</p></details>
+
+<details><summary>More notes</summary><p>Two.</p></details>
+
+<Question name="q3" legend="What converges?">The mean-square error.</Question>
+
+<Question name="q4" legend="Where is the bump?">Next to the jump.</Question>
+`;
+
+describe("written-answer Question", () => {
+	test("a text box named by the legend, the answer behind its own fold, which Expand all never opens", async () => {
+		const { output } = await pack("study", STUDY);
+		const seen = await inPage(output, async (cdp) => {
+			const opening = await cdp.evaluate<{
+				box: string[][];
+				markdown: string;
+				buttons: number[];
+			}>(`({
+				box: [...document.querySelectorAll("fieldset.written")].map((f) => [f.querySelector("textarea").id, document.getElementById(f.querySelector("textarea").getAttribute("aria-labelledby")).textContent, f.querySelector("details.answer > summary").textContent]),
+				markdown: document.querySelector("#q1 ~ details.answer strong")?.textContent,
+				buttons: [...document.querySelectorAll("section")].map((s) => s.querySelectorAll(".fold-all").length),
+			})`);
+			const expanded = await act<string[]>(
+				cdp,
+				`document.querySelector(".fold-all").click()`,
+				`[[...document.querySelectorAll("details")].map((d) => d.open).join(), document.querySelector(".fold-all").textContent]`,
+			);
+			return { ...opening, expanded };
+		});
+		expect(seen.box).toEqual([
+			["q1", "Why do sines build a square wave?", "Show answer"],
+			["q2", "Which harmonics does f have?", "Show answer"],
+			["q3", "What converges?", "Show answer"],
+			["q4", "Where is the bump?", "Show answer"],
+		]);
+		expect(seen.markdown).toBe("more");
+		// A section whose folds are all answers gets no Expand all; beside plain folds, Expand all opens only those.
+		expect(seen.buttons).toEqual([0, 1]);
+		expect(seen.expanded).toEqual(["false,false,true,true,false,false", "Collapse all"]);
+	}, 30_000);
+
+	test("what the reader wrote is kept across a reload and is sent in the reply under the question", async () => {
+		const { output } = await pack("study-reply", STUDY);
+		const seen = await inPage(output, async (cdp) => {
+			await act(
+				cdp,
+				`const box = document.getElementById("q1"); box.value = "They add up"; box.dispatchEvent(new Event("input", { bubbles: true }))`,
+				"0",
+			);
+			await load(cdp);
+			return act<[string, string[]]>(
+				cdp,
+				`document.querySelector(".reply-bar .primary").click()`,
+				`[document.getElementById("q1").value, document.querySelector(".reply-md").textContent.split("\\n").filter((line) => line.startsWith("- "))]`,
+			);
+		});
+		expect(seen[0]).toBe("They add up");
+		expect(seen[1]).toContain("- Why do sines build a square wave? They add up");
+	}, 30_000);
+
+	test("the props that pick among options fail without options, saying what to write instead", async () => {
+		expect(
+			await packFailure("written-answer", `<Question name="w" legend="Why?" answer="b" />`),
+		).toEqual([
+			1,
+			expect.stringContaining(
+				'<Question name="w"> has an answer but no options: a written answer has no value to check, so write the model answer inside the Question',
+			),
+		]);
+		expect(
+			await packFailure("written-multiple", `<Question name="w" legend="Why?" multiple />`),
+		).toEqual([1, expect.stringContaining("has multiple or checked but no options")]);
+	}, 30_000);
+
+	test("Show answer is the page's labels text, from the page and from a client component", async () => {
+		const late = `"use client";
+import { useState } from "preact/hooks";
+import { Question } from "kit";
+
+export function Late() {
+	const [open, setOpen] = useState(false);
+	return <div><button type="button" id="more" onClick={() => setOpen(true)}>More</button>{open && <Question name="late" legend="Zakaj?">Ker.</Question>}</div>;
+}
+`;
+		const { output } = await pack(
+			"study-labels",
+			`---\nlang: sl\nlabels:\n  showAnswer: "Poka\u017ei odgovor"\n---\nimport { Question } from "kit";\nimport { Late } from "./late.tsx";\n\n# \u0160tudij\n\n<Question name="q" legend="Zakaj?">Ker.</Question>\n\n<Late />\n`,
+			{ "late.tsx": late },
+		);
+		const summaries = await inPage(output, (cdp) =>
+			act<string[]>(
+				cdp,
+				`document.getElementById("more").click()`,
+				`[...document.querySelectorAll("details.answer > summary")].map((s) => s.textContent)`,
+			),
+		);
+		expect(summaries).toEqual(["Poka\u017ei odgovor", "Poka\u017ei odgovor"]);
 	}, 30_000);
 });

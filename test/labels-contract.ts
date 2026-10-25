@@ -1,6 +1,6 @@
 import { SETTLED } from "./support.ts";
 
-/** Every text the kit scripts add, by kitLabels key, as an English page shows it. */
+/** Every text the kit scripts and components add, by kitLabels key, as an English page shows it. */
 export const ENGLISH = {
 	back: "Back",
 	play: "Play",
@@ -34,6 +34,7 @@ export const ENGLISH = {
 	saveNote: "Save note",
 	figure: "figure",
 	page: "page",
+	showAnswer: "Show answer",
 };
 
 export const SLOVENIAN: typeof ENGLISH = {
@@ -69,6 +70,7 @@ export const SLOVENIAN: typeof ENGLISH = {
 	saveNote: "Shrani opombo",
 	figure: "slika",
 	page: "stran",
+	showAnswer: "Pokaži odgovor",
 };
 
 /**
