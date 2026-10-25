@@ -436,8 +436,11 @@ function ChangeTable(props: { rows: Move[]; end: number }) {
 	);
 }
 
-/** Section 2: pick a place and an end year; the heading, stats, bars and table say what changed since 2000. */
-export function ChangeExplorer() {
+/**
+ * Section 2: pick a place and an end year; the heading, stats, bars and table say what changed since 2000. The intro under
+ * the heading is the children from the page.
+ */
+export function ChangeExplorer({ children }: { children?: ComponentChildren }) {
 	const [key, setKey] = useState(WORLD.slug);
 	const [end, setEnd] = useState(Y1);
 	const [unit, setUnit] = useState<Unit>("twh");
@@ -446,11 +449,7 @@ export function ChangeExplorer() {
 	return (
 		<>
 			<h2>{view.title}</h2>
-			<p>
-				Pick any place and stretch the end year. Bars to the right grew; bars to the left shrank.
-				Switch the unit: a source can produce more electricity and still supply a smaller share of a
-				growing total.
-			</p>
+			{children}
 			<figure class="fig">
 				<div class="controls">
 					<label class="field pick" for="place">

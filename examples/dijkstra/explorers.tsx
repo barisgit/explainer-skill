@@ -423,8 +423,8 @@ function negHeading(w: number, steps: Step[]) {
 		: `With B→A = ${num(w)}, Dijkstra is still right: no negative edge means no wrong answer`;
 }
 
-/** The negative-edge section's heading, lead and explorer: one road's weight and whether settled nodes may be re-opened. */
-export function NegativeEdge() {
+/** The negative-edge section's heading, lead (the children from the page) and explorer: one road's weight and whether settled nodes may be re-opened. */
+export function NegativeEdge({ children }: { children?: ComponentChildren }) {
 	const [w, setW] = useState(-2);
 	const [reopen, setReopen] = useState<"no" | "yes">("no");
 	const [step, setStep] = useState(1);
@@ -463,11 +463,7 @@ export function NegativeEdge() {
 	return (
 		<>
 			<h2>{negHeading(w, steps)}</h2>
-			<p>
-				Here the roads are one-way, and road B→A has a weight you can change. A negative weight
-				means taking that road <em>reduces</em> the total, like a toll rebate. Drag it below −1 and
-				watch which step breaks.
-			</p>
+			{children}
 			<Explorer
 				id="neg"
 				label="Dijkstra's algorithm on a graph with one negative edge, step by step"

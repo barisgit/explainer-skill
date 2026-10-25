@@ -34,14 +34,18 @@ Explore any country or region, and see who left coal fastest.
 </div>
 </details>
 
-{/* These sections' headings state what their controls show, so the components render them. */}
+{/* These sections' headings state what their controls show, so the components render them, then the intro written here. */}
 
 <section>
-<ChangeExplorer />
+<ChangeExplorer>
+Pick any place and stretch the end year. Bars to the right grew; bars to the left shrank. Switch the unit: a source can produce more electricity and still supply a smaller share of a growing total.
+</ChangeExplorer>
 </section>
 
 <section>
-<CoalRanking />
+<CoalRanking>
+Every country with data for both years, ranked. Change the period or the size cut-off, flip to the countries that moved toward coal, or switch from share to terawatt-hours: the order changes, and for China the two tell opposite stories.
+</CoalRanking>
 
 <p class="caveat"><b>Reading it</b>Shares in a single year move with weather and demand: a wet year can lift hydro and lower coal's share without any policy change. Over a short period that can overstate or understate the underlying trend.</p>
 </section>

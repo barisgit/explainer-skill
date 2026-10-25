@@ -2,9 +2,18 @@
  * The browser side of .mdx pages: pack bundles this module with the page's client components into one script and calls
  * hydrateIslands with those modules. Each island pack prerendered (islands/server.ts) sits between `<!--island:N-->` and
  * `<!--/island-->`; it is hydrated in place with the props in `<script type="application/json" id="explainer-islands">`,
- * with no wrapper element, so the theme's child selectors still match.
+ * with no wrapper element, so the theme's child selectors still match. Its slot (its children from the page, which pack
+ * rendered once) sits between `<!--slot:N-->` and `<!--/slot-->` inside it and stays static HTML: see Slot.
  */
-import { type ComponentType, type ContainerNode, h, hydrate, render } from "preact";
+import {
+	Component,
+	type ComponentType,
+	type ContainerNode,
+	h,
+	hydrate,
+	render,
+	type VNode,
+} from "preact";
 import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
 
@@ -53,24 +62,83 @@ function range(start: Comment, end: Comment): ContainerNode {
 	};
 }
 
-/** The start and end comment of every island in the document, by island number. */
-function markers(): Map<number, [Comment, Comment]> {
-	const found = new Map<number, [Comment, Comment]>();
+/** The start and end comment of an island's range or of its slot. */
+type Pair = [Comment, Comment];
+
+/**
+ * The markers of every island in the document, by island number: its range and, when it has one, its slot. A slot can hold
+ * islands of its own (a kit Chart), so markers nest.
+ */
+function markers(): Map<number, { island?: Pair; slot?: Pair }> {
+	const found = new Map<number, { island?: Pair; slot?: Pair }>();
 	const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
-	let open: { n: number; start: Comment } | undefined;
+	const open: { kind: "island" | "slot"; n: number; start: Comment }[] = [];
 	for (let comment = walker.nextNode(); comment; comment = walker.nextNode()) {
 		if (!(comment instanceof Comment)) {
 			continue;
 		}
-		const start = /^island:(\d+)$/.exec(comment.data);
+		const start = /^(island|slot):(\d+)$/.exec(comment.data);
 		if (start) {
-			open = { n: Number(start[1]), start: comment };
-		} else if (comment.data === "/island" && open) {
-			found.set(open.n, [open.start, comment]);
-			open = undefined;
+			open.push({
+				kind: start[1] === "slot" ? "slot" : "island",
+				n: Number(start[2]),
+				start: comment,
+			});
+		} else if (comment.data === "/island" || comment.data === "/slot") {
+			const begun = open.pop();
+			if (begun) {
+				found.set(begun.n, { ...found.get(begun.n), [begun.kind]: [begun.start, comment] });
+			}
 		}
 	}
 	return found;
+}
+
+/**
+ * An island's slot: static HTML that Preact never diffs. Its nodes leave the DOM while the island hydrates, and go back in
+ * unchanged right after the empty text node that is all the Slot renders, once it mounts, which is before the kit scripts
+ * run. A re-render of the island leaves them, and what kit scripts have since done to them, as they are; unmounting takes
+ * them out and mounting again puts the same nodes back.
+ *
+ * The text node comes first because Preact places a node it inserts in front of the Slot before the Slot's DOM, which is that
+ * text node, and one after the Slot before the DOM of the Slot's next sibling: both land outside the slot's nodes.
+ */
+interface SlotProps {
+	nodes: ChildNode[];
+}
+
+class Slot extends Component<SlotProps> {
+	override shouldComponentUpdate() {
+		return false;
+	}
+	override componentDidMount() {
+		// The Slot renders a text node, so its base is that node.
+		(this.base as Text).after(...this.props.nodes);
+	}
+	override componentWillUnmount() {
+		for (const node of this.props.nodes) {
+			node.remove();
+		}
+	}
+	override render() {
+		return "";
+	}
+}
+
+/**
+ * Takes the slot's nodes out of the page, leaving an empty text node where they were, which the Slot hydrates as its own; the
+ * returned vnode is the island's `children`.
+ */
+function takeSlot([start, end]: Pair): VNode<SlotProps> {
+	const nodes: ChildNode[] = [];
+	for (let node = start.nextSibling; node && node !== end; node = node.nextSibling) {
+		nodes.push(node);
+	}
+	start.replaceWith(document.createTextNode(""));
+	for (const node of [...nodes, end]) {
+		node.remove();
+	}
+	return h(Slot, { nodes });
 }
 
 /**
@@ -107,15 +175,17 @@ export function hydrateIslands(modules: Record<string, unknown>[]): void {
 	const found = markers();
 	for (const [n, { m, e, p, v }] of data.entries()) {
 		const component = modules[m]?.[e];
-		const pair = found.get(n);
+		const { island, slot } = found.get(n) ?? {};
 		if (typeof component === "function" && v !== undefined) {
 			// pack wrote these props for a filled View (kit/islands/server.ts).
 			fill(v, component as DrawRecord, p as unknown as FillProps);
 			continue;
 		}
-		if (typeof component !== "function" || !pair) {
+		if (typeof component !== "function" || !island) {
 			throw new Error(`island ${n} (${e}) is missing from the page`);
 		}
-		hydrate(h(component as ComponentType<Record<string, unknown>>, p), range(...pair));
+		// An island comes before the islands in its slot, so its slot goes back into the page before they hydrate.
+		const props = slot ? { ...p, children: takeSlot(slot) } : p;
+		hydrate(h(component as ComponentType<Record<string, unknown>>, props), range(...island));
 	}
 }

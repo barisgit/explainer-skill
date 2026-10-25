@@ -2,11 +2,13 @@
  * The prerender side of .mdx pages: pack bundles this module with the page and calls renderPage once, in Bun, to get the page's
  * static HTML. Client components ("islands": capitalised exports of a module whose first statement is "use client") render here
  * between `<!--island:N-->` and `<!--/island-->`, and their props are returned for the client bundle (islands/client.ts) to
- * hydrate with. Never shipped in a page.
+ * hydrate with. An island's children from the page are its slot: rendered here once to static HTML, between `<!--slot:N-->`
+ * and `<!--/slot-->` where the component places `children`. Never shipped in a page.
  */
 import {
 	type ComponentChildren,
 	type ComponentType,
+	Fragment,
 	h,
 	type Options,
 	options,
@@ -32,8 +34,9 @@ export class IslandError extends Error {
 	override name = "IslandError";
 }
 
-/** The element a prerendered island sits in until renderPage turns it into comment markers. */
+/** The elements a prerendered island and its slot sit in until renderPage turns them into comment markers. */
 const MARKER = "explainer-island";
+const SLOT = "explainer-slot";
 
 /** Above 0 while an island renders: its handlers hydrate, and an island inside it is a plain part of it. */
 let depth = 0;
@@ -42,12 +45,15 @@ let islands: Island[] = [];
 let rendering = "the page";
 /** The components island() made: their function props are refused as not JSON, before this file's handler check would see them. */
 const wrappers = new WeakSet<ComponentType<Record<string, unknown>>>();
+/** The client component whose slot renders right now; a client component of the author's inside it is refused. */
+let slotOf: string | undefined;
 
 /**
  * The value pack exports in place of a client module's export `name`: a component (a capitalised function, or the default
- * export) becomes an island; anything else is returned as it is.
+ * export) becomes an island; anything else is returned as it is. `kit` marks the kit's own client modules (Chart, Plot),
+ * which may sit in another island's slot as islands of their own.
  */
-export function island(module: string, name: string, value: unknown): unknown {
+export function island(module: string, name: string, value: unknown, kit = false): unknown {
 	if (typeof value !== "function" || !(name === "default" || /^[A-Z]/.test(name))) {
 		return value;
 	}
@@ -61,9 +67,9 @@ export function island(module: string, name: string, value: unknown): unknown {
 		if (depth) {
 			return h(Component, { ...props, children });
 		}
-		if (hasContent(children)) {
+		if (slotOf !== undefined && !kit) {
 			throw new IslandError(
-				`<${label}> has children in the page, but a client component takes JSON props only: pass the text as a prop, or write the content inside ${label}`,
+				`<${label}> is in the children of <${slotOf}>, which pack renders once as static HTML, so ${label} would not share ${slotOf}'s state: render <${label}> inside ${slotOf}, or beside it in the page`,
 			);
 		}
 		const problem = notJson(props, "");
@@ -72,15 +78,7 @@ export function island(module: string, name: string, value: unknown): unknown {
 				`<${label} ${problem.path.slice(1)}> is ${problem.what}, but props from the page to a client component must be JSON: move the code that makes it into your own "use client" component and render <${label}> there`,
 			);
 		}
-		depth++;
-		let html: string;
-		try {
-			html = renderToString(h(Component, props));
-		} finally {
-			depth--;
-		}
-		const n = islands.push({ module, name, props }) - 1;
-		return h(MARKER, { "data-island": n, dangerouslySetInnerHTML: { __html: html } });
+		return prerendered({ module, name, props }, Component, label, children);
 	}
 	Island.displayName = label;
 	Island.fill = (view: string, props: FillProps) => {
@@ -95,6 +93,35 @@ export function island(module: string, name: string, value: unknown): unknown {
 	};
 	wrappers.add(Island);
 	return Island;
+}
+
+/** Numbers `entry` and renders its component, with its slot when the page gave it children, as the marker element for renderPage. */
+function prerendered(
+	entry: Island,
+	Component: ComponentType<Record<string, unknown>>,
+	label: string,
+	children: ComponentChildren,
+) {
+	// Numbered before its slot renders, so an island in the slot comes after it, in page order.
+	const n = islands.push(entry) - 1;
+	const slot = hasContent(children) ? slotFor(label, n, children) : undefined;
+	depth++;
+	let html: string;
+	try {
+		html = renderToString(
+			h(Component, slot ? { ...entry.props, children: slot.vnode } : entry.props),
+		);
+	} finally {
+		depth--;
+	}
+	if (slot && slot.placed() !== 1) {
+		throw new IslandError(
+			slot.placed()
+				? `<${label}> renders its children from the page ${slot.placed()} times, but they are one piece of static HTML: write {children} once in ${label}`
+				: `<${label}> has children in the page, but ${label} does not render them: write {children} in ${label} where they go, or leave them out`,
+		);
+	}
+	return h(MARKER, { "data-island": n, dangerouslySetInnerHTML: { __html: html } });
 }
 
 /**
@@ -117,6 +144,42 @@ function drawEach(view: string, label: string, render: DrawRecord, { records, ba
 		depth--;
 	}
 }
+
+/**
+ * The slot of island `n`: its children from the page rendered once, now, as static HTML (handlers in them fail as anywhere
+ * outside an island), and the vnode the component gets as `children`, which counts how often the component places it.
+ */
+function slotFor(label: string, n: number, children: ComponentChildren) {
+	if (hasFunction(children)) {
+		throw new IslandError(
+			`<${label}> has a function among its children in the page, but they are rendered once in pack as static HTML, so it would never run: compute that part inside ${label}`,
+		);
+	}
+	const outer = { slotOf, rendering };
+	slotOf = label;
+	let html: string;
+	try {
+		html = renderToString(h(Fragment, null, children));
+	} finally {
+		({ slotOf, rendering } = outer);
+	}
+	let placed = 0;
+	function Slot() {
+		placed++;
+		return h(SLOT, { "data-slot": n, dangerouslySetInnerHTML: { __html: html } });
+	}
+	return { vnode: h(Slot, null), placed: () => placed };
+}
+
+/** True when `children` hold a function anywhere (a render prop), which static HTML would drop without a word. */
+const hasFunction = (children: unknown): boolean =>
+	Array.isArray(children)
+		? children.some(hasFunction)
+		: typeof children === "function" ||
+			(typeof children === "object" &&
+				children !== null &&
+				"props" in children &&
+				hasFunction((children.props as { children?: unknown }).children));
 
 /** True for children that render something; whitespace between tags does not count. */
 const hasContent = (children: ComponentChildren): boolean =>
@@ -243,13 +306,21 @@ options.vnode = (vnode) => {
 	previousVnode?.(vnode);
 };
 
-/** Renders the page's MDX content to HTML with each island between comment markers, and returns the islands in marker order. */
+/** The island and slot elements' tags (`explainer-<kind>`); a slot can hold an island, so each tag is replaced on its own. */
+const MARKERS = /<(\/?)explainer-(island|slot)(?: data-\2="(\d+)")?>/g;
+
+/**
+ * Renders the page's MDX content to HTML with each island between `<!--island:N-->` and `<!--/island-->`, and its slot, if
+ * any, between `<!--slot:N-->` and `<!--/slot-->`; returns the islands in marker order.
+ */
 export function renderPage(Content: ComponentType): { html: string; islands: Island[] } {
 	islands = [];
 	rendering = "the page";
+	slotOf = undefined;
 	const html = renderToString(h(Content, {})).replace(
-		new RegExp(`<${MARKER} data-island="(\\d+)">([\\s\\S]*?)</${MARKER}>`, "g"),
-		"<!--island:$1-->$2<!--/island-->",
+		MARKERS,
+		(_, close: string, kind: string, n: string | undefined) =>
+			close ? `<!--/${kind}-->` : `<!--${kind}:${n}-->`,
 	);
 	return { html, islands };
 }

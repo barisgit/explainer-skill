@@ -110,18 +110,24 @@ Two facts make this work. First, every term repeats after 2π, so any sum of the
 
 The figure above is the series in action. With one term the square wave is a single sine of amplitude 4/π. Each added sine puts back detail the previous sum lacked, and the corners get steeper.
 
-{/* These three sections' headings follow their controls, so each component renders its section's heading and figure. */}
+{/* These three sections' headings follow their controls, so each component renders its section's heading, then the intro written here, then its figure. */}
 
 <section>
-<Coefficients />
+<Coefficients>
+Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.
+</Coefficients>
 </section>
 
 <section>
-<Gibbs />
+<Gibbs>
+Here is the square wave from the top, close to its jump at *x* = 0. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.
+</Gibbs>
 </section>
 
 <section>
-<Symmetry />
+<Symmetry>
+An even function (*f*(−*x*) = *f*(*x*)) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.
+</Symmetry>
 
 Spotting the symmetry first halves the work, and saves a mistake: a stray cosine term in an odd function's answer is wrong. The half ramp is the sum of its even part, a triangle, and its odd part, a straight line, so it has both kinds of term.
 

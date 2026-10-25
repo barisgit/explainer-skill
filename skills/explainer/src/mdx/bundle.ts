@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, relative } from "node:path";
+import { dirname, extname, join, relative, sep } from "node:path";
 import type { BuildConfig, BunPlugin, JavaScriptLoader } from "bun";
 import type { Island, renderPage } from "../../kit/islands/server.ts";
 import { PackError } from "../pack-error.ts";
@@ -34,18 +34,20 @@ const loaderOf = (path: string): JavaScriptLoader => LOADERS[extname(path)] ?? "
 
 /**
  * The module the prerender loads in place of a client module: each export goes through `island()` (kit/islands/server.ts),
- * which turns components into islands, and the module's own code is loaded under the `island-source:` prefix.
+ * which turns components into islands (telling it whether the module is the kit's own), and the module's own code is loaded
+ * under the `island-source:` prefix.
  */
 function islandModule(path: string, source: string): string {
 	const { exports } = new Bun.Transpiler({ loader: loaderOf(path) }).scan(source);
 	const id = JSON.stringify(path);
+	const kit = path.startsWith(KIT_DIR + sep);
 	return [
 		`import * as source from ${JSON.stringify(SOURCE + path)};`,
 		`import { island } from ${JSON.stringify(join(ISLANDS, "server.ts"))};`,
 		...exports.map((name) =>
 			name === "default"
-				? `export default island(${id}, "default", source.default);`
-				: `export const ${name} = island(${id}, ${JSON.stringify(name)}, source.${name});`,
+				? `export default island(${id}, "default", source.default, ${kit});`
+				: `export const ${name} = island(${id}, ${JSON.stringify(name)}, source.${name}, ${kit});`,
 		),
 	].join("\n");
 }

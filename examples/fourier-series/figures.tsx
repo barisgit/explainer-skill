@@ -1,7 +1,8 @@
 "use client";
-/* The page's interactive parts. Each section whose heading follows its controls renders that heading too; everything else on
-   the page is rendered once when it packs (page.mdx). */
+/* The page's interactive parts. Each section whose heading follows its controls renders that heading too, then its intro from
+   the page (children); everything else on the page is rendered once when it packs (page.mdx). */
 import { Chart, Plot, Stepper } from "kit";
+import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { Seg, Slider, Toggle } from "./controls.tsx";
 import { DERIVATIONS } from "./derivations.tsx";
@@ -181,8 +182,8 @@ function coefOption(name: WaveName): PlotOption {
 	};
 }
 
-/** The coefficients section: its heading, the derivation stepper for the chosen wave, and the b_n it ends with. */
-export function Coefficients() {
+/** The coefficients section: its heading, the intro, the derivation stepper for the chosen wave, and the b_n it ends with. */
+export function Coefficients({ children }: { children?: ComponentChildren }) {
 	const [name, setName] = useState<WaveName>("square");
 	const steps = DERIVATIONS[name];
 	const option = useMemo(() => coefOption(name), [name]);
@@ -200,10 +201,7 @@ export function Coefficients() {
 					? "Square wave: only odd harmonics, amplitudes 4/(nπ)"
 					: "Sawtooth: every harmonic, amplitudes 2/n with alternating sign"}
 			</h2>
-			<p>
-				Pick a wave and step through its integral, one line at a time. Both waves are odd, so the
-				cosine integrals vanish at once and only the sine integral takes work.
-			</p>
+			{children}
 			<Stepper
 				id="deriv-fig"
 				start={1}
@@ -352,8 +350,8 @@ function rms(k: number): number {
 	return Math.sqrt(Math.max(0, 1 - used));
 }
 
-/** The Gibbs section: its heading, the sum near the jump, and the peak against the number of terms. */
-export function Gibbs() {
+/** The Gibbs section: its heading, the intro, the sum near the jump, and the peak against the number of terms. */
+export function Gibbs({ children }: { children?: ComponentChildren }) {
 	const [k, setK] = useState(5);
 	const [zoom, setZoom] = useState(false);
 	const best = peak(square, k);
@@ -365,10 +363,7 @@ export function Gibbs() {
 				With {terms(k)} the sum peaks at {fixed(best, 3)}; as the number of terms grows, the peak
 				approaches 1.179
 			</h2>
-			<p>
-				Here is the square wave from the top, close to its jump at <i>x</i> = 0. Drag the slider
-				from 1 term up to 200 and watch two things: the width of the bump and its height.
-			</p>
+			{children}
 			<figure class="fig">
 				<div class="controls">
 					<Slider id="gk" label="Terms" max={200} value={k} onInput={setK} />
@@ -513,19 +508,14 @@ function symmetry(key: SymName) {
 	};
 }
 
-/** The symmetry section's heading and figure: one signal, its even and odd parts, the coefficients that survive. */
-export function Symmetry() {
+/** The symmetry section's heading, intro and figure: one signal, its even and odd parts, the coefficients that survive. */
+export function Symmetry({ children }: { children?: ComponentChildren }) {
 	const [key, setKey] = useState<SymName>("even");
 	const s = useMemo(() => symmetry(key), [key]);
 	return (
 		<>
 			<h2>{s.heading}</h2>
-			<p>
-				An even function (<i>f</i>(−<i>x</i>) = <i>f</i>(<i>x</i>)) is a mirror image across the
-				vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a
-				mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three
-				cases; the coefficients are computed by numerical integration.
-			</p>
+			{children}
 			<figure class="fig">
 				<div class="controls">
 					<Seg name="sym" label="Signal" options={SYM_NAMES} value={key} onChange={setKey} />
