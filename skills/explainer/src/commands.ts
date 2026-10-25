@@ -9,7 +9,14 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
-import { authorTsconfig, kitFiles, kitPath, leadingComment, readKitText } from "./kit.ts";
+import {
+	authorTsconfig,
+	kitFiles,
+	kitLabels,
+	kitPath,
+	leadingComment,
+	readKitText,
+} from "./kit.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
@@ -87,6 +94,20 @@ const componentsDoc = (): string =>
 /** The page conventions of an .mdx page: the index header after its first line. */
 const pageDoc = () => kitHeader("components/index.ts").split("\n").slice(1).join("\n");
 
+/**
+ * What `kit labels` prints: the frontmatter `labels` key with every text the kit scripts add, in English and grouped by script,
+ * so an author translates the values and pastes the block whole into a page's frontmatter. Values are JSON strings, which YAML
+ * reads as they are, so a colon or quote in a translation needs no thought.
+ */
+const labelsBlock = (): string =>
+	[
+		"labels:",
+		...kitLabels().flatMap(({ file, labels }) => [
+			`  # kit ${file}`,
+			...Object.entries(labels).map(([key, text]) => `  ${key}: ${JSON.stringify(text)}`),
+		]),
+	].join("\n");
+
 /** What `kit` prints: everything an .mdx page can use, with where each one's documentation is. */
 function kitListing(): string {
 	const list = components().map(
@@ -106,18 +127,25 @@ Attributes you write on your own elements:
 
 ${pageDoc()}
 
-Documentation of one component or kit file: ${CLI} kit <name>; kit components prints every component. Fonts are inlined from theme.css.
-The texts the kit adds (buttons, accessible names, messages) are English; a page in another language sets them with labels in its frontmatter.`;
+Documentation of one component or kit file: ${CLI} kit <name>; kit components prints every component. Fonts are inlined from theme.css.`;
 }
 
 /** One spec per command: drives dispatch, flag validation and --help. Exit codes: 0 ok, 1 problems found, 2 usage. */
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List what an .mdx page can use (the kit's components, Mermaid fences, the stylesheet, the attributes the kit reads, the page conventions), or print the documentation of one component, kit file, the mermaid fences or every component; types prints a tsconfig for author typechecking.",
-		usage: "kit [Component | file | mermaid | components | types]",
+			"List what an .mdx page can use (the kit's components, Mermaid fences, the stylesheet, the attributes the kit reads, the page conventions), or print the documentation of one component, kit file, the mermaid fences or every component; types prints a tsconfig for author typechecking; labels prints the kit's texts as frontmatter labels to translate.",
+		usage: "kit [Component | file | mermaid | components | types | labels]",
 		flags: [],
-		examples: ["kit", "kit Stepper", "kit theme.css", "kit mermaid", "kit components", "kit types"],
+		examples: [
+			"kit",
+			"kit Stepper",
+			"kit theme.css",
+			"kit mermaid",
+			"kit components",
+			"kit types",
+			"kit labels",
+		],
 		run: async ([topic]) => {
 			if (!topic) {
 				console.log(kitListing());
@@ -129,6 +157,10 @@ export const COMMANDS: Record<string, Command> = {
 			}
 			if (topic === "types") {
 				console.log(authorTsconfig());
+				return 0;
+			}
+			if (topic === "labels") {
+				console.log(labelsBlock());
 				return 0;
 			}
 			if (topic === "components") {
