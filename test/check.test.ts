@@ -33,6 +33,46 @@ const tall = (script: string) =>
 		`</h1>${[1, 2, 3, 4, 5].map((n) => `<section id="s${n}" style="height:1200px">Section ${n}</section>`).join("")}`,
 	);
 
+test("check reports an id on two elements, in a page made elsewhere and after a --do step that writes one", async () => {
+	const written = dir.write(
+		"repeated.html",
+		page("").replace(
+			"</h1>",
+			'</h1><details id="opt-O2"><summary>O2</summary></details><input type="checkbox" id="opt-O2">',
+		),
+	);
+	const scripted = dir.write(
+		"scripted.html",
+		page(
+			'document.body.insertAdjacentHTML("beforeend", \'<button id="add">Add</button><p id="note">One</p>\');\ndocument.getElementById("add").onclick = () => document.body.insertAdjacentHTML("beforeend", \'<p id="note">Two</p>\');',
+		),
+	);
+
+	const [repeated, before, after] = await Promise.all([
+		checkQuick(written),
+		checkQuick(scripted),
+		runCli([
+			"check",
+			scripted,
+			"--quick",
+			"--view",
+			"none",
+			"--out",
+			dir.path("shots-do"),
+			"--do",
+			"click:#add",
+		]),
+	]);
+
+	expect(repeated.code).toBe(1);
+	expect(repeated.stdout).toContain(
+		'the id "opt-O2" is on 2 elements (details#opt-O2, input#opt-O2): scripts, label for, #links and --do steps find only the first; give each its own id',
+	);
+	expect(before.code).toBe(0);
+	expect(after.code).toBe(1);
+	expect(after.stdout).toContain('the id "note" is on 2 elements (p#note, p#note)');
+}, 60_000);
+
 test("check scrolls the page, so an observer or scroll handler that throws only after scrolling is a problem", async () => {
 	const observer = dir.write(
 		"observer.html",

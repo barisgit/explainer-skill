@@ -1,17 +1,38 @@
-/* reply keep: what the reader entered, kept across reloads. The persistence half of kit:reply.js, not referenced from pages: pack joins
-   it in front of reply.js, which calls it once and gets back { update, clear, touch, touched }:
-     selector        CSS selector of the controls that can be kept
-     clean, ownText  text helpers of reply.js (whitespace-normalised text; a label's text without its controls)
-     notes           { list(): the notes worth keeping, restore(saved): takes back what was saved }
-     onChange        called when something changed outside reply.js's own calls: a page script moved a control, the DOM changed,
-                     the page is being left, the restore finished
-     update()        after any change: adopts new controls, saves, returns whether anything is kept
-     clear()         every control back to its default, saved state dropped (notes are reply.js's to empty)
-     touch(el), touched(el)   the reader acted on a control, even if the value equals the default
-   Owns the saved copy completely: defaults and signatures of controls, entries waiting for controls not yet shown, restoring through
-   the page's own rebuilds, localStorage, and watching the DOM. */
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
+/* keep: what the reader entered in the page's controls, kept across reloads. pack includes it on a page with a control that has an id.
+   Every text, textarea, radio, checkbox, select, range and number control that the reader moved off its default (what the markup
+   says: value, checked, selected) is saved in localStorage under the page's own address and restored after the page's load
+   handlers have run. Restored controls get input and change events, so the page's own listeners redraw charts and outputs; a
+   control changed by script without events is saved at the next click or when the page is left. Controls the page renders later
+   (views, panels) are picked up as they appear and get their saved value then; one the page replaces (also in answer to a restored
+   value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
+   saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
+   Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
+   <details> are not kept. With reply (kit reply) the reader's notes are kept too, and its Clear button puts every control back to its
+   default, again with events. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
+(() => {
+	const selector =
+		"input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
+	const clean = (s: string) => s.replace(/\s+/g, " ").trim();
+	/** A label's text without the controls and outputs inside it. */
+	const ownText = (label: HTMLLabelElement) => {
+		const copy = document.createElement("div");
+		copy.innerHTML = label.innerHTML;
+		for (const n of copy.querySelectorAll("input, select, textarea, output")) {
+			n.remove();
+		}
+		return clean(copy.textContent ?? "");
+	};
+	/** The notes saved with the answers. Until reply.js takes them over, they are kept as they were stored, so saving answers never drops them. */
+	let storedNotes: unknown = [];
+	let notes: KeepNotes = {
+		list: () => (Array.isArray(storedNotes) ? storedNotes : []),
+		restore: (saved) => {
+			storedNotes = saved;
+		},
+	};
+	/** Called when something changed outside reply.js's own calls; alone, keep.js saves then. */
+	let onChange: () => void = () => void update();
 	/** What a control is, by its own label and kind alone (never its group's): a saved value is put only into a control with the same one. */
 	type Control = ReplyControl;
 	/** What a control holds: checked, selected values (multiple select), or its text. */
@@ -282,11 +303,11 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 	}
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
-	const later = () => setTimeout(onChange);
+	const later = () => setTimeout(() => onChange());
 	for (const type of ["input", "change", "click"]) {
 		document.addEventListener(type, later);
 	}
-	addEventListener("pagehide", onChange);
+	addEventListener("pagehide", () => onChange());
 	// Controls the page renders, replaces or removes after load: only changes to the controls themselves matter, not to this UI.
 	const isControl = (n: Node) =>
 		n instanceof Element && (n.matches(selector) || n.querySelector(selector));
@@ -309,5 +330,17 @@ window.ReplyKeep = ({ selector, clean, ownText, notes, onChange }) => {
 		addEventListener("load", () => setTimeout(restore), { once: true });
 	}
 
-	return { update, clear, touch: (el) => touched.add(el), touched: (el) => touched.has(el) };
-};
+	window.Keep = {
+		selector,
+		ownText,
+		update,
+		clear,
+		touch: (el) => touched.add(el),
+		touched: (el) => touched.has(el),
+		attach(owner) {
+			owner.notes.restore(notes.list());
+			({ notes, onChange } = owner);
+			onChange();
+		},
+	};
+})();

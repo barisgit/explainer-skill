@@ -173,9 +173,29 @@ function staticHandler(vnode: VNode): string | undefined {
 	return `<${tag} ${handler[0]}>`;
 }
 
+/**
+ * The message for a `ref` that is not a Preact ref (a function or a useRef object), anywhere in the page: Preact takes `ref`
+ * out of the props of every element and component, so `ref="flow"` meant as a link name would vanish without a word.
+ */
+function misusedRef(vnode: VNode): string | undefined {
+	const { ref, type } = vnode;
+	if (ref == null || typeof ref === "function" || typeof ref === "object") {
+		return undefined;
+	}
+	const written = typeof ref === "string" ? `"${ref}"` : `{${String(ref)}}`;
+	const element = typeof type === "string";
+	const tag = element ? type : type.displayName || type.name || "a component";
+	const place = rendering === "MDXContent" ? "the page" : rendering;
+	return `<${tag} ref=${written}> in ${place}: ref is Preact's handle to ${element ? "the element" : "a component"} (a function or useRef()) and never reaches the page${element ? "" : ` or ${tag}'s props`}; to link the part with others, write data-ref=${written}${element ? "" : `, or give ${tag}'s prop another name`}`;
+}
+
 // What is made outside every island is static HTML: a handler on it would never run, so the pack fails instead.
 const previousVnode = options.vnode;
 options.vnode = (vnode) => {
+	const ref = misusedRef(vnode);
+	if (ref) {
+		throw new IslandError(ref);
+	}
 	const tag = staticHandler(vnode);
 	if (tag) {
 		throw new IslandError(

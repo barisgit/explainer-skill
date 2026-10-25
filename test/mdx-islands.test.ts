@@ -376,10 +376,21 @@ describe("keeping inside an island", () => {
 		expect(state.reloaded).toEqual(queue(1, 5, "Hour 1: 2 waiting", "burst,3,true", "6"));
 		expect(state.cleared).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2"));
 	}, 30_000);
+
+	test("without reply the controls are kept by keep.js alone, and no reply bar shows", async () => {
+		const output = await pack("kept-alone", queuePage("title: Queues"));
+		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["echarts", "charts", "steps", "keep"]);
+		const reloaded = await inPage(output, async (cdp) => {
+			await act(cdp, `document.getElementById("scenario-burst").click()`, "0");
+			await load(cdp);
+			return cdp.evaluate(`[${QUEUE_STATE}.controls, document.querySelector(".reply-bar")]`);
+		});
+		expect(reloaded).toEqual(["burst,1,false", null]);
+	}, 30_000);
 });
 
 /** The kit scripts a packed page includes, found by the documentation comment pack puts in front of each. */
-const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "reply"];
+const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "keep", "reply"];
 const scriptsIn = (html: string) => KIT_SCRIPTS.filter((name) => html.includes(`/* ${name}: `));
 
 /** A client component that renders `jsx` (kit components from `imports`) only after #reveal is clicked. */
@@ -471,6 +482,18 @@ describe("kit scripts", () => {
 	}, 60_000);
 });
 
+/** Packs `body` under a kit import as `<name>.mdx`, expecting a failure; returns the exit code and the message. */
+async function packFailure(name: string, body: string) {
+	const source = `import { Question } from "kit";\n\n# Ids\n\n${body}\n`;
+	const result = await runCli([
+		"pack",
+		dir.write(`${name}.mdx`, source),
+		"-o",
+		dir.path(`${name}.out.html`),
+	]);
+	return [result.code, result.stderr.trim()];
+}
+
 describe("Question", () => {
 	test("options whose values differ only in case keep their own answer across a reload, and the reply holds it", async () => {
 		const output = await pack(
@@ -492,28 +515,78 @@ describe("Question", () => {
 	test("a value twice in one Question, or two Questions writing one id, fails the pack, saying what to change", async () => {
 		const question = (name: string, options: string) =>
 			`<Question name="${name}" legend="Which?" options={${options}} />`;
-		const failed = async (name: string, body: string) => {
-			const source = `import { Question } from "kit";\n\n# Ids\n\n${body}\n`;
-			const result = await runCli([
-				"pack",
-				dir.write(`${name}.mdx`, source),
-				"-o",
-				dir.path(`${name}.out.html`),
-			]);
-			return [result.code, result.stderr.trim()];
-		};
+		const failed = packFailure;
 		expect(await failed("twice", question("pick", '["Yes", "No", "Yes"]'))).toEqual([
 			1,
 			expect.stringContaining('<Question name="pick"> has the option value "Yes" twice'),
 		]);
 		expect(
-			await failed(
-				"shared",
-				`${question("pick", '["Yes"]')}\n\n${question("pick", '["Yes", "No"]')}`,
+			await failed("shared", `${question("a-b", '["c"]')}\n\n${question("a", '["b-c"]')}`),
+		).toEqual([
+			1,
+			expect.stringContaining(
+				'the id "a-b-c" is on 2 elements: <input type="radio" name="a-b" value="c"> under "Ids", <input type="radio" name="a" value="b-c"> under "Ids". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id (a Question\'s option ids are its name and value, so give each Question its own name)',
 			),
-		).toEqual([1, expect.stringContaining('the id "pick-Yes" is on 2 controls')]);
+		]);
 		expect(
 			await failed("grouped", `${question("pick", '["Yes"]')}\n\n${question("pick", '["No"]')}`),
 		).toEqual([1, expect.stringContaining('2 questions use the name "pick"')]);
+	}, 30_000);
+});
+
+describe("self-check Question", () => {
+	test("a self-check marks the choice, opens its explanation, keeps the choice after a reload, and is not in the reply", async () => {
+		const output = await pack(
+			"self-check",
+			`import { Question } from "kit";
+
+# Study
+
+<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">
+A **kWh** is a kW for an hour.
+</Question>
+
+<Question name="unit2" legend="Which one is power?" options={["kW", "kWh"]} answer="kW" />
+`,
+		);
+		expect(scriptsIn(readFileSync(output, "utf8"))).toEqual(["keep"]);
+		// What the reader sees of the first question: the right and the chosen option's marks, and whether the explanation shows.
+		const seen = `(() => {
+			const look = (value) => { const s = getComputedStyle(document.querySelector('[name=unit][value="' + value + '"] + span')); return s.textDecorationLine + " " + s.boxShadow.includes("0px 0px 0px 2px"); };
+			return [look("kW"), look("kWh"), document.querySelector(".explain").checkVisibility(), document.querySelector(".reply-bar")];
+		})()`;
+		const state = await inPage(output, async (cdp) => {
+			const before = await cdp.evaluate(seen);
+			const wrong = await act(cdp, `document.getElementById("unit-kW").click()`, seen);
+			await load(cdp);
+			return { before, wrong, reloaded: await cdp.evaluate(seen) };
+		});
+		expect(state.before).toEqual(["none false", "none false", false, null]);
+		expect(state.wrong).toEqual(["line-through true", "none true", true, null]);
+		expect(state.reloaded).toEqual(state.wrong);
+	}, 30_000);
+
+	test("a self-check with an answer that cannot be checked fails the pack, saying what to change", async () => {
+		const question = (props: string, inside = "") =>
+			`<Question name="q" legend="Which?" options={["a", "b"]} ${props}${inside ? `>${inside}</Question>` : " />"}`;
+		const failed = (name: string, props: string, inside = "") =>
+			packFailure(name, question(props, inside));
+		expect(await failed("not-option", 'answer="c"')).toEqual([
+			1,
+			expect.stringContaining(
+				'<Question name="q"> has the answer "c", which is not one of its option values (a, b)',
+			),
+		]);
+		expect(await failed("multiple", 'answer="a" multiple')).toEqual([
+			1,
+			expect.stringContaining("a self-check has one right option"),
+		]);
+		expect(
+			await packFailure("two-checks", `${question('answer="a"')}\n\n${question('answer="b"')}`),
+		).toEqual([1, expect.stringContaining('2 questions use the name "q"')]);
+		expect(await failed("no-answer", "", "Because.")).toEqual([
+			1,
+			expect.stringContaining("has an explanation inside but no answer"),
+		]);
 	}, 30_000);
 });

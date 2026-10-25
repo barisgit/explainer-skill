@@ -112,8 +112,14 @@ const FEATURES: Feature[] = [
 	{
 		name: "reply",
 		files: ["reply.js"],
-		line: 'data-reply="Label" on a panel of controls with ids: their values join the reader\'s reply; notes; kept inputs.',
+		line: "data-reply=\"Label\" on a panel of controls with ids: their values join the reader's reply, with the reader's notes.",
 		doc: () => kitHeader("reply.js"),
+	},
+	{
+		name: "keep",
+		files: ["keep.js"],
+		line: 'controls with ids keep their values across reloads; data-keep="off" leaves one out.',
+		doc: () => kitHeader("keep.js"),
 	},
 	{
 		name: "page",
@@ -242,11 +248,11 @@ export const COMMANDS: Record<string, Command> = {
 	},
 	check: {
 		summary:
-			"Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view, into a fresh temp directory (printed) unless --out says where. Scrolls each page (and view) to its end and back before the full-page shots, so errors thrown by scroll handlers and IntersectionObserver callbacks are caught (at most 3 s per page). Reports first-screen info, errors, network requests and overflow as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts, sideways-scrolling containers and steppers whose steps change only their captions as warnings.",
+			"Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view, into a fresh temp directory (printed) unless --out says where. Scrolls each page (and view) to its end and back before the full-page shots, so errors thrown by scroll handlers and IntersectionObserver callbacks are caught (at most 3 s per page). Reports first-screen info, errors, network requests, overflow and ids on more than one element as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts, sideways-scrolling containers and steppers whose steps change only their captions as warnings.",
 		usage:
 			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--quick] [--tag <name>] [--out dir] [--json]",
 		flags: [
-			"--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a point; use it for chart marks\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, or one character\n                   reload               reload the page, keeping what it saved for the reader (kit reply); each load otherwise starts with empty storage\n                   Attribute values may be unquoted: [value=0] works.",
+			"--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a point; use it for chart marks\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, or one character\n                   reload               reload the page, keeping what it saved for the reader (kit keep); each load otherwise starts with empty storage\n                   Attribute values may be unquoted: [value=0] works.",
 			"--quick          light theme only, no first-viewport shots; writes desktop.png and narrow.png into --out (a temp directory without it)",
 			"--view <what>    choose drill-down views to capture. The report lists every view hash found (links and static views) and which were captured. Default: the first hash of each view name, at most 6 names. --view all = every hash found (one PNG set each: slower). A hash (repo/mobile) captures exactly the hashes given; repeatable. none = overview only. Hashes only a script navigates to are never found: pass them as --view name/param.",
 			"--tag <name>     add to the PNG names so states do not overwrite each other; with --quick too (kind-desktop.png)",

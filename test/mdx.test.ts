@@ -214,6 +214,43 @@ describe("pack fails on page source that would not work in the browser", () => {
 		);
 	});
 
+	test("a ref that is a name, not a Preact ref, says to write data-ref; refs in a client component pack", async () => {
+		dir.write(
+			"refs.tsx",
+			`"use client";
+import { useRef } from "preact/hooks";
+
+export function Box({ ref: _unused }: { ref?: string }) {
+	return <b>box</b>;
+}
+
+export function Refs() {
+	const held = useRef<HTMLElement>(null);
+	return <p ref={held}><span ref={(el) => el?.focus()}>Refs</span></p>;
+}
+`,
+		);
+		expect(
+			(await packMdx("refs", 'import { Refs } from "./refs.tsx";\n\n<Refs />\n')).result.code,
+		).toBe(0);
+		expect(await failure("ref-element", '# T\n\n<span ref="flow">Flow</span>\n')).toContain(
+			'<span ref="flow"> in the page: ref is Preact\'s handle to the element (a function or useRef()) and never reaches the page; to link the part with others, write data-ref="flow"',
+		);
+		expect(
+			await failure("ref-component", 'import { Box } from "./refs.tsx";\n\n<Box ref="flow" />\n'),
+		).toContain("or give Box's prop another name");
+	});
+
+	test("an id on two elements names the id and where each is", async () => {
+		const stderr = await failure(
+			"repeated-id",
+			'# Plan\n\n## Work list\n\n<details id="opt-O2"><summary>O2</summary>Tasks</details>\n\n## Options\n\n<label><input type="checkbox" id="opt-O2" /> O2</label>\n',
+		);
+		expect(stderr).toContain(
+			'the id "opt-O2" is on 2 elements: <details> under "Work list", <input type="checkbox"> under "Options". A script, a label\'s for, a #link and a check --do step find only the first: give each its own id',
+		);
+	});
+
 	test("children from the page into a client component are refused", async () => {
 		const stderr = await failure(
 			"children",

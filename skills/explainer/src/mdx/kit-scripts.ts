@@ -14,6 +14,7 @@ export type KitScript =
 	| "views.js"
 	| "steps.js"
 	| "link.js"
+	| "keep.js"
 	| "reply.js";
 
 /** A string literal in compiled code, in any quotes. */
@@ -39,18 +40,31 @@ const MARKERS: { html: string; code: RegExp; scripts: KitScript[] }[] = [
 		scripts: ["link.js"],
 	},
 	{
+		html: "input[id], select[id], textarea[id]",
+		// A control element made with an id in its props: jsx("input", { type: "range", id: "scale" }).
+		code: /["'`](?:input|select|textarea)["'`],\s*\{[^}]*\bid:/,
+		scripts: ["keep.js"],
+	},
+	{
 		html: "[data-reply]",
 		code: new RegExp(`${literal("data-reply")}|\\bdataset\\.reply\\b`),
-		scripts: ["reply.js"],
+		scripts: ["keep.js", "reply.js"],
 	},
 ];
 
 /**
  * The order the kit scripts run in. Libraries the client components call (Charts.make, Plot.make) load before the islands
- * hydrate; scripts that read and wire the page's DOM (views, steps, link, reply) load after, so they reach the markup Preact owns.
+ * hydrate; scripts that read and wire the page's DOM (views, steps, link, keep, reply) load after, so they reach the markup Preact
+ * owns. reply.js drives keep.js, so keep.js comes first.
  */
 export const BEFORE_ISLANDS: KitScript[] = ["echarts.js", "charts.js", "plot.js"];
-export const AFTER_ISLANDS: KitScript[] = ["views.js", "steps.js", "link.js", "reply.js"];
+export const AFTER_ISLANDS: KitScript[] = [
+	"views.js",
+	"steps.js",
+	"link.js",
+	"keep.js",
+	"reply.js",
+];
 
 /** The kit scripts compiled JavaScript (a client bundle, a transpiled component) can need for the markup it writes. */
 export function scriptsInCode(code: string): Set<KitScript> {

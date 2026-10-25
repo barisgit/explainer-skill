@@ -96,7 +96,8 @@ const TALL_FIGURE = 1.5;
  * than their box and scrolls sideways (a wide data table may, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box (ellipsis truncation excepted),
  * a missing viewport meta and SVG text rendered under 9 px (narrow only), diagrams and charts
  * (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players with a log) are tall by design and
- * are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to the screen.
+ * are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to the screen. `repeated`: ids on more
+ * than one element, as the page's scripts and `--do` steps left them (problems).
  */
 const PAGE_JS = (narrow: boolean) => `(() => {
 	const vw = document.documentElement.clientWidth;
@@ -126,8 +127,11 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 		const h = el.getBoundingClientRect().height;
 		warnings.push(name(el) + " is " + Math.round(h) + " px tall, " + (h / innerHeight).toFixed(1) + " viewports (limit ${TALL_FIGURE}): shrink it, split it or move detail behind a click");
 	}
+	const ids = new Map();
+	for (const el of document.querySelectorAll("[id]")) if (el.id) ids.set(el.id, [...(ids.get(el.id) ?? []), el]);
+	const repeated = [...ids].filter(([, els]) => els.length > 1).map(([id, els]) => 'the id "' + id + '" is on ' + els.length + " elements (" + els.map(name).join(", ") + "): scripts, label for, #links and --do steps find only the first; give each its own id");
 	return {
-		overflow: document.documentElement.scrollWidth > vw + 1, culprits: bad.slice(0, 4).map(name), warnings,
+		overflow: document.documentElement.scrollWidth > vw + 1, culprits: bad.slice(0, 4).map(name), warnings, repeated,
 		scrolls: inner.slice(0, 6).map((el) => name(el) + " (content " + el.scrollWidth + "px in " + el.clientWidth + "px)"),
 	};
 })()`;
@@ -348,7 +352,7 @@ interface Run {
 /**
  * Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. Local storage is emptied
  * once the old page is gone: every file:// page shares one origin and one profile serves all shots, so a page that keeps what the
- * reader entered (kit:reply.js) would otherwise carry one shot's `--do` state into the next, and the old page saves again as it unloads.
+ * reader entered (kit:keep.js) would otherwise carry one shot's `--do` state into the next, and the old page saves again as it unloads.
  */
 async function open(run: Run, hash: string) {
 	const { cdp } = run;
@@ -380,7 +384,9 @@ async function capture(run: Run, png: string, screen: Screen): Promise<string[]>
 		culprits: string[];
 		scrolls: string[];
 		warnings: string[];
+		repeated: string[];
 	}>(PAGE_JS(narrow));
+	log.problems.push(...page.repeated);
 	if (page.overflow) {
 		log.problems.push(
 			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
@@ -506,7 +512,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
  * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
  * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
- * Reports console/page errors, network requests, failed loads and page-level horizontal overflow (problems), and warnings
+ * Reports console/page errors, network requests, failed loads, page-level horizontal overflow and repeated ids (problems), and warnings
  * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts, steppers that change only their captions). Reduced motion is emulated so animations are finished in the shots.
  */
 export async function check(

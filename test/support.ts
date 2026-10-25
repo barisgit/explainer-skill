@@ -186,7 +186,7 @@ export function runPacked(
 		for (const viewport of widths) {
 			width = viewport.width;
 			await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
-			// As in check: what kit:reply.js keeps from one width must not carry into the next, and the old page saves as it unloads.
+			// As in check: what kit:keep.js keeps from one width must not carry into the next, and the old page saves as it unloads.
 			await open(cdp, "about:blank");
 			await cdp.send("Storage.clearDataForOrigin", {
 				origin: "file://",
