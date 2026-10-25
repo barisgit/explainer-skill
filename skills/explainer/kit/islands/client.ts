@@ -16,19 +16,7 @@ import {
 } from "preact";
 import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
-
-/**
- * One island as pack writes it: the index of its module in hydrateIslands' list, its export name and its props; `r` lists the
- * functions client modules export that go into the props, each as [path, module index, export name]; `v` names the filled View
- * it draws, for an island without markup.
- */
-interface IslandData {
-	m: number;
-	e: string;
-	p: Record<string, unknown>;
-	r?: [(string | number)[], number, string][];
-	v?: string;
-}
+import type { IslandData } from "./server.ts";
 
 /** Puts each referenced export into `props` at its path, where pack left null (kit/islands/server.ts clientRefs). */
 function withRefs(

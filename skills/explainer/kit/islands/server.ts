@@ -44,6 +44,19 @@ export interface Island {
 	view?: string;
 }
 
+/**
+ * An Island as pack writes it into the page for islands/client.ts, with its modules as indexes into the client bundle's list:
+ * `m` the module, `e` the export name, `p` the props; `r` the client functions that go into the props, each as [path, module,
+ * export name]; `v` the filled View it draws, for an island without markup.
+ */
+export interface IslandData {
+	m: number;
+	e: string;
+	p: Record<string, unknown>;
+	r?: [(string | number)[], number, string][];
+	v?: string;
+}
+
 /** What the page would do wrong in the browser; the message is for the page's author. pack finds it by name, not by class. */
 export class IslandError extends Error {
 	override name = "IslandError";

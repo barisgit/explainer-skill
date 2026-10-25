@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { basename, dirname, extname, relative } from "node:path";
+import type { Island, IslandData } from "../../kit/islands/server.ts";
 import { safeScript } from "../escape.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
@@ -86,6 +87,16 @@ async function answerClashes(html: string): Promise<string[]> {
 		);
 }
 
+/** The islands as the page carries them for kit/islands/client.ts, each module named by its index in `modules`. */
+const islandData = (islands: Island[], modules: string[]): IslandData[] =>
+	islands.map(({ module, name, props, refs, view }) => ({
+		m: modules.indexOf(module),
+		e: name,
+		p: props,
+		...(refs ? { r: refs.map((ref) => [ref.path, modules.indexOf(ref.module), ref.name]) } : {}),
+		...(view === undefined ? {} : { v: view }),
+	}));
+
 /**
  * The kit scripts the page needs: for the markup its HTML holds, the markup its client code (`scan`, bundle.ts's clientScan) can
  * write later, and reply: true.
@@ -137,13 +148,6 @@ export async function mdxPage(
 	const links = [...css].map(
 		(file) => `<link rel="stylesheet" href="${escapeHtml(relative(dir, file))}">`,
 	);
-	const islandData = islands.map(({ module, name, props, refs, view }) => ({
-		m: modules.indexOf(module),
-		e: name,
-		p: props,
-		...(refs ? { r: refs.map((ref) => [ref.path, modules.indexOf(ref.module), ref.name]) } : {}),
-		...(view === undefined ? {} : { v: view }),
-	}));
 	const scheme = page.front.scheme ? ` data-scheme="${page.front.scheme}"` : "";
 	const shell = [
 		"<!doctype html>",
@@ -160,7 +164,7 @@ export async function mdxPage(
 		`<main class="page">${hoistViews(html, shownPath(path))}</main>`,
 		...(islands.length
 			? [
-					`<script type="application/json" id="explainer-islands">${scriptJson(islandData)}</script>`,
+					`<script type="application/json" id="explainer-islands">${scriptJson(islandData(islands, modules))}</script>`,
 				]
 			: []),
 		...(page.front.labels
