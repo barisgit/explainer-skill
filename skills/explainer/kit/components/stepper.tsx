@@ -5,6 +5,7 @@
      children  the parts, HTML or hand-built SVG. data-step="2 4" makes a part appear at step 2 and lit (is-now) on 2 and 4;
                "0 3" is visible from the start and lit at 3; a part without data-step never changes
      captions  one per step, text or JSX; the current one shows. The number of steps is the number of captions, else the highest step used
+     captionsFirst  the captions (and the controls over them) before the parts, as text to read before the picture; default after
      start     the opening step. By default the stepper opens on the last step (the complete picture, same as print and without JS);
                study pages start at 1. Play restarts from step 1 and never starts by itself
      label     the accessible name, else kitLabels.stepper ("Step-through; use the arrow keys")
@@ -25,6 +26,7 @@ import { useLayoutEffect, useRef } from "preact/hooks";
 export interface StepperProps {
 	children?: ComponentChildren;
 	captions?: ComponentChildren[];
+	captionsFirst?: boolean;
 	start?: number;
 	label?: string;
 	class?: string;
@@ -49,6 +51,7 @@ const isStepChange = (event: Event): event is CustomEvent<StepChange> =>
 export function Stepper({
 	children,
 	captions,
+	captionsFirst = false,
 	start,
 	label,
 	class: classes = "fig",
@@ -77,6 +80,14 @@ export function Stepper({
 			Steps.refresh(root.current);
 		}
 	});
+	// steps.js puts its controls just before this list, wherever it is.
+	const list = captions && (
+		<ol data-captions="">
+			{captions.map((caption) => (
+				<li>{caption}</li>
+			))}
+		</ol>
+	);
 	return (
 		<figure
 			ref={root}
@@ -86,14 +97,9 @@ export function Stepper({
 			data-start={start}
 			aria-label={label}
 		>
+			{captionsFirst && list}
 			{children}
-			{captions && (
-				<ol data-captions="">
-					{captions.map((caption) => (
-						<li>{caption}</li>
-					))}
-				</ol>
-			)}
+			{!captionsFirst && list}
 		</figure>
 	);
 }

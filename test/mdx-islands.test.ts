@@ -203,6 +203,24 @@ describe("Stepper", () => {
 		expect(state).toEqual({ opening: "is-on is-now,,", next: "is-on,is-on is-now," });
 	}, 30_000);
 
+	test("captionsFirst puts the captions, and the controls over them, before the parts", async () => {
+		const output = await pack(
+			"captions-first",
+			STATIC_STEPPER.replace("start={1}", "start={1} captionsFirst"),
+		);
+		const state = await inPage(output, async (cdp) => ({
+			order: await cdp.evaluate(
+				`[...document.getElementById("s").children].map((el) => el.getAttribute("class") ?? el.localName).join()`,
+			),
+			caption: await act(
+				cdp,
+				`document.querySelector('[data-go="1"]').click()`,
+				`document.querySelector("[data-captions] .is-now").textContent`,
+			),
+		}));
+		expect(state).toEqual({ order: "player,ol,svg", caption: "two" });
+	}, 30_000);
+
 	test("in a client component: onStep redraws the chart, a scenario switch changes the captions and count, nothing spins", async () => {
 		const output = await pack("queue", queuePage("title: Queues"));
 		const state = await inPage(output, async (cdp) => {
