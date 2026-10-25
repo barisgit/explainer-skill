@@ -39,18 +39,36 @@ interface ParsedStep {
 	value?: string | undefined;
 }
 
-/** `<css>=<value>` split at the first `=` outside `[...]`, so `input[name=q]=a=b` is `input[name=q]` and `a=b`. */
-const SELECTOR_VALUE = /^((?:[^=[]|\[[^\]]*\])*)=(.*)$/s;
+/** How each bracket changes the attribute-selector depth while valueStart scans. */
+const BRACKET_DEPTH: Record<string, number> = { "[": 1, "]": -1 };
+/** The tokens valueStart scans: a backslash escape, a whole quoted string (unclosed runs to the end), or one character. */
+const SELECTOR_TOKEN = /\\.|"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?|./gs;
+
+/**
+ * Where the value of `<css>=<value>` starts: after the first `=` outside `[...]` and quoted strings, with a backslash escaping the
+ * next character as in CSS. So `input[name=q]=a=b` is `input[name=q]` and `a=b`, and `[data-label="a]=b"]=new` keeps its quoted
+ * `]=` in the selector. -1 when there is no such `=`.
+ */
+function valueStart(arg: string): number {
+	let depth = 0;
+	for (const { 0: token, index } of arg.matchAll(SELECTOR_TOKEN)) {
+		if (token === "=" && depth === 0) {
+			return index + 1;
+		}
+		depth += BRACKET_DEPTH[token] ?? 0;
+	}
+	return -1;
+}
 
 function parseStep(step: string): ParsedStep | undefined {
 	const [, kind, arg] = STEP.exec(step) ?? [];
 	if (!kind || !arg) {
 		return undefined;
 	}
-	const split = kind in VALUE_FORMS ? SELECTOR_VALUE.exec(arg) : null;
-	return split
-		? { kind: kind as StepKind, arg: split[1] ?? "", value: split[2] ?? "" }
-		: { kind: kind as StepKind, arg };
+	const start = kind in VALUE_FORMS ? valueStart(arg) : -1;
+	return start < 0
+		? { kind: kind as StepKind, arg }
+		: { kind: kind as StepKind, arg: arg.slice(0, start - 1), value: arg.slice(start) };
 }
 
 /** Returns why a `--do` step is malformed, or "" when it parses. */

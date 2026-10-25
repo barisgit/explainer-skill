@@ -8,6 +8,7 @@ afterAll(dir.cleanup);
 const FORM = (checks: Record<string, string>) => `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1"></head><body><h1>Form</h1>
 <input id="q" value="old"><input id="note" name="note"><textarea id="t">draft</textarea>
+<input id="a[1]"><input data-label="a]=b">
 <input id="r" type="range" min="0" max="10" value="2">
 <select id="s"><option value="a">A</option><option value="b">B</option><option value="c">C</option></select>
 <script>
@@ -25,13 +26,22 @@ test("check --do type: types over a field key by key, then leaves it, so input l
 		"an input event per key, the last with the whole text":
 			'of("q").filter((h) => h.includes(" input ")).length === 9 && of("q").includes("q input heat pump")',
 		"change fires once, after the text is in": 'of("q").at(-1) === "q change heat pump"',
+		"a quoted ]= inside an attribute value stays in the selector":
+			'document.querySelector("[data-label]").value === "new"',
+		"escaped brackets stay in the selector": 'document.getElementById("a[1]").value === "x=y"',
 		"a selector with = in it and a text with = in it split at the first = outside brackets":
 			'document.getElementById("note").value === "a=b"',
 		"type: with no text clears a textarea": 'document.getElementById("t").value === ""',
 	});
 
 	const failures = await packAndRun(dir, "type", page, {
-		steps: ["type:#q=heat pump", "type:input[name=note]=a=b", "type:#t="],
+		steps: [
+			"type:#q=heat pump",
+			"type:input[name=note]=a=b",
+			"type:#t=",
+			'type:input[data-label="a]=b"]=new',
+			"type:#a\\[1\\]=x=y",
+		],
 	});
 
 	expect(failures).toEqual([]);
