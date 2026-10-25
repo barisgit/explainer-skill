@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync, realpathSync } from "node:fs";
 import { relative } from "node:path";
-import { packMdx, runCli, scratch } from "./support.ts";
+import { act, inPage, packedMdx, packMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -135,3 +135,28 @@ describe("files that client code shows", () => {
 		);
 	}, 30_000);
 });
+
+/** A client component that draws the imported icon from its first render and re-renders on a click. */
+const COUNTER = `"use client";
+import { useState } from "preact/hooks";
+import icon from "./icon.svg";
+export function Counter() {
+	const [n, setN] = useState(0);
+	return <p><img src={icon} alt="icon" width="40" /><button type="button" id="more" onClick={() => setN(n + 1)}>{n}</button></p>;
+}
+`;
+
+test("an svg image a client component draws at first stays one image, so it shows in dark before and after a re-render", async () => {
+	const output = await packedMdx(
+		dir,
+		"island-svg/page",
+		'---\nscheme: dark\n---\nimport { Counter } from "./counter.tsx";\n\n# Counter\n\n<Counter />\n',
+		{ "island-svg/icon.svg": ICON, "island-svg/counter.tsx": COUNTER },
+	);
+	const shown = `[...document.querySelectorAll("main img")].map((img) => getComputedStyle(img).display !== "none" && img.getBoundingClientRect().width > 0)`;
+	const states = await inPage(output, async (cdp) => [
+		await cdp.evaluate(shown),
+		await act(cdp, `document.getElementById("more").click()`, shown),
+	]);
+	expect(states).toEqual([[true], [true]]);
+}, 30_000);

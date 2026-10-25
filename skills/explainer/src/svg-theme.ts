@@ -39,12 +39,26 @@ const SVG_DATA = "data:image/svg+xml;base64,";
  * Replaces each `<img>` of a base64 svg (what `pack` makes of a local svg file) with one image per colour scheme, classes `light`
  * and `dark`, one of which theme.css hides: an image document cannot read the page's CSS, so each copy carries
  * the scheme's colours instead. Attributes go to both copies, the id only to the first so it stays unique. An `<img>` inside
- * `<picture>` stays as it is, since the browser picks among the sources.
+ * `<picture>` stays as it is, since the browser picks among the sources, and so does one a client component rendered (between
+ * `<!--island:N-->` and `<!--/island-->`, outside its slot): Preact hydrates it as one element and drops the second copy, which
+ * left only the light one, hidden in dark.
  */
 export async function themeSvgImages(html: string): Promise<string> {
 	const tokens = colourTokens();
 	let pictures = 0;
+	// The island and slot markers the next img is inside, innermost last; a slot stays static HTML, so its images are themed.
+	const markers: ("island" | "slot")[] = [];
 	return await new HTMLRewriter()
+		.onDocument({
+			comments(comment) {
+				const marker = /^(\/?)(island|slot)(?::\d+)?$/.exec(comment.text);
+				if (marker?.[1]) {
+					markers.pop();
+				} else if (marker) {
+					markers.push(marker[2] === "slot" ? "slot" : "island");
+				}
+			},
+		})
 		.on("picture", {
 			element(el) {
 				pictures++;
@@ -55,7 +69,7 @@ export async function themeSvgImages(html: string): Promise<string> {
 		})
 		.on(`img[src^="${SVG_DATA}"]`, {
 			element(img) {
-				if (pictures) {
+				if (pictures || markers.at(-1) === "island") {
 					return;
 				}
 				const svg = Buffer.from((img.getAttribute("src") ?? "").slice(SVG_DATA.length), "base64");
