@@ -37,7 +37,7 @@ const withClass = (paragraph: Paragraph, className: string) => {
 };
 
 /** The plain text of a node, as a title. */
-export const textOf = (node: Nodes): string =>
+const textOf = (node: Nodes): string =>
 	"value" in node ? node.value : "children" in node ? node.children.map(textOf).join("") : "";
 
 /** A `#` and the paragraphs right under it, as the page's `header.masthead`; the first paragraph is the `.lede`, later ones `.meta`. */

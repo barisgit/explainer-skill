@@ -242,10 +242,6 @@ export const COMMANDS: Record<string, Command> = {
 				console.log(kitListing());
 				return 0;
 			}
-			if (topic === "mermaid") {
-				console.log(MERMAID_DOC);
-				return 0;
-			}
 			if (topic === "types") {
 				return types();
 			}
