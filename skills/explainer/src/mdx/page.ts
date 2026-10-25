@@ -16,6 +16,14 @@ import { MATH_ELEMENT } from "./math.ts";
 /** Island markers, and the element a rendered View is wrapped in (VIEW_MARKER in kit/components/view.tsx) so pack can move it. */
 const VIEW = /<!--island:\d+-->|<!--\/island-->|<explainer-view>|<\/explainer-view>/g;
 
+/** How an island marker changes the depth of islands: a start opens one, an end closes one. */
+const islandStep = (marker: string) => (marker === "<!--/island-->" ? -1 : 1);
+
+const nestedView = (file: string, inside: string) =>
+	new PackError(
+		`${file}: a View is inside ${inside}; put it in the page or a static component, and put client components inside the View instead`,
+	);
+
 /**
  * The page's HTML with every view moved, in page order, after the overview, wherever the page rendered it, as views.js expects
  * (it hides [data-overview] while a view shows). A View inside a View or inside a client component is a PackError: the first
@@ -26,15 +34,14 @@ function hoistViews(html: string, file: string): string {
 	let rest = "";
 	let at = 0;
 	let open: number | undefined;
-	let inIsland = false;
+	// Islands nest: a kit Chart in another island's slot is an island of its own.
+	let islands = 0;
 	for (const { 0: token, index } of html.matchAll(VIEW)) {
 		if (token.startsWith("<!--")) {
-			inIsland = token !== "<!--/island-->";
+			islands += islandStep(token);
 		} else if (token === "<explainer-view>") {
-			if (open !== undefined || inIsland) {
-				throw new PackError(
-					`${file}: a View is inside ${inIsland ? "a client component" : "another View"}; put it in the page or a static component, and put client components inside the View instead`,
-				);
+			if (open !== undefined || islands > 0) {
+				throw nestedView(file, islands > 0 ? "a client component" : "another View");
 			}
 			rest += html.slice(at, index);
 			open = index + token.length;

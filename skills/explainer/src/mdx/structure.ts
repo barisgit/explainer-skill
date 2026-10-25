@@ -65,14 +65,29 @@ function sectionOf(heading: Heading | MdxJsxFlowElement, children: Flow[]): MdxJ
 	return section;
 }
 
+/**
+ * The heading of the section `node` starts: a `##` or `<h2>`, or the one a component's children from the page open with. A
+ * client component places those children (its slot) among its own markup, so the component and what follows it form the
+ * section, with the heading as the section's direct child, where the theme and the contents rail look for it.
+ */
+function sectionHeading(node: Nodes): Heading | MdxJsxFlowElement | undefined {
+	const component =
+		node.type === "mdxJsxFlowElement" && /^[A-Z]/.test(node.name ?? "") && node.name !== "View";
+	const heading = component ? node.children[0] : node;
+	return isSectionHeading(heading) ? heading : undefined;
+}
+
+const isSectionHeading = (node: Nodes | undefined): node is Heading | MdxJsxFlowElement =>
+	node !== undefined && (isHeading(node, 2) || isJsx(node, "h2"));
+
 /** A node a section does not take in: the next `#`, or a section the author wrote themselves (to give it data-nav, say). */
 const endsSection = (node: Flow) => isHeading(node, 1) || isJsx(node, "section");
 
 /**
- * The house layout of one flow container (the overview or a view): each `##` (or `<h2>`) with what follows, up to the next `#`/`##` or a
- * `<section>` the author wrote themselves, becomes a `<section>`. With `masthead` (the overview), its first `#` with the
- * paragraphs right under it becomes the masthead; a View lays out its own head (kit/components/view.tsx), so that a view
- * rendered from data gets one too.
+ * The house layout of one flow container (the overview or a view): each `##` (or `<h2>`, or a component whose children open
+ * with one) with what follows, up to the next `#`/`##` or a `<section>` the author wrote themselves, becomes a `<section>`.
+ * With `masthead` (the overview), its first `#` with the paragraphs right under it becomes the masthead; a View lays out its
+ * own head (kit/components/view.tsx), so that a view rendered from data gets one too.
  */
 function layout(nodes: Flow[], masthead: boolean): Flow[] {
 	const out: Flow[] = [];
@@ -88,9 +103,10 @@ function layout(nodes: Flow[], masthead: boolean): Flow[] {
 			i = taken.next;
 			continue;
 		}
-		if (node && (isHeading(node, 2) || isJsx(node, "h2"))) {
+		const heading = node && sectionHeading(node);
+		if (node && heading) {
 			section = [node];
-			out.push(sectionOf(node, section));
+			out.push(sectionOf(heading, section));
 		} else if (node && endsSection(node)) {
 			section = undefined;
 			out.push(node);

@@ -251,16 +251,6 @@ export function Refs() {
 		);
 	});
 
-	test("children from the page into a client component are refused", async () => {
-		const stderr = await failure(
-			"children",
-			'import { Counter } from "./counter.tsx";\n\n<Counter start={1}>Text</Counter>\n',
-		);
-		expect(stderr).toContain(
-			"<Counter> has children in the page, but a client component takes JSON props only",
-		);
-	});
-
 	test("a label key no kit script reads names the key, which would otherwise stay English", async () => {
 		const stderr = await failure(
 			"label-key",
