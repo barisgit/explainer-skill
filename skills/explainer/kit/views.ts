@@ -36,10 +36,10 @@
    in the navigation. With kit:link.js, data-ref on a row lights it, and a closed fold that holds a lit row is tinted too. Trees
    print fully open.
    Labels: the texts the navigation adds are English. A page in another language sets them, with those of the other kit scripts, in
-   one object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { contents: "Vsebina", ... }.
-   Keys here: contents "Contents" (the rail's name and its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name),
-   expandAll "Expand all", collapseAll "Collapse all", overview "Overview" (the overview's name in crumbs and rail, used only when no
-   .back link names it). A key left out stays English. */
+   the page's frontmatter labels, one key: text per line (contents: Vsebina). Keys here: contents "Contents" (the rail's name and
+   its phone disclosure), breadcrumb "Breadcrumb" (the trail's accessible name), expandAll "Expand all", collapseAll "Collapse
+   all", overview "Overview" (the overview's name in crumbs and rail, used only when no .back link names it). A key left out stays
+   English. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const root = document.documentElement;

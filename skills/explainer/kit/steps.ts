@@ -8,8 +8,8 @@
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
    A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
-   Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in one
-   object at the top level of any of its scripts, before or after the kit scripts: var kitLabels = { back: "Nazaj", ... }. Keys here:
+   Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in the
+   page's frontmatter labels, one key: text per line (back: Nazaj). Keys here:
    back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
    (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
@@ -85,7 +85,7 @@
 			if (root.dataset.labels !== undefined) {
 				// v0.7.0 read per-stepper labels; a page written for it would otherwise turn English without a word.
 				console.warn(
-					"kit:steps.js: data-labels is no longer read; set the texts in kitLabels (kit steps.js)",
+					"kit:steps.js: data-labels is no longer read; set the texts in the page's frontmatter labels (kit labels)",
 				);
 			}
 			this.bar.className = "player";

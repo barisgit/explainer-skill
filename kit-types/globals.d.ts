@@ -130,8 +130,8 @@ interface ReplyNotesOptions {
 }
 
 /**
- * Set by the page in any of its scripts: its texts for the kit's own controls, accessible names and messages, by key; `kit <file>`
- * lists the keys. The kit scripts read it when they draw, never caching it, so it may be set after them.
+ * The page's texts for the kit's own controls, accessible names and messages, by key: pack sets it from the frontmatter `labels`,
+ * whose keys `kit labels` lists. The kit scripts read it when they draw, never caching it, so it may be set after them.
  */
 declare var kitLabels: Readonly<Record<string, string>> | undefined;
 
