@@ -13,13 +13,18 @@ import {
 	type VNode,
 } from "preact";
 import { renderToString } from "preact-render-to-string";
+import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
 
-/** One prerendered client component: the module that defines it, its export name and the JSON props it hydrates with. */
+/**
+ * One prerendered client component: the module that defines it, its export name and the JSON props it hydrates with. With
+ * `view`, it has no markup: it draws the open record of that filled View in the browser, from props that are FillProps.
+ */
 export interface Island {
 	module: string;
 	name: string;
 	props: Record<string, unknown>;
+	view?: string;
 }
 
 /** What the page would do wrong in the browser; the message is for the page's author. pack finds it by name, not by class. */
@@ -78,8 +83,39 @@ export function island(module: string, name: string, value: unknown): unknown {
 		return h(MARKER, { "data-island": n, dangerouslySetInnerHTML: { __html: html } });
 	}
 	Island.displayName = label;
+	Island.fill = (view: string, props: FillProps) => {
+		const problem = notJson(props.records, "");
+		if (problem) {
+			throw new IslandError(
+				`<View name="${view}" records>: ${problem.path.slice(1)} is ${problem.what}, but the records reach the browser as JSON`,
+			);
+		}
+		drawEach(view, label, Component as DrawRecord, props);
+		islands.push({ module, name, props: { ...props }, view });
+	};
 	wrappers.add(Island);
 	return Island;
+}
+
+/**
+ * Draws every record of a filled view once and throws the HTML away: a record the component cannot draw fails the pack, naming
+ * it, rather than leaving the reader an empty view.
+ */
+function drawEach(view: string, label: string, render: DrawRecord, { records, back }: FillProps) {
+	depth++;
+	try {
+		for (const [param, record] of Object.entries(records)) {
+			try {
+				renderToString(h(FilledRecord, { render, record, back }));
+			} catch (e) {
+				throw new IslandError(
+					`<View name="${view}" render={${label}}> threw for #${view}/${param}: ${e instanceof Error ? e.message : String(e)}`,
+				);
+			}
+		}
+	} finally {
+		depth--;
+	}
 }
 
 /** True for children that render something; whitespace between tags does not count. */

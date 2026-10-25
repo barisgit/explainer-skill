@@ -232,12 +232,26 @@
 		apply(writes);
 	}
 
-	/** Everything to keep: the answered controls by key over the entries still waiting for theirs, and the notes. */
+	/** What the last snapshot kept of controls with an id, for when one leaves the page. */
+	let keptById: Record<string, Saved> = {};
+
+	/**
+	 * Everything to keep: the answered controls by key over the entries still waiting for theirs, and the notes. A control with an
+	 * id that has left the page (a filled view showing another record) waits again for its return, as a saved entry does.
+	 */
 	function snapshot() {
+		const present = units();
+		const here = new Set(present.map((u) => u.key));
+		for (const [key, entry] of Object.entries(keptById)) {
+			if (!(here.has(key) || key in pending)) {
+				pending[key] = entry;
+			}
+		}
 		const controls = { ...pending };
-		for (const u of units().filter(answered)) {
+		for (const u of present.filter(answered)) {
 			controls[u.key] = { value: readControl(u.el), sig: u.sig };
 		}
+		keptById = Object.fromEntries(Object.entries(controls).filter(([key]) => key.startsWith("#")));
 		return { controls, notes: notes.list() };
 	}
 
@@ -282,6 +296,7 @@
 		);
 		touched = new WeakSet();
 		pending = {};
+		keptById = {};
 		taken.clear();
 		onChange();
 	}

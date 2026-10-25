@@ -72,7 +72,8 @@ details > :last-child:not(summary) {
 }
 
 /* Views (kit:views.js): the overview is the page; #name/param shows <section class="view" data-view="name">.
-   Without JS every view stays visible below the overview; print always shows everything. */
+   Without JS every view stays visible below the overview; print shows everything but a filled view (data-fill), which holds
+   only the record open, and so shows and prints only while it is open. */
 .view {
 	margin-block-start: clamp(3.5rem, 9vw, 6rem);
 	padding-block-start: 1.5rem;
@@ -117,6 +118,9 @@ details > :last-child:not(summary) {
 .js-views.in-view [data-overview] {
 	display: none;
 }
+.view[data-fill]:not(.active) {
+	display: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
 	*,
@@ -135,9 +139,9 @@ details > :last-child:not(summary) {
 	.back {
 		display: none;
 	}
-	.js-views .view:not(.active),
+	.js-views .view:not(.active, [data-fill]),
 	.js-views.in-view [data-overview] {
-		/* biome-ignore lint/complexity/noImportantStyles: print shows every view, over the display rules of the screen layout */
+		/* biome-ignore lint/complexity/noImportantStyles: print shows every static view, over the display rules of the screen layout */
 		display: block !important;
 	}
 	/* Every fold prints open. A closed <details> hides its content box, not its children, so the box is what is shown. */

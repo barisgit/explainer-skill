@@ -122,10 +122,11 @@ export async function mdxPage(
 	const links = [...css].map(
 		(file) => `<link rel="stylesheet" href="${escapeHtml(relative(dir, file))}">`,
 	);
-	const islandData = islands.map(({ module, name, props }) => ({
+	const islandData = islands.map(({ module, name, props, view }) => ({
 		m: modules.indexOf(module),
 		e: name,
 		p: props,
+		...(view === undefined ? {} : { v: view }),
 	}));
 	return [
 		"<!doctype html>",
