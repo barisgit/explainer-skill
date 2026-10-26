@@ -536,9 +536,25 @@ h3,
 	--_key-badge: var(--sunken);
 	font-family: var(--font);
 	overflow: visible;
+	/* pack sets both on the svg: 1.2 times the drawn size at most, and at least the width that keeps its smallest text at 10 px,
+	   below which the block scrolls sideways. */
+	max-width: var(--mermaid-max);
+	min-width: var(--mermaid-min);
 }
 .mermaid > svg .mono {
 	font-family: var(--mono);
+}
+/* A flowchart or state diagram too wide for a phone comes with a copy laid out across it (svg[data-phone]), shown on phones in
+   its place. */
+@media (width >= 40rem) {
+	.mermaid > svg[data-phone] {
+		display: none;
+	}
+}
+@media (width < 40rem) {
+	.mermaid:has(> svg[data-phone]) > svg:not([data-phone]) {
+		display: none;
+	}
 }
 /* pack inlines an svg file in <img> once per scheme; the copy shown follows the system scheme unless <html data-scheme> forces one
    (light-dark() cannot switch display). Only the other copy is hidden, so the page's own display rule for the <img> stays. */
@@ -2129,7 +2145,7 @@ dialog.reply-dialog[open] {
 <li>A wrong password is <span data-ref="l_reject">rejected</span>; nothing is stored.</li>
 <li>A correct one is <span data-ref="l_rehash">hashed again</span> with the new algorithm and cost.</li>
 <li><span data-ref="l_store">The new hash replaces the old one.</span> This user no longer has a weak hash at rest.</li>
-</ol></div><figure class="fig" aria-label="Re-hash at login"><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 329.4309999999999 552.554" width="100%" style="max-width: 396px">
+</ol></div><figure class="fig" aria-label="Re-hash at login"><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 329.4309999999999 552.554" width="100%" style="--mermaid-max: 396px; --mermaid-min: 300px">
 <defs>
   <marker id="mm0-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
@@ -2180,7 +2196,7 @@ dialog.reply-dialog[open] {
 <li>A batch job <span data-ref="w_wrap">hashes each stored hash with the new algorithm</span>. No password is needed. Layering has algorithm- and encoding-specific risks, so it is a stopgap.</li>
 <li>At the <span data-ref="w_login">next login</span>, check the password through both layers.</li>
 <li>Then <span data-ref="w_plain">hash the plain password directly</span> with the new algorithm and drop the layered form.</li>
-</ol></div><figure class="fig" aria-label="Wrap the stored hash"><div class="mermaid"><svg id="mm1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 235.92499999999998 315.6" width="100%" style="max-width: 284px">
+</ol></div><figure class="fig" aria-label="Wrap the stored hash"><div class="mermaid"><svg id="mm1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 235.92499999999998 315.6" width="100%" style="--mermaid-max: 284px; --mermaid-min: 182px">
 <defs>
   <marker id="mm1-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
@@ -2212,7 +2228,7 @@ dialog.reply-dialog[open] {
 <li><span data-ref="x_idle">Some users never log in</span>, so the re-hash at login never reaches them.</li>
 <li>After an inactivity period you choose (OWASP gives none), <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
 <li>Their next login <span data-ref="x_reset">needs a password reset</span>, which creates a hash with the new algorithm.</li>
-</ol></div><figure class="fig" aria-label="Expire inactive users"><div class="mermaid"><svg id="mm2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 209.873 230.70000000000002" width="100%" style="max-width: 252px">
+</ol></div><figure class="fig" aria-label="Expire inactive users"><div class="mermaid"><svg id="mm2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 209.873 230.70000000000002" width="100%" style="--mermaid-max: 252px; --mermaid-min: 162px">
 <defs>
   <marker id="mm2-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
@@ -3172,7 +3188,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
      a ```mermaid fence                                                       pack gives every diagram part the data-ref of its Mermaid id
    A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
    too), so the parts of one diagram never link each other; the light and dark copies pack makes of an SVG file in <img> count
-   once; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
+   once, as do a diagram and the copy pack lays out for phones; any other element is a place of its own. A prose term and a
+   diagram part link, as do two diagrams sharing a node id.
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
@@ -3200,7 +3217,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
   function placeOf(el) {
     const svg = outermostSvg(el);
     if (svg) {
-      return svg;
+      const twin = svg.previousElementSibling;
+      return svg.matches("svg[data-phone]") && twin instanceof SVGSVGElement ? twin : svg;
     }
     const twin = el.previousElementSibling;
     return el.matches("img.dark") && twin?.matches("img.light") ? twin : el;
