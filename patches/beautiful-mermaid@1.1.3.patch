@@ -211,7 +211,7 @@ index b4a6454e1015b38924cacc674f488d3460861af2..c3f0b98d9784ebebef90507263d56666
  export type { AsciiRenderOptions } from './ascii/index.ts'
  
 diff --git a/src/layout-engine.ts b/src/layout-engine.ts
-index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb0771285eb0c65d 100644
+index 8557308223e16670db3d126d9c55673b6e946598..bf5af809aff7e31aec5c04ce3cc6c8b0a8b65e73 100644
 --- a/src/layout-engine.ts
 +++ b/src/layout-engine.ts
 @@ -30,7 +30,7 @@ import type {
@@ -239,12 +239,14 @@ index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb077128
    }
  
    if (shape === 'hexagon') {
-@@ -209,10 +211,16 @@ function mermaidToElk(
+@@ -209,10 +211,18 @@ function mermaidToElk(
        'elk.layered.highDegreeNodes.threshold': '8',
        'elk.layered.compaction.postCompaction.strategy': 'LEFT_RIGHT_CONSTRAINT_LOCKING',
        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-+      // Back edges are the ones written last, as in Mermaid, so a cycle does not reorder a top-down flow.
-+      'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
++      // In each cycle the edges back to where it was entered, in written order, turn back, as in Mermaid, so a loop does not
++      // reorder a top-down flow. An edge on no cycle keeps its direction: MODEL_ORDER turned back every edge to a node written
++      // earlier, so a side input written after its target (c --> x below x --> f) sat after it, its edge looping back.
++      'elk.layered.cycleBreaking.strategy': 'SCC_CONNECTIVITY',
        'elk.layered.wrapping.strategy': 'OFF',
        // Use SEPARATE when subgraphs have direction overrides (enables proper direction handling)
        // Use INCLUDE_CHILDREN otherwise (simpler cross-hierarchy edge routing)
@@ -256,13 +258,13 @@ index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb077128
      },
      children: [],
      edges: [],
-@@ -259,23 +267,25 @@ function mermaidToElk(
+@@ -259,23 +269,25 @@ function mermaidToElk(
      }
    }
  
 -  // Add top-level nodes (those not in any subgraph)
 +  // Top-level nodes and subgraphs, in the order they are first written (a subgraph where its first member is), so that
-+  // MODEL_ORDER cycle breaking turns back exactly the edges that point to something written earlier.
++  // cycle breaking turns back the edges of a cycle that point to something written earlier.
 +  const rank = appearanceRank(graph)
 +  const topLevel: Array<{ rank: number; node: ElkGraphNode }> = []
    for (const [id, node] of graph.nodes) {
@@ -288,7 +290,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb077128
  
    // Add root-level edges
    for (const { index, edge } of edgesBySubgraph.get(null)!) {
-@@ -324,6 +334,23 @@ function mermaidToElk(
+@@ -324,6 +336,23 @@ function mermaidToElk(
    return elkGraph
  }
  
@@ -312,17 +314,17 @@ index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb077128
  /**
   * Convert a MermaidSubgraph to an ELK compound node.
   * Includes internal edges (edges where both endpoints are in this subgraph)
-@@ -353,6 +380,9 @@ function subgraphToElk(
+@@ -353,6 +382,9 @@ function subgraphToElk(
      'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
      'elk.layered.spacing.edgeNodeBetweenLayers': '12',
      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
-+    // MODEL_ORDER throws inside a compound node in elkjs 0.11.1; a depth-first search over the children, which are in
-+    // written order, turns back the same edges.
++    // SCC_CONNECTIVITY and MODEL_ORDER throw inside a compound node in elkjs 0.11.1; a depth-first search over the children,
++    // which are in written order, turns back only edges on a cycle too.
 +    'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
      'elk.layered.spacing.nodeNodeBetweenLayers': String(opts.layerSpacing),
      'elk.spacing.nodeNode': String(opts.nodeSpacing),
    }
-@@ -380,24 +410,25 @@ function subgraphToElk(
+@@ -380,24 +412,25 @@ function subgraphToElk(
      }))
    }
  
@@ -354,7 +356,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb077128
  
    // Add internal edges (edges where both endpoints are in this subgraph)
    const internalEdges = edgesBySubgraph.get(sg.id) ?? []
-@@ -776,6 +807,7 @@ function extractEdgesRecursively(
+@@ -776,6 +809,7 @@ function extractEdgesRecursively(
      }
  
      edges.push({
@@ -362,7 +364,51 @@ index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb077128
        source: originalEdge.source,
        target: originalEdge.target,
        label: originalEdge.label,
-@@ -1404,9 +1436,25 @@ export function layoutGraphSync(
+@@ -1212,6 +1246,23 @@ function adjustJunctionForGroups(
+   return crossingGroup.y - GAP // TD
+ }
+ 
++/**
++ * Whether an edge outside `bundle` meets `node` on the side where the bundle's trunk would (`side`, that side's coordinate
++ * across the layers): the trunk, which meets the side's middle, would run over it, as over a loop's return edge leaving
++ * a node that a fan-in enters. Such a bundle keeps ELK's separate ports.
++ */
++function sideTaken(
++  node: PositionedNode,
++  side: number,
++  horizontal: boolean,
++  bundle: PositionedEdge[],
++  edges: PositionedEdge[]
++): boolean {
++  const onSide = (p: Point | undefined) => p !== undefined && Math.abs((horizontal ? p.x : p.y) - side) < 1
++  return edges.some(e => !bundle.includes(e) &&
++    ((e.source === node.id && onSide(e.points[0])) || (e.target === node.id && onSide(e.points.at(-1)))))
++}
++
+ /**
+  * Bundle fan-out and fan-in edge paths so they share a common trunk segment.
+  *
+@@ -1267,6 +1318,9 @@ function bundleEdgePaths(
+     })
+     if (forward.length < 2) continue
+ 
++    const exitSide = isLR ? source.x + source.width : isRL ? source.x : isBT ? source.y : source.y + source.height
++    if (sideTaken(source, exitSide, isHorizontal, forward, edges)) continue
++
+     const targets = forward.map(e => ({ edge: e, node: nodeMap.get(e.target)! }))
+     const srcCX = source.x + source.width / 2
+     const srcCY = source.y + source.height / 2
+@@ -1343,6 +1397,9 @@ function bundleEdgePaths(
+     })
+     if (forward.length < 2) continue
+ 
++    const entrySide = isLR ? target.x : isRL ? target.x + target.width : isBT ? target.y + target.height : target.y
++    if (sideTaken(target, entrySide, isHorizontal, forward, edges)) continue
++
+     const sources = forward.map(e => ({ edge: e, node: nodeMap.get(e.source)! }))
+     const tgtCX = target.x + target.width / 2
+     const tgtCY = target.y + target.height / 2
+@@ -1404,9 +1461,25 @@ export function layoutGraphSync(
    options: RenderOptions = {}
  ): PositionedGraph {
    const opts = { ...DEFAULTS, ...options }

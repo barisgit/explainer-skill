@@ -140,6 +140,26 @@ const readingOrder = [
 	On --> Off: power`,
 		forward: ["_start>Off", "_start2>Idle", "Idle>Busy"],
 	},
+	{
+		name: "a side input written after the node it feeds",
+		axis: 0,
+		source: `flowchart LR
+	m[Message] --> x(("×"))
+	c[Carrier] --> x
+	x --> f[Filter]`,
+		forward: ["m>x", "c>x", "x>f"],
+	},
+	{
+		name: "inputs written after a subgraph they feed",
+		axis: 1,
+		source: `flowchart TD
+	subgraph g[Group]
+		m[Merge] --> o[Out]
+		s[Side] --> m
+	end
+	i[In] --> m`,
+		forward: ["m>o", "s>m", "i>m"],
+	},
 ];
 
 test.each(readingOrder)("$name lays out in reading order", ({ source, axis, forward }) => {
@@ -149,6 +169,15 @@ test.each(readingOrder)("$name lays out in reading order", ({ source, axis, forw
 		return !edge || (edge.end[axis] ?? 0) <= (edge.start[axis] ?? 0);
 	});
 	expect(backwards).toEqual([]);
+});
+
+test("a loop's return edge leaves its node apart from the edges that enter it there", () => {
+	const ends = edgeEnds(svgOf("flowchart LR\n  send --> wait\n  wait --> send\n  timer --> wait"));
+	const back = ends.get("wait>send")?.start;
+	expect(back).toBeDefined();
+	for (const key of ["send>wait", "timer>wait"]) {
+		expect({ key, end: ends.get(key)?.end }).not.toEqual({ key, end: back });
+	}
 });
 
 test("an edge between levels of a nested subgraph starts and ends at its nodes", () => {
