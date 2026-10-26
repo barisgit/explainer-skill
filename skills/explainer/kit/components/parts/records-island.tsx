@@ -1,8 +1,9 @@
 "use client";
 /* Records with controls (see ../records.tsx): the island that keeps the reader's state. Its first render is the state pack
-   prerendered; then it reads the URL hash, and writes the view, sort, search and filters back with history.replaceState, so a
-   link to the page shows what the reader saw and Back from an item's view returns to it. Folds stay out of the hash: a toggle
-   would otherwise replace an anchor the reader came by (a hand-written open= is still read). Print shows the whole tree. */
+   prerendered; then it reads the URL hash, and writes the whole state back with history.replaceState, so a link to the page or
+   a reload shows what the reader saw and Back from an item's view returns to it. Opening or closing a fold writes only over
+   this block's own hash or none, so an anchor the reader came by (#plan.1.wp1, which opens its group) stays. Print shows the
+   whole tree. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
 	createRecords,
@@ -34,7 +35,7 @@ function flipped(
 	return { ...state, [key]: open ? [...ids, id] : ids.filter((other) => other !== id) };
 }
 
-/** What print shows: the default state as the tree (when the block has one) with every group open. */
+/** What print shows: the default state as the tree (when the block has one) with every group and detail open. */
 function printState(records: Records): RecordsState {
 	const tree = records.view({ ...records.initial, view: "tree" });
 	return tree.body.kind === "tree" ? tree.body.expandAll : records.initial;
@@ -44,21 +45,36 @@ function printState(records: Records): RecordsState {
 const inView = (root: { current: HTMLElement | null }) =>
 	Boolean(root.current?.closest("[data-view]"));
 
-/** Keeps the hash in step with `state`, folds left out. */
-function syncHash(records: Records, state: RecordsState) {
-	const want = records.writeHash({ ...state, open: [], details: [] });
+/** Whether two states differ only in their open groups and details. */
+const sameBesideFolds = (records: Records, a: RecordsState, b: RecordsState) =>
+	records.writeHash({ ...a, open: [], details: [] }) ===
+	records.writeHash({ ...b, open: [], details: [] });
+
+/**
+ * Keeps the hash in step with `state`, which follows `previous`. Over a hash that is not this block's (an anchor, another
+ * block's state), a change of folds alone and a return to the default write nothing; any other change replaces it.
+ */
+function syncHash(records: Records, state: RecordsState, previous: RecordsState) {
+	const want = records.writeHash(state);
 	const current = location.hash.slice(1);
-	if (want === records.config.id) {
-		// Back to the default: drop the hash only when it is this block's, never someone else's anchor.
-		if (current && records.readHash(current)) {
-			history.replaceState(history.state, "", location.pathname + location.search);
-		}
-	} else if (current !== want) {
-		history.replaceState(history.state, "", `#${want}`);
+	const mine = current === "" || records.readHash(current) !== null;
+	if (!mine && (want === records.config.id || sameBesideFolds(records, state, previous))) {
+		return;
+	}
+	const next = want === records.config.id ? "" : want;
+	if (next !== current) {
+		history.replaceState(
+			history.state,
+			"",
+			next ? `#${next}` : location.pathname + location.search,
+		);
 	}
 }
 
-/** Reads the hash now and at every hashchange; a hash that is not this block's leaves the state as it is. */
+/**
+ * Reads the hash now and at every hashchange. A hash that is not this block's leaves the state as it is; a change to no hash
+ * (Back to the page as it opened) is the default state, since the block writes none for it.
+ */
 function useHash(
 	records: Records,
 	root: { current: HTMLElement | null },
@@ -66,8 +82,15 @@ function useHash(
 ) {
 	const ready = useRef(false);
 	useEffect(() => {
-		const read = () => {
-			const found = inView(root) ? null : records.readHash(location.hash);
+		const read = (event?: Event) => {
+			if (inView(root)) {
+				return;
+			}
+			if (event && location.hash.length <= 1) {
+				set(records.initial);
+				return;
+			}
+			const found = records.readHash(location.hash);
 			if (found) {
 				set(found);
 				requestAnimationFrame(() => root.current?.scrollIntoView({ block: "start" }));
@@ -112,17 +135,21 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 	const ready = useHash(records, root, setState);
 	usePrint(setPrinting);
 	useEffect(() => setLive(true), []);
+	const written = useRef(state);
 	useEffect(() => {
 		if (ready.current && !printing && !inView(root)) {
-			syncHash(records, state);
+			syncHash(records, state, written.current);
+			written.current = state;
 		}
 	}, [records, state, printing, ready]);
-	// The reader may close a fold the state keeps open (a group a search opened); a later render opens it again.
+	// The reader may close a fold the state keeps open (a group a search opened); a later render opens it again. Only opening is
+	// forced: a fold opened from outside (the router revealing an anchor) reaches the state through its toggle event, which a
+	// render in between must not undo.
 	useLayoutEffect(() => {
 		for (const group of groupsShown(vm)) {
 			const fold = document.getElementById(group.anchor);
-			if (fold instanceof HTMLDetailsElement && fold.open !== group.open) {
-				fold.open = group.open;
+			if (fold instanceof HTMLDetailsElement && group.open && !fold.open) {
+				fold.open = true;
 			}
 		}
 	});

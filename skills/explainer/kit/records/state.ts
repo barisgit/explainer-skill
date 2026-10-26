@@ -7,7 +7,7 @@
  * router (kit/views.ts) without clashing: a block id has no `/`, so no `#name/param` route claims it, and no element has the id
  * `plan?...`, so the router shows the overview, where the block is. An item's own view (`#item/WP1-02`) replaces the block's
  * hash, and Back returns to it. One block's state at a time lives in the hash: a hash that names another block, or none,
- * reads as null, and the block keeps the state it has.
+ * reads as null here; the island keeps the state it has for another block's hash and takes the default for none.
  */
 import type { ViewKind } from "./config.ts";
 

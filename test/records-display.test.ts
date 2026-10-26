@@ -3,7 +3,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act, inPage, packedMdx, packMdx, runPacked, SETTLED, scratch } from "./support.ts";
+import { act, inPage, load, packedMdx, packMdx, runPacked, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -105,6 +105,52 @@ var contract = settled.then(frames).then(async () => {
 	);
 	expect(await runPacked(output)).toEqual([]);
 }, 60_000);
+
+let fixture: Promise<string> | undefined;
+/** The fixture page packed once, for the tests that drive it in the browser. */
+const packedFixture = () => {
+	fixture ??= packedMdx(dir, "fixture", fixturePage());
+	return fixture;
+};
+
+interface Folds {
+	open: string;
+	hash: string;
+}
+/** The plan block's open group ids, and the location hash, as Folds. */
+const FOLDS = `({ open: [...document.querySelectorAll("#plan details[id]")].filter((d) => d.open).map((d) => d.id).join(" "), hash: location.hash })`;
+
+test("opened groups go in the hash and come back after a reload, and a fold never replaces an anchor the reader came by", async () => {
+	const seen = await inPage(await packedFixture(), async (cdp) => {
+		const all = await act<Folds>(cdp, `document.querySelector("#plan .fold-all").click()`, FOLDS);
+		await load(cdp);
+		const allAfterReload = await cdp.evaluate<Folds>(FOLDS);
+		await act(cdp, `document.querySelector("#plan .fold-all").click()`, FOLDS);
+		const one = await act<Folds>(
+			cdp,
+			`document.getElementById("plan.2").querySelector("summary").click()`,
+			FOLDS,
+		);
+		await load(cdp);
+		const oneAfterReload = await cdp.evaluate<Folds>(FOLDS);
+		// A link to a group's anchor opens its branch, and the hash stays the anchor.
+		const anchor = await act<Folds>(cdp, `location.hash = "plan.3.wp10"`, FOLDS);
+		await act(cdp, `location.hash = "plan?open=2"`, FOLDS);
+		// Back to the page as it opened, with no hash: the default state.
+		const cleared = await act<Folds>(cdp, `location.hash = ""`, FOLDS);
+		return { all, allAfterReload, one, oneAfterReload, anchor, cleared };
+	});
+	// Three phases of five packages each.
+	expect(seen.all.open.split(" ")).toHaveLength(3 + 3 * 5);
+	expect(seen).toEqual({
+		all: { open: seen.all.open, hash: "#plan?open=*" },
+		allAfterReload: { open: seen.all.open, hash: "#plan?open=*" },
+		one: { open: "plan.2", hash: "#plan?open=2" },
+		oneAfterReload: { open: "plan.2", hash: "#plan?open=2" },
+		anchor: { open: "plan.2 plan.3 plan.3.wp10", hash: "#plan.3.wp10" },
+		cleared: { open: "", hash: "" },
+	});
+}, 30_000);
 
 test("an incomplete sum shows as a lower bound or unknown in every view, in words for screen readers", async () => {
 	const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
@@ -210,20 +256,28 @@ test("a record's detail opens in place in every view, stays open across them, an
 		expanded: {
 			details: ["A-1 open: Measured on A.", "A-2 open: Guessed."],
 			button: "Collapse all true",
-			hash: "",
+			hash: "#why?open=*&detail=*",
 		},
 		// One detail closed again: the tree is no longer all open, though every group is.
-		oneClosed: { details: ["A-1", "A-2 open: Guessed."], button: "Expand all false", hash: "" },
-		table: { details: ["A-1", "A-2 open: Guessed."], button: null, hash: "#why?view=table" },
+		oneClosed: {
+			details: ["A-1", "A-2 open: Guessed."],
+			button: "Expand all false",
+			hash: "#why?open=*&detail=A-2",
+		},
+		table: {
+			details: ["A-1", "A-2 open: Guessed."],
+			button: null,
+			hash: "#why?view=table&open=*&detail=A-2",
+		},
 		opened: {
 			details: ["A-1 open: Measured on A.", "A-2 open: Guessed."],
 			button: null,
-			hash: "#why?view=table",
+			hash: "#why?view=table&open=*&detail=*",
 		},
 		board: {
 			details: ["A-1 open: Measured on A.", "A-2 open: Guessed."],
 			button: null,
-			hash: "#why?view=board",
+			hash: "#why?view=board&open=*&detail=*",
 		},
 	});
 }, 30_000);
