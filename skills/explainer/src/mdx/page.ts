@@ -95,19 +95,32 @@ interface RecordsBlockUse {
 	links: Set<string>;
 }
 
-/**
- * What breaks between the Records blocks and the Views of the page, which only the whole page shows: a block's `link` that
- * names no View (its rows would open nothing), and a block id that is also a View's name (the router would take the block's
- * hash, #plan?view=table, as that View's route). Read from the prerendered HTML: `div.records[id]` and its `#name/id` row links.
- */
-async function recordsLinkProblems(html: string): Promise<string[]> {
-	const blocks: RecordsBlockUse[] = [];
+/** Each record a filled View drew at pack time, with the hash that opens it (its id escaped as View escapes it) as its place. */
+const filledRecords = (islands: Island[]) =>
+	islands.flatMap(({ view, drawn = {} }) =>
+		Object.entries(drawn).map(([param, record]) => ({
+			place: `#${view}/${param.replace(/[%?#]/g, encodeURIComponent)}`,
+			record,
+		})),
+	);
+
+/** The names of the page's Views, static and filled: each `data-view` before its first "/". */
+async function viewNames(html: string): Promise<Set<string>> {
 	const views = new Set<string>();
-	let block: RecordsBlockUse | null = null;
 	await new HTMLRewriter()
 		.on("[data-view]", {
 			element: (el) => void views.add((el.getAttribute("data-view") ?? "").split("/")[0] ?? ""),
 		})
+		.transform(new Response(html))
+		.text();
+	return views;
+}
+
+/** The Records blocks in `html`: `div.records[id]` and the View names its `#name/id` row links open. */
+async function recordsBlocks(html: string): Promise<RecordsBlockUse[]> {
+	const blocks: RecordsBlockUse[] = [];
+	let block: RecordsBlockUse | null = null;
+	await new HTMLRewriter()
 		.on("div.records[id]", {
 			element(el) {
 				const found: RecordsBlockUse = { id: el.getAttribute("id") ?? "", links: new Set() };
@@ -128,29 +141,47 @@ async function recordsLinkProblems(html: string): Promise<string[]> {
 		})
 		.transform(new Response(html))
 		.text();
+	return blocks;
+}
+
+/**
+ * What breaks between the Records blocks and the Views of the page, which only the whole page shows: a block's `link` that
+ * names no View (its rows would open nothing), and a block id that is also a View's name (the router would take the block's
+ * hash, #plan?view=table, as that View's route). Checks the blocks of the prerendered page and of every record a filled View
+ * drew, naming the record (`records "subs" in #part/c`); the View names come from the page alone, since a record holds none.
+ */
+async function recordsLinkProblems(html: string, islands: Island[]): Promise<string[]> {
+	const views = await viewNames(html);
 	const known = views.size
 		? `the page's Views are ${[...views].join(", ")}`
 		: "the page has no View";
-	return blocks.flatMap(({ id, links }) => [
-		...[...links]
-			.filter((name) => !views.has(name))
-			.map(
-				(name) =>
-					`records "${id}": link "${name}" names no View, so its rows open nothing (${known}); write one of those, or add <View name="${name}" records={...} render={...} />`,
-			),
-		...(views.has(id)
-			? [
-					`records "${id}": its id is also a View's name, so its hash (#${id}?view=table) would open that View; give the block or the View another name`,
-				]
-			: []),
-	]);
+	const places = [{ place: "", record: html }, ...filledRecords(islands)];
+	const found = await Promise.all(
+		places.map(async ({ place, record }) => ({
+			block: place ? ` in ${place}` : "",
+			blocks: await recordsBlocks(record),
+		})),
+	);
+	return found.flatMap(({ block, blocks }) =>
+		blocks.flatMap(({ id, links }) => [
+			...[...links]
+				.filter((name) => !views.has(name))
+				.map(
+					(name) =>
+						`records "${id}"${block}: link "${name}" names no View, so its rows open nothing (${known}); write one of those, or add <View name="${name}" records={...} render={...} />`,
+				),
+			...(views.has(id)
+				? [
+						`records "${id}"${block}: its id is also a View's name, so its hash (#${id}?view=table) would open that View; give the block or the View another name`,
+					]
+				: []),
+		]),
+	);
 }
 
 /** The ids each filled View's record repeats while it is open, in itself or beside the page's own `html` (ids.ts). */
 async function recordIds(html: string, islands: Island[]): Promise<string[]> {
-	const filled = islands.flatMap(({ view, drawn = {} }) =>
-		Object.entries(drawn).map(([param, record]) => ({ place: `#${view}/${param}`, record })),
-	);
+	const filled = filledRecords(islands);
 	if (!filled.length) {
 		return [];
 	}
@@ -201,7 +232,7 @@ export async function mdxPage(
 	const prerendered = await prerender(compiled, css, page.front.labels);
 	const clashes = [
 		...(await answerClashes(prerendered.html)),
-		...(await recordsLinkProblems(prerendered.html)),
+		...(await recordsLinkProblems(prerendered.html, prerendered.islands)),
 	];
 	if (clashes.length) {
 		throw new PackError(clashes.map((clash) => `${shownPath(path)}: ${clash}`).join("\n"));

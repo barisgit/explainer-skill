@@ -482,3 +482,40 @@ export const fields = { id: { label: "Id", kind: "text" }, title: { label: "Titl
 		'records "item": its id is also a View\'s name, so its hash (#item?view=table) would open that View; give the block or the View another name',
 	);
 });
+
+test("pack checks the Records blocks a filled View draws as it checks the page's, naming the record they are in", async () => {
+	const { result } = await packMdx(
+		dir,
+		"filled-links",
+		`import { View } from "kit";
+import { Part } from "./part.tsx";
+
+# Parts
+
+<View name="part" records={[{ id: "a?b" }, { id: "c" }]} render={Part} />
+`,
+		{
+			"part.tsx": `"use client";
+import { Records } from "kit";
+
+const fields = { id: { label: "Id", kind: "text" as const } };
+
+export function Part({ record }: { record: { id: string } }) {
+	return (<>
+		<h1>{record.id}</h1>
+		{record.id === "c"
+			? <Records id="part" data={[{ id: "x" }]} idField="id" fields={fields} columns={["id"]} views={["table"]} />
+			: <Records id="subs" data={[{ id: "x" }]} idField="id" fields={fields} columns={["id"]} link="prat" />}
+	</>);
+}
+`,
+		},
+	);
+	expect(result.code).not.toBe(0);
+	expect(result.stderr).toContain(
+		'records "subs" in #part/a%3Fb: link "prat" names no View, so its rows open nothing (the page\'s Views are part); write one of those, or add <View name="prat"',
+	);
+	expect(result.stderr).toContain(
+		'records "part" in #part/c: its id is also a View\'s name, so its hash (#part?view=table) would open that View; give the block or the View another name',
+	);
+});
