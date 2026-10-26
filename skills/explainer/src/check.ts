@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./chrome.ts";
-import { settle, withPage } from "./chrome.ts";
+import { ChromeError, settle, withPage } from "./chrome.ts";
 import {
 	DISCOVER_JS,
 	FIRST_SCREEN_JS,
@@ -50,13 +50,20 @@ export interface Shot {
 	problems: string[];
 	warnings: string[];
 }
-/** `quick`: light theme only, no first-viewport shots, overview PNGs named desktop.png and narrow.png. `views` are --view values: hashes, "all" or "none". */
+/**
+ * `quick`: light theme only, no first-viewport shots, overview PNGs named desktop.png and narrow.png. `views` are --view values:
+ * hashes, "all" or "none". `timeoutSeconds`: the whole run's limit, past which check stops Chrome and throws a ChromeError.
+ */
 export interface CheckOptions {
 	steps: string[];
 	views: string[];
 	tag: string;
 	quick: boolean;
+	timeoutSeconds: number;
 }
+
+/** The overall limit of one check run when --timeout gives none: far above a page with every view captured and many steps. */
+export const DEFAULT_TIMEOUT_SECONDS = 600;
 /** `found`: every drill-down hash the overview links to or declares; `uncaptured`: those not captured; `templates`: view names with a param that no link reaches. */
 export interface ViewReport {
 	found: string[];
@@ -200,6 +207,8 @@ interface Run {
 	/** The drill-down hashes to capture, set once by the first overview pass (light, desktop) and reused for every other screen. */
 	viewHashes: string[];
 	stepNotes: Set<string>;
+	/** What the run is doing now ("dark narrow, view #fix/none"), for an error that stops it. */
+	at: string;
 }
 
 /**
@@ -209,16 +218,12 @@ interface Run {
  */
 async function open(run: Run, hash: string) {
 	const { cdp } = run;
-	const blank = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url: "about:blank" });
-	await blank;
+	await cdp.load("about:blank");
 	await cdp.send("Storage.clearDataForOrigin", {
 		origin: "file://",
 		storageTypes: "local_storage",
 	});
-	const loaded = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url: run.url + hash });
-	await loaded;
+	await cdp.load(run.url + hash);
 	await settle(400);
 }
 
@@ -329,6 +334,7 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name, vp } = screen;
 	const { opts } = run;
+	run.at = `${theme} ${name}, overview`;
 	run.log.reset();
 	await open(run, "");
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
@@ -357,6 +363,7 @@ async function shootOverview(run: Run, screen: Screen) {
 /** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
 async function shootView(run: Run, screen: Screen, hash: string) {
 	const { theme, name, vp } = screen;
+	run.at = `${theme} ${name}, view ${hash}`;
 	run.log.reset();
 	await open(run, hash);
 	if (
@@ -382,12 +389,65 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 	}
 }
 
+/** Every theme x viewport: the overview, then each chosen view. */
+async function shootAll(run: Run, themes: readonly string[]) {
+	const { cdp } = run;
+	await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
+	for (const theme of themes) {
+		for (const [name, vp] of Object.entries(VIEWPORTS)) {
+			const narrow = name === "narrow";
+			await cdp.send("Emulation.setDeviceMetricsOverride", {
+				...vp,
+				deviceScaleFactor: 1,
+				mobile: narrow,
+			});
+			await cdp.send("Emulation.setEmulatedMedia", {
+				features: [
+					{ name: "prefers-color-scheme", value: theme },
+					{ name: "prefers-reduced-motion", value: "reduce" },
+				],
+			});
+			const screen = { theme, name, vp };
+			await shootOverview(run, screen);
+			for (const hash of run.viewHashes) {
+				await shootView(run, screen, hash);
+			}
+		}
+	}
+}
+
+/**
+ * Runs shootAll within the run's overall limit. Past it, every pending and later Chrome call fails with the limit's error, which
+ * says where the run was; any other ChromeError gets the same `at` added, so a stalled call names the screen it stalled on.
+ */
+async function shootWithin(run: Run, themes: readonly string[]) {
+	const { timeoutSeconds } = run.opts;
+	let stopped: ChromeError | undefined;
+	const limit = setTimeout(() => {
+		stopped = new ChromeError(
+			`check passed its ${timeoutSeconds} s limit at ${run.at}, after ${run.shots.length} page(s): raise --timeout for a page with many views or --do steps`,
+		);
+		run.cdp.abort(stopped);
+	}, timeoutSeconds * 1000);
+	try {
+		await shootAll(run, themes);
+	} catch (error) {
+		if (error instanceof ChromeError && error !== stopped) {
+			throw new ChromeError(`${error.message} (at ${run.at})`);
+		}
+		throw error;
+	} finally {
+		clearTimeout(limit);
+	}
+}
+
 /**
  * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
  * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
- * Reports console/page errors, network requests, failed loads, page-level horizontal overflow and repeated ids (problems), and warnings
+ * Reports console/page errors, network requests, failed loads, page-level horizontal overflow, and repeated ids (problems), and warnings
  * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts, steppers that change only their captions). Reduced motion is emulated so animations are finished in the shots.
+ * A ChromeError ends the run with no result: Chrome failed to start or stalled, or the run passed `opts.timeoutSeconds`.
  */
 export async function check(
 	file: string,
@@ -400,41 +460,23 @@ export async function check(
 	const shots: Shot[] = [];
 	const views: ViewReport = { found: [], captured: [], uncaptured: [], templates: [] };
 	const stepNotes = new Set<string>();
-	await withPage(async (cdp) => {
-		const run: Run = {
-			cdp,
-			log: new PageLog(cdp),
-			url: `file://${resolve(file)}`,
-			outDir,
-			stem,
-			opts,
-			shots,
-			views,
-			viewHashes: [],
-			stepNotes,
-		};
-		await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
-		for (const theme of themes) {
-			for (const [name, vp] of Object.entries(VIEWPORTS)) {
-				const narrow = name === "narrow";
-				await cdp.send("Emulation.setDeviceMetricsOverride", {
-					...vp,
-					deviceScaleFactor: 1,
-					mobile: narrow,
-				});
-				await cdp.send("Emulation.setEmulatedMedia", {
-					features: [
-						{ name: "prefers-color-scheme", value: theme },
-						{ name: "prefers-reduced-motion", value: "reduce" },
-					],
-				});
-				const screen = { theme, name, vp };
-				await shootOverview(run, screen);
-				for (const hash of run.viewHashes) {
-					await shootView(run, screen, hash);
-				}
-			}
-		}
-	});
+	await withPage((cdp) =>
+		shootWithin(
+			{
+				cdp,
+				log: new PageLog(cdp),
+				url: `file://${resolve(file)}`,
+				outDir,
+				stem,
+				opts,
+				shots,
+				views,
+				viewHashes: [],
+				stepNotes,
+				at: "starting",
+			},
+			themes,
+		),
+	);
 	return { shots, views, stepNotes: [...stepNotes] };
 }

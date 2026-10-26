@@ -433,9 +433,7 @@ async function shotStep(
 
 /** Reloads the page as the reader would (same URL, same storage) and waits for the load and for scripts to settle. */
 async function reloadStep(cdp: Cdp): Promise<StepResult> {
-	const loaded = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.reload");
-	await loaded;
+	await cdp.load();
 	await settle(RELOAD_SETTLE_MS);
 	return {};
 }

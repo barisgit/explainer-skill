@@ -154,13 +154,6 @@ var contract = settled.then(() => window.stepsDone).then(() => [${Object.entries
 	.map(([name, body]) => `(${body}) ? "" : ${JSON.stringify(name)}`)
 	.join(",\n")}].filter(Boolean));`;
 
-/** Navigates and waits for the load event. */
-async function open(cdp: Cdp, url: string) {
-	const loaded = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url });
-	await loaded;
-}
-
 /** A window size a page runs at; `mobile` emulates a phone (touch, mobile viewport). */
 export interface Viewport {
 	width: number;
@@ -250,12 +243,12 @@ export function runPacked(
 			width = viewport.width;
 			await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
 			// As in check: what kit:keep.js keeps from one width must not carry into the next, and the old page saves as it unloads.
-			await open(cdp, "about:blank");
+			await cdp.load("about:blank");
 			await cdp.send("Storage.clearDataForOrigin", {
 				origin: "file://",
 				storageTypes: "local_storage",
 			});
-			await open(cdp, `file://${output}`);
+			await cdp.load(`file://${output}`);
 			if (steps.length) {
 				const shotPath: ShotPath = (_selector, index) =>
 					`${output.replace(/\.html$/, "")}-${width}-${index ?? 0}.png`;
@@ -300,9 +293,7 @@ const DRAWN = `new Promise((drawn, failed) => {
  * FRAMES again for the effects and redraws those start.
  */
 export async function load(cdp: Cdp, url?: string) {
-	const loaded = cdp.once("Page.loadEventFired");
-	await (url ? cdp.send("Page.navigate", { url }) : cdp.send("Page.reload"));
-	await loaded;
+	await cdp.load(url);
 	await cdp.evaluate(
 		`${FRAMES}.then(() => document.fonts.ready).then(() => ${DRAWN}).then(() => ${FRAMES})`,
 		true,

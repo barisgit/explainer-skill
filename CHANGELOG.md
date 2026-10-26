@@ -21,6 +21,12 @@ One collection of records, shown as a grouped tree, a sortable table or a board,
 - Flowcharts turn back only the edges of a real cycle. An input written after the node it feeds now sits before that node, instead of being looped around it.
 - `check`'s warning about tiny SVG text names the fix: drop the page rule that squeezes a diagram, or for a hand-built SVG, redraw it about 360 wide or hold it at the `min-width` it gives inside a `.scroll` block.
 
+### check
+
+- When Chrome fails to start or stops answering, `check` prints one line and exits 1 with no report, for example `error: the load event of file:///…/page.html did not come in 10 s (at dark narrow, view #fix/none)`. It used to wait forever.
+- `--timeout <seconds>` (default 600) limits the whole run: `error: check passed its 600 s limit at light desktop, view #plan/a, after 324 page(s): raise --timeout for a page with many views or --do steps`.
+- Chrome exits with `check` however `check` ends. Before, a `check` killed by a timeout left a Chrome running that used a CPU core.
+
 ## v0.9.0
 
 Pages are MDX. An agent writes `page.mdx`: Markdown prose, the kit's components, and the `.ts` or `.json` data and `.css` it imports. `pack` renders it once to static HTML with Preact and ships code only for client components. Packed v0.8 files still open offline, and `check` still takes them.

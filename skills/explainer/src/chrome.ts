@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
+import type { Readable, Writable } from "node:stream";
 
 const { CHROME } = process.env;
 const CHROME_PATHS = [
@@ -27,8 +28,22 @@ function downloaded(dir: string, prefix: string, binary: string): string[] {
 		.map((name) => join(dir, name, binary));
 }
 
-/** Waits `ms` milliseconds, for page scripts, transitions and rebuilt DOM to settle after a load or an action. */
+/** Waits `ms` milliseconds. For pacing that is about time itself (a recorded clip's frames); check waits on what the page draws instead. */
 export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+/**
+ * How long one DevTools call may take before Chrome counts as stalled, far above any real call: the longest, check's page-side
+ * waits, end themselves within 10 s and say what is still missing.
+ */
+const CALL_DEADLINE_MS = 20_000;
+/** How long a page may take from navigation to its load event: a packed page loads nothing, so only a stalled Chrome comes close. */
+const LOAD_DEADLINE_MS = 10_000;
+/** How long Chrome may take from launch to a page ready to drive. */
+const START_DEADLINE_MS = 20_000;
+/** How long a failed start waits to see whether Chrome is exiting on its own, whose log then explains the failure. */
+const EXIT_NOTICE_MS = 1_000;
+
+const seconds = (ms: number) => `${ms / 1000} s`;
 
 /** Chrome could not be started or driven: an environment problem the CLI reports without a stack trace. */
 export class ChromeError extends Error {}
@@ -66,47 +81,144 @@ interface CdpEvents {
 	"Network.requestWillBeSent": { request: { url: string } };
 	"Network.loadingFailed": { errorText: string; canceled?: boolean };
 	"Page.loadEventFired": object;
+	"Inspector.targetCrashed": object;
+	"Target.detachedFromTarget": { sessionId: string };
 }
 
 type Reply = { result?: unknown; error?: { message: string } };
-type Message = Reply & { id?: number; method?: keyof CdpEvents; params?: unknown };
+type Message = Reply & {
+	id?: number;
+	method?: keyof CdpEvents;
+	params?: unknown;
+	sessionId?: string;
+};
 
-/** Minimal Chrome DevTools Protocol client: request/response plus event subscription. */
+/** A promise that rejects with ChromeError(`message`) unless `work` settles within `ms`; the timer never outlives the work. */
+function within<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const late = new Promise<never>((_, fail) => {
+		timer = setTimeout(() => fail(new ChromeError(message)), ms);
+	});
+	return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Minimal Chrome DevTools Protocol client over Chrome's debugging pipe (`--remote-debugging-pipe`: JSON messages ended by a NUL
+ * byte, written to Chrome's fd 3 and read from its fd 4): request/response plus event subscription. It starts on the browser
+ * target, and `attachPage` then points every call and event at one page. Every call and awaited event has a deadline, and once
+ * the connection is lost (Chrome exited, the page crashed or closed, or `abort` was called) every pending and later call fails
+ * with that reason instead of waiting forever.
+ */
 export class Cdp {
 	private id = 0;
 	private readonly pending = new Map<number, (r: Reply) => void>();
 	private readonly listeners = new Map<string, Array<(params: never) => void>>();
-	private readonly ws: WebSocket;
-	private constructor(ws: WebSocket) {
-		this.ws = ws;
-		ws.onmessage = (m) => {
-			const msg = JSON.parse(String(m.data)) as Message;
-			if (msg.id) {
-				this.pending.get(msg.id)?.(msg);
-			} else if (msg.method) {
-				for (const listener of this.listeners.get(msg.method) ?? []) {
-					listener(msg.params as never);
-				}
+	/** Rejecters of the calls and events being awaited, called with the reason the connection is lost. */
+	private readonly waiters = new Set<(error: ChromeError) => void>();
+	private lost: ChromeError | undefined;
+	/** The page's session once attachPage has run; until then calls go to the browser. */
+	private sessionId: string | undefined;
+	private readonly output: Writable;
+	constructor(input: Readable, output: Writable) {
+		this.output = output;
+		const closed = () => this.abort(new ChromeError("Chrome closed the DevTools connection"));
+		output.on("error", closed);
+		input.on("error", closed).on("close", closed);
+		input.setEncoding("utf8");
+		// A message can span chunks (a screenshot is megabytes), so only each new chunk is searched for the end byte.
+		let parts: string[] = [];
+		input.on("data", (chunk: string) => {
+			const messages = chunk.split("\0");
+			const last = messages.pop() ?? "";
+			for (const text of messages) {
+				this.receive(JSON.parse(parts.join("") + text) as Message);
+				parts = [];
 			}
-		};
-	}
-	static async connect(url: string): Promise<Cdp> {
-		const ws = new WebSocket(url);
-		await new Promise((ok, fail) => {
-			ws.onopen = ok;
-			ws.onerror = () => fail(new ChromeError("cannot connect to Chrome"));
+			parts.push(last);
 		});
-		return new Cdp(ws);
+		this.on("Inspector.targetCrashed", () =>
+			this.abort(
+				new ChromeError("the page crashed in Chrome (out of memory, or its process was killed)"),
+			),
+		);
 	}
-	/** Sends a command; `T` is the caller's description of the reply, which the protocol does not let us check. */
-	send<T = unknown>(method: string, params: object = {}): Promise<T> {
+	private receive(msg: Message) {
+		if (msg.id) {
+			this.pending.get(msg.id)?.(msg);
+		} else if (msg.method === "Target.detachedFromTarget") {
+			if ((msg.params as CdpEvents["Target.detachedFromTarget"]).sessionId === this.sessionId) {
+				this.abort(new ChromeError("Chrome closed the DevTools connection"));
+			}
+		} else if (msg.method && msg.sessionId === this.sessionId) {
+			for (const listener of this.listeners.get(msg.method) ?? []) {
+				listener(msg.params as never);
+			}
+		}
+	}
+	/** Opens a new page and directs every later call and event to it. */
+	async attachPage() {
+		const { targetId } = await this.send<{ targetId: string }>("Target.createTarget", {
+			url: "about:blank",
+		});
+		const { sessionId } = await this.send<{ sessionId: string }>("Target.attachToTarget", {
+			targetId,
+			flatten: true,
+		});
+		this.sessionId = sessionId;
+	}
+	/**
+	 * Fails every pending and later call and awaited event with `error`: for a caller whose own deadline has passed. The first
+	 * reason wins, so a later close does not replace it.
+	 */
+	abort(error: ChromeError) {
+		if (this.lost) {
+			return;
+		}
+		this.lost = error;
+		for (const fail of this.waiters) {
+			fail(error);
+		}
+		this.waiters.clear();
+	}
+	/** Runs `start` and waits for what it resolves through `ok`, failing on the deadline or a lost connection. */
+	private wait<T>(
+		message: string,
+		ms: number,
+		start: (ok: (value: T) => void, fail: (error: Error) => void) => () => void,
+	): Promise<T> {
+		if (this.lost) {
+			return Promise.reject(this.lost);
+		}
+		let fail: (error: Error) => void = () => undefined;
+		let stop: () => void = () => undefined;
+		const work = new Promise<T>((ok, failed) => {
+			fail = failed;
+			stop = start(ok, failed);
+		});
+		this.waiters.add(fail);
+		return within(work, ms, message).finally(() => {
+			this.waiters.delete(fail);
+			stop();
+		});
+	}
+	/**
+	 * Sends a command and waits at most `deadline` ms for its reply; `T` is the caller's description of the reply, which the protocol
+	 * does not let us check. A protocol error is a ChromeError naming the method.
+	 */
+	send<T = unknown>(method: string, params: object = {}, deadline = CALL_DEADLINE_MS): Promise<T> {
 		const id = ++this.id;
-		return new Promise((ok, fail) => {
-			this.pending.set(id, (r) =>
-				r.error ? fail(new Error(`${method}: ${r.error.message}`)) : ok(r.result as T),
-			);
-			this.ws.send(JSON.stringify({ id, method, params }));
-		});
+		return this.wait<T>(
+			`Chrome did not answer ${method} in ${seconds(deadline)}`,
+			deadline,
+			(ok, fail) => {
+				this.pending.set(id, (r) =>
+					r.error ? fail(new ChromeError(`${method}: ${r.error.message}`)) : ok(r.result as T),
+				);
+				const { sessionId } = this;
+				this.output.write(`${JSON.stringify({ id, method, params, sessionId })}\0`);
+				return () => this.pending.delete(id);
+			},
+		);
 	}
 	/** Evaluates `expression` in the page and returns its JSON value; throws with the page's error when the script throws. */
 	async evaluate<T>(expression: string, awaitPromise = false): Promise<T> {
@@ -122,23 +234,59 @@ export class Cdp {
 	on<E extends keyof CdpEvents>(event: E, fn: (params: CdpEvents[E]) => void) {
 		this.listeners.set(event, [...(this.listeners.get(event) ?? []), fn]);
 	}
-	once(event: keyof CdpEvents): Promise<void> {
-		return new Promise((ok) => this.on(event, () => ok()));
+	/** Resolves on the next `event`; `what` names it in the error when it does not come within `deadline` ms. */
+	once(event: keyof CdpEvents, what: string = event, deadline = CALL_DEADLINE_MS): Promise<void> {
+		return this.wait<void>(`${what} did not come in ${seconds(deadline)}`, deadline, (ok) => {
+			const listener = () => ok();
+			this.on(event, listener);
+			return () => this.off(event, listener);
+		});
+	}
+	private off(event: keyof CdpEvents, fn: () => void) {
+		this.listeners.set(
+			event,
+			(this.listeners.get(event) ?? []).filter((listener) => listener !== fn),
+		);
+	}
+	/**
+	 * Opens `url` in the page, or reloads it when `url` is undefined, and waits for its load event. Fails when Chrome refuses the
+	 * navigation, or the load event does not come within LOAD_DEADLINE_MS.
+	 */
+	async load(url?: string): Promise<void> {
+		const what = url ? `the load event of ${url}` : "the load event after a reload";
+		const loaded = this.once("Page.loadEventFired", what, LOAD_DEADLINE_MS);
+		// The navigation may fail first; the load wait then fails too, and must not surface as an unhandled rejection.
+		loaded.catch(() => undefined);
+		if (url) {
+			const { errorText } = await this.send<{ errorText?: string }>("Page.navigate", { url });
+			if (errorText) {
+				throw new ChromeError(`Chrome could not open ${url}: ${errorText}`);
+			}
+		} else {
+			await this.send("Page.reload");
+		}
+		await loaded;
 	}
 	close() {
-		this.ws.close();
+		this.output.end();
 	}
 }
 
+/** A running Chrome: the client attached to its page, and `stop`, which resolves once the process has exited. */
+interface Chrome {
+	cdp: Cdp;
+	stop: () => Promise<void>;
+}
+
 /**
- * Starts headless Chrome and resolves with its DevTools HTTP port.
+ * Starts headless Chrome and resolves once its page can be driven.
  *
  * Where Chrome cannot build its sandbox (Ubuntu 23.10+ restricts the user namespaces it needs,
  * and so do most containers), Chrome exits with "No usable sandbox"; the launch is then retried
  * once without it. The tradeoff is acceptable because Chrome only ever opens a local page: the
  * one being checked, or a build script's own.
  */
-async function launch(profile: string): Promise<{ port: number; stop: () => void }> {
+async function launch(profile: string): Promise<Chrome> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
 		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
@@ -153,16 +301,25 @@ async function launch(profile: string): Promise<{ port: number; stop: () => void
 	}
 }
 
-async function start(
-	bin: string,
-	profile: string,
-	extra: string[],
-): Promise<{ port: number; stop: () => void }> {
+/** The last line of Chrome's log that says something, for a one-line error. */
+const lastLine = (log: string) =>
+	log
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.at(-1) ?? "no output";
+
+/**
+ * Spawns Chrome and attaches to a new page over the debugging pipe. The pipe is also why Chrome cannot outlive this process:
+ * when it ends, however it ends (a test runner's or an agent's SIGKILL included), the pipe closes and Chrome exits, where a
+ * Chrome driven over a port kept running and spun a CPU core.
+ */
+async function start(bin: string, profile: string, extra: string[]): Promise<Chrome> {
 	const proc = spawn(
 		bin,
 		[
 			"--headless=new",
-			"--remote-debugging-port=0",
+			"--remote-debugging-pipe",
 			`--user-data-dir=${profile}`,
 			"--hide-scrollbars",
 			"--no-first-run",
@@ -176,60 +333,70 @@ async function start(
 		// Chrome still adds keychain items at launch despite --use-mock-keychain, and macOS shows a
 		// "Keychain Not Found" dialog when HOME has none (a sandboxed HOME, such as verify:install's).
 		// The account's own home always has its keychain; the profile stays in --user-data-dir.
-		{ stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, HOME: userInfo().homedir } },
+		{
+			stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"],
+			env: { ...process.env, HOME: userInfo().homedir },
+		},
 	);
-	const port = await new Promise<number>((ok, fail) => {
-		let log = "";
-		proc.stderr.on("data", (d) => {
-			log += d;
-			const m = log.match(/DevTools listening on ws:\/\/[^:]+:(\d+)/);
-			if (m) {
-				ok(Number(m[1]));
-			}
-		});
-		// The full log is searched: Chrome's stack trace pushes the sandbox line out of the tail.
-		proc.on("exit", () =>
-			fail(
-				log.includes("No usable sandbox")
-					? new SandboxUnavailable("Chrome has no usable sandbox")
-					: new ChromeError(`Chrome exited early:\n${log.slice(-400)}`),
-			),
-		);
+	let log = "";
+	proc.stderr?.on("data", (d) => {
+		log += d;
 	});
-	return { port, stop: () => proc.kill() };
-}
-
-/**
- * The DevTools URL of Chrome's first page. Chrome announces its port before it registers the page,
- * by about 200 ms on a slow Linux host, so the list is polled for up to five seconds.
- */
-async function firstPage(port: number): Promise<string> {
-	for (let tries = 0; tries < 50; tries++) {
-		const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then(
-			(r) => r.json() as Promise<Array<{ type: string; webSocketDebuggerUrl: string }>>,
-		);
-		const page = targets.find((t) => t.type === "page");
-		if (page) {
-			return page.webSocketDebuggerUrl;
+	// Registered at once, so an exit before `stop` (a crash, or a failed start) is not missed.
+	let stopping = false;
+	const exited = new Promise<void>((done) => proc.once("exit", () => done()));
+	const stop = async () => {
+		stopping = true;
+		proc.kill();
+	};
+	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes the sandbox line out of
+	// the tail.
+	const exitError = () =>
+		log.includes("No usable sandbox")
+			? new SandboxUnavailable("Chrome has no usable sandbox")
+			: new ChromeError(
+					`Chrome exited before it started (code ${proc.exitCode}): ${lastLine(log)}`,
+				);
+	const exitedEarly = exited.then(() => {
+		if (!stopping) {
+			throw exitError();
 		}
-		await settle(100);
+	});
+	const cdp = new Cdp(proc.stdio[4] as Readable, proc.stdio[3] as Writable);
+	try {
+		await within(
+			Promise.race([cdp.attachPage(), exitedEarly]),
+			START_DEADLINE_MS,
+			`Chrome did not start in ${seconds(START_DEADLINE_MS)}`,
+		);
+		return { cdp, stop };
+	} catch (error) {
+		// The closed pipe can be reported before the exit: an exit Chrome chose explains the failure better, and decides the
+		// sandbox retry.
+		const chose =
+			!stopping &&
+			(await within(exited, EXIT_NOTICE_MS, "").then(
+				() => true,
+				() => false,
+			));
+		await stop();
+		throw chose ? exitError() : error;
 	}
-	throw new ChromeError("Chrome opened no page to drive");
 }
 
 /** Runs `fn` against the page of a fresh headless Chrome; Chrome and its profile are always cleaned up. */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
-	const chrome = await launch(profile);
 	try {
-		const cdp = await Cdp.connect(await firstPage(chrome.port));
+		const chrome = await launch(profile);
 		try {
-			return await fn(cdp);
+			await chrome.cdp.send("Inspector.enable");
+			return await fn(chrome.cdp);
 		} finally {
-			cdp.close();
+			chrome.cdp.close();
+			await chrome.stop();
 		}
 	} finally {
-		chrome.stop();
 		rmSync(profile, { recursive: true, force: true });
 	}
 }

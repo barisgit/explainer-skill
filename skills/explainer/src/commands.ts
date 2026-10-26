@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
-import { check, kitReferences } from "./check.ts";
+import { check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
 import { authorTsconfig, kitLabels, kitPath, leadingComment, readKitText } from "./kit.ts";
 import { clientBundle, isClientModule } from "./mdx/bundle.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
@@ -319,15 +319,16 @@ export const COMMANDS: Record<string, Command> = {
 	},
 	check: {
 		summary:
-			"Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view and one PNG of an element per --do shot:<css>, into a fresh temp directory (printed) unless --out says where. Scrolls each page (and view) to its end and back before the full-page shots, so errors thrown by scroll handlers and IntersectionObserver callbacks are caught (at most 3 s per page). Reports first-screen info, errors, network requests, overflow and ids on more than one element as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts, sideways-scrolling containers and steppers whose steps change only their captions as warnings.",
+			"Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view and one PNG of an element per --do shot:<css>, into a fresh temp directory (printed) unless --out says where. Scrolls each page (and view) to its end and back before the full-page shots, so errors thrown by scroll handlers and IntersectionObserver callbacks are caught (at most 3 s per page). Reports first-screen info, errors, network requests, overflow and ids on more than one element as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts, sideways-scrolling containers and steppers whose steps change only their captions as warnings. When Chrome fails to start or stops answering, or the run passes --timeout, check prints one error line and exits 1 with no report.",
 		usage:
-			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--quick] [--tag <name>] [--out dir] [--json]",
+			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--quick] [--tag <name>] [--out dir] [--timeout <seconds>] [--json]",
 		flags: [
 			"--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a point; use it for chart marks\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, Backspace, or one character; arrows move a focused range by its step and a select by one option\n                   type:<css>=<text>    type over the first match's text key by key (a newline presses Enter), then leave it, so input and change fire; type:#q= clears it\n                   set:<css>=<value>    set a range, select, date or other field's value at once, then fire input and change\n                   shot:<css>           PNG of the first match's box as the page is at this step (@all: each match; @<n>: that one), per theme and size, listed in the report\n                   reload               reload the page, keeping what it saved for the reader (kit keep); each load otherwise starts with empty storage\n                   Attribute values may be unquoted: [value=0] works. The value of type: and set: starts after the first = outside [...].",
 			"--quick          light theme only, no first-viewport shots, no theme in PNG names (desktop.png, narrow.png); into --out (a temp directory without it)",
 			"--view <what>    choose drill-down views to capture. The report lists every view hash found (links and static views) and which were captured. Default: the first hash of each view name, at most 6 names. --view all = every hash found (one PNG set each: slower). A hash (repo/mobile) captures exactly the hashes given; repeatable. none = overview only. Hashes only a script navigates to are never found: pass them as --view name/param.",
 			"--tag <name>     add to the PNG names so states do not overwrite each other; with --quick too (kind-desktop.png)",
 			"--out <dir>      screenshot directory, created if missing (default: a new temp directory, printed in the report; nothing is written next to the file)",
+			`--timeout <s>    stop after this many seconds (default ${DEFAULT_TIMEOUT_SECONDS}): Chrome is stopped, nothing is reported, and the error says where the run was`,
 			"--json           machine-readable result on stdout",
 		],
 		examples: [
@@ -358,6 +359,11 @@ export const COMMANDS: Record<string, Command> = {
 			if (bad) {
 				return usage(bad);
 			}
+			const timeout = flags.get("--timeout")?.[0];
+			const timeoutSeconds = timeout === undefined ? DEFAULT_TIMEOUT_SECONDS : Number(timeout);
+			if (!(timeoutSeconds > 0)) {
+				return usage(`--timeout takes a number of seconds above 0, not "${timeout}"`);
+			}
 			const out = resolve(
 				flags.get("--out")?.[0] ?? mkdtempSync(join(tmpdir(), "explainer-check-")),
 			);
@@ -366,6 +372,7 @@ export const COMMANDS: Record<string, Command> = {
 				views: flags.get("--view") ?? [],
 				tag: flags.get("--tag")?.[0] ?? "",
 				quick: flags.has("--quick"),
+				timeoutSeconds,
 			});
 			const ok = shots.every((s) => !s.problems.length);
 			if (flags.has("--json")) {
