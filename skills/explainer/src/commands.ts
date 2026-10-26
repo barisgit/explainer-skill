@@ -43,7 +43,7 @@ Use the ids from prose and replies:
 Diagrams do not step. To walk through one, show it whole and give each step's text the data-ref of its parts.
 Keep ids short and meaningful: they are what you type here.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
-Phones: the diagram scales to the column, so a wide left-to-right chart gets tiny text; prefer top-down (flowchart TD) and few nodes. check warns under 9 px.`;
+Phones: a flowchart or state diagram too wide for the column also gets a copy laid out across its direction, shown instead; other diagrams shrink no further than readable text and then scroll sideways.`;
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {

@@ -1,6 +1,9 @@
 import { renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.js";
 
-/** A rendered diagram: one SVG that follows light and dark through the kit's tokens, and the data-ref ids of its parts. */
+/**
+ * A rendered diagram: its SVG, which follows light and dark through the kit's tokens, then for a wide flowchart or state diagram
+ * the copy phones show instead (see phoneLayout); and the data-ref ids of its parts, which both copies carry.
+ */
 export interface Diagram {
 	svg: string;
 	refs: string[];
@@ -8,6 +11,10 @@ export interface Diagram {
 
 /** The renderer sets node labels at 13 px; drawn 1.2 times larger they read like the page's 16 px text and Mermaid's labels. */
 const SCALE = 1.2;
+/** A diagram shrinks with its column until its smallest text is this size in px; in a narrower column it scrolls sideways. */
+const READABLE_PX = 10;
+/** The width a diagram block gives its SVG on a 390 px phone: the viewport less the page's and the block's 16 px insets. */
+const PHONE_COLUMN_PX = 326;
 
 /** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, `;` as a line break for flowcharts and states. */
 type Family = "flowchart" | "state" | "sequence" | "other";
@@ -220,11 +227,30 @@ const scopeRules = (css: string, id: string) =>
 		return `${before}\n  ${scoped.join(", ")} {`;
 	});
 
+/** The renderer's drawn width of `svg`, in px. */
+const drawnWidth = (svg: string) => Number(/^<svg [^>]*?width="([\d.]+)"/.exec(svg)?.[1]);
+
+/** The width at which the smallest text of `svg` (an attribute or stylesheet font size) shows at READABLE_PX; 0 with no text. */
+function readableWidth(svg: string): number {
+	const sizes = [...svg.matchAll(/font-size(?:="|:\s*)([\d.]+)/g)].map((m) => Number(m[1]));
+	return (drawnWidth(svg) * READABLE_PX) / Math.min(...sizes);
+}
+
+/**
+ * The width limits theme.css reads from a diagram's custom properties: at most SCALE times its drawn size, and at least the
+ * width that keeps its smallest text readable (never more than the most), below which its block scrolls sideways. Custom
+ * properties rather than an inline max-width, so one page rule on `.mermaid > svg` can still size it.
+ */
+function sizeStyle(svg: string): string {
+	const most = Math.ceil(drawnWidth(svg) * SCALE);
+	return `--mermaid-max: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px`;
+}
+
 /**
  * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide
  * `svg`/`text` rules; theme.css maps the renderer's variables instead), prefixes its ids so markers of two diagrams do not
  * clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the diagram shrink
- * to the column (at most SCALE times its size). Only attributes and stylesheets change: a label reads as written.
+ * with the column within sizeStyle's limits. Only attributes and stylesheets change: a label reads as written.
  */
 function inline(svg: string, id: string): string {
 	return editMarkup(svg.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, ""), {
@@ -236,9 +262,21 @@ function inline(svg: string, id: string): string {
 			),
 	}).replace(
 		/^<svg ([^>]*?)width="([\d.]+)" height="[\d.]+" style="[^"]*"/,
-		(_, attrs: string, width: string) =>
-			`<svg id="${id}" ${attrs}width="100%" style="max-width: ${Math.ceil(Number(width) * SCALE)}px"`,
+		(_, attrs: string) => `<svg id="${id}" ${attrs}width="100%" style="${sizeStyle(svg)}"`,
 	);
+}
+
+/**
+ * The copy of a flowchart or state diagram that phones show instead (theme.css): the source laid out across its direction (LR
+ * as top-down, TD as left to right), when the diagram would scroll sideways on a phone and the copy is narrower. Phones then
+ * read a left-to-right flow top-down, while wide screens keep the shorter left-to-right layout. Undefined otherwise.
+ */
+function phoneLayout(family: Family, svg: string, draw: (transpose: boolean) => string) {
+	if ((family !== "flowchart" && family !== "state") || readableWidth(svg) <= PHONE_COLUMN_PX) {
+		return undefined;
+	}
+	const across = draw(true);
+	return readableWidth(across) < readableWidth(svg) ? across : undefined;
 }
 
 /** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */
@@ -253,15 +291,25 @@ function renderOne(source: string, n: number): Diagram {
 
 	// Mermaid reads ";" as a line break in flowcharts and state diagrams; elsewhere it can be message or label text.
 	const text = family === "flowchart" || family === "state" ? statements : body;
-	const raw = renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist" });
-	const svg = annotateParts(inline(raw, `mm${n}`));
-	return { svg, refs: [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? "") };
+	const draw = (transpose: boolean) =>
+		renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist", transpose });
+	const raw = draw(false);
+	const phone = phoneLayout(family, raw, draw);
+	const svg =
+		annotateParts(inline(raw, `mm${n}`)) +
+		(phone
+			? annotateParts(inline(phone, `mm${n}-phone`)).replace(/^<svg /, "<svg data-phone ")
+			: "");
+	return {
+		svg,
+		refs: [...new Set([...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""))],
+	};
 }
 
 /**
- * Renders one Mermaid source to one inline SVG, with no browser: beautiful-mermaid parses and lays it out (ELK) in this process,
- * estimating text widths. `n`, the block's place on the page, keeps its ids apart from the other diagrams. A source that fails,
- * or whose type is not supported, returns an Error whose message tells the author what to write instead.
+ * Renders one Mermaid source to one inline SVG, plus a phone copy for a wide flowchart or state diagram (phoneLayout), with no
+ * browser: beautiful-mermaid parses and lays it out (ELK) in this process, estimating text widths. `n`, the block's place on the
+ * page, keeps its ids apart from the other diagrams. A source that fails, or whose type is not supported, returns an Error whose message tells the author what to write instead.
  * Every part carries the data-ref of its Mermaid id (see annotateParts), and colours come from the kit's tokens (theme.css).
  */
 export function renderMermaid(source: string, n = 0): Diagram | Error {

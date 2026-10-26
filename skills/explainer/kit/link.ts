@@ -5,7 +5,8 @@
      a ```mermaid fence                                                       pack gives every diagram part the data-ref of its Mermaid id
    A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
    too), so the parts of one diagram never link each other; the light and dark copies pack makes of an SVG file in <img> count
-   once; any other element is a place of its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
+   once, as do a diagram and the copy pack lays out for phones; any other element is a place of its own. A prose term and a
+   diagram part link, as do two diagrams sharing a node id.
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
@@ -41,11 +42,15 @@
 		return svg;
 	}
 
-	/** The place an element sits in: its outermost SVG, or the element itself. pack's dark copy of an SVG file sits with its light copy. */
+	/**
+	 * The place an element sits in: its outermost SVG, or the element itself. pack's dark copy of an SVG file sits with its light
+	 * copy, and a diagram's phone copy (svg[data-phone]) with the diagram before it.
+	 */
 	function placeOf(el: Part): Element {
 		const svg = outermostSvg(el);
 		if (svg) {
-			return svg;
+			const twin = svg.previousElementSibling;
+			return svg.matches("svg[data-phone]") && twin instanceof SVGSVGElement ? twin : svg;
 		}
 		const twin = el.previousElementSibling;
 		return el.matches("img.dark") && twin?.matches("img.light") ? twin : el;

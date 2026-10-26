@@ -150,9 +150,25 @@
 	--_key-badge: var(--sunken);
 	font-family: var(--font);
 	overflow: visible;
+	/* pack sets both on the svg: 1.2 times the drawn size at most, and at least the width that keeps its smallest text at 10 px,
+	   below which the block scrolls sideways. */
+	max-width: var(--mermaid-max);
+	min-width: var(--mermaid-min);
 }
 .mermaid > svg .mono {
 	font-family: var(--mono);
+}
+/* A flowchart or state diagram too wide for a phone comes with a copy laid out across it (svg[data-phone]), shown on phones in
+   its place. */
+@media (width >= 40rem) {
+	.mermaid > svg[data-phone] {
+		display: none;
+	}
+}
+@media (width < 40rem) {
+	.mermaid:has(> svg[data-phone]) > svg:not([data-phone]) {
+		display: none;
+	}
 }
 /* pack inlines an svg file in <img> once per scheme; the copy shown follows the system scheme unless <html data-scheme> forces one
    (light-dark() cannot switch display). Only the other copy is hidden, so the page's own display rule for the <img> stays. */

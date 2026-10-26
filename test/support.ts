@@ -350,14 +350,17 @@ export function inPage<T>(
 	});
 }
 
-/** The rendered diagram's SVG, failing the test when the source does not render. */
-export function svgOf(source: string): string {
+/** The rendered diagram's SVGs: the one wide screens show, then any phone copy; fails the test when the source does not render. */
+export function copiesOf(source: string): string[] {
 	const diagram = renderMermaid(source);
 	if (diagram instanceof Error) {
 		throw diagram;
 	}
-	return diagram.svg;
+	return diagram.svg.split(/(?=<svg )/);
 }
+
+/** The rendered diagram's SVG as wide screens show it, failing the test when the source does not render. */
+export const svgOf = (source: string): string => copiesOf(source)[0] ?? "";
 
 /** The message a source fails with, or "rendered". */
 export function failureOf(source: string): string {

@@ -1,7 +1,16 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
-import { failureOf, packHtml, runCli, scratch, svgOf } from "./support.ts";
+import {
+	copiesOf,
+	failureOf,
+	packAndRun,
+	packHtml,
+	pageContract,
+	runCli,
+	scratch,
+	svgOf,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -343,3 +352,59 @@ test("<br> in a fence label breaks the line, as in Mermaid", async () => {
 	expect(html).not.toContain("onetwo");
 	expect(html).not.toMatch(/<br\s*\/?>/);
 });
+
+const PIPELINE = `flowchart LR
+	src["Raw readings"] --> clean["Drop outliers"]
+	clean --> resample["Resample to 1 min"]
+	resample --> fill{"Gaps?"}
+	fill -->|"short"| interp["Interpolate"]
+	fill -->|"long"| flag["Flag as missing"]
+	interp --> store[("Store")]
+	flag --> store`;
+
+const SEQUENCE = `sequenceDiagram
+	participant B as Browser
+	participant S as Server
+	participant C as Cache
+	participant D as Database
+	B->>S: GET /report
+	S->>C: lookup report
+	C-->>S: miss
+	S->>D: query rows
+	D-->>S: rows
+	S-->>B: 200 OK`;
+
+test("a flowchart too wide for a phone carries a top-down copy with its own ids and the same parts; one that fits does not", () => {
+	const [wide = "", phone = ""] = copiesOf(PIPELINE);
+	const refs = (svg: string) => [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1]).sort();
+	const height = (svg: string) => Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)?.[1]);
+
+	expect(phone).toStartWith('<svg data-phone id="mm0-phone"');
+	expect(phone.match(/ id="[^"]+"/g)?.every((id) => id.startsWith(' id="mm0-phone'))).toBe(true);
+	expect(refs(phone)).toEqual(refs(wide));
+	expect(height(phone)).toBeGreaterThan(2 * height(wide));
+	expect(copiesOf("flowchart LR\n  a[Input] --> b[Output]")).toHaveLength(1);
+	expect(copiesOf(SEQUENCE)).toHaveLength(1);
+});
+
+test("on a phone a wide flowchart shows its top-down copy, and a wide sequence keeps 10 px text and scrolls sideways", async () => {
+	const body = `<pre class="mermaid" id="flow">${PIPELINE}</pre>\n<pre class="mermaid" id="seq">${SEQUENCE}</pre>`;
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main>${body}</main><script src="kit:link.js"></script><script>${pageContract(
+		{
+			"the phone copy shows on phones only, in the diagram's place": `(() => {
+			const phone = innerWidth < 640;
+			const [wide, copy] = document.querySelectorAll("#flow > svg");
+			const shows = (svg) => getComputedStyle(svg).display !== "none";
+			return copy.matches("[data-phone]") && shows(copy) === phone && shows(wide) === !phone;
+		})()`,
+			"no shown diagram text is under 10 px": `[...document.querySelectorAll(".mermaid > svg")]
+			.filter((svg) => getComputedStyle(svg).display !== "none")
+			.every((svg) => [...svg.querySelectorAll("text")].every((t) => parseFloat(getComputedStyle(t).fontSize) * svg.getScreenCTM().a > 9.99))`,
+			"the sequence scrolls sideways on phones only": `(innerWidth < 640) === (document.querySelector("#seq").scrollWidth > document.querySelector("#seq").clientWidth + 1)`,
+			"a diagram and its phone copy do not link each other's parts": `!document.querySelector(".is-linked")`,
+		},
+	)}</script></body></html>`;
+
+	expect(await packAndRun(dir, "phone", page)).toEqual([]);
+}, 30_000);

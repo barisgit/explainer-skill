@@ -10,6 +10,8 @@ export interface RenderOptions {
 	layerSpacing?: number;
 	/** No background on the root svg. Default false. */
 	transparent?: boolean;
+	/** Lay a flowchart or state diagram out across its written direction (TD as LR, LR as TB; subgraph overrides stay). Default false. */
+	transpose?: boolean;
 }
 
 /** Thrown by every parser for input it does not consume: `unread` is the part left over, `line` the statement it is in. */
