@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { type Cdp, withPage } from "../skills/explainer/src/chrome.ts";
-import { load, packedMdx, packMdx, runCli, scratch } from "./support.ts";
+import { FRAMES, load, packedMdx, packMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -139,7 +139,10 @@ const SHOWN = `(() => {
 	return { view: copy.outerHTML, rail: document.querySelector(".toc").outerHTML, focused: document.activeElement.outerHTML };
 })()`;
 
-/** SHOWN for each hash, each opened fresh (a reload on the hash), then reached by its previous/next link. */
+/**
+ * SHOWN for each hash, each opened fresh (a reload on the hash), then reached by its previous/next link: views.js routes on the
+ * hashchange the click queues, and its rail marks the current item a frame later.
+ */
 async function shownAt(output: string, hashes: string[]) {
 	return inChrome(async (cdp) => {
 		const seen: unknown[] = [];
@@ -149,7 +152,11 @@ async function shownAt(output: string, hashes: string[]) {
 			seen.push(await cdp.evaluate(SHOWN));
 			seen.push(
 				await cdp.evaluate(
-					`(document.querySelector(".view.active [rel=next]") ?? document.querySelector(".view.active [rel=prev]")).click(), ${SHOWN}`,
+					`new Promise((routed) => {
+						addEventListener("hashchange", routed, { once: true });
+						(document.querySelector(".view.active [rel=next]") ?? document.querySelector(".view.active [rel=prev]")).click();
+					}).then(() => ${FRAMES}).then(() => ${SHOWN})`,
+					true,
 				),
 			);
 		}
