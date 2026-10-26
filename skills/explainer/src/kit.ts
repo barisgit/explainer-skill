@@ -75,8 +75,9 @@ export function kitLabels(): { file: string; labels: Record<string, string> }[] 
 
 /**
  * A tsconfig for the author's page directory `dir` that checks `sources` (the files the pages import, see mdx/sources.ts) and what
- * they import, as browser code: `kit`, Preact and ECharts resolve to this skill's components and vendored declarations, so
- * `bun check` needs no install. Nothing else beside the page (a Bun script, a scratch file) is checked.
+ * they import, as browser code: `kit`, Preact, ECharts and TanStack Table (which the records core uses) resolve to this skill's
+ * components and vendored declarations, so `bun check` needs no install. Nothing else beside the page (a Bun script, a scratch
+ * file) is checked.
  */
 export function authorTsconfig(dir: string, sources: string[]): string {
 	const types = join(SKILL_ROOT, "vendor/types");
@@ -100,6 +101,9 @@ export function authorTsconfig(dir: string, sources: string[]): string {
 					"preact/*": [join(types, "preact/*/src/index.d.ts")],
 					"preact-render-to-string": [join(types, "preact-render-to-string/dist/index.d.ts")],
 					echarts: [join(types, "echarts/types/dist/echarts.d.ts")],
+					"@tanstack/table-core": [join(types, "@tanstack/table-core/dist/index.d.ts")],
+					"@tanstack/table-core/*": [join(types, "@tanstack/table-core/dist/*.d.ts")],
+					"@tanstack/store": [join(types, "@tanstack/store/dist/index.d.ts")],
 				},
 			},
 			files: [join(types, "globals.d.ts"), ...sources.map((file) => relative(dir, file))],

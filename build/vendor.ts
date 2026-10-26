@@ -7,7 +7,7 @@
  *   vendor/mdx.js                 the MDX compiler with remark-gfm and remark-frontmatter, one ES module; used by `pack` for .mdx pages, never inlined
  *   vendor/preact/*.js            Preact, its hooks and JSX runtime, and preact-render-to-string, as ES modules that import "preact";
  *                                 pack bundles them into a page's prerender and its client components
- *   vendor/types/                Preact, ECharts and kit declarations for author typechecking
+ *   vendor/types/                Preact, ECharts, TanStack Table and kit declarations for author typechecking
  *   vendor/table-core.js          the TanStack Table parts the records core uses (build/table-core-entry.ts), one ES module,
  *                                 with vendor/table-core.d.ts naming the same exports
  *   kit/licenses/*.txt            licence texts the bundles must carry
@@ -143,6 +143,18 @@ for (const file of declarations) {
 	copyFileSync(nm(file), out);
 }
 copyFileSync(join(root, "kit-types/globals.d.ts"), join(skill, "vendor/types/globals.d.ts"));
+// The records core reaches TanStack through vendor/table-core.d.ts, so an author's typecheck of a page with Records needs these
+// packages' declarations too: every .d.ts of their dist, since they import one another by relative path.
+for (const pkg of ["@tanstack/table-core", "@tanstack/store"]) {
+	const out = join(skill, "vendor/types", pkg);
+	rmSync(out, { recursive: true, force: true });
+	for (const file of readdirSync(nm(pkg, "dist"), { recursive: true, encoding: "utf8" })) {
+		if (file.endsWith(".d.ts")) {
+			mkdirSync(join(out, "dist", file, ".."), { recursive: true });
+			copyFileSync(nm(pkg, "dist", file), join(out, "dist", file));
+		}
+	}
+}
 
 const [table, store] = await Promise.all(
 	["@tanstack/table-core", "@tanstack/store"].map(versionOf),
