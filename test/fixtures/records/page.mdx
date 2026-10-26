@@ -1,0 +1,22 @@
+---
+title: RC-2 plan
+---
+import { Records, View } from "kit";
+import plan from "../t6-plan.json";
+import { Item } from "./item.tsx";
+
+# RC-2 takes *3,116 hours* over three phases, a third of them in Phase 1.
+
+The fictional RC-2 roaster plan: 96 work items in three phases, each with an owner, a likely and a high estimate, and its labour at the team's rates.
+
+## Every work item, by phase and package
+
+Petra Saldana carries the most items; <a href="#plan?f.owner=JV">Jonas Vireo's work</a> is mostly firmware, and <a href="#plan?view=table&sort=-labour">the costliest items</a> are hardware.
+
+<Records {...plan} />
+
+## Who owns what
+
+<Records id="owners" data={plan.data} idField="id" fields={plan.fields} columns={["id", "title", "likely"]} groupBy={["owner"]} detail="rationale" refField="owner" />
+
+<View name="item" records={plan.data} render={Item} back="Plan" />
