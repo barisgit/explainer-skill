@@ -1,7 +1,7 @@
 /**
- * The records core at its interface: config in, view model and hash out. The fixture is artifact-lab's fictional RC-2 plan
- * (tasks/sources/t6-plan: estimates.csv joined with the rates of price-model.md, the 96 base items without the options), whose
- * source order is not phase order: the WP0 project-management items of all three phases come first.
+ * The records core at its interface: config in, view model and hash out. The fixture is the fictional 96-item RC-2 plan
+ * (fixtures/t6-plan.json), whose source order is not phase order: the WP0 project-management items of all three phases come
+ * first.
  */
 import { expect, test } from "bun:test";
 import {
