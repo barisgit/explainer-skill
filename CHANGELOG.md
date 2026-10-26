@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Mermaid diagrams stay readable on phones. A flowchart or state diagram too wide for a phone gets a second layout across its direction (left to right becomes top-down), shown below 40rem, so left to right is fine to write. Other diagrams shrink until their smallest text is 10 px, then scroll sideways.
+- A diagram's width limits are the custom properties `--mermaid-max` and `--mermaid-min` on its `svg`, so one page rule can change them.
+- A circle node with a short label is about the size of a box node, not a large disc.
+- Flowcharts turn back only the edges of a real cycle. An input written after the node it feeds now sits before that node, instead of being looped around it.
+- `check`'s warning about tiny SVG text names the fix: drop the page rule that squeezes a diagram, or for a hand-built SVG, redraw it about 360 wide or hold it at the `min-width` it gives inside a `.scroll` block.
+
 ## v0.9.0
 
 Pages are MDX. An agent writes `page.mdx`: Markdown prose, the kit's components, and the `.ts` or `.json` data and `.css` it imports. `pack` renders it once to static HTML with Preact and ships code only for client components. Packed v0.8 files still open offline, and `check` still takes them.
