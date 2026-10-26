@@ -1,8 +1,9 @@
 /**
  * What the reader has chosen in one records block, and its form in the URL hash.
  *
- * The hash form is `<block id>?<params>`, such as `plan?view=table&sort=-labour&q=power&f.owner=JV,PS&open=1,1.wp1`, and only
- * the params that differ from the defaults are written; the defaults alone are just `plan`. It lives beside the kit's views
+ * The hash form is `<block id>?<params>`, such as `plan?view=table&sort=-labour&q=power&f.owner=JV,PS&open=1,1.wp1&detail=WP1-02`
+ * (`open=*` and `detail=*` for all), and only the params that differ from the defaults are written; the defaults alone are
+ * just `plan`. It lives beside the kit's views
  * router (kit/views.ts) without clashing: a block id has no `/`, so no `#name/param` route claims it, and no element has the id
  * `plan?...`, so the router shows the overview, where the block is. An item's own view (`#item/WP1-02`) replaces the block's
  * hash, and Back returns to it. One block's state at a time lives in the hash: a hash that names another block, or none,
@@ -27,6 +28,8 @@ export interface RecordsState {
 	search: string;
 	/** Ids of the tree's open groups. */
 	open: readonly string[];
+	/** Ids of the records whose detail (config `detail`) is open, in every view. */
+	details: readonly string[];
 }
 
 /** What a block allows, which a state is checked against. */
@@ -43,11 +46,26 @@ export interface StateRules {
 	facets: Readonly<Record<string, readonly string[]>>;
 	/** Every group id of the tree, in tree order. */
 	groups: readonly string[];
+	/** The ids of the records that have a detail, in source order. */
+	details: readonly string[];
 }
 
 /** The state a block opens with. */
 export function initialState(rules: StateRules): RecordsState {
-	return { view: rules.views[0] ?? "table", sort: rules.sort, filters: {}, search: "", open: [] };
+	return {
+		view: rules.views[0] ?? "table",
+		sort: rules.sort,
+		filters: {},
+		search: "",
+		open: [],
+		details: [],
+	};
+}
+
+/** The ids of `all` that `chosen` holds, in the order of `all`. */
+function kept(all: readonly string[], chosen: readonly string[]): readonly string[] {
+	const set = new Set(chosen);
+	return all.filter((id) => set.has(id));
 }
 
 const sameSort = (a: SortState | null, b: SortState | null) =>
@@ -55,7 +73,7 @@ const sameSort = (a: SortState | null, b: SortState | null) =>
 
 /**
  * The state with everything the block does not allow dropped: an unknown view or sort field falls back to the default, unknown
- * facets, values and groups are left out, and selections and open groups follow the block's own order.
+ * facets, values, groups and details are left out, and selections and open folds follow the block's own order.
  */
 export function normalize(rules: StateRules, state: RecordsState): RecordsState {
 	const filters: Record<string, readonly string[]> = {};
@@ -71,7 +89,8 @@ export function normalize(rules: StateRules, state: RecordsState): RecordsState 
 		sort: sortOk ? state.sort : rules.sort,
 		filters,
 		search: rules.searchable ? state.search : "",
-		open: rules.groups.filter((id) => state.open.includes(id)),
+		open: kept(rules.groups, state.open),
+		details: kept(rules.details, state.details),
 	};
 }
 
@@ -87,6 +106,23 @@ function decode(text: string): string {
 }
 
 const decodeList = (text: string) => (text ? text.split(",").map(decode) : []);
+
+/** The open folds' params: each names the state's ids, which `*` writes when every one of the block's is open. */
+const FOLDS = [
+	{ param: "open", key: "open", all: "groups" },
+	{ param: "detail", key: "details", all: "details" },
+] as const;
+
+/** The `open` and `detail` params of a normalized state. */
+function foldParams(rules: StateRules, s: RecordsState): string[] {
+	return FOLDS.flatMap(({ param, key, all }) => {
+		const ids = s[key];
+		if (!ids.length) {
+			return [];
+		}
+		return [`${param}=${ids.length === rules[all].length ? "*" : encode(ids)}`];
+	});
+}
 
 /** The hash for a state, without the `#`: the block id, then the params that differ from the defaults in a fixed order. */
 export function writeHash(rules: StateRules, state: RecordsState): string {
@@ -106,9 +142,7 @@ export function writeHash(rules: StateRules, state: RecordsState): string {
 	for (const [field, values] of Object.entries(s.filters)) {
 		params.push(`f.${encodeURIComponent(field)}=${encode(values)}`);
 	}
-	if (s.open.length) {
-		params.push(`open=${s.open.length === rules.groups.length ? "*" : encode(s.open)}`);
-	}
+	params.push(...foldParams(rules, s));
 	return params.length ? `${rules.id}?${params.join("&")}` : rules.id;
 }
 
@@ -132,8 +166,9 @@ function readParam(
 	if (key === "q") {
 		return { ...state, search: decode(value) };
 	}
-	if (key === "open") {
-		return { ...state, open: value === "*" ? rules.groups : decodeList(value) };
+	const fold = FOLDS.find((f) => f.param === key);
+	if (fold) {
+		return { ...state, [fold.key]: value === "*" ? rules[fold.all] : decodeList(value) };
 	}
 	if (key.startsWith("f.")) {
 		return { ...state, filters: { ...state.filters, [decode(key.slice(2))]: decodeList(value) } };

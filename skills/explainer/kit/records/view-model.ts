@@ -48,8 +48,10 @@ export interface ItemRow {
 	id: string;
 	/** The item's own view (`#item/WP1-02`), when the config has a link. */
 	href?: string;
-	/** The text the row opens to in place (config `detail`); absent when the record has none. */
+	/** The text the row opens to in place (config `detail`), in every view; absent when the record has none. */
 	detail?: string;
+	/** Whether the detail is shown open (state `details`); false without one. */
+	open: boolean;
 	/** The row's data-ref (config `refField`). */
 	ref?: string;
 	cells: readonly Cell[];
@@ -93,6 +95,9 @@ export interface TreeView {
 	groups: readonly GroupRow[];
 	/** The label, then the sums over every record. */
 	total: readonly Cell[];
+	/** Every group and every detail is shown open: Expand all then reads Collapse all. */
+	expanded: boolean;
+	/** The states with every group and detail open, and with all of them closed. */
 	expandAll: RecordsState;
 	collapseAll: RecordsState;
 }

@@ -1,7 +1,7 @@
 /* Records' markup (see ../records.tsx): one pure render of a view model from kit/records, shared by the static block and the
    client island, so pack's prerender and the island's first render are the same markup. Without `actions` it renders no
    controls and no handlers: the static block. */
-import type { JSX, Ref } from "preact";
+import type { ComponentChildren, JSX, Ref } from "preact";
 import type {
 	BoardView,
 	Cell,
@@ -21,7 +21,9 @@ export interface RecordsActions {
 	go(next: RecordsState): void;
 	search(text: string): void;
 	/** A group fold was opened or closed by the reader (or by the page), with its open state now. */
-	toggled(group: string, open: boolean): void;
+	groupToggled(group: string, open: boolean): void;
+	/** A record's detail was opened or closed, with its open state now. */
+	detailToggled(id: string, open: boolean): void;
 }
 
 interface Context {
@@ -110,16 +112,49 @@ function TreeItem({ row, ctx }: { row: ItemRow; ctx: Context }) {
 	}
 	if (row.detail) {
 		return (
-			<details class={miss}>
-				<summary data-ref={row.ref}>{cells}</summary>
-				<p>{row.detail}</p>
-			</details>
+			<Detail row={row} ctx={ctx} summaryRef={row.ref} class={miss}>
+				{cells}
+			</Detail>
 		);
 	}
 	return (
 		<div class={miss ? `tree-row ${miss}` : "tree-row"} data-ref={row.ref}>
 			{cells}
 		</div>
+	);
+}
+
+/**
+ * A row's detail as a native disclosure, the same in the tree, a table's first cell and a card: `children` is its summary, and
+ * the island keeps whether it is open in the state, so it stays open across views and Expand all reaches it.
+ */
+function Detail({
+	row,
+	ctx,
+	summaryRef,
+	class: className,
+	children,
+}: {
+	row: ItemRow;
+	ctx: Context;
+	/** The data-ref for the summary, in the tree, where the summary is the row; a table row or card carries its own. */
+	summaryRef?: string | undefined;
+	class?: string | undefined;
+	children: ComponentChildren;
+}) {
+	const { actions } = ctx;
+	return (
+		<details
+			class={className}
+			open={row.open}
+			onToggle={
+				actions &&
+				((event) => actions.detailToggled(row.id, (event.currentTarget as HTMLDetailsElement).open))
+			}
+		>
+			<summary data-ref={summaryRef}>{children}</summary>
+			<p>{row.detail}</p>
+		</details>
 	);
 }
 
@@ -138,7 +173,8 @@ function TreeGroup({ group, ctx }: { group: GroupRow; ctx: Context }) {
 			class={missed(ctx, group.matches > 0)}
 			onToggle={
 				actions &&
-				((event) => actions.toggled(group.id, (event.currentTarget as HTMLDetailsElement).open))
+				((event) =>
+					actions.groupToggled(group.id, (event.currentTarget as HTMLDetailsElement).open))
 			}
 		>
 			<summary>{rowCells(group.cells, ctx, label)}</summary>
@@ -217,7 +253,9 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 								const text = cellText(cell);
 								return i === 0 ? (
 									<th key={cell.field} class={first && num(first)} scope="row">
-										{row.href ? <a href={row.href}>{text}</a> : text}
+										<RowLabel row={row} ctx={ctx}>
+											{text}
+										</RowLabel>
 									</th>
 								) : (
 									<td key={cell.field} class={column && num(column)} data-label={column?.label}>
@@ -271,11 +309,38 @@ function Values({ cells, columns }: { cells: readonly Cell[]; columns: readonly 
 	);
 }
 
-function Card({ row, columns, lead }: { row: ItemRow; columns: readonly Column[]; lead: number }) {
-	const label = labelOf(row.cells, lead);
+/** A table row's or card's label: a link to the record's view, the summary of its detail, or plain text. */
+function RowLabel({
+	row,
+	ctx,
+	children,
+}: {
+	row: ItemRow;
+	ctx: Context;
+	children: ComponentChildren;
+}) {
+	if (row.href) {
+		return <a href={row.href}>{children}</a>;
+	}
+	return row.detail ? (
+		<Detail row={row} ctx={ctx}>
+			{children}
+		</Detail>
+	) : (
+		children
+	);
+}
+
+function Card({ row, columns, ctx }: { row: ItemRow; columns: readonly Column[]; ctx: Context }) {
+	const { lead } = ctx;
+	const label = (
+		<RowLabel row={row} ctx={ctx}>
+			{labelOf(row.cells, lead)}
+		</RowLabel>
+	);
 	return (
 		<li data-ref={row.ref}>
-			<p>{row.href ? <a href={row.href}>{label}</a> : label}</p>
+			{row.detail && !row.href ? label : <p>{label}</p>}
 			<Values cells={row.cells.slice(lead)} columns={columns.slice(lead)} />
 		</li>
 	);
@@ -308,7 +373,7 @@ function Board({ body, ctx }: { body: BoardView; ctx: Context }) {
 					</div>
 					<ul>
 						{lane.items.map((row) => (
-							<Card key={row.id} row={row} columns={body.columns} lead={ctx.lead} />
+							<Card key={row.id} row={row} columns={body.columns} ctx={ctx} />
 						))}
 					</ul>
 				</div>
@@ -316,10 +381,6 @@ function Board({ body, ctx }: { body: BoardView; ctx: Context }) {
 		</div>
 	);
 }
-
-/** Every group of the tree is open: Expand all then reads Collapse all. */
-const allOpen = (groups: readonly GroupRow[]): boolean =>
-	groups.every((g) => g.open && allOpen(g.children.filter((c) => c.kind === "group")));
 
 function Toolbar({
 	vm,
@@ -331,7 +392,7 @@ function Toolbar({
 	live: boolean;
 }) {
 	const { texts, body } = vm;
-	const expanded = body.kind === "tree" && allOpen(body.groups);
+	const expanded = body.kind === "tree" && body.expanded;
 	return (
 		<div class="toolbar" hidden={!live}>
 			{vm.views.length > 1 && (

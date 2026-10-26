@@ -13,7 +13,7 @@
      search    the fields a search box looks in
      facets    category or text fields to filter by: a button per value with its count
      link      a filled View's name: each row links to #<link>/<id>, and the view's previous/next go through the rows shown
-     detail    a text field a row opens to in place (instead of link)
+     detail    a text field a row opens to in place in every view (instead of link); Expand all opens these too
      refField  a field whose value is the row's data-ref (kit link)
    A field with sum: true adds subtotals to groups and lanes, and a total, shown as ≥ when records without a value leave them
    out, or ? when none has one. The view, sort, search and filters go in the URL hash, so a link opens what the reader saw,

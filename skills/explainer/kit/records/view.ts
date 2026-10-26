@@ -1,6 +1,6 @@
 /** Builds the view model of one state from a block's model: the parts every view shares, then the body of the view shown. */
 import type { ViewKind } from "./config.ts";
-import { type Item, type Narrowing, readValue, type Sum } from "./engine.ts";
+import { type Item, type Narrowing, type Sum, valueText } from "./engine.ts";
 import { slug } from "./ids.ts";
 import type { Model, TreeNode } from "./model.ts";
 import { normalize, type RecordsState, writeHash } from "./state.ts";
@@ -76,12 +76,17 @@ function summaryCells(
 	);
 }
 
-/** A field's value as text, for `detail` and `refField`: empty when the record holds none. */
-function textOf(item: Item, field: string | undefined): string {
-	return field === undefined ? "" : String(readValue(item.record, field) ?? "");
-}
+/** A field's value as text, for `detail` and `refField`: empty when the config names no field or the record holds none. */
+const textOf = (item: Item, field: string | undefined) =>
+	field === undefined ? "" : valueText(item.record, field);
 
-function itemRow(model: Model, item: Item, columns: readonly Column[], match: boolean): ItemRow {
+function itemRow(
+	model: Model,
+	state: RecordsState,
+	item: Item,
+	columns: readonly Column[],
+	match: boolean,
+): ItemRow {
 	const { link } = model.config;
 	const detail = textOf(item, model.config.detail);
 	const ref = textOf(item, model.config.refField);
@@ -90,6 +95,7 @@ function itemRow(model: Model, item: Item, columns: readonly Column[], match: bo
 		id: item.id,
 		...(link ? { href: `#${link}/${encodeURIComponent(item.id)}` } : {}),
 		...(detail ? { detail } : {}),
+		open: detail !== "" && state.details.includes(item.id),
 		...(ref ? { ref } : {}),
 		cells: columns.map((c) => model.cell(item, c.field)),
 		match,
@@ -109,7 +115,9 @@ function groupRow(node: TreeNode, input: TreeInput): GroupRow {
 	const { model, texts, state, columns, matched } = input;
 	const children = node.groups.length
 		? node.groups.map((g) => groupRow(g, input))
-		: node.items.map((item) => itemRow(model, item, columns, !matched || matched.has(item.id)));
+		: node.items.map((item) =>
+				itemRow(model, state, item, columns, !matched || matched.has(item.id)),
+			);
 	const matches = children.reduce(
 		(n, child) => n + (child.kind === "group" ? child.matches : Number(child.match)),
 		0,
@@ -137,6 +145,12 @@ function groupRow(node: TreeNode, input: TreeInput): GroupRow {
 	};
 }
 
+/** Every group and every detail below them is shown open. */
+const allOpen = (rows: readonly (GroupRow | ItemRow)[]): boolean =>
+	rows.every((row) =>
+		row.kind === "group" ? row.open && allOpen(row.children) : !row.detail || row.open,
+	);
+
 function treeView(
 	model: Model,
 	state: RecordsState,
@@ -148,13 +162,15 @@ function treeView(
 		.filter((f) => !model.config.groupBy.includes(f))
 		.map((field) => column(model, field));
 	const input: TreeInput = { model, texts, state, columns, matched };
+	const groups = model.tree.map((node) => groupRow(node, input));
 	return {
 		kind: "tree",
 		columns,
-		groups: model.tree.map((node) => groupRow(node, input)),
+		groups,
 		total: summaryCells(model, columns, texts.total, model.totals, texts),
-		expandAll: { ...state, open: model.rules.groups },
-		collapseAll: { ...state, open: [] },
+		expanded: allOpen(groups),
+		expandAll: { ...state, open: model.rules.groups, details: model.rules.details },
+		collapseAll: { ...state, open: [], details: [] },
 	};
 }
 
@@ -185,12 +201,17 @@ function tableView(
 	return {
 		kind: "table",
 		columns: headers,
-		rows: items.map((item) => itemRow(model, item, columns, true)),
+		rows: items.map((item) => itemRow(model, state, item, columns, true)),
 		total: summaryCells(model, columns, texts.total, sums, texts),
 	};
 }
 
-function boardView(model: Model, narrowing: Narrowing, texts: ViewTexts): BoardView {
+function boardView(
+	model: Model,
+	state: RecordsState,
+	narrowing: Narrowing,
+	texts: ViewTexts,
+): BoardView {
 	const field = model.config.groupBy[0] ?? "";
 	// The lane shows the first groupBy field, so the cards leave out only that one.
 	const columns = model.config.columns.filter((f) => f !== field).map((f) => column(model, f));
@@ -214,7 +235,7 @@ function boardView(model: Model, narrowing: Narrowing, texts: ViewTexts): BoardV
 			count: group?.items.length ?? 0,
 			countText: model.count(group?.items.length ?? 0),
 			cells: summaryCells(model, columns, title, group?.sums ?? {}, texts),
-			items: (group?.items ?? []).map((item) => itemRow(model, item, columns, true)),
+			items: (group?.items ?? []).map((item) => itemRow(model, state, item, columns, true)),
 		};
 	});
 	return { kind: "board", field, label: def?.label ?? field, columns, lanes };
@@ -269,7 +290,7 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 		state.view === "tree"
 			? treeView(model, state, filtering ? new Set(result.items.map((i) => i.id)) : null, texts)
 			: state.view === "board"
-				? boardView(model, narrowing, texts)
+				? boardView(model, state, narrowing, texts)
 				: tableView(model, state, result.items, result.sums, texts);
 	return {
 		id: model.config.id,

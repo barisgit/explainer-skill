@@ -20,6 +20,20 @@ const groupsOf = (rows: readonly GroupRow[]): GroupRow[] =>
 
 const groupsShown = (vm: RecordsView) => (vm.body.kind === "tree" ? groupsOf(vm.body.groups) : []);
 
+/** The state with `id` in its open groups or details when `open`, else without it; the same state when it already is. */
+function flipped(
+	state: RecordsState,
+	key: "open" | "details",
+	id: string,
+	open: boolean,
+): RecordsState {
+	const ids = state[key];
+	if (ids.includes(id) === open) {
+		return state;
+	}
+	return { ...state, [key]: open ? [...ids, id] : ids.filter((other) => other !== id) };
+}
+
 /** What print shows: the default state as the tree (when the block has one) with every group open. */
 function printState(records: Records): RecordsState {
 	const tree = records.view({ ...records.initial, view: "tree" });
@@ -32,7 +46,7 @@ const inView = (root: { current: HTMLElement | null }) =>
 
 /** Keeps the hash in step with `state`, folds left out. */
 function syncHash(records: Records, state: RecordsState) {
-	const want = records.writeHash({ ...state, open: [] });
+	const want = records.writeHash({ ...state, open: [], details: [] });
 	const current = location.hash.slice(1);
 	if (want === records.config.id) {
 		// Back to the default: drop the hash only when it is this block's, never someone else's anchor.
@@ -117,18 +131,14 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 		(): RecordsActions => ({
 			go: setState,
 			search: (text) => setState((s) => ({ ...s, search: text })),
-			toggled(id, open) {
+			groupToggled(id, open) {
 				const group = groupsShown(shown.current).find((g) => g.id === id);
-				if (!group || group.open === open) {
-					return;
+				if (group && group.open !== open) {
+					setState((s) => flipped(s, "open", id, open));
 				}
-				setState((s) => {
-					const has = s.open.includes(id);
-					if (open === has) {
-						return s;
-					}
-					return { ...s, open: open ? [...s.open, id] : s.open.filter((g) => g !== id) };
-				});
+			},
+			detailToggled(id, open) {
+				setState((s) => flipped(s, "details", id, open));
 			},
 		}),
 		[],

@@ -121,6 +121,7 @@ test("a state goes to the URL hash and back, beside the views routes", () => {
 		filters: { owner: ["PS", "JV"], analogue: ["none"] },
 		search: "50% čas, a/b",
 		open: ["1.wp1", "1"],
+		details: [],
 	};
 	const hash = records.writeHash(state);
 	expect(hash).toStartWith("plan?view=table&sort=-labour&q=");
@@ -260,6 +261,33 @@ test("a row opens in place to its detail or links to its view, and carries its r
 	expect(first).toMatchObject({ id: "WP0-01", ref: "HO" });
 	expect(first?.detail).toStartWith("RC-1 kick-off took 30 h");
 	expect(first?.href).toBeUndefined();
+	expect(first?.open).toBe(false);
+	// Expand all opens the groups and every detail, and only then does the tree read as expanded.
+	const whole = body.kind === "tree" ? body.expandAll : folded.initial;
+	const groupsOnly = { ...whole, details: [] };
+	const expanded = (state: RecordsState) => {
+		const view = folded.view(state).body;
+		return view.kind === "tree" && view.expanded;
+	};
+	expect([expanded(folded.initial), expanded(groupsOnly), expanded(whole)]).toEqual([
+		false,
+		false,
+		true,
+	]);
+	expect(whole.details).toHaveLength(96);
+	const open = folded.view(whole).body;
+	expect(open.kind === "tree" && leaves(open.groups).every((row) => row.open)).toBe(true);
+	expect(open.kind === "tree" && open.collapseAll).toMatchObject({ open: [], details: [] });
+	// Open details go in the hash, all of them as *; the table and board open the same ones.
+	expect(folded.writeHash({ ...folded.initial, details: ["WP0-02", "WP0-01"] })).toBe(
+		"plan?detail=WP0-01,WP0-02",
+	);
+	expect(folded.writeHash(whole)).toEndWith("&detail=*");
+	expect(folded.readHash("#plan?detail=WP0-02,nothing")?.details).toEqual(["WP0-02"]);
+	const table = folded.view({ ...folded.initial, view: "table", details: ["WP0-02"] }).body;
+	expect(table.kind === "table" && table.rows.filter((r) => r.open).map((r) => r.id)).toEqual([
+		"WP0-02",
+	]);
 	expect(() => createRecords({ ...(plan as object), detail: "rationale" })).toThrow(
 		'detail: a row links to its view (link "item") or opens in place to its detail, not both',
 	);

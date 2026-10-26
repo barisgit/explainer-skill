@@ -1,9 +1,9 @@
 /* The Records component as a reader meets it, on the fixture page over the fictional RC-2 plan (test/fixtures/records/): what
    pack prerenders, the state the island keeps in the URL hash, the item views a row opens, print, and pack's config errors. */
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { packedMdx, packMdx, runPacked, SETTLED, scratch } from "./support.ts";
+import { act, inPage, packedMdx, packMdx, runPacked, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -16,27 +16,26 @@ const fixturePage = (tail = "") =>
 		.replace("../t6-plan.json", join(FIXTURES, "t6-plan.json"))
 		.replace("./item.tsx", join(FIXTURES, "records", "item.tsx")) + tail;
 
-describe("Records", () => {
-	test("pack prerenders the default tree with its controls hidden, and a block with nothing to choose as static markup", async () => {
-		const html = readFileSync(await packedMdx(dir, "static", fixturePage()), "utf8");
-		const plan = /<div[^>]*id="plan"[\s\S]*?<\/div>\s*<\/section>/.exec(html)?.[0] ?? "";
-		expect(plan).toContain('class="records wide"');
-		expect(plan).toMatch(/<div class="toolbar" hidden/);
-		expect(plan).toMatch(/<div class="facets" hidden/);
-		// The three phases as folds, every work item as a link to its view, and the total under the tree.
-		expect(plan.match(/<details id="plan\.\d+"/g)).toHaveLength(3);
-		expect(plan.match(/<a href="#item\/WP/g)).toHaveLength(96);
-		expect(plan).toMatch(/class="tree-row total"[\s\S]*3,116/);
-		// Every coloured marker sits beside its own word (a phase's title, a facet's value), so no legend repeats them.
-		expect(plan).toMatch(/<i class="swatch" style="--swatch: var\(--c1\)"><\/i>Phase 1/);
-		expect(plan.includes('class="legend"')).toBe(false);
-		const owners = /<div class="records wide" id="owners"[^>]*>/.exec(html)?.[0] ?? "";
-		expect(owners).not.toContain("data-records");
-		expect(html).toMatch(/<summary data-ref="JV">[\s\S]*?<\/summary><p>/);
-	});
+test("pack prerenders the default tree with its controls hidden, and a block with nothing to choose as static markup", async () => {
+	const html = readFileSync(await packedMdx(dir, "static", fixturePage()), "utf8");
+	const plan = /<div[^>]*id="plan"[\s\S]*?<\/div>\s*<\/section>/.exec(html)?.[0] ?? "";
+	expect(plan).toContain('class="records wide"');
+	expect(plan).toMatch(/<div class="toolbar" hidden/);
+	expect(plan).toMatch(/<div class="facets" hidden/);
+	// The three phases as folds, every work item as a link to its view, and the total under the tree.
+	expect(plan.match(/<details id="plan\.\d+"/g)).toHaveLength(3);
+	expect(plan.match(/<a href="#item\/WP/g)).toHaveLength(96);
+	expect(plan).toMatch(/class="tree-row total"[\s\S]*3,116/);
+	// Every coloured marker sits beside its own word (a phase's title, a facet's value), so no legend repeats them.
+	expect(plan).toMatch(/<i class="swatch" style="--swatch: var\(--c1\)"><\/i>Phase 1/);
+	expect(plan.includes('class="legend"')).toBe(false);
+	const owners = /<div class="records wide" id="owners"[^>]*>/.exec(html)?.[0] ?? "";
+	expect(owners).not.toContain("data-records");
+	expect(html).toMatch(/<summary data-ref="JV">[\s\S]*?<\/summary><p>/);
+});
 
-	test("search, facets, views and sort go in the hash; links apply a state; an item view returns to it; Expand all and print open the tree", async () => {
-		const contract = `${SETTLED}
+test("search, facets, views and sort go in the hash; links apply a state; an item view returns to it; Expand all and print open the tree", async () => {
+	const contract = `${SETTLED}
 const $ = (selector) => document.querySelector(selector);
 const block = () => $("#plan");
 const frames = () => new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame));
@@ -96,23 +95,23 @@ var contract = settled.then(frames).then(async () => {
 	expect(block().querySelector(".board"), "after print the reader's view is back");
 	return failures;
 });`;
-		const output = await packedMdx(
-			dir,
-			"reader",
-			fixturePage('\n<script src="contract.js"></script>\n'),
-			{
-				"contract.js": contract,
-			},
-		);
-		expect(await runPacked(output)).toEqual([]);
-	}, 60_000);
+	const output = await packedMdx(
+		dir,
+		"reader",
+		fixturePage('\n<script src="contract.js"></script>\n'),
+		{
+			"contract.js": contract,
+		},
+	);
+	expect(await runPacked(output)).toEqual([]);
+}, 60_000);
 
-	test("an incomplete sum shows as a lower bound or unknown in every view, in words for screen readers", async () => {
-		const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
-		const output = await packedMdx(
-			dir,
-			"gaps",
-			`import { Records } from "kit";
+test("an incomplete sum shows as a lower bound or unknown in every view, in words for screen readers", async () => {
+	const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
+	const output = await packedMdx(
+		dir,
+		"gaps",
+		`import { Records } from "kit";
 
 export const gaps = ${gaps};
 
@@ -124,69 +123,124 @@ export const gaps = ${gaps};
 
 <Records id="board" {...gaps} views={["board"]} />
 `,
+	);
+	const html = readFileSync(output, "utf8");
+	const marked = (words: string) =>
+		new RegExp(
+			`<span class="incomplete"><span aria-hidden="true" title="${words}">([^<]*)</span><span class="vh">${words}</span></span>`,
+			"g",
 		);
-		const html = readFileSync(output, "utf8");
-		const marked = (words: string) =>
-			new RegExp(
-				`<span class="incomplete"><span aria-hidden="true" title="${words}">([^<]*)</span><span class="vh">${words}</span></span>`,
-				"g",
-			);
-		const shown = (id: string, words: string) => {
-			const block = (html.split(`id="${id}"`)[1] ?? "").split('class="records wide"')[0] ?? "";
-			return [...block.matchAll(marked(words))].map((m) => m[1]);
-		};
-		// The mixed group or lane, the one with no value, and the total of the tree and the table (the table shows no groups).
-		const seen = ["tree", "table", "board"].map((id) => [
-			id,
-			shown(id, "at least 8, 1 without a value"),
-			shown(id, "unknown, 1 without a value"),
-			shown(id, "at least 8, 2 without a value"),
-		]);
-		expect(seen).toEqual([
-			["tree", ["≥ 8"], ["?"], ["≥ 8"]],
-			["table", [], [], ["≥ 8"]],
-			["board", ["≥ 8"], ["?"], []],
-		]);
-	});
+	const shown = (id: string, words: string) => {
+		const block = (html.split(`id="${id}"`)[1] ?? "").split('class="records wide"')[0] ?? "";
+		return [...block.matchAll(marked(words))].map((m) => m[1]);
+	};
+	// The mixed group or lane, the one with no value, and the total of the tree and the table (the table shows no groups).
+	const seen = ["tree", "table", "board"].map((id) => [
+		id,
+		shown(id, "at least 8, 1 without a value"),
+		shown(id, "unknown, 1 without a value"),
+		shown(id, "at least 8, 2 without a value"),
+	]);
+	expect(seen).toEqual([
+		["tree", ["≥ 8"], ["?"], ["≥ 8"]],
+		["table", [], [], ["≥ 8"]],
+		["board", ["≥ 8"], ["?"], []],
+	]);
+});
 
-	test("a board names each value on its cards and lane heads, out of sight where the value names itself", async () => {
-		const output = await packedMdx(
-			dir,
-			"board",
-			`import { Records } from "kit";
+test("a board names each value on its cards and lane heads, out of sight where the value names itself", async () => {
+	const output = await packedMdx(
+		dir,
+		"board",
+		`import { Records } from "kit";
 
 # Board
 
 <Records id="work" idField="id" fields={{ id: { label: "Item", kind: "text" }, team: { label: "Team", kind: "text" }, owner: { label: "Owner", kind: "text" }, hours: { label: "Hours", kind: "number", unit: "h", sum: true }, due: { label: "Due", kind: "date" } }} columns={["id", "hours", "owner", "due"]} groupBy={["team"]} views={["board"]} data={[{ id: "A-1", team: "core", owner: "HO", hours: 8, due: "2027-03-01" }, { id: "A-2", team: "core", owner: "JV", hours: 4 }]} />
 `,
-		);
-		const html = readFileSync(output, "utf8").replace(/\u00a0/g, " ");
-		const card = /<li><p>A-1<\/p>(<dl>[\s\S]*?<\/dl>)<\/li>/.exec(html)?.[1];
-		expect(card).toBe(
-			'<dl><div><dt>Hours</dt><dd>8 h</dd></div><div><dt class="vh">Owner</dt><dd>HO</dd></div><div><dt>Due</dt><dd>Mar 1, 2027</dd></div></dl>',
-		);
-		// A card leaves out a value it does not have.
-		expect(/<li><p>A-2<\/p><dl>([\s\S]*?)<\/dl>/.exec(html)?.[1]).not.toContain("Due");
-		const head = /<div class="lane-head">([\s\S]*?)<\/div><ul>/.exec(html)?.[1];
-		expect(head).toBe(
-			"<p>core</p><dl><div><dt>Records</dt><dd>2</dd></div><div><dt>Hours</dt><dd>12 h</dd></div></dl>",
-		);
-	});
+	);
+	const html = readFileSync(output, "utf8").replace(/\u00a0/g, " ");
+	const card = /<li><p>A-1<\/p>(<dl>[\s\S]*?<\/dl>)<\/li>/.exec(html)?.[1];
+	expect(card).toBe(
+		'<dl><div><dt>Hours</dt><dd>8 h</dd></div><div><dt class="vh">Owner</dt><dd>HO</dd></div><div><dt>Due</dt><dd>Mar 1, 2027</dd></div></dl>',
+	);
+	// A card leaves out a value it does not have.
+	expect(/<li><p>A-2<\/p><dl>([\s\S]*?)<\/dl>/.exec(html)?.[1]).not.toContain("Due");
+	const head = /<div class="lane-head">([\s\S]*?)<\/div><ul>/.exec(html)?.[1];
+	expect(head).toBe(
+		"<p>core</p><dl><div><dt>Records</dt><dd>2</dd></div><div><dt>Hours</dt><dd>12 h</dd></div></dl>",
+	);
+});
 
-	test("pack fails on a bad config, naming the path of each problem", async () => {
-		const { result } = await packMdx(
-			dir,
-			"bad",
-			`import { Records } from "kit";
+test("a record's detail opens in place in every view, stays open across them, and Expand all reaches it", async () => {
+	const output = await packedMdx(
+		dir,
+		"details",
+		`import { Records } from "kit";
+
+# Details
+
+<Records id="why" idField="id" fields={{ id: { label: "Item", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number" }, basis: { label: "Basis", kind: "text" } }} columns={["id", "hours"]} groupBy={["team"]} views={["tree", "table", "board"]} detail="basis" data={[{ id: "A-1", team: "core", hours: 8, basis: "Measured on A." }, { id: "A-2", team: "core", hours: 4, basis: "Guessed." }, { id: "B-1", team: "edge", hours: 2 }]} />
+`,
+	);
+	const block = `document.getElementById("why")`;
+	const seen = `(() => {
+			const b = ${block};
+			const button = b.querySelector(".fold-all");
+			return {
+				details: [...b.querySelectorAll("details:not([id])")].map((d) => d.querySelector("summary").textContent.trim().slice(0, 3) + (d.open ? " open: " + d.querySelector("p").textContent : "")),
+				button: button && button.textContent + " " + button.getAttribute("aria-expanded"),
+				hash: location.hash,
+			};
+		})()`;
+	const view = (n: number) => `${block}.querySelector(".seg label:nth-child(${n}) input").click()`;
+	const states = await inPage(output, async (cdp) => {
+		const expanded = await act(cdp, `${block}.querySelector(".fold-all").click()`, seen);
+		const oneClosed = await act(
+			cdp,
+			`${block}.querySelector("details:not([id]) summary").click()`,
+			seen,
+		);
+		const table = await act(cdp, view(2), seen);
+		const opened = await act(cdp, `${block}.querySelector("tbody th summary").click()`, seen);
+		const board = await act(cdp, view(3), seen);
+		return { expanded, oneClosed, table, opened, board };
+	});
+	expect(states).toEqual({
+		expanded: {
+			details: ["A-1 open: Measured on A.", "A-2 open: Guessed."],
+			button: "Collapse all true",
+			hash: "",
+		},
+		// One detail closed again: the tree is no longer all open, though every group is.
+		oneClosed: { details: ["A-1", "A-2 open: Guessed."], button: "Expand all false", hash: "" },
+		table: { details: ["A-1", "A-2 open: Guessed."], button: null, hash: "#why?view=table" },
+		opened: {
+			details: ["A-1 open: Measured on A.", "A-2 open: Guessed."],
+			button: null,
+			hash: "#why?view=table",
+		},
+		board: {
+			details: ["A-1 open: Measured on A.", "A-2 open: Guessed."],
+			button: null,
+			hash: "#why?view=board",
+		},
+	});
+}, 30_000);
+
+test("pack fails on a bad config, naming the path of each problem", async () => {
+	const { result } = await packMdx(
+		dir,
+		"bad",
+		`import { Records } from "kit";
 
 # Plan
 
 <Records id="plan" data={[{ id: "a", hours: 2 }]} idField="id" fields={{ id: { label: "Id", kind: "text" }, hours: { label: "Hours", kind: "hour" } }} columns={["id", "hours", "owner"]} />
 `,
-		);
-		expect(result.code).not.toBe(0);
-		expect(result.stderr).toContain('records "plan"');
-		expect(result.stderr).toContain("fields.hours.kind");
-		expect(result.stderr).toContain("columns[2]");
-	});
+	);
+	expect(result.code).not.toBe(0);
+	expect(result.stderr).toContain('records "plan"');
+	expect(result.stderr).toContain("fields.hours.kind");
+	expect(result.stderr).toContain("columns[2]");
 });

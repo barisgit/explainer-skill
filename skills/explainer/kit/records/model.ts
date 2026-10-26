@@ -10,6 +10,7 @@ import {
 	type Item,
 	readValue,
 	type Sum,
+	valueText,
 } from "./engine.ts";
 import { type FieldBehaviour, fieldBehaviour } from "./fields.ts";
 import { slug } from "./ids.ts";
@@ -139,6 +140,14 @@ function itemsOf(
 	}));
 }
 
+/** The ids of the records that have a detail to open: a non-empty value in the config's `detail` field. */
+function detailIds(config: CheckedConfig, items: readonly Item[]): string[] {
+	const { detail } = config;
+	return detail === undefined
+		? []
+		: items.filter((item) => valueText(item.record, detail) !== "").map((item) => item.id);
+}
+
 /** The model of a checked config. Throws a RecordsConfigError when two groups would share an id. */
 export function buildModel(config: CheckedConfig, locale: string): Model {
 	const kinds: Record<string, FieldBehaviour> = {};
@@ -165,6 +174,7 @@ export function buildModel(config: CheckedConfig, locale: string): Model {
 		searchable: config.search.length > 0,
 		facets: facetValues(config),
 		groups: idsOf(tree),
+		details: detailIds(config, items),
 	};
 	const cell = (item: Item, field: string): Cell => {
 		const value = readValue(item.record, field);

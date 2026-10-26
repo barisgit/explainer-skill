@@ -62,6 +62,9 @@ export function readValue(record: DataRecord, key: string): Value {
 	return typeof value === "string" || typeof value === "number" ? value : null;
 }
 
+/** The record's value in a field as plain text (a row's detail or data-ref): empty when it holds none. */
+export const valueText = (record: DataRecord, key: string) => String(readValue(record, key) ?? "");
+
 const SEARCH = "\u0000search";
 
 const sumFn: AggregationFnDef<typeof FEATURES, Item, unknown, Sum> = {
