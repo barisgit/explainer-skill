@@ -2,7 +2,7 @@
  * What a records block computes once, when it is created: each field's behaviour, the items with their cells and search text,
  * the tree's groups with their ids and subtotals, and the rules a state is checked against. Every view model is built from it.
  */
-import type { DataRecord, Field, RecordsConfig } from "./config.ts";
+import type { DataRecord, Field } from "./config.ts";
 import {
 	createEngine,
 	type Engine,
@@ -14,7 +14,7 @@ import {
 import { type FieldBehaviour, fieldBehaviour } from "./fields.ts";
 import { slug } from "./ids.ts";
 import type { StateRules } from "./state.ts";
-import { RecordsConfigError } from "./validate.ts";
+import { type CheckedConfig, RecordsConfigError } from "./validate.ts";
 import type { Cell } from "./view-model.ts";
 
 /** One group of the tree as built once: the view model adds what depends on the state. */
@@ -34,7 +34,7 @@ export interface TreeNode {
 }
 
 export interface Model {
-	config: RecordsConfig;
+	config: CheckedConfig;
 	locale: string;
 	kinds: Readonly<Record<string, FieldBehaviour>>;
 	items: readonly Item[];
@@ -52,9 +52,9 @@ export interface Model {
 }
 
 /** Each facet field's values in order: a category's as listed, a text field's as they first appear in the data. */
-function facetValues(config: RecordsConfig): Record<string, string[]> {
+function facetValues(config: CheckedConfig): Record<string, string[]> {
 	const values: Record<string, string[]> = {};
-	for (const key of config.facets ?? []) {
+	for (const key of config.facets) {
 		const field = config.fields[key];
 		values[key] =
 			field?.kind === "category"
@@ -66,7 +66,7 @@ function facetValues(config: RecordsConfig): Record<string, string[]> {
 }
 
 interface TreeContext {
-	config: RecordsConfig;
+	config: CheckedConfig;
 	kinds: Readonly<Record<string, FieldBehaviour>>;
 	notes: ReadonlyMap<string, { title?: string; description?: string }>;
 	problems: string[];
@@ -84,7 +84,7 @@ function toNodes(
 	ctx: TreeContext,
 ): TreeNode[] {
 	const depth = path.length;
-	const field: Field | undefined = ctx.config.fields[ctx.config.groupBy?.[depth] ?? ""];
+	const field: Field | undefined = ctx.config.fields[ctx.config.groupBy[depth] ?? ""];
 	const order = field?.kind === "category" ? field.values.map((v) => v.value) : [];
 	const sorted = order.length
 		? [...groups].sort((a, b) => order.indexOf(a.value) - order.indexOf(b.value))
@@ -123,7 +123,7 @@ const idsOf = (nodes: readonly TreeNode[]): string[] =>
 	nodes.flatMap((n) => [n.id, ...idsOf(n.groups)]);
 
 function itemsOf(
-	config: RecordsConfig,
+	config: CheckedConfig,
 	kinds: Readonly<Record<string, FieldBehaviour>>,
 	fold: (t: string) => string,
 ): Item[] {
@@ -135,12 +135,12 @@ function itemsOf(
 		id: String(readValue(record, config.idField)),
 		index,
 		record,
-		haystack: fold((config.search ?? []).map((key) => textOf(record, key)).join("\n")),
+		haystack: fold(config.search.map((key) => textOf(record, key)).join("\n")),
 	}));
 }
 
 /** The model of a checked config. Throws a RecordsConfigError when two groups would share an id. */
-export function buildModel(config: RecordsConfig, locale: string): Model {
+export function buildModel(config: CheckedConfig, locale: string): Model {
 	const kinds: Record<string, FieldBehaviour> = {};
 	for (const [key, field] of Object.entries(config.fields)) {
 		kinds[key] = fieldBehaviour(field, locale);
@@ -149,9 +149,9 @@ export function buildModel(config: RecordsConfig, locale: string): Model {
 		text.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase(locale);
 	const items = itemsOf(config, kinds, fold);
 	const engine = createEngine(items, kinds);
-	const notes = new Map((config.groups ?? []).map((note) => [JSON.stringify(note.path), note]));
+	const notes = new Map(config.groups.map((note) => [JSON.stringify(note.path), note]));
 	const problems: string[] = [];
-	const tree = config.groupBy?.length
+	const tree = config.groupBy.length
 		? toNodes(engine.group(config.groupBy), [], "", { config, kinds, notes, problems })
 		: [];
 	if (problems.length) {
@@ -159,10 +159,10 @@ export function buildModel(config: RecordsConfig, locale: string): Model {
 	}
 	const rules: StateRules = {
 		id: config.id,
-		views: config.views ?? ["table"],
+		views: config.views,
 		sort: config.sort ? { field: config.sort.field, desc: config.sort.desc === true } : null,
 		fields: Object.keys(config.fields),
-		searchable: (config.search ?? []).length > 0,
+		searchable: config.search.length > 0,
 		facets: facetValues(config),
 		groups: idsOf(tree),
 	};

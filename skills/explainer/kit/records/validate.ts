@@ -29,6 +29,10 @@ import {
 import { checkGroupPaths, readData } from "./validate-data.ts";
 import { readFields } from "./validate-fields.ts";
 
+/** A config as parseConfig returns it: the lists left out hold their defaults, so the model never guesses them again. */
+export type CheckedConfig = RecordsConfig &
+	Required<Pick<RecordsConfig, "groupBy" | "groups" | "views" | "search" | "facets">>;
+
 /** The most problems the error's message lists; `problems` keeps them all. */
 const MAX_SHOWN = 20;
 
@@ -283,7 +287,7 @@ function readRowKeys(
 }
 
 /** The config, checked: throws a RecordsConfigError listing every problem, or returns it typed. */
-export function parseConfig(input: unknown): RecordsConfig {
+export function parseConfig(input: unknown): CheckedConfig {
 	if (!isObject(input)) {
 		throw new RecordsConfigError("records", [`the config: expected an object; got ${show(input)}`]);
 	}

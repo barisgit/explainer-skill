@@ -121,9 +121,8 @@ function treeView(
 	texts: ViewTexts,
 ): TreeView {
 	// The groups show the groupBy fields, so the tree's rows leave them out.
-	const grouped = model.config.groupBy ?? [];
 	const columns = model.config.columns
-		.filter((f) => !grouped.includes(f))
+		.filter((f) => !model.config.groupBy.includes(f))
 		.map((field) => column(model, field));
 	const input: TreeInput = { model, state, columns, matched };
 	return {
@@ -169,7 +168,7 @@ function tableView(
 }
 
 function boardView(model: Model, narrowing: Narrowing): BoardView {
-	const field = model.config.groupBy?.[0] ?? "";
+	const field = model.config.groupBy[0] ?? "";
 	// The lane shows the first groupBy field, so the cards leave out only that one.
 	const columns = model.config.columns.filter((f) => f !== field).map((f) => column(model, f));
 	const def = model.config.fields[field];
@@ -226,7 +225,7 @@ function facets(
 
 /** A legend for each category field the block shows (its columns and groups) that has coloured values. */
 function legends(model: Model): Legend[] {
-	const shown = new Set([...(model.config.groupBy ?? []), ...model.config.columns]);
+	const shown = new Set([...model.config.groupBy, ...model.config.columns]);
 	return [...shown].flatMap((field): Legend[] => {
 		const def = model.config.fields[field];
 		if (def?.kind !== "category") {
@@ -256,7 +255,7 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 		terms: model.fold(state.search).split(/\s+/).filter(Boolean),
 	};
 	const filtering = narrowing.terms.length > 0 || Object.keys(state.filters).length > 0;
-	const result = model.engine.query(narrowing, state.sort, model.config.facets ?? []);
+	const result = model.engine.query(narrowing, state.sort, model.config.facets);
 	const count = new Intl.NumberFormat(model.locale);
 	const body =
 		state.view === "tree"
