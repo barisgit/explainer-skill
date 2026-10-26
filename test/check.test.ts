@@ -201,6 +201,30 @@ test("check does not warn about a data table that scrolls sideways, but does abo
 	expect(result.stdout).not.toContain("div#grid");
 }, 30_000);
 
+test("check names a fix for tiny diagram text, and takes a diagram held at its readable width as scrolling by design", async () => {
+	const sequence =
+		"sequenceDiagram\n  Browser->>Server: GET /report\n  Server->>Cache: lookup\n  Server->>Database: query rows\n  Database-->>Browser: rows";
+	const body = `<div id="hand"><svg viewBox="0 0 1200 100" width="100%"><text x="10" y="50" font-size="14">Hand-built label</text></svg></div>
+<pre class="mermaid" id="held">${sequence}</pre><pre class="mermaid" id="squeezed">${sequence}</pre>`;
+	const input = dir.write(
+		"tiny.html",
+		`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css"><style>#squeezed > svg { min-width: 0; }</style></head><body><h1>Probe</h1>${body}</body></html>`,
+	);
+	const output = dir.path("tiny.out.html");
+	expect((await packHtml(input, output)).error).toBe("");
+
+	const result = await checkQuick(output);
+
+	expect(result.stdout).toMatch(
+		/div#hand svg: .*keep it at min-width: \d+px inside a \.scroll block/,
+	);
+	expect(result.stdout).toContain("div#squeezed.mermaid svg: ");
+	expect(result.stdout).toContain(
+		"a page rule makes the diagram narrower than the min-width pack gives it",
+	);
+	expect(result.stdout).not.toContain("div#held");
+}, 30_000);
+
 test("check starts every load with empty page storage, so neither one shot's state nor what the old page writes while leaving reaches the next", async () => {
 	const file = dir.write(
 		"storage.html",

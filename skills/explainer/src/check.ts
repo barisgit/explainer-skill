@@ -83,13 +83,31 @@ export async function kitReferences(html: string): Promise<string[]> {
 }
 
 const TINY_TEXT_PX = 9;
+/** The size the tiny-text hint brings an SVG's smallest text to, as pack does for diagrams (READABLE_PX in mermaid.ts). */
+const READABLE_TEXT_PX = 10;
 const TALL_FIGURE = 1.5;
+
+/**
+ * Page-side function: what to do about an SVG whose smallest text renders at `px`. A diagram pack drew has a readable minimum
+ * width unless page CSS overrides it or an older pack made it; a hand-built SVG can be redrawn for the phone width, or keep the
+ * width that makes its text readable inside a sideways-scrolling block.
+ */
+const TINY_TEXT_FIX_JS = `(svg, px) => {
+	if (svg.parentElement?.matches(".mermaid")) {
+		return getComputedStyle(svg).getPropertyValue("--mermaid-min")
+			? "a page rule makes the diagram narrower than the min-width pack gives it; drop that rule, and the diagram scrolls sideways at a readable size instead"
+			: "pack it again: pack now keeps diagram text at ${READABLE_TEXT_PX} px or more and lays wide flowcharts out top-down on phones";
+	}
+	const width = Math.ceil((svg.getBoundingClientRect().width * ${READABLE_TEXT_PX}) / px);
+	return "redraw it in a viewBox about 360 wide with 14-unit text, or keep it at min-width: " + width + "px inside a .scroll block, which scrolls sideways";
+}`;
 
 /**
  * Runs in the page for the current viewport (`narrow`: the phone width). `culprits`: elements sticking out of the viewport that no scrolling
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
- * than their box and scrolls sideways (a wide data table or equation may, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box (ellipsis truncation excepted),
- * a missing viewport meta and SVG text rendered under 9 px (narrow only), diagrams and charts
+ * than their box and scrolls sideways (a wide data table or equation may, as may an SVG its min-width holds wider, such as a diagram
+ * at its readable minimum, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box (ellipsis truncation excepted),
+ * a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS names), diagrams and charts
  * (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players with a log) are tall by design and
  * are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to the screen. `repeated`: ids on more
  * than one element, as the page's scripts and `--do` steps left them (problems).
@@ -103,7 +121,9 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 	const region = ${REGION_VISIBLE_JS};
 	const all = [...document.body.querySelectorAll("*")];
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
-	const wideByDesign = (el) => [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1);
+	const heldWide = (svg, el) => shown(svg) && parseFloat(getComputedStyle(svg).minWidth) > el.clientWidth + 1;
+	const wideByDesign = (el) => [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1) || [...el.querySelectorAll("svg")].some((svg) => heldWide(svg, el));
+	const tinyFix = ${TINY_TEXT_FIX_JS};
 	const inner = all.filter((el) => scrolls(el) && region(el) && !wideByDesign(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
 	const cut = all.filter((el) => hides(el) && region(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
@@ -116,7 +136,7 @@ const PAGE_JS = (narrow: boolean) => `(() => {
 			.filter((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
 			.map((el) => ({ px: parseFloat(getComputedStyle(el).fontSize) * scale, text: el.textContent.trim().slice(0, 24) }))
 			.filter((t) => t.px < ${TINY_TEXT_PX}).sort((a, b) => a.px - b.px);
-		if (tiny.length) warnings.push(name(svg.parentElement) + " svg: " + tiny.length + " text item(s) render under ${TINY_TEXT_PX} px at " + vw + " px wide (smallest " + tiny[0].px.toFixed(1) + " px, '" + tiny[0].text + "'): simplify the diagram, use top-down layout or fewer nodes");
+		if (tiny.length) warnings.push(name(svg.parentElement) + " svg: " + tiny.length + " text item(s) render under ${TINY_TEXT_PX} px at " + vw + " px wide (smallest " + tiny[0].px.toFixed(1) + " px, '" + tiny[0].text + "'): " + tinyFix(svg, tiny[0].px));
 	}
 	const tall = [...document.querySelectorAll(".mermaid, .chart, svg, canvas")].filter((el) => shown(el) && el.getBoundingClientRect().height > innerHeight * ${TALL_FIGURE});
 	for (const el of tall.filter((el) => !tall.some((o) => o !== el && o.contains(el)))) {
