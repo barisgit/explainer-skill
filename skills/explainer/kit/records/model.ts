@@ -13,7 +13,7 @@ import {
 	valueText,
 } from "./engine.ts";
 import { type FieldBehaviour, fieldBehaviour } from "./fields.ts";
-import { slug } from "./ids.ts";
+import { groupIdClash, slug } from "./ids.ts";
 import type { StateRules } from "./state.ts";
 import { type CheckedConfig, RecordsConfigError } from "./validate.ts";
 import type { Cell } from "./view-model.ts";
@@ -96,9 +96,7 @@ function toNodes(
 		const id = parentId ? `${parentId}.${slug(group.value)}` : slug(group.value);
 		const clash = ids.get(id);
 		if (clash !== undefined) {
-			ctx.problems.push(
-				`data: the ${group.field} values ${JSON.stringify(clash)} and ${JSON.stringify(group.value)} make the same group id "${id}"; make them differ in more than case and punctuation`,
-			);
+			ctx.problems.push(`data: the ${group.field} values ${groupIdClash(clash, group.value, id)}`);
 		}
 		ids.set(id, group.value);
 		const note = ctx.notes.get(JSON.stringify(values));

@@ -13,7 +13,7 @@ import {
 	VIEW_KINDS,
 	type ViewKind,
 } from "./config.ts";
-import { slug } from "./ids.ts";
+import { groupIdClash, slug } from "./ids.ts";
 import {
 	isObject,
 	knownKeys,
@@ -230,10 +230,7 @@ function checkGroupIds(field: Field | undefined, path: string, report: Report) {
 		const id = slug(value);
 		const other = seen.get(id);
 		if (other !== undefined) {
-			report(
-				path,
-				`the values ${show(other)} and ${show(value)} make the same group id "${id}"; make them differ in more than case and punctuation`,
-			);
+			report(path, `the values ${groupIdClash(other, value, id)}`);
 		}
 		seen.set(id, value);
 	}

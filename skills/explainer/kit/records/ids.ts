@@ -9,3 +9,7 @@ export function slug(value: string): string {
 		.replace(/^-+|-+$/g, "");
 	return text || "_";
 }
+
+/** The problem of two group values whose slugs are one id: the validator finds it among a category's values, the model in data. */
+export const groupIdClash = (a: string, b: string, id: string) =>
+	`${JSON.stringify(a)} and ${JSON.stringify(b)} make the same group id "${id}"; make them differ in more than case and punctuation`;
