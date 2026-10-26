@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./chrome.ts";
 import { settle, withPage } from "./chrome.ts";
+import { READABLE_PX } from "./mermaid.ts";
 import { ELEMENT_NAME_JS, PAINTS_JS, REGION_VISIBLE_JS } from "./page-js.ts";
 import { runStep } from "./steps.ts";
 
@@ -83,22 +84,20 @@ export async function kitReferences(html: string): Promise<string[]> {
 }
 
 const TINY_TEXT_PX = 9;
-/** The size the tiny-text hint brings an SVG's smallest text to, as pack does for diagrams (READABLE_PX in mermaid.ts). */
-const READABLE_TEXT_PX = 10;
 const TALL_FIGURE = 1.5;
 
 /**
  * Page-side function: what to do about an SVG whose smallest text renders at `px`. A diagram pack drew has a readable minimum
  * width unless page CSS overrides it or an older pack made it; a hand-built SVG can be redrawn for the phone width, or keep the
- * width that makes its text readable inside a sideways-scrolling block.
+ * width that brings its text to READABLE_PX, as pack does for diagrams, inside a sideways-scrolling block.
  */
 const TINY_TEXT_FIX_JS = `(svg, px) => {
 	if (svg.parentElement?.matches(".mermaid")) {
 		return getComputedStyle(svg).getPropertyValue("--mermaid-min")
 			? "a page rule makes the diagram narrower than the min-width pack gives it; drop that rule, and the diagram scrolls sideways at a readable size instead"
-			: "pack it again: pack now keeps diagram text at ${READABLE_TEXT_PX} px or more and lays wide flowcharts out top-down on phones";
+			: "pack it again: pack now keeps diagram text at ${READABLE_PX} px or more and lays wide flowcharts out top-down on phones";
 	}
-	const width = Math.ceil((svg.getBoundingClientRect().width * ${READABLE_TEXT_PX}) / px);
+	const width = Math.ceil((svg.getBoundingClientRect().width * ${READABLE_PX}) / px);
 	return "redraw it in a viewBox about 360 wide with 14-unit text, or keep it at min-width: " + width + "px inside a .scroll block, which scrolls sideways";
 }`;
 
