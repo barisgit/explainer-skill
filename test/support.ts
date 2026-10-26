@@ -319,6 +319,19 @@ export const act = <T>(cdp: Cdp, action: string, state: string) =>
 		true,
 	);
 
+/** How long `until` waits for its condition, far above any write a test waits for. */
+const UNTIL_DEADLINE_MS = 3000;
+
+/**
+ * Waits, a frame at a time, until the page expression `condition` holds, and says whether it did before the deadline: for state
+ * a page writes after an action settles (history, storage), which no fixed delay orders.
+ */
+export const until = (cdp: Cdp, condition: string) =>
+	cdp.evaluate<boolean>(
+		`new Promise((done) => { const end = performance.now() + ${UNTIL_DEADLINE_MS}; const poll = () => { if (${condition}) done(true); else if (performance.now() > end) done(false); else requestAnimationFrame(poll); }; poll(); })`,
+		true,
+	);
+
 /**
  * Opens a packed page in headless Chrome with reduced motion, at `viewport` (default the desktop), and runs `fn`; fails on any
  * uncaught page error or console error or warning.

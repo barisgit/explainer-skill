@@ -3,7 +3,17 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act, inPage, load, packedMdx, packMdx, runPacked, SETTLED, scratch } from "./support.ts";
+import {
+	act,
+	inPage,
+	load,
+	packedMdx,
+	packMdx,
+	runPacked,
+	SETTLED,
+	scratch,
+	until,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -248,6 +258,11 @@ test("a block inside a View keeps the view and its own state in one hash, throug
 			`document.querySelector("#crew .seg label:nth-child(2) input").click()`,
 			where,
 		);
+		// The reload must find the trail saved with this entry for its new hash, not rebuild one from nothing.
+		const saved = await until(
+			cdp,
+			`location.hash === "#team?crew?view=table" && navigation.currentEntry.getState()?.viewTrailAt === location.hash.slice(1) && navigation.currentEntry.getState()?.viewTrail?.length === 2`,
+		);
 		await load(cdp);
 		const reloaded = await cdp.evaluate(where);
 		const cleared = await act(
@@ -255,7 +270,7 @@ test("a block inside a View keeps the view and its own state in one hash, throug
 			`document.querySelector("#crew .seg label:nth-child(1) input").click()`,
 			where,
 		);
-		return { chosen, reloaded, cleared };
+		return { chosen, saved, reloaded, cleared };
 	});
 	const table = {
 		hash: "#team?crew?view=table",
@@ -265,6 +280,7 @@ test("a block inside a View keeps the view and its own state in one hash, throug
 	};
 	expect(seen).toEqual({
 		chosen: table,
+		saved: true,
 		reloaded: table,
 		cleared: { ...table, hash: "#team", table: false },
 	});
