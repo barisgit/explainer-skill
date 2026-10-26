@@ -1,5 +1,14 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndCheck, packAndRun, SETTLED, scratch } from "./support.ts";
+import {
+	act,
+	inPage,
+	load,
+	packAndCheck,
+	packAndRun,
+	packedMdx,
+	SETTLED,
+	scratch,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -159,4 +168,115 @@ test("a static view whose param has a non-ASCII letter or a space opens by link 
 		"--do",
 		"click:.view.active a[href='#kdo/ana marija']",
 	]);
+}, 30_000);
+
+/** Page expression: the open view's param heading, the hash, its crumbs and its previous, position and next. */
+const SHOWN = `(() => {
+	const view = document.querySelector(".view.active");
+	const sibs = view?.querySelector(".sibs");
+	return {
+		h1: view?.querySelector("h1")?.textContent ?? null,
+		hash: location.hash,
+		crumbs: [...(view?.querySelectorAll(".crumbs li") ?? [])].map((li) => li.textContent).join(" / "),
+		prev: sibs?.querySelector("[rel=prev]")?.getAttribute("href") ?? null,
+		count: sibs?.querySelector(".count")?.textContent ?? null,
+		next: sibs?.querySelector("[rel=next]")?.getAttribute("href") ?? null,
+	};
+})()`;
+
+/** Static views linked with local state after their route, the form a Records block inside a view writes. */
+const LOCAL_STATE_PAGE = `import { View } from "kit";
+
+# Units
+
+Three units.
+
+## Units
+
+- [Alpha](#v/a?panel?x=1)
+- [Beta](#v/b?panel?x=2)
+- [Gamma](#v/c)
+
+{["a", "b", "c"].map((p) => <View name="v" param={p} back="Units"><h1>{p.toUpperCase()}</h1><p>Unit {p}.</p></View>)}
+`;
+
+test("links with local state after the route walk their views by the route, and previous and next keep each link's state", async () => {
+	const output = await packedMdx(dir, "local-state", LOCAL_STATE_PAGE);
+	const seen = await inPage(output, async (cdp) => {
+		const first = await act(
+			cdp,
+			`document.querySelector("a[href='#v/a?panel?x=1']").click()`,
+			SHOWN,
+		);
+		const next = await act(cdp, `document.querySelector(".view.active [rel=next]").click()`, SHOWN);
+		await load(cdp);
+		const reloaded = await cdp.evaluate(SHOWN);
+		return { first, next, reloaded };
+	});
+	const beta = {
+		h1: "B",
+		hash: "#v/b?panel?x=2",
+		crumbs: "Units / Beta",
+		prev: "#v/a?panel?x=1",
+		count: "2 / 3",
+		next: "#v/c",
+	};
+	expect(seen).toEqual({
+		first: {
+			h1: "A",
+			hash: "#v/a?panel?x=1",
+			crumbs: "Units / Alpha",
+			prev: null,
+			count: "1 / 3",
+			next: "#v/b?panel?x=2",
+		},
+		next: beta,
+		reloaded: beta,
+	});
+}, 30_000);
+
+/** Static views whose record ids hold characters a route cannot carry as they are, linked as encodeURIComponent writes them. */
+const ESCAPED_PAGE = `import { View } from "kit";
+
+# Odd ids
+
+Two records.
+
+## Records
+
+- [Why?](#s/a%3Fb)
+- [Most](#s/100%25)
+
+{["a?b", "100%"].map((id) => <View name="s" param={id} back="Records"><h1>{id}</h1><p>Record {id}.</p></View>)}
+`;
+
+test("a static view whose record id holds ? or % opens at its escaped link, by click, deep link and previous/next", async () => {
+	const output = await packedMdx(dir, "escaped", ESCAPED_PAGE);
+	const seen = await inPage(`${output}#s/a%3Fb`, async (cdp) => {
+		const deep = await cdp.evaluate(SHOWN);
+		const next = await act(cdp, `document.querySelector(".view.active [rel=next]").click()`, SHOWN);
+		await act(cdp, `location.hash = ""`, SHOWN);
+		const clicked = await act(cdp, `document.querySelector("a[href='#s/a%3Fb']").click()`, SHOWN);
+		return { deep, next, clicked };
+	});
+	const why = {
+		h1: "a?b",
+		hash: "#s/a%3Fb",
+		crumbs: "Records / Why?",
+		prev: null,
+		count: "1 / 2",
+		next: "#s/100%25",
+	};
+	expect(seen).toEqual({
+		deep: why,
+		next: {
+			h1: "100%",
+			hash: "#s/100%25",
+			crumbs: "Records / Most",
+			prev: "#s/a%3Fb",
+			count: "2 / 2",
+			next: null,
+		},
+		clicked: why,
+	});
 }, 30_000);

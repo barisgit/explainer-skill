@@ -5,7 +5,9 @@
    A static view may claim one param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for
    its param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
    What follows a route's first ? is the state of something inside the view, and changing it leaves the view drawn as it is:
-   #team?crew?view=table is the view #team with "crew?view=table" for what it holds (a param with a ? in it is written %3F).
+   #team?crew?view=table is the view #team with "crew?view=table" for what it holds. Routes compare decoded, so a link escapes a ?
+   in a param as %3F (#s/a%3Fb opens data-view="s/a?b", which the View component writes as "s/a%3Fb"), and previous, next
+   and the crumbs treat #v/a?panel?x=1 as #v/a while following each link with its state.
    Views.local(el) reads that part for an element (the whole hash on the overview; null while the element's view is hidden),
    and Views.setLocal(el, text) writes it in place with history.replaceState, keeping the view's trail.
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
@@ -61,7 +63,7 @@
 	};
 	/** The page's text for `key`, else the English one. Read when the parts draw, which starts once the page's scripts have run. */
 	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
-	const nav = window.ViewsNav({ views, decode, canonical, kitText });
+	const nav = window.ViewsNav({ views, canonical, key, kitText });
 	const refreshFolds = window.ViewsFolds(kitText);
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */
@@ -101,18 +103,30 @@
 			: { path: hash.slice(0, query), local: hash.slice(query + 1) };
 	}
 
+	/**
+	 * A hash's route as one string to compare: the part before its first ?, decoded, so #s/a%3Fb, #s/100%25 and #kdo/blaž name
+	 * the views data-view="s/a%3Fb" (or "s/a?b"), "s/100%" and "kdo/blaž". Routing, sibling lists and labels all compare these.
+	 */
+	function key(hash: string) {
+		return decode(split(canonical(hash)).path);
+	}
+
+	/** A static view's route as key() gives it: its data-view is a route, never followed by local state, so a ? in it is its own. */
+	const viewKey = (view: HTMLElement) => key((view.dataset.view ?? "").replace(/\?/g, "%3F"));
+
 	/** The view a canonical hash claims by its route: `name/param` wins over `name`; param is decoded. */
 	function claim(hash: string): Route {
 		const { path } = split(hash);
 		const [name = "", ...rest] = path.split("/");
+		const wanted = key(path);
 		const view =
-			views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ??
+			(rest.length ? views.find((v) => viewKey(v) === wanted) : undefined) ??
 			views.find((v) => v.dataset.view === name);
 		return view ? { name, view, param: decode(rest.join("/")), hash: path } : OVERVIEW;
 	}
 
-	/** Whether two routes show one view for one route hash, whatever local state follows it. */
-	const sameRoute = (a: Route, b: Route) => a.view === b.view && a.hash === b.hash;
+	/** Whether two routes show one view for one route, whatever local state follows it and however it is escaped. */
+	const sameRoute = (a: Route, b: Route) => a.view === b.view && key(a.hash) === key(b.hash);
 
 	/** The element a hash names by id, if any. */
 	const targetOf = (hash: string) => (hash ? document.getElementById(decode(hash)) : null);

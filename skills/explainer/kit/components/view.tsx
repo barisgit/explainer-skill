@@ -9,7 +9,9 @@
    ...
    </View>
      name    the view's name: a link to #name (or #name/param) opens it
-     param   the record this view shows (#person/ana); leave it out for a single view at #name
+     param   the record this view shows (#person/ana); leave it out for a single view at #name. Pass the id as it is; a link
+             escapes ? # % the way encodeURIComponent does: id "a?b" opens at #person/a%3Fb, what follows a route's first ? being
+             the state of what the view holds
      back    the text of its Back link, naming the overview
    Its # and the paragraphs right under it are the view's head (the first one its lede), and each ## starts a section, as on
    the page. pack puts every View after the overview wherever the page renders it, so one View per record works from data:
@@ -54,6 +56,10 @@ export interface FilledViewProps<T extends ViewRecord> extends Common {
 }
 
 export type ViewProps<T extends ViewRecord = ViewRecord> = StaticViewProps | FilledViewProps<T>;
+
+/** A static view's route: a ? # or % in its param escaped, so the data-view is the hash that opens it (#name/a%3Fb). */
+const route = (name: string, param: string) =>
+	`${name}/${param.replace(/[%?#]/g, encodeURIComponent)}`;
 
 /** The element pack moves, with its content, after the overview (hoistViews in src/mdx/page.ts); it never reaches the page. */
 const VIEW_MARKER = "explainer-view";
@@ -100,7 +106,7 @@ export function View<T extends ViewRecord>(props: ViewProps<T>) {
 	return h(
 		VIEW_MARKER,
 		null,
-		<section class="view" data-view={param === undefined ? name : `${name}/${param}`} id={id}>
+		<section class="view" data-view={param === undefined ? name : route(name, param)} id={id}>
 			{viewBody(children, back)}
 		</section>,
 	);

@@ -17,12 +17,16 @@
                their h2 (ids added when missing), and under the section that first links to a view name, each trail step's
                siblings (only the step itself past 12). The current section follows scrolling; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ViewsNav = ({ views, decode, canonical, kitText }) => {
-	/** One trail step: the view's hash, its name as the reader saw it, and the sibling hashes it walks (absent: every sibling). */
+window.ViewsNav = ({ views, canonical, key, kitText }) => {
+	/**
+	 * One trail step: the view's route (views.js's key: decoded, without local state), its name as the reader saw it, the sibling
+	 * routes it walks (absent: every sibling), and the hash the reader was at in it, local state included, for its crumb.
+	 */
 	interface Step {
 		hash: string;
 		label: string;
 		list?: string[];
+		at?: string;
 	}
 	/** Link text by hash, for the hashes whose text names only them. */
 	type Labels = Map<string, string>;
@@ -77,8 +81,20 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		);
 	}
 
-	// Links, static claims, saved lists and the current hash are all compared in views.js's canonical form.
-	const hashOf = (a: HTMLAnchorElement) => canonical((a.getAttribute("href") ?? "").slice(1));
+	// Links, static claims, saved lists and the current route are all compared by route (views.js's key), so a link's local state
+	// (#v/a?panel?x=1) or its escapes (#s/100%25 for data-view="s/100%") do not make it another sibling.
+	const hashOf = (a: HTMLAnchorElement) => key((a.getAttribute("href") ?? "").slice(1));
+
+	/**
+	 * The hash a navigation link to a route follows: the page's first link to it as written, so it keeps that link's local state;
+	 * else the route with what a hash cannot carry as it is escaped.
+	 */
+	function hrefFor(route: string) {
+		const link = linksTo(nameOf(route)).find((a) => hashOf(a) === route);
+		return link
+			? canonical((link.getAttribute("href") ?? "").slice(1))
+			: route.replace(/[%?#]/g, encodeURIComponent);
+	}
 	const unique = (hashes: string[]) => [...new Set(hashes)];
 	const viewDrawnFor = (hash: string) => [...drawn].find(([, h]) => h === hash)?.[0];
 
@@ -87,7 +103,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const statics = views
 			.map((v) => v.dataset.view ?? "")
 			.filter((claim) => claim.startsWith(`${name}/`))
-			.map(canonical);
+			// A data-view is a route alone, so a ? in it is part of the param, as views.js's viewKey reads it.
+			.map((claim) => key(claim.replace(/\?/g, "%3F")));
 		return unique([...linksTo(name).map(hashOf), ...statics]);
 	}
 
@@ -120,7 +137,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		return (
 			known.get(hash) ||
 			clean(viewDrawnFor(hash)?.querySelector("h1, h2")?.textContent) ||
-			decode(hash.split("/").slice(1).join("/"))
+			hash.split("/").slice(1).join("/")
 		);
 	}
 
@@ -182,8 +199,15 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const before = cut < 0 ? steps : steps.slice(0, cut);
 		const fromBlock = clicked?.hash === hash && clicked.list.includes(hash) ? clicked.list : null;
 		const list = fromBlock ?? inheritedList(hash, before.at(-1), steps[cut]);
-		return [...before, { hash, label: label(hash), ...(list ? { list } : {}) }];
+		return [...before, atHere({ hash, label: label(hash), ...(list ? { list } : {}) })];
 	}
+
+	/**
+	 * The step with the location as its crumb's hash when the location is its route, local state and all; an #anchor inside the
+	 * view leaves the step's hash as it was, so Back to the anchor's entry still finds the view.
+	 */
+	const atHere = (step: Step): Step =>
+		key(locationHash()) === step.hash ? { ...step, at: locationHash() } : step;
 
 	/**
 	 * This history entry's trail: the saved one on Back, Forward and reload, else the previous one with this view put in.
@@ -193,7 +217,8 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const kept = savedTrail();
 		const last = kept?.at(-1);
 		if (kept && last?.hash === hash) {
-			steps = redrawn ? [...kept.slice(0, -1), { ...last, label: label(hash) }] : kept;
+			// The same view, perhaps with other local state after its route: its crumb returns to the state now shown.
+			steps = [...kept.slice(0, -1), atHere(redrawn ? { ...last, label: label(hash) } : last)];
 		} else {
 			steps = hash ? extended(hash) : [];
 		}
@@ -209,7 +234,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const list = make("ol", { class: "crumbs" });
 		list.append(item(back ?? make("a", { href: "#" }, overviewName())));
 		for (const step of steps.slice(0, -1)) {
-			list.append(item(make("a", { href: `#${step.hash}` }, step.label)));
+			list.append(item(make("a", { href: `#${step.at ?? hrefFor(step.hash)}` }, step.label)));
 		}
 		list.append(item(make("span", { "aria-current": "page" }, here.label)));
 		return list;
@@ -224,7 +249,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		}
 		const known = linkLabels(nameOf(here.hash));
 		const link = (hash: string | undefined, rel: string) =>
-			hash ? make("a", { href: `#${hash}`, rel }, label(hash, known)) : make("span");
+			hash ? make("a", { href: `#${hrefFor(hash)}`, rel }, label(hash, known)) : make("span");
 		const box = make("div", { class: "sibs" });
 		box.append(
 			link(list[at - 1], "prev"),
@@ -346,7 +371,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		const sub = make("ol");
 		for (const h of shown) {
 			const text = h === step.hash ? step.label : label(h, known);
-			const a = make("a", { href: `#${h}` }, text);
+			const a = make("a", { href: `#${h === step.hash && step.at ? step.at : hrefFor(h)}` }, text);
 			a.classList.toggle("is-trail", h === step.hash && h !== hash);
 			if (h === hash) {
 				a.setAttribute("aria-current", "page");
@@ -408,28 +433,40 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		revisited,
 		/**
 		 * Puts `hash` ("" for none) in place of this history entry's, keeping the trail saved with it, which history.replaceState
-		 * alone clears. A trail copied from the entry before (not yet this entry's own) is left for show() to stamp.
+		 * alone clears; the last step's crumb follows the new hash. A trail copied from the entry before (not yet this entry's own)
+		 * is left for show() to stamp.
 		 */
 		replace(hash: string) {
-			const state = entryState();
-			const own = state[AT_KEY] === locationHash();
+			const own = revisited();
 			history.replaceState(
 				history.state,
 				"",
 				hash ? `#${hash}` : location.pathname + location.search,
 			);
+			const last = steps.at(-1);
+			if (last) {
+				steps = [...steps.slice(0, -1), atHere(last)];
+			}
 			if (own) {
 				try {
-					navigation.updateCurrentEntry({ state: { ...state, [AT_KEY]: locationHash() } });
+					navigation.updateCurrentEntry({
+						state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() },
+					});
 				} catch {
 					// No Navigation API, or a document whose entries it disables: the trail stays in memory, as in stamp().
 				}
 			}
 		},
-		/** The view hash this history entry showed when it was left, from the trail saved with it; null for the overview or none. */
-		savedHash: () => (revisited() ? (savedTrail()?.at(-1)?.hash ?? null) : null),
+		/**
+		 * The hash this history entry showed when it was left, local state included, from the trail saved with it; null for the
+		 * overview or none.
+		 */
+		savedHash() {
+			const last = revisited() ? savedTrail()?.at(-1) : undefined;
+			return last ? (last.at ?? hrefFor(last.hash)) : null;
+		},
 		show(view: HTMLElement | null, routeHash: string) {
-			const hash = canonical(routeHash);
+			const hash = key(routeHash);
 			// Shown again with no route change in between: a handler registered late has just drawn the view.
 			const redrawn = hash === shownHash;
 			shownHash = hash;

@@ -155,8 +155,9 @@ declare var Keep: KeepApi;
 declare var ReplyNotes: (options: ReplyNotesOptions) => void;
 declare var ViewsNav: (options: {
 	views: HTMLElement[];
-	decode: (text: string) => string;
 	canonical: (hash: string) => string;
+	/** A hash's route to compare: the part before its first ?, decoded. */
+	key: (hash: string) => string;
 	kitText: KitText<"overview" | "contents" | "breadcrumb">;
 }) => {
 	revisited(): boolean;

@@ -102,16 +102,22 @@ export const FIRST_SCREEN_JS = `(() => {
 	return { links: Math.max(0, ...lists.values()), headline: headline.length > 110 ? headline.slice(0, 107) + "..." : headline, figures: outer.map(name) };
 })()`;
 
-/** Runs in the page: every drill-down hash the page links to ("#repo/mobile") or declares (static views, data-view="a/b"), in document order; view templates nothing links to. */
+/**
+ * Runs in the page: every drill-down hash the page links to ("#repo/mobile") or declares (static views, data-view="a/b"), in
+ * document order, one per route (the part before the first ?, decoded, as views.js compares routes); view templates nothing
+ * links to.
+ */
 export const DISCOVER_JS = `(() => {
+	const key = (route) => { try { return decodeURIComponent(route); } catch { return route; } };
 	const names = new Set([...document.querySelectorAll("[data-view]")].map((v) => v.dataset.view));
-	const hashes = new Set([...names].filter((n) => n.includes("/")).map((n) => "#" + n));
+	const byRoute = new Map([...names].filter((n) => n.includes("/")).map((n) => [key(n), "#" + n]));
 	for (const a of document.querySelectorAll('a[href^="#"]')) {
 		const h = a.getAttribute("href").slice(1);
-		if (h && (names.has(h) || names.has(h.split("/")[0]))) hashes.add("#" + h);
+		const route = h.split("?")[0];
+		if (route && (names.has(route) || names.has(route.split("/")[0])) && !byRoute.has(key(route))) byRoute.set(key(route), "#" + h);
 	}
-	const reached = (n) => [...hashes].some((h) => h === "#" + n || h.startsWith("#" + n + "/"));
-	return { hashes: [...hashes], templates: [...names].filter((n) => !n.includes("/") && !reached(n)) };
+	const reached = (n) => [...byRoute.keys()].some((r) => r === n || r.startsWith(n + "/"));
+	return { hashes: [...byRoute.values()], templates: [...names].filter((n) => !n.includes("/") && !reached(n)) };
 })()`;
 
 const SWEEP_BUDGET_MS = 3000;
