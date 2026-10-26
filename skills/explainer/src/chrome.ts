@@ -329,6 +329,10 @@ async function start(bin: string, profile: string, extra: string[]): Promise<Chr
 			// macOS: never touch the login keychain. Without this, Chrome asks for one on every
 			// launch and shows a modal dialog when HOME has none (e.g. the sandboxed verify:install).
 			"--use-mock-keychain",
+			// Chrome otherwise downloads components and models (Safe Browsing lists, optimization guides, a speech engine) into
+			// the profile, up to 150 MB, on the reader's network and CPU, while it only ever opens a local page.
+			"--disable-background-networking",
+			"--disable-component-update",
 			...extra,
 			"about:blank",
 		],

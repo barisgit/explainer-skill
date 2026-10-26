@@ -26,6 +26,7 @@ One collection of records, shown as a grouped tree, a sortable table or a board,
 - When Chrome fails to start or stops answering, `check` prints one line and exits 1 with no report, for example `error: the load event of file:///…/page.html did not come in 10 s (at dark narrow, view #fix/none)`. It used to wait forever.
 - `--timeout <seconds>` (default 600) limits the whole run: `error: check passed its 600 s limit at light desktop, view #plan/a, after 324 page(s): raise --timeout for a page with many views or --do steps`.
 - Chrome exits with `check` however `check` ends, and its profile is deleted (also on Ctrl-C or SIGTERM). Before, every run left a profile of up to 150 MB in the temp directory, and a `check` killed by a timeout left a Chrome running that used a CPU core.
+- Chrome no longer downloads components or models while it checks a page.
 
 ## v0.9.0
 
