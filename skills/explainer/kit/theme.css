@@ -10,7 +10,7 @@
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
-   optional head: kit Tree renders it) | toolbar (the row over a records section: a .seg view switch, <input
+   optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input
    type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
    Expand all joins its end. Layout only: the page owns their state, and inputs with ids are kept across reloads: kit keep).
    Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour

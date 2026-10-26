@@ -1,4 +1,5 @@
 /* Illustrative numbers for a 6 kW rooftop array on a four-person house; not measured. */
+import type { RecordsProps } from "kit";
 
 export const MONTHS = [
 	"Jan",
@@ -68,42 +69,54 @@ export const SIZES: Size[] = [
 
 export const payback = (s: Size) => Math.round(s.price / s.saved);
 
-/** What the 5 kWh installation costs, as the installer's quote lists it; ref names the part in the system diagram. */
-export const QUOTE = [
-	{
-		name: "Hardware",
-		items: [
+/**
+ * What the 5 kWh installation costs, as the installer's quote lists it, as Records' config with the column names given; its
+ * ref field names the part in the system diagram, which a page that draws the diagram links with refField="ref".
+ */
+export const quote = (item: string, price: string) =>
+	({
+		id: "quote",
+		idField: "name",
+		fields: {
+			name: { label: item, kind: "text" },
+			part: { label: "Part", kind: "text" },
+			eur: { label: price, kind: "currency", currency: "EUR", digits: 0, sum: true },
+			note: { label: "Note", kind: "text" },
+			ref: { label: "System part", kind: "text" },
+		},
+		columns: ["name", "eur"],
+		groupBy: ["part"],
+		detail: "note",
+		data: [
 			{
 				name: "Battery module, 5 kWh",
+				part: "Hardware",
 				eur: 2600,
 				ref: "battery",
 				note: "LFP cells, 6000 cycles to 80%.",
 			},
 			{
 				name: "Hybrid inverter upgrade",
+				part: "Hardware",
 				eur: 750,
 				ref: "inverter",
 				note: "Replaces the string inverter.",
 			},
-		],
-	},
-	{
-		name: "Installation",
-		items: [
 			{
 				name: "Electrician, 6 h",
+				part: "Installation",
 				eur: 540,
 				ref: "inverter",
 				note: "Mounting, wiring, commissioning.",
 			},
 			{
 				name: "Meter and breaker",
+				part: "Installation",
 				eur: 310,
 				ref: "grid",
 				note: "Bidirectional meter swap by the grid operator.",
 			},
 		],
-	},
-];
+	}) satisfies RecordsProps;
 
 export const euro = (n: number) => `${n.toLocaleString("en")} €`;

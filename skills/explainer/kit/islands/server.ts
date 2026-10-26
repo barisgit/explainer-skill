@@ -298,7 +298,7 @@ hooks.__r = (vnode) => {
 
 /**
  * `<tag prop>` for a vnode made outside every island that holds a handler: an element's `on*` function, or a
- * component's `onX` function (a static component's other function props, such as Tree's `row`, run in pack and are fine).
+ * component's `onX` function (a static component's other function props, such as Table's `value`, run in pack and are fine).
  */
 function staticHandler(vnode: VNode): string | undefined {
 	const { type } = vnode;

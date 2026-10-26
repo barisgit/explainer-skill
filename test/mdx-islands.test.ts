@@ -408,7 +408,7 @@ export function Reveal() {
 `;
 
 /**
- * One use of each kit component, written so it needs every script the component can need (Tree: folds and refs), and the kit
+ * One use of each kit component, written so it needs every script the component can need (Records: folds and refs), and the kit
  * scripts the page carries when it renders that use itself.
  */
 const COMPONENT_USES: Record<string, { use: string; scripts: string[] }> = {
@@ -436,8 +436,8 @@ const COMPONENT_USES: Record<string, { use: string; scripts: string[] }> = {
 		use: `<Table rows={[{ name: "A", n: 1 }]} cols={[{ head: "Name", value: "name" }, { head: "N", value: "n" }]} />`,
 		scripts: [],
 	},
-	Tree: {
-		use: `<Tree items={[{ label: "Plan", ref: "plan", items: [{ label: "Task", ref: "plan", text: "Do it" }] }]} />`,
+	Records: {
+		use: `<Records id="plan" data={[{ id: "a", phase: "One", note: "Do it" }]} idField="id" fields={{ id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "text" }, note: { label: "Note", kind: "text" } }} columns={["id"]} groupBy={["phase"]} detail="note" refField="phase" />`,
 		scripts: ["views", "link"],
 	},
 };

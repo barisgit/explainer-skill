@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+One collection of records, shown as a grouped tree, a sortable table or a board, is one component: `Records`. It replaces `Tree`. Mermaid diagrams stay readable on phones and in print.
+
+### What an author does differently
+
+- Write `<Records {...plan} />` with a config object (`kit Records`): flat `data`, `idField`, `fields` with a kind each, `columns`, and `groupBy` for the tree's levels. `views`, `search`, `facets` and `sort` add the controls; the view, search and filters go in the URL hash, so `<a href="#plan?f.owner=JV">` opens a filtered list. `link` names a filled `View` each row opens, with previous/next through the rows shown.
+- `pack` checks the config and fails with the path of each problem (`fields.hours.kind`) and what to write instead.
+- `Tree` is gone. Flatten its nested `items` into records with the group's name as a field, list those fields in `groupBy`, and move a row's `text` and `ref` into fields named by `detail` and `refField`. Hand-written `.tree` markup still works. Uneven depths and JSX cells have no Records form; write the `<details>` yourself for those.
+- New label keys for the block's controls and texts (`kit labels` lists them, all starting with `records`).
+
+### Mermaid
+
 - Mermaid diagrams stay readable on phones. A flowchart or state diagram too wide for a phone gets a second layout across its direction (left to right becomes top-down), shown below 40rem, so left to right is fine to write. Other diagrams shrink until their smallest text is 10 px, then scroll sideways. Printed, each diagram fits the paper whole, top-down when the left-to-right layout would be too small to read.
 - A diagram's width limits are the custom properties `--mermaid-max` and `--mermaid-min` on its `svg`, so one page rule can change them.
 - A circle node with a short label is about the size of a box node, not a large disc.

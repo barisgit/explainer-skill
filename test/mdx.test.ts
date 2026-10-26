@@ -178,9 +178,9 @@ describe("pack fails on page source that would not work in the browser", () => {
 	});
 
 	test("a handler prop on a static component fails, and other function props do not", async () => {
-		const tree =
-			'import { Tree } from "kit";\n\n<Tree items={[{ name: "a" }]} row={(r) => ({ label: r.name, text: "t" })} />\n';
-		expect((await pack("static-function", tree)).result.code).toBe(0);
+		const table =
+			'import { Table } from "kit";\n\n<Table rows={[{ name: "a" }]} cols={[{ head: "Name", value: (r) => r.name.toUpperCase() }]} state={() => "fit"} />\n';
+		expect((await pack("static-function", table)).result.code).toBe(0);
 		const stderr = await failure(
 			"component-handler",
 			'import { Stepper } from "kit";\n\n<Stepper captions={["a", "b"]} onStep={() => 1}><svg /></Stepper>\n',

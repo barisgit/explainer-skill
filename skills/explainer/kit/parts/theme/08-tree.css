@@ -1,9 +1,9 @@
 /* theme part: .tree, hierarchical records as nested <details>: one row per item, its label then its numbers in aligned columns.
-   A row is a <summary>, a link that stands as a row, or the .tree-head that names the columns; every child of a row is a cell, the
-   label first. A row is a grid of the chevron's column, the label's, then the number columns of --tree-cols, one width per column.
-   Each level is indented by the chevron's column and gap, so a child's chevron sits under its parent's label, and the number
-   columns, right-aligned at the row's end, line up across rows and levels. Rows are matched through :where(), so the rules below
-   rise in specificity in source order. */
+   A row is a <summary>, a link that stands as a row, a .tree-row (a record that opens to nothing, or the total), or the
+   .tree-head that names the columns; every child of a row is a cell, the label first. A row is a grid of the chevron's column,
+   the label's, then the columns of --tree-cols, one width per column. Each level is indented by the chevron's column and gap,
+   so a child's chevron sits under its parent's label, and the number columns, right-aligned at the row's end, line up across
+   rows and levels. Rows are matched through :where(), so the rules below rise in specificity in source order. */
 .tree {
 	margin-block: 1.25rem;
 	border-block-end: 1px solid var(--rule);
@@ -11,7 +11,7 @@
 }
 /* Unset, --tree-cols is one column per number cell, up to six (--tree-n, counted below), each 5rem where the row has room and
    narrower where it has not, so a deep row on a small phone shrinks its columns rather than scrolling sideways. */
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) {
 	--tree-n: 1;
 	display: grid;
 	grid-template-columns: 0.8125rem minmax(0, 1fr) var(
@@ -25,31 +25,31 @@
 	border-block-start: 1px solid var(--rule);
 	line-height: 1.35;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3)) {
 	--tree-n: 2;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(4)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(4)) {
 	--tree-n: 3;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(5)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(5)) {
 	--tree-n: 4;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(6)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(6)) {
 	--tree-n: 5;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(7)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(7)) {
 	--tree-n: 6;
 }
-/* A link row and the head have no chevron: their label starts in its own column, where its sibling summaries' labels do. */
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > :first-child {
+/* A link row, a plain row and the head have no chevron: their label starts in its own column, where its sibling summaries' labels do. */
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > :first-child {
 	grid-column: 2;
 	min-inline-size: 0;
 }
 /* A row of a label alone gives it the row. */
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > :only-child {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > :only-child {
 	grid-column: 2 / -1;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > * + * {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > * + * {
 	min-inline-size: 0;
 	color: var(--muted);
 	font-size: 0.875rem;
@@ -94,7 +94,7 @@
 	margin-inline-start: 1.3125rem;
 }
 /* A leaf's full text, under its row. */
-.tree details > :not(summary, details, a) {
+.tree details > :not(summary, details, a, .tree-row) {
 	max-inline-size: 66ch;
 	margin-block: 0 0.875rem;
 }
@@ -103,7 +103,7 @@
 }
 /* Rows run on with no gap between them. */
 .tree details[open] > summary,
-.tree details > :is(details, a):last-child {
+.tree details > :is(details, a, .tree-row):last-child {
 	margin-block-end: 0;
 }
 /* A closed branch that holds a row kit:link.js lights is tinted as the row would be. */
@@ -114,19 +114,19 @@
    right-aligned; a single number stays on the label's line. The label spans every column, and the first number starts in its own
    column, which the label holds on the first line, so the numbers go to the second. */
 @media (max-width: 40rem) {
-	.tree :where(summary, .tree > a, details > a, .tree > .tree-head) {
+	.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) {
 		row-gap: 0.125rem;
 	}
-	.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > * + * {
+	.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > * + * {
 		font-size: 0.8125rem;
 	}
 	.tree
-		:where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3))
+		:where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3))
 		> :first-child {
 		grid-area: 1 / 2 / 2 / -1;
 	}
 	.tree
-		:where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3))
+		:where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3))
 		> :nth-child(2) {
 		grid-column-start: 3;
 	}

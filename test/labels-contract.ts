@@ -127,6 +127,27 @@ async function views() {
 	await navigate("");
 }
 
+async function records() {
+	const block = $("[data-records]");
+	if (!block) {
+		return;
+	}
+	const views = [...block.querySelectorAll(".seg span")].map((s) => s.textContent).join("|");
+	expect("records views", views === [L.recordsTree, L.recordsTable, L.recordsBoard].join("|") && aria(".seg", block) === L.recordsView);
+	const search = $("input[type=search]", block);
+	expect("records search", search.getAttribute("aria-label") === L.recordsSearch && search.placeholder === L.recordsSearch);
+	expect("records count", $("output", block).textContent === L.recordsShown.replace("{shown}", "2").replace("{total}", "2"));
+	expect("records total and expand all", $(".total", block).firstElementChild.textContent === L.recordsTotal && $(".fold-all", block).textContent === L.expandAll);
+	const drawn = changed(block);
+	search.value = "zzz";
+	search.dispatchEvent(new Event("input", { bubbles: true }));
+	await drawn;
+	expect("records no matches", $("output", block).textContent === L.recordsNoMatches && $(".reset", block).textContent === L.recordsClear);
+	const cleared = changed(block);
+	$(".reset", block).click();
+	await cleared;
+}
+
 function clearing() {
 	const reply = $(".reply-bar .primary");
 	const clear = $(".reply-bar .btn:not(.primary)");
@@ -177,6 +198,7 @@ ${SETTLED}
 var contract = settled.then(async () => {
 	steps();
 	await views();
+	await records();
 	clearing();
 	note();
 	await dialog();

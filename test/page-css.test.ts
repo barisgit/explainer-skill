@@ -47,13 +47,13 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 		const input = dir.write(
 			"collide.mdx",
 			`import "./own-mdx.css";
-import { Question, Tree, View } from "kit";
+import { Question, Records, View } from "kit";
 
 # Own tree
 
 <ul class="tree"><li>a</li></ul>
 
-<Tree head={["Task", "Hours"]} items={[{ label: "One", cells: ["1 h"], text: "a" }]} />
+<Records id="tasks" data={[{ id: "One", phase: "A", hours: 1 }]} idField="id" fields={{ id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "text" }, hours: { label: "Hours", kind: "number", unit: "h" } }} columns={["id", "hours"]} groupBy={["phase"]} views={["tree", "table"]} />
 
 <Question name="q" legend="Pick" options={{ a: "A", b: "B" }} />
 

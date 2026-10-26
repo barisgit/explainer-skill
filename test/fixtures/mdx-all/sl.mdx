@@ -34,9 +34,10 @@ labels:
   saveNote: "Shrani opombo"
   figure: "slika"
   page: "stran"
+  recordsTotal: "Skupaj"
 ---
-import { Question, Stepper, Tree, View } from "kit";
-import { euro, QUOTE } from "./data.ts";
+import { Question, Records, Stepper, View } from "kit";
+import { quote } from "./data.ts";
 
 # Baterija s 5 kWh pokrije *80 % poletnih večerov*.
 
@@ -52,7 +53,7 @@ Ponudba za baterijo k 6-kilovatni sončni elektrarni na strehi štiričlanske hi
 
 <h2 data-nav="Cena">Ponudba: 4.200 €</h2>
 
-<Tree head={["Postavka", "Cena"]} cols="6rem" items={QUOTE} row={(g) => g.items ? { label: g.name, cells: [euro(g.items.reduce((sum, i) => sum + i.eur, 0))], items: g.items } : { label: g.name, cells: [euro(g.eur)], text: g.note }} />
+<Records {...quote("Postavka", "Cena")} />
 
 [Kako so nastale številke](#metoda)
 

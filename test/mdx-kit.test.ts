@@ -20,56 +20,29 @@ const PLAN = {
 		{ id: "luka", name: "Luka Kos", role: "Builds the boards.", hours: 34 },
 		{ id: "mia", name: "Mia Zupan", role: "Tests everything.", hours: 20 },
 	],
-	phases: [
-		{
-			id: "p1",
-			name: "1 Discovery",
-			hours: 52,
-			tasks: [
-				{
-					id: "spike",
-					name: "1.1 Spike boards",
-					hours: 52,
-					tasks: [
-						{
-							name: "1.1.1 Schematic review",
-							hours: 12,
-							owner: "Ana",
-							ref: "ana",
-							note: "Walk the old schematic.",
-						},
-						{
-							name: "1.1.2 Power stage",
-							hours: 24,
-							owner: "Mia",
-							ref: "mia",
-							note: "Build the buck stage.",
-						},
-						{ name: "1.1.3 Enclosure fit", hours: 16, owner: "Luka", ref: "luka", view: "luka" },
-					],
-				},
-			],
-		},
-		{
-			id: "p2",
-			name: "2 Firmware",
-			hours: 20,
-			tasks: [
-				{
-					name: "2.1 HAL and clocks",
-					hours: 20,
-					owner: "Ana",
-					ref: "ana",
-					note: "Bring up the clocks.",
-				},
-			],
-		},
-	],
 };
+
+/**
+ * The plan's tree as a v0.8 author wrote it by hand, before Records: the .tree runtime still reads this markup. It is one line in
+ * the page, since MDX reads a line that opens a tag and goes on with text as a paragraph, which must close the tag itself.
+ */
+const TREE = `<div class="tree" style="--tree-cols: 4rem 4rem">
+<div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
+<details id="p1"><summary><span>1 Discovery</span><span>52 h</span><span></span></summary>
+<details id="spike"><summary><span>1.1 Spike boards</span><span>52 h</span><span></span></summary>
+<details><summary data-ref="ana"><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Walk the old schematic.</p></details>
+<details><summary data-ref="mia"><span>1.1.2 Power stage</span><span>24 h</span><span>Mia</span></summary><p>Build the buck stage.</p></details>
+<a href="#person/luka" data-ref="luka"><span>1.1.3 Enclosure fit</span><span>16 h</span><span>Luka</span></a>
+</details>
+</details>
+<details id="p2"><summary><span>2 Firmware</span><span>20 h</span><span></span></summary>
+<details><summary data-ref="ana"><span>2.1 HAL and clocks</span><span>20 h</span><span>Ana</span></summary><p>Bring up the clocks.</p></details>
+</details>
+</div>`.replaceAll("\n", "");
 
 /** A page as an agent writes one with the kit's static components: a view per person from data, a tree, a table, a question. */
 const PAGE = (script = "") => `import plan from "./plan.json";
-import { Question, Tree, View } from "kit";
+import { Question, View } from "kit";
 
 # The board ships in 72 hours
 
@@ -81,7 +54,7 @@ Two phases, three people, one decision left.
 
 <h2 data-nav="Plan">The plan has two phases and 72 hours</h2>
 
-<Tree cols="4rem 4rem" head={["Task", "Hours", "Owner"]} items={plan.phases} row={(r) => ({ label: r.name, cells: [\`\${r.hours} h\`, r.owner], items: r.tasks, text: r.note, href: r.view && \`#person/\${r.view}\`, id: r.id, ref: r.ref })} />
+${TREE}
 
 ## Options
 
@@ -121,19 +94,7 @@ const V08_MAIN = `<main class="page"><div data-overview>
 <section data-nav="People"><h2>Three people share the work, <em>Ana</em> most of it</h2>
 <ul><li><a href="#person/ana">Ana Novak</a>: 52 h, <span data-ref="ana">ana</span></li><li><a href="#person/luka">Luka Kos</a>: 34 h, <span data-ref="luka">luka</span></li><li><a href="#person/mia">Mia Zupan</a>: 20 h, <span data-ref="mia">mia</span></li></ul></section>
 <section data-nav="Plan"><h2>The plan has two phases and 72 hours</h2>
-<div class="tree" style="--tree-cols: 4rem 4rem">
-<div class="tree-head"><span>Task</span><span>Hours</span><span>Owner</span></div>
-<details id="p1"><summary><span>1 Discovery</span><span>52 h</span><span></span></summary>
-	<details id="spike"><summary><span>1.1 Spike boards</span><span>52 h</span><span></span></summary>
-		<details><summary data-ref="ana"><span>1.1.1 Schematic review</span><span>12 h</span><span>Ana</span></summary><p>Walk the old schematic.</p></details>
-		<details><summary data-ref="mia"><span>1.1.2 Power stage</span><span>24 h</span><span>Mia</span></summary><p>Build the buck stage.</p></details>
-		<a href="#person/luka" data-ref="luka"><span>1.1.3 Enclosure fit</span><span>16 h</span><span>Luka</span></a>
-	</details>
-</details>
-<details id="p2"><summary><span>2 Firmware</span><span>20 h</span><span></span></summary>
-	<details><summary data-ref="ana"><span>2.1 HAL and clocks</span><span>20 h</span><span>Ana</span></summary><p>Bring up the clocks.</p></details>
-</details>
-</div></section>
+${TREE}</section>
 <section><h2>Options</h2><p>See <a href="#about">the method</a>.</p>
 <table class="compare"><thead><tr><th>Option</th><th>What it means</th><th class="num">Delay</th></tr></thead><tbody>
 <tr><th scope="row">A. Ship now</th><td data-label="What it means">Spike boards go out as they are.</td><td class="num" data-label="Delay">0 weeks</td></tr>
@@ -167,8 +128,9 @@ const mainOf = (html: string) =>
 		.replace(/=""/g, "");
 
 describe("the kit's static components render a v0.8 page", () => {
-	test("View, Tree, Question, a Markdown table and an <h2 data-nav> render the markup a v0.8 author writes", async () => {
+	test("View, Question, a Markdown table and an <h2 data-nav> render the markup a v0.8 author writes", async () => {
 		const { result, output } = await pack("parity", PAGE());
+		expect(result.stderr).toBe("");
 		expect(result.code).toBe(0);
 		expect(mainOf(readFileSync(output, "utf8"))).toBe(mainOf(V08_MAIN));
 	});
@@ -265,7 +227,7 @@ const LABELS_PAGE = (labels: string) => `---
 lang: sl
 ${labels}
 ---
-import { Question, Tree, View } from "kit";
+import { Question, Records, View } from "kit";
 
 # Labels
 
@@ -275,11 +237,14 @@ import { Question, Tree, View } from "kit";
 
 <a href="#p/a">A</a> <a href="#p/b">B</a>
 
-<Tree items={[{ label: "One", text: "1" }, { label: "Two", text: "2" }]} />
+<details><summary>One</summary><p>1</p></details>
+<details><summary>Two</summary><p>2</p></details>
 
 ## Items
 
 <a href="#i/1">One</a>, and the <span data-ref="cache">cache</span>.
+
+<Records id="tasks" data={[{ id: "A", phase: "One", hours: 2 }, { id: "B", phase: "Two", hours: 3 }]} idField="id" fields={{ id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }} columns={["id", "hours"]} groupBy={["phase"]} views={["tree", "table", "board"]} search={["id"]} />
 
 <figure aria-label="Scheme"><p>The <span data-ref="db">db</span>.</p></figure>
 
@@ -327,10 +292,8 @@ test("kit labels prints every kit text, and the block, translated, is the page's
 	expect(await runPacked(output, { slowdown: 4 })).toEqual([]);
 }, 60_000);
 
-test("MDX records keep JSX category markers, a plain toolbar's Expand all, and numeric table alignment at 390px", async () => {
-	const source = `import { Tree } from "kit";
-
-# Records
+test("hand-written records in MDX keep category markers, a plain toolbar's Expand all, and numeric table alignment at 390px", async () => {
+	const source = `# Records
 
 ## Tasks
 
@@ -338,11 +301,7 @@ test("MDX records keep JSX category markers, a plain toolbar's Expand all, and n
 
 <p class="legend"><span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span></p>
 
-<Tree cols="minmax(0, 4rem) minmax(0, 5rem)" head={["Task", "Hours", "Type"]} items={[
-  { label: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span>, cells: [70, null], items: [
-    { label: "Clocks", cells: [12, <span class="chip" style="--swatch: var(--c2)"><i></i>FW</span>], text: "Bring up the clocks." }
-  ] }
-]} />
+<div class="tree" style="--tree-cols: minmax(0, 4rem) minmax(0, 5rem)"><div class="tree-head"><span>Task</span><span>Hours</span><span>Type</span></div><details><summary><span><span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span></span><span>70</span><span></span></summary><details><summary><span>Clocks</span><span>12</span><span><span class="chip" style="--swatch: var(--c2)"><i></i>FW</span></span></summary><p>Bring up the clocks.</p></details></details></div>
 
 | Task | Hours |
 |---|---:|

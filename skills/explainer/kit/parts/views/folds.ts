@@ -4,15 +4,16 @@
    gets one button just above the block holding its first fold, or at the end of the section's .toolbar when one comes before
    that fold: Expand all, which opens every level of nested folds (a .tree), or Collapse all once every fold is open, which closes
    them all; it is kept in step when the reader opens folds one at a time. An answer fold (details.answer) is none of these: a
-   study page would otherwise reveal every answer in one click.
+   study page would otherwise reveal every answer in one click. Neither are the folds of Records with controls ([data-records]),
+   whose toolbar has its own Expand all, kept in its state.
    Folds a view handler draws count from its next refresh. */
 window.ViewsFolds = (kitText) => {
 	const buttons = new Map<HTMLElement, HTMLButtonElement>();
 
-	/** The section's own folds, nested ones included, answers left out. */
+	/** The section's own folds, nested ones included, answers and Records' left out. */
 	function foldsOf(section: HTMLElement) {
 		return [...section.querySelectorAll<HTMLDetailsElement>("details:not(.answer)")].filter(
-			(d) => d.closest("section") === section,
+			(d) => d.closest("section") === section && !d.closest("[data-records]"),
 		);
 	}
 

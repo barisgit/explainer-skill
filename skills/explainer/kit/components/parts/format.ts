@@ -12,8 +12,12 @@ export function setPageLang(lang: string): void {
 }
 
 /** The page's language: `<html lang>` in the browser, the frontmatter's while pack renders. */
-const pageLang = () =>
+export const pageLang = (): string =>
 	(typeof document === "undefined" ? packLang : document.documentElement.lang) || "en";
+
+/** The page's frontmatter labels: kitLabels, which pack defines while it renders and the page defines in the browser. */
+export const pageLabels = (): Readonly<Record<string, string>> =>
+	(typeof kitLabels === "undefined" ? undefined : kitLabels) ?? {};
 
 /** The Intl options of a NumberFormat; plot.js and charts.js build the same. */
 const intlOptions = ({

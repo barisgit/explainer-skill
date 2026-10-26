@@ -23,7 +23,7 @@ export { Chart } from "./chart.tsx";
 export { Explore } from "./explore.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
+export { Records, type RecordsProps } from "./records.tsx";
 export { Stepper } from "./stepper.tsx";
 export { Table } from "./table.tsx";
-export { Tree, type TreeItem, type TreeRow } from "./tree.tsx";
 export { View } from "./view.tsx";

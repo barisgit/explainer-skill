@@ -1,8 +1,8 @@
 ---
 title: Home battery size
 ---
-import { Chart, Plot, Question, Stepper, Tree, View } from "kit";
-import { euro, MONTHS, PRODUCTION, payback, QUOTE, SIZES, USE } from "./data.ts";
+import { Chart, Plot, Question, Records, Stepper, View } from "kit";
+import { euro, MONTHS, PRODUCTION, payback, quote, SIZES, USE } from "./data.ts";
 import { Day } from "./day.tsx";
 import "./page.css";
 
@@ -63,7 +63,7 @@ flowchart TD
 
 <h2 data-nav="Cost">The 5 kWh quote is 4,200 €, two thirds of it the battery</h2>
 
-<Tree head={["Item", "Price"]} cols="6rem" items={QUOTE} row={(g) => g.items ? { label: g.name, cells: [euro(g.items.reduce((sum, i) => sum + i.eur, 0))], items: g.items } : { label: g.name, cells: [euro(g.eur)], text: g.note, ref: g.ref }} />
+<Records {...quote("Item", "Price")} refField="ref" />
 
 <h2 data-nav="Options">Three sizes, one decision</h2>
 

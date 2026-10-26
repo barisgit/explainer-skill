@@ -41,13 +41,15 @@ test("kit types checks an external page's own sources without installed dependen
 		'const probe: number = "not checked";\nconsole.log(probe, Bun.version);\n',
 	);
 	const good = `"use client";
-import { Chart, Explore, Plot, Question, Stepper, Table, Tree, type TreeItem, type TreeRow, View } from "kit";
+import { Chart, Explore, Plot, Question, Records, type RecordsProps, Stepper, Table, View } from "kit";
 import { useState } from "preact/hooks";
 import { start as first } from "./data.ts";
 const option: PlotOption = { series: [{ type: "line", data: [[0, 1]] }] };
-interface Task { name: string; hours: number; tasks?: Task[] }
-const taskRow = (task: Task): TreeRow<Task> => ({ label: task.name, cells: [task.hours], items: task.tasks, text: "Full" });
-const rows: TreeItem[] = [{ label: "A", cells: [1], text: "Full" }];
+const plan = {
+  id: "plan", idField: "id", data: [{ id: "A", phase: "One", hours: 2 }],
+  fields: { id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "category", values: [{ value: "One", color: "var(--c1)" }] }, hours: { label: "Hours", kind: "number", unit: "h", sum: true } },
+  columns: ["id", "hours"], groupBy: ["phase"], views: ["tree", "table"], sort: { field: "hours", desc: true },
+} satisfies RecordsProps;
 const chart: ChartOption = { series: [{ type: "bar", data: [1] }] };
 export function Figure({ start = first }: { start?: number }) {
   const [count, setCount] = useState(start);
@@ -57,8 +59,7 @@ export function Figure({ start = first }: { start?: number }) {
     <Explore label="Values" controls={[{ id: "on", label: "On", toggle: true }]} frame={(on: boolean) => ({ plot: option, readout: on ? <b>On</b> : "Off" })} />
     <Question name="q" legend="Pick" options={["a", "b"]} />
     <Stepper captions={["One", "Two"]}><p data-step="1">One</p></Stepper>
-    <Tree cols="4rem" head={["Task", "Hours"]} items={rows} />
-    <Tree items={[{ name: "B", hours: 2 }]} row={taskRow} />
+    <Records {...plan} />
     <Table rows={[{ name: "A", share: 0.5 }]} cols={[{ head: "Name", value: "name", link: (r) => \`#\${r.name}\` }, { head: "Share", value: "share", format: { percent: true } }]} />
     <View name="detail"><h1>Detail</h1></View></>;
 }
@@ -73,7 +74,7 @@ export function Figure({ start = first }: { start?: number }) {
 	expect(checked.code).toBe(0);
 	dir.write(
 		"figure.tsx",
-		`${good}\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Tree items={[]} cell="4rem" />;\n`,
+		`${good}\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Records {...plan} cell="4rem" />;\n`,
 	);
 	const failed = await run(["check", "--no-pretty"]);
 	expect(failed.code).not.toBe(0);
