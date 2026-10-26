@@ -5,6 +5,7 @@
  */
 import { expect, test } from "bun:test";
 import {
+	type Cell,
 	createRecords,
 	type DataRecord,
 	type GroupRow,
@@ -166,6 +167,56 @@ test("a bad config is rejected with every problem, where it is and what to write
 		"views[0]: the tree view needs groupBy, the fields it groups by",
 		'data[0].hours: expected a finite number or null; got "12h"',
 		'data[1].id: "A-1" is also the id of data[0]; ids must be unique',
+	]);
+});
+
+test("a sum over records with unknown values reads as a lower bound, or as unknown when none has one", () => {
+	const partial = createRecords({
+		id: "gaps",
+		idField: "id",
+		fields: {
+			id: { label: "Id", kind: "text" },
+			team: { label: "Team", kind: "text" },
+			hours: { label: "Hours", kind: "number", unit: "h", sum: true },
+		},
+		columns: ["id", "hours"],
+		groupBy: ["team"],
+		views: ["tree", "table", "board"],
+		data: [
+			{ id: "a", team: "known", hours: 1200 },
+			{ id: "b", team: "known", hours: 164 },
+			{ id: "c", team: "mixed", hours: 8 },
+			{ id: "d", team: "mixed", hours: null },
+			{ id: "e", team: "none" },
+			{ id: "f", team: "none", hours: null },
+		],
+	});
+	// The texts join a number to its unit and to ≥ with no-break spaces; the expectations write plain ones.
+	const plain = (text: string | undefined) => text?.replace(/\u00a0/g, " ");
+	const hours = (cells: readonly Cell[]) => {
+		const { text, value, incomplete } = cells[1] ?? {};
+		return { text: plain(text), value, incomplete: plain(incomplete) };
+	};
+	const { body: treeBody } = partial.view();
+	const groups = treeBody.kind === "tree" ? treeBody.groups : [];
+	expect(groups.map((g) => hours(g.cells))).toEqual([
+		{ text: "1,364 h", value: 1364, incomplete: undefined },
+		{ text: "≥ 8 h", value: 8, incomplete: "at least 8 h, 1 without a value" },
+		// Unknown is not zero: the sum of nothing known is unknown.
+		{ text: "?", value: null, incomplete: "unknown, 2 without a value" },
+	]);
+	expect(treeBody.kind === "tree" && hours(treeBody.total)).toEqual({
+		text: "≥ 1,372 h",
+		value: 1372,
+		incomplete: "at least 1,372 h, 3 without a value",
+	});
+	const { body: table } = partial.view({ ...partial.initial, view: "table" });
+	expect(table.kind === "table" && hours(table.total).text).toBe("≥ 1,372 h");
+	const { body: board } = partial.view({ ...partial.initial, view: "board" });
+	expect(board.kind === "board" && board.lanes.map((l) => hours(l.cells).text)).toEqual([
+		"1,364 h",
+		"≥ 8 h",
+		"?",
 	]);
 });
 

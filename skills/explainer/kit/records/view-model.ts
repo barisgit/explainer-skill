@@ -16,8 +16,11 @@ export interface Cell {
 	text: string;
 	/** A category value's marker colour. */
 	swatch?: string;
-	/** A sum that leaves out records with no value in the field: show it as a lower bound. */
-	incomplete?: true;
+	/**
+	 * A sum over records some of which have no value in the field, in words ("at least 1,372 h, 3 without a value"), for screen
+	 * readers and the tooltip; `text` then reads "≥ 1,372 h", or "?" when none of them has a value, since unknown is not zero.
+	 */
+	incomplete?: string;
 }
 
 /** One column of a view. */

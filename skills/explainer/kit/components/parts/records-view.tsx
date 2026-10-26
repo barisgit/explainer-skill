@@ -48,8 +48,21 @@ const isTag = (c: Column) => c.align === "start";
 
 const swatchStyle = (swatch: string) => `--swatch: ${swatch}`;
 
-/** A cell's text; a category value with a colour is a chip with its marker. */
+/**
+ * A cell's text; a category value with a colour is a chip with its marker. An incomplete sum shows its short form (≥ 1,372 h)
+ * with the words as its tooltip, and screen readers read the words alone.
+ */
 function cellText(cell: Cell): JSX.Element | string {
+	if (cell.incomplete) {
+		return (
+			<span class="incomplete">
+				<span aria-hidden="true" title={cell.incomplete}>
+					{cell.text}
+				</span>
+				<span class="vh">{cell.incomplete}</span>
+			</span>
+		);
+	}
 	return cell.swatch ? (
 		<span class="chip" style={swatchStyle(cell.swatch)}>
 			<i />
@@ -220,7 +233,7 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 							const column = rest[i];
 							return (
 								<td key={cell.field} class={column && num(column)} data-label={column?.label}>
-									{cell.text}
+									{cellText(cell)}
 								</td>
 							);
 						})}
@@ -256,9 +269,12 @@ function Board({ body, ctx }: { body: BoardView; ctx: Context }) {
 							{lane.swatch && <i class="swatch" style={swatchStyle(lane.swatch)} />}
 							{lane.title}
 						</span>
-						{[String(lane.count), ...lane.cells.slice(1).map((c) => c.text)]
-							.filter(Boolean)
-							.join(" · ")}
+						<span>
+							{lane.count}
+							{lane.cells
+								.slice(1)
+								.map((c) => c.text && <span key={c.field}> · {cellText(c)}</span>)}
+						</span>
 					</p>
 					<ul>
 						{lane.items.map((row) => (

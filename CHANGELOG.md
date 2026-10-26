@@ -7,6 +7,7 @@ One collection of records, shown as a grouped tree, a sortable table or a board,
 ### What an author does differently
 
 - Write `<Records {...plan} />` with a config object (`kit Records`): flat `data`, `idField`, `fields` with a kind each, `columns`, and `groupBy` for the tree's levels. `views`, `search`, `facets` and `sort` add the controls; the view, search and filters go in the URL hash, so `<a href="#plan?f.owner=JV">` opens a filtered list. `link` names a filled `View` each row opens, with previous/next through the rows shown.
+- A field with `sum: true` adds subtotals and a total. Records without a value never count as zero: the sum shows as `≥ 1,372 h` (or `?` when no record has a value), and screen readers hear how many records it leaves out.
 - `pack` checks the config and fails with the path of each problem (`fields.hours.kind`) and what to write instead.
 - `Tree` is gone. Flatten its nested `items` into records with the group's name as a field, list those fields in `groupBy`, and move a row's `text` and `ref` into fields named by `detail` and `refField`. Hand-written `.tree` markup still works. Uneven depths and JSX cells have no Records form; write the `<details>` yourself for those.
 - New label keys for the block's controls and texts (`kit labels` lists them, all starting with `records`).

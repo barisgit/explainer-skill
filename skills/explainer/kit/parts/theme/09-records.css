@@ -19,6 +19,19 @@
 	background: var(--swatch);
 }
 
+/* An incomplete sum: ≥ or ? on screen with the words as a tooltip; .vh holds the words for screen readers, out of sight. */
+.records .incomplete {
+	cursor: help;
+}
+.records .vh {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
 /* Facets: one row per field, its name then its values; a pressed value is tinted in the accent. */
 .records > .facets {
 	display: grid;

@@ -104,6 +104,48 @@ var contract = settled.then(frames).then(async () => {
 		expect(await runPacked(output)).toEqual([]);
 	}, 60_000);
 
+	test("an incomplete sum shows as a lower bound or unknown in every view, in words for screen readers", async () => {
+		const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
+		const output = await packedMdx(
+			dir,
+			"gaps",
+			`import { Records } from "kit";
+
+export const gaps = ${gaps};
+
+# Gaps
+
+<Records id="tree" {...gaps} views={["tree"]} />
+
+<Records id="table" {...gaps} views={["table"]} />
+
+<Records id="board" {...gaps} views={["board"]} />
+`,
+		);
+		const html = readFileSync(output, "utf8");
+		const marked = (words: string) =>
+			new RegExp(
+				`<span class="incomplete"><span aria-hidden="true" title="${words}">([^<]*)</span><span class="vh">${words}</span></span>`,
+				"g",
+			);
+		const shown = (id: string, words: string) => {
+			const block = (html.split(`id="${id}"`)[1] ?? "").split('class="records wide"')[0] ?? "";
+			return [...block.matchAll(marked(words))].map((m) => m[1]);
+		};
+		// The mixed group or lane, the one with no value, and the total of the tree and the table (the table shows no groups).
+		const seen = ["tree", "table", "board"].map((id) => [
+			id,
+			shown(id, "at least 8, 1 without a value"),
+			shown(id, "unknown, 1 without a value"),
+			shown(id, "at least 8, 2 without a value"),
+		]);
+		expect(seen).toEqual([
+			["tree", ["≥ 8"], ["?"], ["≥ 8"]],
+			["table", [], [], ["≥ 8"]],
+			["board", ["≥ 8"], ["?"], []],
+		]);
+	});
+
 	test("pack fails on a bad config, naming the path of each problem", async () => {
 		const { result } = await packMdx(
 			dir,

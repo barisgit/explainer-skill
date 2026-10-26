@@ -13,6 +13,8 @@ export const LABELS = {
 	recordsShown: "{shown} of {total}",
 	recordsNoMatches: "No matches",
 	recordsClear: "Clear filters",
+	recordsAtLeast: "at least {value}, {missing} without a value",
+	recordsUnknown: "unknown, {missing} without a value",
 	expandAll: "Expand all",
 	collapseAll: "Collapse all",
 };

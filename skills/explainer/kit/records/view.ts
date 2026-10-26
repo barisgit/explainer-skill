@@ -28,6 +28,9 @@ export interface ViewTexts {
 	total: string;
 	/** "{shown} of {total}". */
 	shown: string;
+	/** An incomplete sum in words: "at least {value}, {missing} without a value", and "unknown, {missing} without a value". */
+	atLeast: string;
+	unknown: string;
 	views: Readonly<Record<ViewKind, string>>;
 }
 
@@ -42,15 +45,35 @@ function column(model: Model, field: string): Column {
 	};
 }
 
+/** A field's sum as a cell, marked incomplete when records without a value leave it out; empty when the field is not summed. */
+function sumCell(
+	model: Model,
+	field: string,
+	sums: Readonly<Record<string, Sum>>,
+	texts: ViewTexts,
+): Cell {
+	const sum = sums[field];
+	const value = sum?.total ?? null;
+	const text = model.kinds[field]?.text(value) ?? "";
+	if (!sum?.missing) {
+		return { field, value, text };
+	}
+	const words = (value === null ? texts.unknown : texts.atLeast)
+		.replace("{value}", text)
+		.replace("{missing}", model.count(sum.missing));
+	return { field, value, text: value === null ? "?" : `≥\u00a0${text}`, incomplete: words };
+}
+
 /** The first cell of a group, lane or total: its title under the label column; the rest are sums or empty. */
 function summaryCells(
 	model: Model,
 	columns: readonly Column[],
 	title: string,
 	sums: Readonly<Record<string, Sum>>,
+	texts: ViewTexts,
 ): Cell[] {
 	return columns.map((c, i) =>
-		i === 0 ? { field: c.field, value: null, text: title } : model.sumCell(c.field, sums),
+		i === 0 ? { field: c.field, value: null, text: title } : sumCell(model, c.field, sums, texts),
 	);
 }
 
@@ -76,6 +99,7 @@ function itemRow(model: Model, item: Item, columns: readonly Column[], match: bo
 
 interface TreeInput {
 	model: Model;
+	texts: ViewTexts;
 	state: RecordsState;
 	columns: readonly Column[];
 	/** Ids of the matching items; null when nothing narrows. */
@@ -83,7 +107,7 @@ interface TreeInput {
 }
 
 function groupRow(node: TreeNode, input: TreeInput): GroupRow {
-	const { model, state, columns, matched } = input;
+	const { model, texts, state, columns, matched } = input;
 	const children = node.groups.length
 		? node.groups.map((g) => groupRow(g, input))
 		: node.items.map((item) => itemRow(model, item, columns, !matched || matched.has(item.id)));
@@ -105,7 +129,7 @@ function groupRow(node: TreeNode, input: TreeInput): GroupRow {
 		open: saved || (matched !== null && matches > 0),
 		count: node.count,
 		matches,
-		cells: summaryCells(model, columns, node.title, node.sums),
+		cells: summaryCells(model, columns, node.title, node.sums, texts),
 		children,
 		toggle: {
 			...state,
@@ -124,12 +148,12 @@ function treeView(
 	const columns = model.config.columns
 		.filter((f) => !model.config.groupBy.includes(f))
 		.map((field) => column(model, field));
-	const input: TreeInput = { model, state, columns, matched };
+	const input: TreeInput = { model, texts, state, columns, matched };
 	return {
 		kind: "tree",
 		columns,
 		groups: model.tree.map((node) => groupRow(node, input)),
-		total: summaryCells(model, columns, texts.total, model.totals),
+		total: summaryCells(model, columns, texts.total, model.totals, texts),
 		expandAll: { ...state, open: model.rules.groups },
 		collapseAll: { ...state, open: [] },
 	};
@@ -163,11 +187,11 @@ function tableView(
 		kind: "table",
 		columns: headers,
 		rows: items.map((item) => itemRow(model, item, columns, true)),
-		total: summaryCells(model, columns, texts.total, sums),
+		total: summaryCells(model, columns, texts.total, sums, texts),
 	};
 }
 
-function boardView(model: Model, narrowing: Narrowing): BoardView {
+function boardView(model: Model, narrowing: Narrowing, texts: ViewTexts): BoardView {
 	const field = model.config.groupBy[0] ?? "";
 	// The lane shows the first groupBy field, so the cards leave out only that one.
 	const columns = model.config.columns.filter((f) => f !== field).map((f) => column(model, f));
@@ -189,7 +213,7 @@ function boardView(model: Model, narrowing: Narrowing): BoardView {
 			title,
 			...(swatch ? { swatch } : {}),
 			count: group?.items.length ?? 0,
-			cells: summaryCells(model, columns, title, group?.sums ?? {}),
+			cells: summaryCells(model, columns, title, group?.sums ?? {}, texts),
 			items: (group?.items ?? []).map((item) => itemRow(model, item, columns, true)),
 		};
 	});
@@ -256,12 +280,11 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 	};
 	const filtering = narrowing.terms.length > 0 || Object.keys(state.filters).length > 0;
 	const result = model.engine.query(narrowing, state.sort, model.config.facets);
-	const count = new Intl.NumberFormat(model.locale);
 	const body =
 		state.view === "tree"
 			? treeView(model, state, filtering ? new Set(result.items.map((i) => i.id)) : null, texts)
 			: state.view === "board"
-				? boardView(model, narrowing)
+				? boardView(model, narrowing, texts)
 				: tableView(model, state, result.items, result.sums, texts);
 	return {
 		id: model.config.id,
@@ -276,8 +299,8 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 		shown: result.items.length,
 		total: model.items.length,
 		shownText: texts.shown
-			.replace("{shown}", count.format(result.items.length))
-			.replace("{total}", count.format(model.items.length)),
+			.replace("{shown}", model.count(result.items.length))
+			.replace("{total}", model.count(model.items.length)),
 		clear: filtering ? { ...state, filters: {}, search: "" } : null,
 		body,
 	};

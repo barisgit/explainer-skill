@@ -47,8 +47,8 @@ export interface Model {
 	fold(text: string): string;
 	/** One item's cell in a field. */
 	cell(item: Item, field: string): Cell;
-	/** A cell for a sum, or an empty one when the field is not summed. */
-	sumCell(field: string, sums: Readonly<Record<string, Sum>>): Cell;
+	/** A count of records in the page's locale ("1,364"). */
+	count(n: number): string;
 }
 
 /** Each facet field's values in order: a category's as listed, a text field's as they first appear in the data. */
@@ -171,17 +171,8 @@ export function buildModel(config: CheckedConfig, locale: string): Model {
 		const swatch = kinds[field]?.swatch(value);
 		return { field, value, text: kinds[field]?.text(value) ?? "", ...(swatch ? { swatch } : {}) };
 	};
-	const sumCell = (field: string, sums: Readonly<Record<string, Sum>>): Cell => {
-		const sum = sums[field];
-		const value = sum?.total ?? null;
-		const partial = value !== null && (sum?.missing ?? 0) > 0;
-		return {
-			field,
-			value,
-			text: kinds[field]?.text(value) ?? "",
-			...(partial ? { incomplete: true } : {}),
-		};
-	};
+	const counts = new Intl.NumberFormat(locale);
+	const count = (n: number) => counts.format(n);
 	const totals = engine.query({ filters: {}, terms: [] }, null, []).sums;
-	return { config, locale, kinds, items, engine, tree, totals, rules, fold, cell, sumCell };
+	return { config, locale, kinds, items, engine, tree, totals, rules, fold, cell, count };
 }

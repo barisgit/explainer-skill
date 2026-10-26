@@ -44,6 +44,8 @@ export const ENGLISH = {
 	recordsShown: "{shown} of {total}",
 	recordsNoMatches: "No matches",
 	recordsClear: "Clear filters",
+	recordsAtLeast: "at least {value}, {missing} without a value",
+	recordsUnknown: "unknown, {missing} without a value",
 };
 
 export const SLOVENIAN: typeof ENGLISH = {
@@ -89,6 +91,8 @@ export const SLOVENIAN: typeof ENGLISH = {
 	recordsShown: "{shown} od {total}",
 	recordsNoMatches: "Ni zadetkov",
 	recordsClear: "Počisti filtre",
+	recordsAtLeast: "vsaj {value}, {missing} brez vrednosti",
+	recordsUnknown: "neznano, {missing} brez vrednosti",
 };
 
 /**
