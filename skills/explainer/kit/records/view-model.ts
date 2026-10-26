@@ -1,8 +1,8 @@
 /**
- * The view model: everything a renderer draws for one records block in one state, decided and formatted, so an HTML kit script
- * and a Preact component draw the same thing from it without logic of their own. Every control carries the state it leads to
- * (`next`, `toggle`, `clear`), so a renderer only hands that back. Ids are stable across edits of other records: a group's id
- * comes from its values, an item's from its id field.
+ * The view model: everything a renderer draws for one records block in one state, decided and formatted, so the static block
+ * and the island draw it (kit/components/parts/records-view.tsx) without logic of their own. Every control carries the state
+ * it leads to (`next`, `toggle`, `clear`), so a renderer only hands that back. Ids are stable across edits of other records: a
+ * group's id comes from its values, an item's from its id field.
  */
 import type { FieldKind, Value, ViewKind } from "./config.ts";
 import type { RecordsState } from "./state.ts";

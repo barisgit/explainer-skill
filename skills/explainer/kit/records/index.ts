@@ -1,14 +1,13 @@
 /**
- * records: one collection of records shown as a tree, a table or a board, framework-free and DOM-free, so the kit's HTML
- * renderer and an MDX page's component share it, and `pack` can check a config without a browser.
+ * records: one collection of records shown as a tree, a table or a board, framework-free and DOM-free, so the Records
+ * component's prerender in pack and its island in the browser share it, and `pack` can check a config without a browser.
  *
  *   const records = createRecords(config, { locale: "sl", labels: kitLabels });   // throws RecordsConfigError
  *   let state = records.readHash(location.hash) ?? records.initial;
  *   const model = records.view(state);   // draw model.body; a control's `next` is the state it leads to
  *
  * The config is `RecordsConfig` (config.ts), the view model `RecordsView` (view-model.ts), the state and its hash form
- * `RecordsState` (state.ts). Renderers write `model.hash` to the URL with history.replaceState while the reader types or
- * opens folds, and push an entry for a change of view, sort or filter, so Back undoes a choice rather than a keystroke.
+ * `RecordsState` (state.ts). The island (kit/components/parts/records-island.tsx) decides when `model.hash` goes to the URL.
  */
 import type { RecordsConfig, ViewKind } from "./config.ts";
 import { LABELS, type RecordsLabel } from "./labels.ts";

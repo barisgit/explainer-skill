@@ -3,7 +3,7 @@
      id        the block's element id, its URL hash (#plan?view=table&q=board) and the start of its groups' anchors (#plan.1.wp1)
      data      the records, one flat object each; their order is the order everywhere until a table header sorts
      idField   the key that names each record uniquely
-     fields    each key shown, as { label, kind }: kind "text", "number" (unit, digits, sum), "currency" (currency: "EUR",
+     fields    each key the block reads, as { label, kind }: kind "text", "number" (unit, digits, sum), "currency" (currency: "EUR",
                digits, sum), "date" (values as YYYY-MM-DD) or "category" (values: [{ value, label, color: "var(--c1)" }], in order)
      columns   the fields of a row, in order; the leading text ones (an id, a title) form its label
      groupBy   the fields of the tree's levels, outermost first (phase, then package); the board's lanes are the first
@@ -17,7 +17,7 @@
      refField  a field whose value is the row's data-ref (kit link)
    A field with sum: true adds subtotals to groups and lanes, and a total. The view, sort, search and filters go in the URL hash,
    so a link opens what the reader saw, and a link of your own applies a state: <a href="#plan?f.owner=JV">JV's work</a>.
-   With one view and no search or facets the block is static markup. Otherwise it is an island that carries the data as JSON, a
+   A tree or board alone, with no search or facets, is static markup. Otherwise it is an island that carries the data as JSON, a
    second copy beside a filled View of the same records; its controls show once the script runs, and before that the default
    view reads as it is. pack checks the config and names the path of each problem (fields.hours.kind). It prints as the whole
    tree. */

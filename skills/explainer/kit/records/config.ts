@@ -1,7 +1,7 @@
 /**
  * The records contract: one config object describes a collection of records (tasks, findings, costs) and how a page shows it as
- * a tree, a table or a board. It is plain JSON, so an HTML page can carry it in a `<script type="application/json">` beside its
- * records element and an MDX page can pass it as props, and `pack` can validate it without running the page.
+ * a tree, a table or a board. It is plain JSON, so an MDX page passes it as the Records component's props, the island carries it
+ * to the browser, and `pack` validates it without running the page.
  *
  * The defaults follow the guide: every record in the source's own order, grouped with subtotals; a row shows only the fields
  * readers compare across rows (`columns`), the rest stays in the record for search or the item's own view; a coloured marker
