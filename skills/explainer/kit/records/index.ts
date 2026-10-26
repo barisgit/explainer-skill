@@ -69,6 +69,7 @@ function textsOf(labels: Readonly<Record<string, string>>): ViewTexts {
 			clear: text("recordsClear"),
 			expandAll: text("expandAll"),
 			collapseAll: text("collapseAll"),
+			count: text("recordsCount"),
 		},
 		total: text("recordsTotal"),
 		shown: text("recordsShown"),

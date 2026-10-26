@@ -212,6 +212,7 @@ function boardView(model: Model, narrowing: Narrowing, texts: ViewTexts): BoardV
 			title,
 			...(swatch ? { swatch } : {}),
 			count: group?.items.length ?? 0,
+			countText: model.count(group?.items.length ?? 0),
 			cells: summaryCells(model, columns, title, group?.sums ?? {}, texts),
 			items: (group?.items ?? []).map((item) => itemRow(model, item, columns, true)),
 		};

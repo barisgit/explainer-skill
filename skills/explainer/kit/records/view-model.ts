@@ -113,8 +113,9 @@ export interface Lane {
 	value: string;
 	title: string;
 	swatch?: string;
-	/** Matching records in the lane. */
+	/** Matching records in the lane, as a number and as the reader sees it, under the label `texts.count`. */
 	count: number;
+	countText: string;
 	/** The title, then the sums over the cards shown. */
 	cells: readonly Cell[];
 	items: readonly ItemRow[];
@@ -163,6 +164,8 @@ export interface RecordsTexts {
 	clear: string;
 	expandAll: string;
 	collapseAll: string;
+	/** What a board lane's count counts. */
+	count: string;
 }
 
 /** One records block in one state. */

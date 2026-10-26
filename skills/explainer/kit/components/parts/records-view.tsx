@@ -10,6 +10,7 @@ import type {
 	GroupRow,
 	ItemRow,
 	RecordsState,
+	RecordsTexts,
 	RecordsView,
 	TableView,
 	TreeView,
@@ -25,6 +26,7 @@ export interface RecordsActions {
 
 interface Context {
 	actions: RecordsActions | undefined;
+	texts: RecordsTexts;
 	filtering: boolean;
 	/** How many leading columns form the row's label: the run of text columns (an id and a title), at least one. */
 	lead: number;
@@ -245,40 +247,68 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 }
 
 /** A card's label (a link to its view when it has one), then its other non-empty cells. */
-function Card({ row, lead }: { row: ItemRow; lead: number }) {
+/**
+ * A card's or lane's values as a compact list of label and value. Numbers and dates show their label; text and category values
+ * name themselves (an owner, a status chip), so their label is there for screen readers only.
+ */
+function Values({ cells, columns }: { cells: readonly Cell[]; columns: readonly Column[] }) {
+	return (
+		<dl>
+			{cells.map((cell, i) => {
+				const column = columns[i];
+				if (!(cell.text && column)) {
+					return null;
+				}
+				const named = column.kind === "text" || column.kind === "category";
+				return (
+					<div key={cell.field}>
+						<dt class={named ? "vh" : undefined}>{column.label}</dt>
+						<dd>{cellText(cell)}</dd>
+					</div>
+				);
+			})}
+		</dl>
+	);
+}
+
+function Card({ row, columns, lead }: { row: ItemRow; columns: readonly Column[]; lead: number }) {
 	const label = labelOf(row.cells, lead);
 	return (
 		<li data-ref={row.ref}>
 			<p>{row.href ? <a href={row.href}>{label}</a> : label}</p>
-			<p>
-				{row.cells
-					.slice(lead)
-					.map((cell) => (cell.text ? <span key={cell.field}>{cellText(cell)}</span> : null))}
-			</p>
+			<Values cells={row.cells.slice(lead)} columns={columns.slice(lead)} />
 		</li>
 	);
 }
 
 function Board({ body, ctx }: { body: BoardView; ctx: Context }) {
+	const count: Column = {
+		field: "",
+		label: ctx.texts.count,
+		kind: "number",
+		align: "end",
+		sum: false,
+	};
 	return (
 		<div class="board">
 			{body.lanes.map((lane) => (
 				<div key={lane.id} class="lane">
-					<p class="lane-head">
-						<span>
+					<div class="lane-head">
+						<p>
 							{lane.swatch && <i class="swatch" style={swatchStyle(lane.swatch)} />}
 							{lane.title}
-						</span>
-						<span>
-							{lane.count}
-							{lane.cells
-								.slice(1)
-								.map((c) => c.text && <span key={c.field}> · {cellText(c)}</span>)}
-						</span>
-					</p>
+						</p>
+						<Values
+							cells={[
+								{ field: "", value: lane.count, text: lane.countText },
+								...lane.cells.slice(1),
+							]}
+							columns={[count, ...body.columns.slice(1)]}
+						/>
+					</div>
 					<ul>
 						{lane.items.map((row) => (
-							<Card key={row.id} row={row} lead={ctx.lead} />
+							<Card key={row.id} row={row} columns={body.columns} lead={ctx.lead} />
 						))}
 					</ul>
 				</div>
@@ -388,6 +418,7 @@ export function RecordsBlock({
 	const { body } = vm;
 	const ctx: Context = {
 		actions,
+		texts: vm.texts,
 		filtering: vm.filtering,
 		lead: leadOf(body.columns),
 		tags: new Set(body.kind === "tree" ? body.columns.filter(isTag).map((c) => c.field) : []),

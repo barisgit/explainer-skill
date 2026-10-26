@@ -149,6 +149,30 @@ export const gaps = ${gaps};
 		]);
 	});
 
+	test("a board names each value on its cards and lane heads, out of sight where the value names itself", async () => {
+		const output = await packedMdx(
+			dir,
+			"board",
+			`import { Records } from "kit";
+
+# Board
+
+<Records id="work" idField="id" fields={{ id: { label: "Item", kind: "text" }, team: { label: "Team", kind: "text" }, owner: { label: "Owner", kind: "text" }, hours: { label: "Hours", kind: "number", unit: "h", sum: true }, due: { label: "Due", kind: "date" } }} columns={["id", "hours", "owner", "due"]} groupBy={["team"]} views={["board"]} data={[{ id: "A-1", team: "core", owner: "HO", hours: 8, due: "2027-03-01" }, { id: "A-2", team: "core", owner: "JV", hours: 4 }]} />
+`,
+		);
+		const html = readFileSync(output, "utf8").replace(/\u00a0/g, " ");
+		const card = /<li><p>A-1<\/p>(<dl>[\s\S]*?<\/dl>)<\/li>/.exec(html)?.[1];
+		expect(card).toBe(
+			'<dl><div><dt>Hours</dt><dd>8 h</dd></div><div><dt class="vh">Owner</dt><dd>HO</dd></div><div><dt>Due</dt><dd>Mar 1, 2027</dd></div></dl>',
+		);
+		// A card leaves out a value it does not have.
+		expect(/<li><p>A-2<\/p><dl>([\s\S]*?)<\/dl>/.exec(html)?.[1]).not.toContain("Due");
+		const head = /<div class="lane-head">([\s\S]*?)<\/div><ul>/.exec(html)?.[1];
+		expect(head).toBe(
+			"<p>core</p><dl><div><dt>Records</dt><dd>2</dd></div><div><dt>Hours</dt><dd>12 h</dd></div></dl>",
+		);
+	});
+
 	test("pack fails on a bad config, naming the path of each problem", async () => {
 		const { result } = await packMdx(
 			dir,

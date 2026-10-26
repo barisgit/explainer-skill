@@ -151,15 +151,10 @@
 	background: var(--sunken);
 }
 .records .lane-head {
-	display: grid;
-	gap: 0.125rem;
 	margin: 0 0 0.625rem;
-	color: var(--muted);
-	font-size: 0.8125rem;
-	font-variant-numeric: tabular-nums;
 }
-.records .lane-head > :first-child {
-	color: var(--ink);
+.records .lane-head > p {
+	margin: 0 0 0.125rem;
 	font-size: 0.9375rem;
 	font-weight: 600;
 }
@@ -188,15 +183,32 @@
 .records .lane li a:hover {
 	text-decoration: underline;
 }
-/* The card's other cells, on a line under its label. */
-.records .lane li > p + p {
+/* A card's other values and a lane's sums, on a line under the title: each label in small caps before its value. */
+.records .lane dl {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.125rem 0.75rem;
-	margin-block-start: 0.25rem;
+	margin: 0;
 	color: var(--muted);
 	font-size: 0.8125rem;
 	font-variant-numeric: tabular-nums;
+}
+.records .lane li > dl {
+	margin-block-start: 0.25rem;
+}
+.records .lane dl > div {
+	display: flex;
+	align-items: baseline;
+	gap: 0.3125rem;
+}
+.records .lane dt {
+	font-size: 0.6875rem;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+.records .lane dd {
+	margin: 0;
+	color: var(--ink);
 }
 
 /* Phones: the tree keeps the label and the numbers, a line under it; owners, categories and dates are left to the table, the
