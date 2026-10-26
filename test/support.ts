@@ -108,12 +108,13 @@ export function scratch() {
 }
 
 /**
- * Page script that throws "<contract>: <name>" when `body` is false 300 ms after load. Each contract gets its own throw, so one
- * failure does not hide the others; check reports them as page errors. The wait is a fixed time, and a throw that comes after
- * check's shot is not reported, so a page that needs no `--do` step or `--view` load uses pageContract instead (#38).
+ * Page script that throws "<contract>: <name>" when `body` is false 300 ms after each load. Each contract gets its own throw, so
+ * one failure does not hide the others; check reports them as page errors. check waits after every load and step for the timers
+ * of up to 1 s a page has pending, so the assertion always runs before check measures and a false one is always reported. A page
+ * that needs no `--do` step or `--view` load uses pageContract instead (#38).
  */
 export const pageAssertion = (contract: string, name: string, body: string) =>
-	`setTimeout(() => { if (!(${body})) throw new Error("${contract}: ${name}"); }, 300);`;
+	`addEventListener("load", () => setTimeout(() => { if (!(${body})) throw new Error("${contract}: ${name}"); }, 300));`;
 
 /**
  * Packs `page` as `<name>.html` in `dir` and runs `check --quick` on the result with `args`; fails the test when either command
