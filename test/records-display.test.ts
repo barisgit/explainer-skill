@@ -416,3 +416,34 @@ test("pack fails on a bad config, naming the path of each problem", async () => 
 	expect(result.stderr).toContain("fields.hours.kind");
 	expect(result.stderr).toContain("columns[2]");
 });
+
+test("pack fails on a link that names no View and on a block id that is a View's name, naming each", async () => {
+	const { result } = await packMdx(
+		dir,
+		"links",
+		`import { Records, View } from "kit";
+
+export const data = [{ id: "a", title: "Alpha" }];
+export const fields = { id: { label: "Id", kind: "text" }, title: { label: "Title", kind: "text" } };
+
+# Plan
+
+<Records id="plan" data={data} idField="id" fields={fields} columns={["id", "title"]} link="itme" />
+
+<Records id="item" data={data} idField="id" fields={fields} columns={["id", "title"]} views={["table"]} />
+
+<View name="item" param="a" back="Plan">
+
+# Alpha
+
+</View>
+`,
+	);
+	expect(result.code).not.toBe(0);
+	expect(result.stderr).toContain(
+		'records "plan": link "itme" names no View, so its rows open nothing (the page\'s Views are item); write one of those, or add <View name="itme"',
+	);
+	expect(result.stderr).toContain(
+		'records "item": its id is also a View\'s name, so its hash (#item?view=table) would open that View; give the block or the View another name',
+	);
+});
