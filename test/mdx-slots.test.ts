@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { withPage } from "../skills/explainer/src/chrome.ts";
-import { runCli, scratch } from "./support.ts";
+import { act, inPage, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -72,33 +71,22 @@ const STATE = `(() => {
 	};
 })()`;
 
-/** Waits a frame, a task and a frame, so effects and the redraws they start have run. */
-const SETTLE = `new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame))`;
-
 /**
  * Opens the packed slots page, reads STATE, then steps the Stepper in the slot and clicks the Panel twice, and reads it again;
  * keeps the slot's heading, term and step controls in `window.kept` to see that they are the same nodes afterwards.
  */
 function stepAndClick(output: string) {
-	return withPage(async (cdp) => {
-		const errors: string[] = [];
-		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
-			errors.push(d.exception?.description ?? d.text),
-		);
-		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
-		const loaded = cdp.once("Page.loadEventFired");
-		await cdp.send("Page.navigate", { url: `file://${output}` });
-		await loaded;
-		await cdp.evaluate(`document.fonts.ready.then(() => ${SETTLE})`, true);
+	return inPage(output, async (cdp) => {
 		const opened = await cdp.evaluate(STATE);
-		const clicked = await cdp.evaluate(
+		await act(
+			cdp,
 			`window.kept = [document.querySelector("h2"), document.querySelector("span[data-ref]"), document.querySelector("#s .player")];
 			document.querySelector('#s [data-go="1"]').click();
-			document.getElementById("more").click();
-			${SETTLE}.then(() => { document.getElementById("more").click(); return ${SETTLE}; }).then(() => ${STATE})`,
-			true,
+			document.getElementById("more").click();`,
+			"0",
 		);
-		return { opened, clicked, errors };
+		const clicked = await act(cdp, `document.getElementById("more").click()`, STATE);
+		return { opened, clicked };
 	});
 }
 
@@ -119,7 +107,6 @@ describe("a client component's children from the page (its slot)", () => {
 		expect(html).not.toMatch(/explainer-islands">[^<]*bump stays/);
 
 		const state = await stepAndClick(output);
-		expect(state.errors).toEqual([]);
 		const slot = ["h2", "p", "s", "calls"];
 		expect(state.opened).toEqual({
 			children: [...slot, "panel", "p"],

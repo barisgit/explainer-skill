@@ -1,7 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { withPage } from "../skills/explainer/src/chrome.ts";
-import { packMdx, runCli, scratch } from "./support.ts";
+import { act, inPage, packMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -99,30 +98,12 @@ describe("an .mdx page packs to one prerendered file", () => {
 
 	test("a click on the island re-renders it and re-applies the chart's option", async () => {
 		const { output } = await pack("clicked", PAGE);
-		const state = await withPage(async (cdp) => {
-			await cdp.send("Page.enable");
-			const loaded = cdp.once("Page.loadEventFired");
-			await cdp.send("Page.navigate", { url: `file://${output}` });
-			await loaded;
-			const read = `({ count: document.getElementById("count").textContent,
-				bars: echarts.getInstanceByDom(document.querySelector(".chart")).getOption().series[0].data.length })`;
-			// Preact runs effects after a frame; the second frame lets the chart apply the new option.
-			return cdp.evaluate(
-				// The load event has fired: the chart mounts once the fonts are in and its first resize callback has run.
-				`document.fonts.ready
-				.then(() => new Promise(requestAnimationFrame))
-				.then(() => new Promise(requestAnimationFrame))
-				.then(() => {
-					const before = ${read};
-					document.getElementById("more").click();
-					return new Promise(requestAnimationFrame)
-						.then(() => new Promise((done) => setTimeout(done)))
-						.then(() => new Promise(requestAnimationFrame))
-						.then(() => ({ before, after: ${read} }));
-				})`,
-				true,
-			);
-		});
+		const read = `({ count: document.getElementById("count").textContent,
+			bars: echarts.getInstanceByDom(document.querySelector(".chart"))?.getOption().series[0].data.length })`;
+		const state = await inPage(output, async (cdp) => ({
+			before: await cdp.evaluate(read),
+			after: await act(cdp, `document.getElementById("more").click()`, read),
+		}));
 		expect(state).toEqual({ before: { count: "3", bars: 3 }, after: { count: "4", bars: 4 } });
 	}, 30_000);
 
@@ -160,19 +141,14 @@ export function Marked() {
 		expect(html).toMatch(/<fieldset data-reply(="")?><legend>Pick/);
 		expect(html).toMatch(/<fieldset data-reply(="")? id="q"><legend>Map/);
 		expect(html).toMatch(/<div data-early(="")?><button/);
-		const values = await withPage(async (cdp) => {
-			await cdp.send("Page.enable");
-			const loaded = cdp.once("Page.loadEventFired");
-			await cdp.send("Page.navigate", { url: `file://${output}` });
-			await loaded;
-			// The click makes new DOM after hydration; Preact renders it in a later frame.
-			return cdp.evaluate(
-				`document.getElementById("late").click(),
-				new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done))).then(() =>
-					["#q", "[data-early]", "[data-late]"].map((s) => document.querySelector(s)?.getAttribute(s === "#q" ? "data-reply" : s.slice(1, -1))))`,
-				true,
-			);
-		});
+		// The click makes new DOM after hydration, which Preact renders later.
+		const values = await inPage(output, (cdp) =>
+			act(
+				cdp,
+				`document.getElementById("late").click()`,
+				`["#q", "[data-early]", "[data-late]"].map((s) => document.querySelector(s)?.getAttribute(s === "#q" ? "data-reply" : s.slice(1, -1)))`,
+			),
+		);
 		expect(values).toEqual(["", "", ""]);
 	}, 30_000);
 });

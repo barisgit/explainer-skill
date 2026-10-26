@@ -269,27 +269,53 @@ export function runPacked(
 	});
 }
 
-/** Waits in the page for a re-render and the effects and redraws it starts: a frame, a task, another frame. */
+/**
+ * Waits in the page for a re-render and the effects and redraws it starts: a frame, a task, another frame. The task's delay orders
+ * it after the effects Preact schedules in that frame (a frame, then a task of no delay), not a time to wait for something.
+ */
 export const FRAMES = `new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame))`;
 
+/** How long DRAWN waits for a chart before it fails the test, far above any real mount. */
+const DRAW_DEADLINE_MS = 10_000;
+
 /**
- * Opens `url` (or reloads, keeping storage) and waits until the page has settled: the load event, the kit's load-time tasks, the
- * fonts (charts and plots redraw when theirs arrive), then FRAMES twice for the islands' effects and the redraws they start.
+ * Page expression: a promise of the moment every Chart the reader can see is drawn, that is each `.chart` with a width (plots
+ * aside, which plot.js draws as it makes them) has its ECharts instance. Charts.make mounts a chart on its first resize once its
+ * font has loaded, which no frame or task orders, so this polls each frame; past the deadline it rejects, naming the charts.
+ */
+const DRAWN = `new Promise((drawn, failed) => {
+	const deadline = performance.now() + ${DRAW_DEADLINE_MS};
+	const poll = () => {
+		const empty = window.echarts ? [...document.querySelectorAll(".chart:not(.plot)")].filter((el) => el.clientWidth && !echarts.getInstanceByDom(el)) : [];
+		if (!empty.length) drawn();
+		else if (performance.now() > deadline) failed(new Error("charts not drawn in ${DRAW_DEADLINE_MS} ms: " + empty.map((el) => el.id || el.getAttribute("aria-label")).join(", ")));
+		else requestAnimationFrame(poll);
+	};
+	poll();
+})`;
+
+/**
+ * Opens `url` (or reloads, keeping storage) and waits until the page has settled: the load event; FRAMES, after which the islands'
+ * first effects (which make the charts and plots and start their fonts) and keep.js's restore have run; the fonts; DRAWN; then
+ * FRAMES again for the effects and redraws those start.
  */
 export async function load(cdp: Cdp, url?: string) {
 	const loaded = cdp.once("Page.loadEventFired");
 	await (url ? cdp.send("Page.navigate", { url }) : cdp.send("Page.reload"));
 	await loaded;
 	await cdp.evaluate(
-		`new Promise((done) => setTimeout(done, 100)).then(() => document.fonts.ready).then(() => ${FRAMES}).then(() => ${FRAMES})`,
+		`${FRAMES}.then(() => document.fonts.ready).then(() => ${DRAWN}).then(() => ${FRAMES})`,
 		true,
 	);
 }
 
-/** Runs `action` in the page, waits for the re-render and the redraws it starts, and returns the page's `state` expression. */
+/**
+ * Runs `action` in the page, waits for the re-render and the redraws it starts (FRAMES, DRAWN for a chart it shows or mounts,
+ * FRAMES), and returns the page's `state` expression.
+ */
 export const act = <T>(cdp: Cdp, action: string, state: string) =>
 	cdp.evaluate<T>(
-		`(() => { ${action} })(), ${FRAMES}.then(() => ${FRAMES}).then(() => (${state}))`,
+		`(() => { ${action} })(), ${FRAMES}.then(() => ${DRAWN}).then(() => ${FRAMES}).then(() => (${state}))`,
 		true,
 	);
 
