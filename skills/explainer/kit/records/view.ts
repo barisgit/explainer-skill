@@ -1,6 +1,6 @@
 /** Builds the view model of one state from a block's model: the parts every view shares, then the body of the view shown. */
 import type { ViewKind } from "./config.ts";
-import type { Item, Narrowing, Sum } from "./engine.ts";
+import { type Item, type Narrowing, readValue, type Sum } from "./engine.ts";
 import { slug } from "./ids.ts";
 import type { Model, TreeNode } from "./model.ts";
 import { normalize, type RecordsState, writeHash } from "./state.ts";
@@ -22,7 +22,9 @@ import type {
 } from "./view-model.ts";
 
 /** The texts a view model needs, resolved from the page's labels by the caller. */
-export interface ViewTexts extends RecordsTexts {
+export interface ViewTexts {
+	/** The controls' texts, which the view model hands the renderer as they are. */
+	controls: RecordsTexts;
 	total: string;
 	/** "{shown} of {total}". */
 	shown: string;
@@ -54,8 +56,7 @@ function summaryCells(
 
 /** A field's value as text, for `detail` and `refField`: empty when the record holds none. */
 function textOf(item: Item, field: string | undefined): string {
-	const value = field === undefined ? undefined : item.record[field];
-	return typeof value === "string" || typeof value === "number" ? String(value) : "";
+	return field === undefined ? "" : String(readValue(item.record, field) ?? "");
 }
 
 function itemRow(model: Model, item: Item, columns: readonly Column[], match: boolean): ItemRow {
@@ -113,8 +114,18 @@ function groupRow(node: TreeNode, input: TreeInput): GroupRow {
 	};
 }
 
-function treeView(input: TreeInput, texts: ViewTexts): TreeView {
-	const { model, state, columns } = input;
+function treeView(
+	model: Model,
+	state: RecordsState,
+	matched: TreeInput["matched"],
+	texts: ViewTexts,
+): TreeView {
+	// The groups show the groupBy fields, so the tree's rows leave them out.
+	const grouped = model.config.groupBy ?? [];
+	const columns = model.config.columns
+		.filter((f) => !grouped.includes(f))
+		.map((field) => column(model, field));
+	const input: TreeInput = { model, state, columns, matched };
 	return {
 		kind: "tree",
 		columns,
@@ -246,23 +257,10 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 	};
 	const filtering = narrowing.terms.length > 0 || Object.keys(state.filters).length > 0;
 	const result = model.engine.query(narrowing, state.sort, model.config.facets ?? []);
-	// The groups show the groupBy fields, so the tree's rows leave them out.
-	const grouped = model.config.groupBy ?? [];
-	const columns = model.config.columns
-		.filter((f) => !grouped.includes(f))
-		.map((field) => column(model, field));
 	const count = new Intl.NumberFormat(model.locale);
 	const body =
 		state.view === "tree"
-			? treeView(
-					{
-						model,
-						state,
-						columns,
-						matched: filtering ? new Set(result.items.map((i) => i.id)) : null,
-					},
-					texts,
-				)
+			? treeView(model, state, filtering ? new Set(result.items.map((i) => i.id)) : null, texts)
 			: state.view === "board"
 				? boardView(model, narrowing)
 				: tableView(model, state, result.items, result.sums, texts);
@@ -270,16 +268,9 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 		id: model.config.id,
 		state,
 		hash: writeHash(model.rules, state),
-		texts: {
-			view: texts.view,
-			search: texts.search,
-			noMatches: texts.noMatches,
-			clear: texts.clear,
-			expandAll: texts.expandAll,
-			collapseAll: texts.collapseAll,
-		},
+		texts: texts.controls,
 		views: viewOptions(model, state, texts),
-		searchable: (model.config.search ?? []).length > 0,
+		searchable: model.rules.searchable,
 		facets: facets(model, state, result.counts),
 		legends: legends(model),
 		filtering,

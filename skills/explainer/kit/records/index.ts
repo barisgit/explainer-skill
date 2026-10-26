@@ -62,12 +62,14 @@ function textsOf(labels: Readonly<Record<string, string>>): ViewTexts {
 		board: text("recordsBoard"),
 	};
 	return {
-		view: text("recordsView"),
-		search: text("recordsSearch"),
-		noMatches: text("recordsNoMatches"),
-		clear: text("recordsClear"),
-		expandAll: text("expandAll"),
-		collapseAll: text("collapseAll"),
+		controls: {
+			view: text("recordsView"),
+			search: text("recordsSearch"),
+			noMatches: text("recordsNoMatches"),
+			clear: text("recordsClear"),
+			expandAll: text("expandAll"),
+			collapseAll: text("collapseAll"),
+		},
 		total: text("recordsTotal"),
 		shown: text("recordsShown"),
 		views,

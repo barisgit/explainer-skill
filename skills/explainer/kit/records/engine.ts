@@ -146,10 +146,11 @@ export function createEngine(
 		});
 	}
 
-	function sumsOf(row: ItemRow): Record<string, Sum> {
+	/** Each summed field's Sum from `aggregate`, which TanStack types unknown; no value means no record had one. */
+	function sumsBy(aggregate: (key: string) => unknown): Record<string, Sum> {
 		const sums: Record<string, Sum> = {};
 		for (const key of sumKeys) {
-			const value = row.getValue(key);
+			const value = aggregate(key);
 			sums[key] = isSum(value) ? value : { total: null, missing: 0 };
 		}
 		return sums;
@@ -162,7 +163,7 @@ export function createEngine(
 			value: String(row.groupingValue),
 			groups: nested.map(toGroup),
 			items: nested.length ? [] : row.subRows.map((sub) => sub.original),
-			sums: sumsOf(row),
+			sums: sumsBy((key) => row.getValue(key)),
 		};
 	}
 
@@ -183,11 +184,7 @@ export function createEngine(
 		) {
 			const t = table(narrowing, { sort });
 			const rows = t.getSortedRowModel().rows;
-			const sums: Record<string, Sum> = {};
-			for (const key of sumKeys) {
-				const value = t.getColumn(key)?.getAggregationValue({ rows });
-				sums[key] = isSum(value) ? value : { total: null, missing: 0 };
-			}
+			const sums = sumsBy((key) => t.getColumn(key)?.getAggregationValue({ rows }));
 			const counts: Record<string, ReadonlyMap<unknown, number>> = {};
 			for (const key of facets) {
 				counts[key] = t.getColumn(key)?.getFacetedUniqueValues() ?? new Map();
