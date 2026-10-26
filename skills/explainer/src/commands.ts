@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, kitReferences } from "./check.ts";
 import { authorTsconfig, kitLabels, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { clientBundle, isClientModule } from "./mdx/bundle.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
@@ -86,26 +87,40 @@ function moduleTree(path: string, found = new Set<string>()): Set<string> {
 
 /**
  * The size `kit` lists for a component: the kit scripts a page using it carries, as pack decides from the compiled code of the
- * component and the kit modules it imports. A component that draws a Plot or a Chart (Explore) is listed with the Plot's, and a
- * "+" for the more a chart brings.
+ * component and the kit modules it imports, and the client bundle of its "use client" modules (Preact included), as pack
+ * builds it for a page with only that component. A component that draws a Plot or a Chart (Explore) is listed with the Plot's,
+ * and a "+" for the more a chart brings.
  */
-function componentSize(file: string): string {
+async function componentSize(file: string): Promise<string> {
 	const transpiler = new Bun.Transpiler({ loader: "tsx" });
+	const modules = [...moduleTree(kitPath(file))];
+	const sources = modules.map((path) => readFileSync(path, "utf8"));
 	const scripts = new Set(
-		[...moduleTree(kitPath(file))].flatMap((path) => [
-			...scriptsInCode(transpiler.transformSync(readFileSync(path, "utf8"))),
-		]),
+		sources.flatMap((code) => [...scriptsInCode(transpiler.transformSync(code))]),
 	);
 	const either = scripts.has("plot.js") && scripts.has("charts.js");
 	const files = [...scripts].filter(
 		(script) => !(either && (script === "charts.js" || script === "echarts.js")),
 	);
-	return either ? kitSize(files).replace(" KB", "+ KB") : kitSize(files);
+	const clients = modules.filter((_, i) => isClientModule(sources[i] ?? ""));
+	// The page that carries the bundle is never written: only its directory is read, for the entry's path.
+	const page = { path: join(kitPath("components"), "size.mdx"), js: "", lang: "en" };
+	const island = clients.length
+		? Buffer.byteLength(await clientBundle(page, clients, new Set()))
+		: 0;
+	const size = sizeText(kitBytes(files) + island);
+	return either ? size.replace(" KB", "+ KB") : size;
 }
 
+/** The bytes of kit files as a page carries them. */
+const kitBytes = (files: string[]) =>
+	files.reduce((sum, f) => sum + Buffer.byteLength(readKitText(kitPath(f))), 0);
+
+/** A size as `kit` lists it, e.g. "16 KB". */
+const sizeText = (bytes: number) => `${(bytes / 1024).toFixed(0)} KB`;
+
 /** The size of kit files as a page carries them, e.g. "16 KB". */
-const kitSize = (files: string[]) =>
-	`${(files.reduce((sum, f) => sum + Buffer.byteLength(readKitText(kitPath(f))), 0) / 1024).toFixed(0)} KB`;
+const kitSize = (files: string[]) => sizeText(kitBytes(files));
 
 /** A part of the kit other than a component: its `kit` line, the kit files a page using it carries, and its documentation. */
 interface Feature {
@@ -194,12 +209,14 @@ function labelsBlock(): string {
 }
 
 /** What `kit` prints: one line per component and feature, and how to read one. */
-function kitListing(): string {
+async function kitListing(): Promise<string> {
 	const line = (name: string, size: string, text: string) =>
 		`${name.padEnd(9)} ${size.padStart(6)}  ${text}`;
 	return [
 		'An .mdx page imports components from "kit" (import { Chart, View } from "kit"); pack adds the theme and the kit scripts it uses.',
-		...components().map((c) => line(c.name, componentSize(c.file), c.summary)),
+		...(await Promise.all(
+			components().map(async (c) => line(c.name, await componentSize(c.file), c.summary)),
+		)),
 		...FEATURES.map((f) => line(f.name, f.files.length ? kitSize(f.files) : "", f.line)),
 		`Read one: ${CLI} kit <name>. The kit's texts are English: kit labels prints them to translate.`,
 	].join("\n");
@@ -244,7 +261,7 @@ export const COMMANDS: Record<string, Command> = {
 		examples: ["kit", "kit Stepper", "kit page", "kit types > tsconfig.json", "kit labels"],
 		run: async ([topic]) => {
 			if (!topic) {
-				console.log(kitListing());
+				console.log(await kitListing());
 				return 0;
 			}
 			if (topic === "types") {

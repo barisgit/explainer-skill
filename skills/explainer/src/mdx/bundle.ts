@@ -37,6 +37,9 @@ const EMBEDDABLE = new RegExp(
 );
 /** A module whose first statement, after comments, is the "use client" directive. */
 const USE_CLIENT = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(["'])use client\1/;
+
+/** Whether a module's source starts with the "use client" directive, so its components hydrate. */
+export const isClientModule = (source: string): boolean => USE_CLIENT.test(source);
 const SOURCE = "island-source:";
 
 const loaderOf = (path: string): JavaScriptLoader => LOADERS[extname(path)] ?? "js";
@@ -115,7 +118,7 @@ function pagePlugin(
 					return { contents: `export { Question } from "${QUESTION_IMPORT}";`, loader: "js" };
 				}
 				const source = readFileSync(path, "utf8");
-				return purpose === "prerender" && USE_CLIENT.test(source)
+				return purpose === "prerender" && isClientModule(source)
 					? { contents: islandModule(path, source), loader: "js" }
 					: { contents: source, loader: loaderOf(path) };
 			});
