@@ -179,14 +179,19 @@ function topicDoc(topic: string): string | undefined {
  * so an author translates the values and pastes the block whole into a page's frontmatter. Values are JSON strings, which YAML
  * reads as they are, so a colon or quote in a translation needs no thought.
  */
-const labelsBlock = (): string =>
-	[
+function labelsBlock(): string {
+	// A key two files share (expandAll) is written once, under the first: YAML takes each key once.
+	const written = new Set<string>();
+	return [
 		"labels:",
-		...kitLabels().flatMap(({ file, labels }) => [
-			`  # kit ${file}`,
-			...Object.entries(labels).map(([key, text]) => `  ${key}: ${JSON.stringify(text)}`),
-		]),
+		...kitLabels().flatMap(({ file, labels }) => {
+			const lines = Object.entries(labels)
+				.filter(([key]) => !written.has(key) && written.add(key))
+				.map(([key, text]) => `  ${key}: ${JSON.stringify(text)}`);
+			return lines.length ? [`  # kit ${file}`, ...lines] : [];
+		}),
 	].join("\n");
+}
 
 /** What `kit` prints: one line per component and feature, and how to read one. */
 function kitListing(): string {

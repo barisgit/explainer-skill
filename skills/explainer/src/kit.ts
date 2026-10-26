@@ -21,8 +21,11 @@ export const kitFiles = (): string[] =>
 		.map((e) => (e.name.endsWith(".ts") ? `${e.name.slice(0, -3)}.js` : e.name))
 		.sort();
 
-/** A kit script's or component's English texts: its `const LABELS = {` block, one `key: "Text",` line per kitLabels key. */
-const LABELS_BLOCK = /^\s*const LABELS = \{\n([\s\S]*?)\n\s*\};$/m;
+/**
+ * A kit script's or component's English texts: its `const LABELS = {` block (exported or not), one `key: "Text",` line per
+ * kitLabels key. Two files may share a key (Expand all) with the same text.
+ */
+const LABELS_BLOCK = /^\s*(?:export )?const LABELS = \{\n([\s\S]*?)\n\s*\};$/m;
 const LABEL_LINE = /^\s*(\w+): ("(?:[^"\\]|\\.)*"),$/;
 
 /**
@@ -42,7 +45,8 @@ function labelSources(): { file: string; path: string }[] {
 			const component = /^\/\* ([A-Z]\w*):/.exec(readFileSync(path, "utf8"))?.[1];
 			return { file: component ?? name, path };
 		});
-	return [...scripts, ...components];
+	// Records' texts are its core's, which a renderer without Preact can read too.
+	return [...scripts, ...components, { file: "Records", path: kitPath("records/labels.ts") }];
 }
 
 /**

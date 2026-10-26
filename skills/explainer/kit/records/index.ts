@@ -11,6 +11,7 @@
  * opens folds, and push an entry for a change of view, sort or filter, so Back undoes a choice rather than a keystroke.
  */
 import type { RecordsConfig, ViewKind } from "./config.ts";
+import { LABELS, type RecordsLabel } from "./labels.ts";
 import { buildModel } from "./model.ts";
 import { initialState, type RecordsState, readHash, writeHash } from "./state.ts";
 import { parseConfig, RecordsConfigError } from "./validate.ts";
@@ -19,27 +20,10 @@ import type { RecordsView } from "./view-model.ts";
 
 export type * from "./config.ts";
 export { VIEW_KINDS } from "./config.ts";
+export { LABELS as RECORDS_LABELS, type RecordsLabel } from "./labels.ts";
 export type { RecordsState, SortState } from "./state.ts";
 export { RecordsConfigError } from "./validate.ts";
 export type * from "./view-model.ts";
-
-/**
- * The English texts of the records controls, by kitLabels key. A page in another language sets the ones it shows in its
- * kitLabels; expandAll and collapseAll are the keys kit:views.js uses too, so one entry covers both.
- */
-export const RECORDS_LABELS = {
-	recordsTree: "Tree",
-	recordsTable: "Table",
-	recordsBoard: "Board",
-	recordsView: "View",
-	recordsSearch: "Search",
-	recordsTotal: "Total",
-	recordsShown: "{shown} of {total}",
-	recordsNoMatches: "No matches",
-	recordsClear: "Clear filters",
-	expandAll: "Expand all",
-	collapseAll: "Collapse all",
-} as const;
 
 export interface RecordsOptions {
 	/** The page's language as a BCP 47 tag (its `<html lang>`), for numbers, amounts, dates and collation. Default "en". */
@@ -72,7 +56,7 @@ function checkedLocale(locale: string): string {
 }
 
 function textsOf(labels: Readonly<Record<string, string>>): ViewTexts {
-	const text = (key: keyof typeof RECORDS_LABELS) => labels[key] || RECORDS_LABELS[key];
+	const text = (key: RecordsLabel) => labels[key] || LABELS[key];
 	const views: Record<ViewKind, string> = {
 		tree: text("recordsTree"),
 		table: text("recordsTable"),

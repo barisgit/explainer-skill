@@ -35,6 +35,15 @@ export const ENGLISH = {
 	figure: "figure",
 	page: "page",
 	showAnswer: "Show answer",
+	recordsTree: "Tree",
+	recordsTable: "Table",
+	recordsBoard: "Board",
+	recordsView: "View",
+	recordsSearch: "Search",
+	recordsTotal: "Total",
+	recordsShown: "{shown} of {total}",
+	recordsNoMatches: "No matches",
+	recordsClear: "Clear filters",
 };
 
 export const SLOVENIAN: typeof ENGLISH = {
@@ -71,13 +80,23 @@ export const SLOVENIAN: typeof ENGLISH = {
 	figure: "slika",
 	page: "stran",
 	showAnswer: "Pokaži odgovor",
+	recordsTree: "Drevo",
+	recordsTable: "Tabela",
+	recordsBoard: "Tabla",
+	recordsView: "Pogled",
+	recordsSearch: "Iskanje",
+	recordsTotal: "Skupaj",
+	recordsShown: "{shown} od {total}",
+	recordsNoMatches: "Ni zadetkov",
+	recordsClear: "Počisti filtre",
 };
 
 /**
  * Page script that works each kit component with a label and resolves `contract` with the name of every text that is not
  * `expected`'s (see packAndRun). The page needs a stepper (#s), nested views p and i with no .back link (the overview's name is
  * the label), a section with two folds first, a radio question with a "b" option, and three note parts: data-ref "cache" in a
- * section headed Items, "db" in a figure named Scheme, and "loose" outside any section.
+ * section headed Items, "db" in a figure named Scheme, and "loose" outside any section. Records with two tasks, three views and
+ * a search are worked when the page has them (an .mdx page; an HTML page cannot write the component).
  */
 export const labelsScript = (expected: typeof ENGLISH) => `const L = ${JSON.stringify(expected)};
 const $ = (selector, root = document) => root.querySelector(selector);
