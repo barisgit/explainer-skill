@@ -30,7 +30,7 @@ export interface Command {
 }
 
 const MERMAID_DOC = `\`\`\`mermaid fences hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
-pack renders each one to one SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
+pack renders each one to SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
 It draws a subset of each type and fails on any line, or part of one, it cannot read (notes, titles, cross and circle edge ends, new-style shapes), naming the line.
 Labels wrap at about 30 characters into tall boxes: keep them to a few words, or break one with <br>. Markdown strings ("\`...\`") are not supported; **bold** and *italic* work in plain labels.
 Pack gives each node, group, edge and sequence part a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
@@ -123,7 +123,7 @@ const FEATURES: Feature[] = [
 	{
 		name: "mermaid",
 		files: [],
-		line: "```mermaid fences: flowchart, state, sequence, class, ER and xychart, drawn as one SVG; each part gets a data-ref of its id.",
+		line: "```mermaid fences: flowchart, state, sequence, class, ER and xychart, drawn as SVG; each part gets a data-ref of its id.",
 		doc: () => MERMAID_DOC,
 	},
 	{
