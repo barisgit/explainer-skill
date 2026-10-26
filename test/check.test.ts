@@ -456,3 +456,53 @@ ${pageContract({})}
 		expect(new Set(corners)).toEqual(new Set(["255,0,0"]));
 	}
 }, 60_000);
+
+test("check waits for the timers a page sets at load and after a --do step, so what they throw is reported", async () => {
+	const file = dir.write(
+		"timers.html",
+		`<!doctype html><html><head>${VIEWPORT}</head><body><h1>Timers</h1><button id="b">Later</button><script>
+setTimeout(() => { throw new Error("thrown 700 ms after load"); }, 700);
+document.getElementById("b").onclick = () => setTimeout(() => { throw new Error("thrown 400 ms after the click"); }, 400);
+</script></body></html>`,
+	);
+
+	const result = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--out",
+		dir.path("shots"),
+		"--do",
+		"click:#b",
+	]);
+
+	expect(result.stdout).toContain("page error: Error: thrown 700 ms after load");
+	expect(result.stdout).toContain("page error: Error: thrown 400 ms after the click");
+}, 30_000);
+
+test("check waits for a chart drawn late and names a visible one still not drawn at its deadline", async () => {
+	// #never is shown on the desktop only, so one screen waits out the deadline. #late mounts 1.5 s after load, later than any
+	// timer check tracks, so only the drawn signal makes check wait for it.
+	const output = dir.path("undrawn.out.html");
+	const packed = await packHtml(
+		dir.write(
+			"undrawn.html",
+			`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css">
+<style>@media (max-width: 600px) { #never { display: none; } }</style></head><body><main><h1>Charts</h1>
+<div class="chart" id="late"></div><div class="chart" id="never"></div></main>
+<script src="kit:echarts.js"></script><script src="kit:charts.js"></script>
+<script>setTimeout(() => Charts.make(document.getElementById("late"), { xAxis: { data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }), 1500);</script>
+</body></html>`,
+		),
+		output,
+	);
+	expect(packed.error).toBe("");
+
+	const result = await checkQuick(output);
+
+	expect(result.stdout).toContain(
+		"still waiting after 10 s for charts to be drawn: div#never.chart",
+	);
+	expect(result.stdout).not.toContain("#late");
+	expect(result.code).toBe(1);
+}, 40_000);

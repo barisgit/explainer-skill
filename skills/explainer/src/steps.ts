@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
-import { type Cdp, settle } from "./chrome.ts";
-import { ELEMENT_NAME_JS, REGION_VISIBLE_JS } from "./page-js.ts";
+import type { Cdp } from "./chrome.ts";
+import { ELEMENT_NAME_JS, REGION_VISIBLE_JS, SETTLE_JS } from "./page-js.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
 const KEYS: Record<string, [number, string]> = {
@@ -24,8 +24,6 @@ const STEP = new RegExp(`^(${KINDS.join("|")}):(.+)$`, "s");
 const POINT = /^(\d+),(\d+)$/;
 const NTH = /@(all|\d+)$/;
 const RELOAD = "reload";
-const SETTLE_MS = 150;
-const RELOAD_SETTLE_MS = 400;
 /** The steps that write a value into a field, with the form their help shows. */
 const VALUE_FORMS = { type: "type:<css>=<text>", set: "set:<css>=<value>" } as const;
 /** The steps that act on an element and cannot take a point. */
@@ -250,7 +248,8 @@ async function domClick(cdp: Cdp, step: string, target: Target): Promise<StepRes
 			"el.scrollIntoView({ block: 'center' }); el.focus?.({ preventScroll: true }); el.click()",
 		);
 		if (target.indices.length > 1) {
-			await settle(SETTLE_MS);
+			// What a click still misses shows in the settle after the step.
+			await settlePage(cdp);
 		}
 	}
 	return target.nth === "all" ? { note: `${step}: clicked ${target.indices.length}` } : {};
@@ -390,7 +389,7 @@ async function settledBox(cdp: Cdp, target: Target, index: number): Promise<Box 
 		return null;
 	}
 	if (brought === "scrolled") {
-		await settle(SETTLE_MS);
+		await settlePage(cdp);
 	}
 	return valueOnNth<Box>(cdp, target.selector, index, BOX_JS);
 }
@@ -431,21 +430,31 @@ async function shotStep(
 	return { pngs, note: `${step}: no PNG at ${width} px wide: ${which} is not shown` };
 }
 
-/** Reloads the page as the reader would (same URL, same storage) and waits for the load and for scripts to settle. */
-async function reloadStep(cdp: Cdp): Promise<StepResult> {
-	await cdp.load();
-	await settle(RELOAD_SETTLE_MS);
-	return {};
-}
+/**
+ * Waits until the page has drawn what its load or the last action started (SETTLE_JS: frames, fonts, visible charts, the short
+ * timers check tracks); returns "" or what is still missing at the deadline.
+ */
+export const settlePage = (cdp: Cdp) => cdp.evaluate<string>(SETTLE_JS, true);
 
 /**
- * Runs one step in the page. Selectors may end in `@all` (every match, re-queried before each click, with a pause after each so handlers
- * that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used. A shot: step writes to `shotPath`.
+ * Runs one step in the page, then waits until the page has settled (settlePage); a step after which something is still missing
+ * reports it as its problem. Selectors may end in `@all` (every match, re-queried before each click, the page settling after
+ * each so handlers that rebuild the DOM finish) or `@<index>` (0-based); without it the first match is used. A shot: step writes
+ * to `shotPath`. `reload` reloads the page as the reader would (same URL, same storage).
  */
 export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
+	let result: StepResult = {};
 	if (step === RELOAD) {
-		return reloadStep(cdp);
+		await cdp.load();
+	} else {
+		result = await act(cdp, step, shotPath);
 	}
+	const missing = await settlePage(cdp);
+	return missing && !result.problem ? { ...result, problem: `${step}: ${missing}` } : result;
+}
+
+/** Runs one step other than reload, without waiting for the page afterwards. */
+async function act(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
 	const parsed = parseStep(step);
 	if (!parsed) {
 		return { problem: stepError(step) };

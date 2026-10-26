@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./chrome.ts";
-import { ChromeError, settle, withPage } from "./chrome.ts";
+import { ChromeError, withPage } from "./chrome.ts";
+import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import {
 	DISCOVER_JS,
 	FIRST_SCREEN_JS,
@@ -10,7 +11,7 @@ import {
 	STEPPERS_JS,
 	SWEEP_JS,
 } from "./page-probes.ts";
-import { runStep } from "./steps.ts";
+import { runStep, settlePage } from "./steps.ts";
 
 const VIEWPORTS = {
 	desktop: { width: 1440, height: 900 },
@@ -181,7 +182,9 @@ class PageLog {
 
 /** Where an exception was thrown, in the page's own line:column: the top frames ("fmt 3:38, render 4:28") or, without a stack (a syntax error), the position alone. */
 function errorLocation(d: ExceptionDetails): string {
-	const frames = (d.stackTrace?.callFrames ?? []).slice(0, STACK_FRAMES);
+	const frames = (d.stackTrace?.callFrames ?? [])
+		.filter((f) => f.url !== TIMERS_URL)
+		.slice(0, STACK_FRAMES);
 	if (!frames.length) {
 		return `${d.lineNumber + 1}:${d.columnNumber + 1}`;
 	}
@@ -212,9 +215,10 @@ interface Run {
 }
 
 /**
- * Loads the page fresh (via about:blank, so a hash-only change is a real load), then lets scripts settle. Local storage is emptied
- * once the old page is gone: every file:// page shares one origin and one profile serves all shots, so a page that keeps what the
- * reader entered (kit:keep.js) would otherwise carry one shot's `--do` state into the next, and the old page saves again as it unloads.
+ * Loads the page fresh (via about:blank, so a hash-only change is a real load), then waits until it has settled (settlePage); what
+ * is still missing then is a problem of the shot. Local storage is emptied once the old page is gone: every file:// page shares one
+ * origin and one profile serves all shots, so a page that keeps what the reader entered (kit:keep.js) would otherwise carry one
+ * shot's `--do` state into the next, and the old page saves again as it unloads.
  */
 async function open(run: Run, hash: string) {
 	const { cdp } = run;
@@ -224,7 +228,10 @@ async function open(run: Run, hash: string) {
 		storageTypes: "local_storage",
 	});
 	await cdp.load(run.url + hash);
-	await settle(400);
+	const missing = await settlePage(cdp);
+	if (missing) {
+		run.log.problems.push(`${hash ? `${hash}: ` : ""}${missing}`);
+	}
 }
 
 interface Screen {
@@ -325,7 +332,6 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 			run.stepNotes.add(result.note);
 		}
 		elements.push(...(result.pngs ?? []).map((png) => ({ step, png })));
-		await settle(200);
 	}
 	return elements;
 }
@@ -393,6 +399,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 async function shootAll(run: Run, themes: readonly string[]) {
 	const { cdp } = run;
 	await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
+	await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: TIMERS_JS });
 	for (const theme of themes) {
 		for (const [name, vp] of Object.entries(VIEWPORTS)) {
 			const narrow = name === "narrow";
@@ -445,7 +452,9 @@ async function shootWithin(run: Run, themes: readonly string[]) {
  * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
  * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
- * Reports console/page errors, network requests, failed loads, page-level horizontal overflow, and repeated ids (problems), and warnings
+ * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
+ * Reports console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had still not drawn at
+ * the settle deadline (problems), and warnings
  * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts, steppers that change only their captions). Reduced motion is emulated so animations are finished in the shots.
  * A ChromeError ends the run with no result: Chrome failed to start or stalled, or the run passed `opts.timeoutSeconds`.
  */

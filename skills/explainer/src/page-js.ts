@@ -33,3 +33,80 @@ export const REGION_VISIBLE_JS = `(el) => {
 	if (!(${LAID_OUT_JS})(el)) return false;
 	return paints(el) || [...el.querySelectorAll("*")].some(paints);
 }`;
+
+/** Timers due within this time count as work the page is about to do: check waits for them. */
+const SHORT_TIMER_MS = 1000;
+/** How long SETTLE_JS waits before it gives up and says what is still missing. */
+export const SETTLE_DEADLINE_MS = 10_000;
+/** The script name TIMERS_JS gives itself, so a report can leave its wrapper out of a page error's stack. */
+export const TIMERS_URL = "explainer-check-timers.js";
+/** Where TIMERS_JS keeps its state on `window`: a registered symbol, so no page script or enumeration meets it. */
+const TIMERS_KEY = `Symbol.for("explainer.check.timers")`;
+
+/**
+ * Page script for every new document (Page.addScriptToEvaluateOnNewDocument): wraps setTimeout and clearTimeout to track the
+ * timers due within SHORT_TIMER_MS, the work a page defers by a moment (a restore after load, a redraw after a click, a test's
+ * contract), so SETTLE_JS can wait for that work instead of for a fixed time. It keeps the original setTimeout for its own waits.
+ */
+export const TIMERS_JS = `(() => {
+	if (window[${TIMERS_KEY}]) return;
+	const set = window.setTimeout.bind(window);
+	const clear = window.clearTimeout.bind(window);
+	const pending = new Set();
+	window.setTimeout = function (handler, ms, ...args) {
+		const id = set(function () {
+			pending.delete(id);
+			return typeof handler === "function" ? handler.apply(this, args) : (0, eval)(String(handler));
+		}, ms);
+		if (!(Number(ms) > ${SHORT_TIMER_MS})) pending.add(id);
+		return id;
+	};
+	window.clearTimeout = (id) => { pending.delete(id); clear(id); };
+	window[${TIMERS_KEY}] = {
+		set,
+		/** Resolves once every short timer pending now has run or been cleared; timers those set are not waited for. */
+		ran: () => new Promise((done) => {
+			const ids = [...pending];
+			const poll = () => (ids.some((id) => pending.has(id)) ? set(poll, 10) : done());
+			poll();
+		}),
+	};
+})()
+//# sourceURL=${TIMERS_URL}`;
+
+/**
+ * Page expression: a promise of "" once the page has drawn what its load or the last step started, or of what is still missing
+ * after SETTLE_DEADLINE_MS. In order: a frame, a task and a frame (Preact runs an island's effects in between, which make its
+ * charts and start their fonts); the fonts; every chart the reader can see drawn, that is each `.chart` with a width (plots aside,
+ * which plot.js draws as it makes them) has its ECharts instance, since Charts.make mounts a chart once its font has loaded; the
+ * same frames again for the redraws those start; then the short timers pending by then (TIMERS_JS, where check installed it).
+ * The deadline runs on a timer, so a page that stops producing frames still ends the wait.
+ */
+export const SETTLE_JS = `(() => {
+	const timers = window[${TIMERS_KEY}];
+	const later = timers?.set ?? setTimeout;
+	const name = ${ELEMENT_NAME_JS};
+	const frame = () => new Promise((done) => requestAnimationFrame(() => done()));
+	const frames = () => frame().then(() => new Promise((done) => later(done, 50))).then(frame);
+	const undrawn = () => window.echarts ? [...document.querySelectorAll(".chart:not(.plot)")].filter((el) => el.clientWidth && !echarts.getInstanceByDom(el)) : [];
+	let waiting = "an animation frame";
+	const work = (async () => {
+		await frames();
+		waiting = "the page's fonts";
+		await document.fonts.ready;
+		waiting = "";
+		while (undrawn().length) await frame();
+		waiting = "an animation frame";
+		await frames();
+		waiting = "the page's timers of up to ${SHORT_TIMER_MS / 1000} s";
+		await timers?.ran();
+		return "";
+	})();
+	let timer;
+	const deadline = new Promise((done) => { timer = later(() => {
+		const charts = undrawn().map(name);
+		const what = waiting || (charts.length ? "charts to be drawn: " + charts.join(", ") : "an animation frame");
+		done("still waiting after ${SETTLE_DEADLINE_MS / 1000} s for " + what);
+	}, ${SETTLE_DEADLINE_MS}); });
+	return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
+})()`;

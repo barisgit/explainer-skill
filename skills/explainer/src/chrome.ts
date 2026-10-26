@@ -56,6 +56,7 @@ class SandboxUnavailable extends ChromeError {}
 /** One call-stack entry of an exception; line and column numbers are 0-based. */
 interface CallFrame {
 	functionName: string;
+	url: string;
 	lineNumber: number;
 	columnNumber: number;
 }
