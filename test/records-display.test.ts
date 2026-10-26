@@ -152,6 +152,70 @@ test("opened groups go in the hash and come back after a reload, and a fold neve
 	});
 }, 30_000);
 
+/** A block inside a static View, reached from another view, so the view has a trail of two steps. */
+const NESTED = `import { Records, View } from "kit";
+
+# Units
+
+Pick a unit.
+
+## Units
+
+- [Unit A](#unit/a)
+
+<View name="unit" param="a" back="Units">
+
+# Unit A
+
+## Crew
+
+- [The crew](#team)
+
+</View>
+
+<View name="team" back="Units">
+
+# Crew
+
+## Members
+
+<Records id="crew" idField="id" fields={{ id: { label: "Who", kind: "text" }, team: { label: "Team", kind: "text" } }} columns={["id", "team"]} groupBy={["team"]} views={["tree", "table"]} data={[{ id: "Ana", team: "core" }, { id: "Bo", team: "ops" }]} />
+
+</View>
+`;
+
+test("a block inside a View keeps the view and its own state in one hash, through a reload, with the view's trail", async () => {
+	const output = await packedMdx(dir, "nested", NESTED);
+	const where = `({ hash: location.hash, view: document.querySelector(".view.active")?.dataset.view, table: Boolean(document.querySelector("#crew table")), crumbs: [...document.querySelectorAll(".view.active .crumbs li")].map((li) => li.textContent).join(" / ") })`;
+	const seen = await inPage(`${output}#unit/a`, async (cdp) => {
+		await act(cdp, `location.hash = "team"`, where);
+		const chosen = await act(
+			cdp,
+			`document.querySelector("#crew .seg label:nth-child(2) input").click()`,
+			where,
+		);
+		await load(cdp);
+		const reloaded = await cdp.evaluate(where);
+		const cleared = await act(
+			cdp,
+			`document.querySelector("#crew .seg label:nth-child(1) input").click()`,
+			where,
+		);
+		return { chosen, reloaded, cleared };
+	});
+	const table = {
+		hash: "#team?crew?view=table",
+		view: "team",
+		table: true,
+		crumbs: "Units / Unit A / Crew",
+	};
+	expect(seen).toEqual({
+		chosen: table,
+		reloaded: table,
+		cleared: { ...table, hash: "#team", table: false },
+	});
+}, 30_000);
+
 test("an incomplete sum shows as a lower bound or unknown in every view, in words for screen readers", async () => {
 	const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
 	const output = await packedMdx(

@@ -144,7 +144,13 @@ declare var Plot: {
 	make(el: HTMLElement, option: PlotOption): { set(patch: PlotOption): void; dispose(): void };
 };
 declare var Steps: { refresh(el: Element, step?: number): void };
-declare var Views: { on(name: string, fn: ViewHandler): void };
+declare var Views: {
+	on(name: string, fn: ViewHandler): void;
+	/** The part of the hash that belongs to `el`: after its view's route and ?, the whole hash on the overview; null while hidden. */
+	local(el: Element): string | null;
+	/** Writes `text` as `el`'s part of the hash, in place, keeping the view's trail; nothing while its view is hidden. */
+	setLocal(el: Element, text: string): void;
+};
 declare var Keep: KeepApi;
 declare var ReplyNotes: (options: ReplyNotesOptions) => void;
 declare var ViewsNav: (options: {
@@ -155,6 +161,7 @@ declare var ViewsNav: (options: {
 }) => {
 	revisited(): boolean;
 	savedHash(): string | null;
+	replace(hash: string): void;
 	show(view: HTMLElement | null, hash: string): void;
 };
 declare var ViewsFolds: (kitText: KitText<"expandAll" | "collapseAll">) => () => void;

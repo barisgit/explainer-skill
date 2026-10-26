@@ -17,7 +17,8 @@
      refField  a field whose value is the row's data-ref (kit link)
    A field with sum: true adds subtotals to groups and lanes, and a total, shown as ≥ when records without a value leave them
    out, or ? when none has one. The view, sort, search, filters and open folds go in the URL hash, so a link opens what the reader saw,
-   and a link of your own applies a state: <a href="#plan?f.owner=JV">JV's work</a>.
+   and a link of your own applies a state: <a href="#plan?f.owner=JV">JV's work</a>. Inside a View the state follows its route:
+   #team?crew?view=table.
    A tree or board alone, with no search or facets, is static markup. Otherwise it is an island that carries the data as JSON, a
    second copy beside a filled View of the same records; its controls show once the script runs, and before that the default
    view reads as it is. pack checks the config and names the path of each problem (fields.hours.kind). It prints as the whole

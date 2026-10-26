@@ -1,7 +1,8 @@
 "use client";
 /* Records with controls (see ../records.tsx): the island that keeps the reader's state. Its first render is the state pack
-   prerendered; then it reads the URL hash, and writes the whole state back with history.replaceState, so a link to the page or
-   a reload shows what the reader saw and Back from an item's view returns to it. Opening or closing a fold writes only over
+   prerendered; then it reads its part of the URL hash (Views.local: the whole hash on the overview, #team?crew?view=table in
+   the View team) and writes the whole state back in place (Views.setLocal), so a link to the page or a reload shows what the
+   reader saw and Back from an item's view returns to it. Opening or closing a fold writes only over
    this block's own hash or none, so an anchor the reader came by (#plan.1.wp1, which opens its group) stays. Print shows the
    whole tree. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -41,10 +42,6 @@ function printState(records: Records): RecordsState {
 	return tree.body.kind === "tree" ? tree.body.expandAll : records.initial;
 }
 
-/** Whether the block sits in a drill-down view, which leaves the URL hash to views.js. */
-const inView = (root: { current: HTMLElement | null }) =>
-	Boolean(root.current?.closest("[data-view]"));
-
 /** Whether two states differ only in their open groups and details. */
 const sameBesideFolds = (records: Records, a: RecordsState, b: RecordsState) =>
 	records.writeHash({ ...a, open: [], details: [] }) ===
@@ -54,20 +51,24 @@ const sameBesideFolds = (records: Records, a: RecordsState, b: RecordsState) =>
  * Keeps the hash in step with `state`, which follows `previous`. Over a hash that is not this block's (an anchor, another
  * block's state), a change of folds alone and a return to the default write nothing; any other change replaces it.
  */
-function syncHash(records: Records, state: RecordsState, previous: RecordsState) {
+function syncHash(
+	records: Records,
+	block: HTMLElement,
+	state: RecordsState,
+	previous: RecordsState,
+) {
+	const current = Views.local(block);
+	if (current === null) {
+		return;
+	}
 	const want = records.writeHash(state);
-	const current = location.hash.slice(1);
 	const mine = current === "" || records.readHash(current) !== null;
 	if (!mine && (want === records.config.id || sameBesideFolds(records, state, previous))) {
 		return;
 	}
 	const next = want === records.config.id ? "" : want;
 	if (next !== current) {
-		history.replaceState(
-			history.state,
-			"",
-			next ? `#${next}` : location.pathname + location.search,
-		);
+		Views.setLocal(block, next);
 	}
 }
 
@@ -83,23 +84,35 @@ function useHash(
 	const ready = useRef(false);
 	useEffect(() => {
 		const read = (event?: Event) => {
-			if (inView(root)) {
+			const hash = root.current ? Views.local(root.current) : null;
+			if (hash === null) {
 				return;
 			}
-			if (event && location.hash.length <= 1) {
+			if (event && hash === "") {
 				set(records.initial);
 				return;
 			}
-			const found = records.readHash(location.hash);
+			const found = records.readHash(hash);
 			if (found) {
 				set(found);
 				requestAnimationFrame(() => root.current?.scrollIntoView({ block: "start" }));
 			}
 		};
-		read();
-		ready.current = true;
-		addEventListener("hashchange", read);
-		return () => removeEventListener("hashchange", read);
+		// The first read waits for the page's scripts: views.js, which loads after the islands, says which view is shown.
+		const start = () => {
+			read();
+			ready.current = true;
+			addEventListener("hashchange", read);
+		};
+		if (document.readyState === "loading") {
+			addEventListener("DOMContentLoaded", start, { once: true });
+		} else {
+			start();
+		}
+		return () => {
+			removeEventListener("DOMContentLoaded", start);
+			removeEventListener("hashchange", read);
+		};
 	}, [records, root, set]);
 	return ready;
 }
@@ -137,8 +150,8 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 	useEffect(() => setLive(true), []);
 	const written = useRef(state);
 	useEffect(() => {
-		if (ready.current && !printing && !inView(root)) {
-			syncHash(records, state, written.current);
+		if (ready.current && !printing && root.current) {
+			syncHash(records, root.current, state, written.current);
 			written.current = state;
 		}
 	}, [records, state, printing, ready]);

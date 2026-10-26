@@ -1,7 +1,7 @@
 /* views nav: the trail, previous/next and contents rail of kit:views.js, not referenced from pages: pack joins it in front of
    views.js, which calls it once (with its kitText(key) for overview, contents and breadcrumb) and then show(view, hash) after
    every route change, once the view's handler has drawn it; revisited() and savedHash() tell it which view a history entry
-   was left from.
+   was left from, and replace(hash) rewrites the entry's hash without losing its trail.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
                its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
@@ -385,6 +385,26 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 
 	return {
 		revisited,
+		/**
+		 * Puts `hash` ("" for none) in place of this history entry's, keeping the trail saved with it, which history.replaceState
+		 * alone clears. A trail copied from the entry before (not yet this entry's own) is left for show() to stamp.
+		 */
+		replace(hash: string) {
+			const state = entryState();
+			const own = state[AT_KEY] === locationHash();
+			history.replaceState(
+				history.state,
+				"",
+				hash ? `#${hash}` : location.pathname + location.search,
+			);
+			if (own) {
+				try {
+					navigation.updateCurrentEntry({ state: { ...state, [AT_KEY]: locationHash() } });
+				} catch {
+					// No Navigation API, or a document whose entries it disables: the trail stays in memory, as in stamp().
+				}
+			}
+		},
 		/** The view hash this history entry showed when it was left, from the trail saved with it; null for the overview or none. */
 		savedHash: () => (revisited() ? (savedTrail()?.at(-1)?.hash ?? null) : null),
 		show(view: HTMLElement | null, routeHash: string) {

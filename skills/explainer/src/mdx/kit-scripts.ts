@@ -132,7 +132,11 @@ const MARKERS: { html: string; code: (code: string) => boolean; scripts: KitScri
 	{ html: ".plot", code: matches(/\bPlot\.make\b/), scripts: ["plot.js"] },
 	{
 		html: "[data-view], details",
-		code: matches(new RegExp(`${literal("data-view")}|${literal("details")}|\\bdataset\\.view\\b`)),
+		code: matches(
+			new RegExp(
+				`${literal("data-view")}|${literal("details")}|\\bdataset\\.view\\b|\\bViews\\.(?:local|setLocal)\\b`,
+			),
+		),
 		scripts: ["views.js"],
 	},
 	{

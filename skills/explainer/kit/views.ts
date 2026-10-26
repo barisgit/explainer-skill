@@ -4,6 +4,10 @@
    on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to.
    A static view may claim one param exactly: data-view="option/block-sort". Views.on(name, (el, param) => ...) fills a view for
    its param; it also runs on hashchange and on Back, so a view is a pure function of the URL.
+   What follows a route's first ? is the state of something inside the view, and changing it leaves the view drawn as it is:
+   #team?crew?view=table is the view #team with "crew?view=table" for what it holds (a param with a ? in it is written %3F).
+   Views.local(el) reads that part for an element (the whole hash on the overview; null while the element's view is hidden),
+   and Views.setLocal(el, text) writes it in place with history.replaceState, keeping the view's trail.
    Load order: a page opened on a hash shows its view at once, but handlers run only after the page's scripts have all run
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
@@ -89,14 +93,26 @@
 	/** The route last drawn, once routing has started. */
 	let shown = OVERVIEW;
 
-	/** The view a canonical hash claims: `name/param` wins over `name`; param is decoded. */
+	/** A canonical hash split at its first ?: the route, and the local state after it ("" when there is no ?). */
+	function split(hash: string) {
+		const query = hash.indexOf("?");
+		return query < 0
+			? { path: hash, local: "" }
+			: { path: hash.slice(0, query), local: hash.slice(query + 1) };
+	}
+
+	/** The view a canonical hash claims by its route: `name/param` wins over `name`; param is decoded. */
 	function claim(hash: string): Route {
-		const [name = "", ...rest] = hash.split("/");
+		const { path } = split(hash);
+		const [name = "", ...rest] = path.split("/");
 		const view =
 			views.find((v) => canonical(v.dataset.view ?? "") === `${name}/${rest.join("/")}`) ??
 			views.find((v) => v.dataset.view === name);
-		return view ? { name, view, param: decode(rest.join("/")), hash } : OVERVIEW;
+		return view ? { name, view, param: decode(rest.join("/")), hash: path } : OVERVIEW;
 	}
+
+	/** Whether two routes show one view for one route hash, whatever local state follows it. */
+	const sameRoute = (a: Route, b: Route) => a.view === b.view && a.hash === b.hash;
 
 	/** The element a hash names by id, if any. */
 	const targetOf = (hash: string) => (hash ? document.getElementById(decode(hash)) : null);
@@ -105,21 +121,18 @@
 	 * The route for the current hash: the view it claims; else, for a plain #anchor, on Back, Forward and reload the route this
 	 * history entry showed when the reader left it (the navigation keeps it in the entry's Navigation API state), and on a link
 	 * just followed the open view when the anchor's element is in it; else the overview. The open view is handed back as `shown`
-	 * itself, so show() knows it is already drawn.
+	 * itself, so show() knows it is already drawn: also when only the local state after the route changed.
 	 */
 	function route(): Route {
 		const hash = canonical(location.hash.slice(1));
 		const claimed = claim(hash);
 		if (claimed.view) {
-			return claimed;
+			return sameRoute(claimed, shown) ? shown : claimed;
 		}
 		// The saved route first: every param of a view may draw the same anchor, so the open view is no evidence on Back.
 		if (nav.revisited()) {
-			const saved = nav.savedHash();
-			if (!saved) {
-				return OVERVIEW;
-			}
-			return shown.view && saved === shown.hash ? shown : claim(saved);
+			const saved = claim(nav.savedHash() ?? "");
+			return sameRoute(saved, shown) ? shown : saved;
 		}
 		return shown.view?.contains(targetOf(hash)) ? shown : OVERVIEW;
 	}
@@ -206,7 +219,34 @@
 		}
 	}
 
+	/** The shown route an element's local state follows: `shown` when the element is in its view, OVERVIEW outside every view. */
+	function routeOf(el: Element) {
+		const view = el.closest("[data-view]");
+		if (view) {
+			return view === shown.view ? shown : null;
+		}
+		return shown.view ? null : OVERVIEW;
+	}
+
 	window.Views = {
+		local(el) {
+			const hash = canonical(location.hash.slice(1));
+			const view = el.closest("[data-view]");
+			if (!view) {
+				return root.classList.contains("in-view") ? null : hash;
+			}
+			// Read from the hash and the view shown, not from `shown`: a component may read before routing starts.
+			if (!view.classList.contains("active")) {
+				return null;
+			}
+			return claim(hash).view === view ? split(hash).local : hash;
+		},
+		setLocal(el, text) {
+			const at = started ? routeOf(el) : null;
+			if (at) {
+				nav.replace(at.view ? `${at.hash}${text ? `?${text}` : ""}` : text);
+			}
+		},
 		on(name, fn) {
 			handlers[name] = fn;
 			if (!started) {
