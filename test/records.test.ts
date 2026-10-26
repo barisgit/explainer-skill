@@ -171,7 +171,7 @@ test("a bad config is rejected with every problem, where it is and what to write
 	]);
 });
 
-test("a sum over records with unknown values reads as a lower bound, or as unknown when none has one", () => {
+test("a sum over records with unknown values shows the known part and how many it leaves out, or unknown when none has one", () => {
 	const partial = createRecords({
 		id: "gaps",
 		idField: "id",
@@ -192,7 +192,7 @@ test("a sum over records with unknown values reads as a lower bound, or as unkno
 			{ id: "f", team: "none", hours: null },
 		],
 	});
-	// The texts join a number to its unit and to ≥ with no-break spaces; the expectations write plain ones.
+	// The texts join a number to its unit and to + ? with no-break spaces; the expectations write plain ones.
 	const plain = (text: string | undefined) => text?.replace(/\u00a0/g, " ");
 	const hours = (cells: readonly Cell[]) => {
 		const { text, value, incomplete } = cells[1] ?? {};
@@ -202,23 +202,47 @@ test("a sum over records with unknown values reads as a lower bound, or as unkno
 	const groups = treeBody.kind === "tree" ? treeBody.groups : [];
 	expect(groups.map((g) => hours(g.cells))).toEqual([
 		{ text: "1,364 h", value: 1364, incomplete: undefined },
-		{ text: "≥ 8 h", value: 8, incomplete: "at least 8 h, 1 without a value" },
+		{ text: "8 h + ?", value: 8, incomplete: "8 h known, 1 without a value" },
 		// Unknown is not zero: the sum of nothing known is unknown.
 		{ text: "?", value: null, incomplete: "unknown, 2 without a value" },
 	]);
 	expect(treeBody.kind === "tree" && hours(treeBody.total)).toEqual({
-		text: "≥ 1,372 h",
+		text: "1,372 h + ?",
 		value: 1372,
-		incomplete: "at least 1,372 h, 3 without a value",
+		incomplete: "1,372 h known, 3 without a value",
 	});
 	const { body: table } = partial.view({ ...partial.initial, view: "table" });
-	expect(table.kind === "table" && hours(table.total).text).toBe("≥ 1,372 h");
+	expect(table.kind === "table" && hours(table.total).text).toBe("1,372 h + ?");
 	const { body: board } = partial.view({ ...partial.initial, view: "board" });
 	expect(board.kind === "board" && board.lanes.map((l) => hours(l.cells).text)).toEqual([
 		"1,364 h",
-		"≥ 8 h",
+		"8 h + ?",
 		"?",
 	]);
+});
+
+test("a signed sum with an unknown value is not read as a bound: a known 100 and a refund without an amount show 100 + ?", () => {
+	const ledger = createRecords({
+		id: "ledger",
+		idField: "id",
+		fields: {
+			id: { label: "Id", kind: "text" },
+			amount: { label: "Amount", kind: "currency", currency: "EUR", sum: true },
+		},
+		columns: ["id", "amount"],
+		views: ["table"],
+		data: [
+			{ id: "sale", amount: 130 },
+			{ id: "fee", amount: -30 },
+			{ id: "refund", amount: null },
+		],
+	});
+	const { body } = ledger.view();
+	const total = body.kind === "table" ? body.total[1] : undefined;
+	expect({
+		text: total?.text.replace(/\u00a0/g, " "),
+		incomplete: total?.incomplete?.replace(/\u00a0/g, " "),
+	}).toEqual({ text: "€100.00 + ?", incomplete: "€100.00 known, 1 without a value" });
 });
 
 test("a field named like an object's built-in property reads only the record's own value", () => {

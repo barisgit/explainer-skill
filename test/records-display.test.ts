@@ -286,7 +286,26 @@ test("a block inside a View keeps the view and its own state in one hash, throug
 	});
 }, 30_000);
 
-test("an incomplete sum shows as a lower bound or unknown in every view, in words for screen readers", async () => {
+test("a tree column with an incomplete sum makes room for + ?, so the widest sum stays on one line", async () => {
+	const output = await packedMdx(
+		dir,
+		"wide-gaps",
+		`import { Records } from "kit";
+
+# Gaps
+
+<Records id="ledger" idField="id" fields={{ id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, cost: { label: "Cost", kind: "currency", currency: "EUR", sum: true } }} columns={["id", "cost"]} groupBy={["team"]} data={[{ id: "a", team: "x", cost: 12500.5 }, { id: "b", team: "x", cost: null }]} />
+`,
+	);
+	const lines = await inPage(output, (cdp) =>
+		cdp.evaluate<number[]>(
+			`[...document.querySelectorAll("#ledger .incomplete > [aria-hidden]")].map((s) => s.getClientRects().length)`,
+		),
+	);
+	expect(lines).toEqual([1, 1]);
+});
+
+test("an incomplete sum shows its known part plus ?, or unknown, in every view, in words for screen readers", async () => {
 	const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
 	const output = await packedMdx(
 		dir,
@@ -312,19 +331,19 @@ export const gaps = ${gaps};
 		);
 	const shown = (id: string, words: string) => {
 		const block = (html.split(`id="${id}"`)[1] ?? "").split('class="records wide"')[0] ?? "";
-		return [...block.matchAll(marked(words))].map((m) => m[1]);
+		return [...block.matchAll(marked(words))].map((m) => m[1]?.replace(/\u00a0/g, " "));
 	};
 	// The mixed group or lane, the one with no value, and the total of the tree and the table (the table shows no groups).
 	const seen = ["tree", "table", "board"].map((id) => [
 		id,
-		shown(id, "at least 8, 1 without a value"),
+		shown(id, "8 known, 1 without a value"),
 		shown(id, "unknown, 1 without a value"),
-		shown(id, "at least 8, 2 without a value"),
+		shown(id, "8 known, 2 without a value"),
 	]);
 	expect(seen).toEqual([
-		["tree", ["≥ 8"], ["?"], ["≥ 8"]],
-		["table", [], [], ["≥ 8"]],
-		["board", ["≥ 8"], ["?"], []],
+		["tree", ["8 + ?"], ["?"], ["8 + ?"]],
+		["table", [], [], ["8 + ?"]],
+		["board", ["8 + ?"], ["?"], []],
 	]);
 });
 

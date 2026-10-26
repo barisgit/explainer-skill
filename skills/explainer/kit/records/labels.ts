@@ -14,7 +14,7 @@ export const LABELS = {
 	recordsCount: "Records",
 	recordsNoMatches: "No matches",
 	recordsClear: "Clear filters",
-	recordsAtLeast: "at least {value}, {missing} without a value",
+	recordsKnown: "{value} known, {missing} without a value",
 	recordsUnknown: "unknown, {missing} without a value",
 	expandAll: "Expand all",
 	collapseAll: "Collapse all",

@@ -73,7 +73,7 @@ function textsOf(labels: Readonly<Record<string, string>>): ViewTexts {
 		},
 		total: text("recordsTotal"),
 		shown: text("recordsShown"),
-		atLeast: text("recordsAtLeast"),
+		known: text("recordsKnown"),
 		unknown: text("recordsUnknown"),
 		views,
 	};

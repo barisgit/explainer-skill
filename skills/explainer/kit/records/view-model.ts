@@ -17,8 +17,9 @@ export interface Cell {
 	/** A category value's marker colour. */
 	swatch?: string;
 	/**
-	 * A sum over records some of which have no value in the field, in words ("at least 1,372 h, 3 without a value"), for screen
-	 * readers and the tooltip; `text` then reads "≥ 1,372 h", or "?" when none of them has a value, since unknown is not zero.
+	 * A sum over records some of which have no value in the field, in words ("1,372 h known, 3 without a value"), for screen
+	 * readers and the tooltip; `text` then reads "1,372 h + ?", or "?" when none of them has a value, since unknown is not zero.
+	 * Not a bound: values may be negative (a refund), so the unknown part may raise or lower the sum.
 	 */
 	incomplete?: string;
 }

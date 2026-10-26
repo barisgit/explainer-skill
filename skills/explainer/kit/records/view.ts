@@ -27,8 +27,8 @@ export interface ViewTexts {
 	total: string;
 	/** "{shown} of {total}". */
 	shown: string;
-	/** An incomplete sum in words: "at least {value}, {missing} without a value", and "unknown, {missing} without a value". */
-	atLeast: string;
+	/** An incomplete sum in words: "{value} known, {missing} without a value", and "unknown, {missing} without a value". */
+	known: string;
 	unknown: string;
 	views: Readonly<Record<ViewKind, string>>;
 }
@@ -57,10 +57,10 @@ function sumCell(
 	if (!sum?.missing) {
 		return { field, value, text };
 	}
-	const words = (value === null ? texts.unknown : texts.atLeast)
+	const words = (value === null ? texts.unknown : texts.known)
 		.replace("{value}", text)
 		.replace("{missing}", model.count(sum.missing));
-	return { field, value, text: value === null ? "?" : `≥\u00a0${text}`, incomplete: words };
+	return { field, value, text: value === null ? "?" : `${text}\u00a0+\u00a0?`, incomplete: words };
 }
 
 /** The first cell of a group, lane or total: its title under the label column; the rest are sums or empty. */

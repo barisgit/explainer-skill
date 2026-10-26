@@ -45,7 +45,7 @@ export const ENGLISH = {
 	recordsCount: "Records",
 	recordsNoMatches: "No matches",
 	recordsClear: "Clear filters",
-	recordsAtLeast: "at least {value}, {missing} without a value",
+	recordsKnown: "{value} known, {missing} without a value",
 	recordsUnknown: "unknown, {missing} without a value",
 };
 
@@ -93,7 +93,7 @@ export const SLOVENIAN: typeof ENGLISH = {
 	recordsCount: "Zapisi",
 	recordsNoMatches: "Ni zadetkov",
 	recordsClear: "Počisti filtre",
-	recordsAtLeast: "vsaj {value}, {missing} brez vrednosti",
+	recordsKnown: "znanih {value}, {missing} brez vrednosti",
 	recordsUnknown: "neznano, {missing} brez vrednosti",
 };
 

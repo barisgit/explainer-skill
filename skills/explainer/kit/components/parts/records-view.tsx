@@ -45,15 +45,25 @@ const WIDTHS: Record<Column["kind"], string> = {
 	category: "9.5rem",
 };
 
-const widths = (columns: readonly Column[]) =>
-	columns.map((c) => `minmax(0, ${WIDTHS[c.kind]})`).join(" ");
+/** The room " + ?" takes after an incomplete sum, so the sum stays on one line. */
+const UNKNOWN_PART = "1.75rem";
+
+/** The widths of `columns`, with room for " + ?" in those listed in `incomplete`. */
+const widths = (columns: readonly Column[], incomplete: ReadonlySet<string>) =>
+	columns
+		.map((c) =>
+			incomplete.has(c.field)
+				? `minmax(0, calc(${WIDTHS[c.kind]} + ${UNKNOWN_PART}))`
+				: `minmax(0, ${WIDTHS[c.kind]})`,
+		)
+		.join(" ");
 
 const isTag = (c: Column) => c.align === "start";
 
 const swatchStyle = (swatch: string) => `--swatch: ${swatch}`;
 
 /**
- * A cell's text; a category value with a colour is a chip with its marker. An incomplete sum shows its short form (≥ 1,372 h)
+ * A cell's text; a category value with a colour is a chip with its marker. An incomplete sum shows its short form (1,372 h + ?)
  * with the words as its tooltip, and screen readers read the words alone.
  */
 function cellText(cell: Cell): JSX.Element | string {
@@ -199,9 +209,18 @@ function leadOf(columns: readonly Column[]): number {
 function Tree({ body, ctx }: { body: TreeView; ctx: Context }) {
 	const rest = body.columns.slice(ctx.lead);
 	const head = body.columns.slice(0, ctx.lead).map((c) => c.label);
-	// Two sets of widths: every column, and on phones only the number columns (09-records.css picks one).
+	// Two sets of widths: every column, and on phones only the number columns (09-records.css picks one). A column whose
+	// total is incomplete is the one whose sums may read "+ ?": every incomplete subtotal leaves the total incomplete too.
+	const incomplete = new Set(
+		body.total.filter((cell) => cell.incomplete).map((cell) => cell.field),
+	);
 	const style = rest.length
-		? `--records-cols: ${widths(rest)}; --records-cols-narrow: ${widths(rest.filter((c) => !isTag(c))) || "0"}`
+		? `--records-cols: ${widths(rest, incomplete)}; --records-cols-narrow: ${
+				widths(
+					rest.filter((c) => !isTag(c)),
+					incomplete,
+				) || "0"
+			}`
 		: undefined;
 	return (
 		<div class="tree" style={style}>
