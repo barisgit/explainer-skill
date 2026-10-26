@@ -199,7 +199,7 @@ index a4edaa8a57dfa5835675b8ecf1c794897f225076..d02e7185cfa94a999ba669c28a71a6a0
  }
  
 diff --git a/src/index.ts b/src/index.ts
-index b4a6454e1015b38924cacc674f488d3460861af2..f29317ce9e2bda6de0e8ff5eb265b4add50bfd91 100644
+index b4a6454e1015b38924cacc674f488d3460861af2..8108c6980769601de9ef1e10763937285a0ac764 100644
 --- a/src/index.ts
 +++ b/src/index.ts
 @@ -23,6 +23,7 @@ export type { RenderOptions, MermaidGraph, PositionedGraph } from './types.ts'
@@ -223,7 +223,7 @@ index b4a6454e1015b38924cacc674f488d3460861af2..f29317ce9e2bda6de0e8ff5eb265b4ad
    }
  }
  
-+/** The direction across each flow direction, for RenderOptions.transpose: down becomes right, up becomes left. */
++/** The direction across each flow direction, for RenderOptions.transpose: down and right swap, as do up and left. */
 +const ACROSS: Record<Direction, Direction> = { TD: 'LR', TB: 'LR', BT: 'RL', LR: 'TB', RL: 'BT' }
 +
  /**
