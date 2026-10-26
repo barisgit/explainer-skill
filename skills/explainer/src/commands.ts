@@ -43,7 +43,7 @@ Use the ids from prose and replies:
 Diagrams do not step. To walk through one, show it whole and give each step's text the data-ref of its parts.
 Keep ids short and meaningful: they are what you type here.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
-Phones: a flowchart or state diagram too wide for the column also gets a copy laid out across its direction, shown instead; other diagrams shrink no further than readable text and then scroll sideways. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
+Phones: a flowchart or state diagram too wide for the column also gets a copy laid out across its direction, shown instead; other diagrams shrink no further than readable text and then scroll sideways. Print fits each diagram to the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {

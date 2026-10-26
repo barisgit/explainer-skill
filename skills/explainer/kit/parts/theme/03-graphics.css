@@ -160,13 +160,24 @@
 }
 /* A flowchart or state diagram too wide for a phone comes with a copy laid out across it (svg[data-phone]), shown on phones in
    its place. */
-@media (width >= 40rem) {
+@media screen and (width >= 40rem) {
 	.mermaid > svg[data-phone] {
 		display: none;
 	}
 }
-@media (width < 40rem) {
+@media screen and (width < 40rem) {
 	.mermaid:has(> svg[data-phone]) > svg:not([data-phone]) {
+		display: none;
+	}
+}
+/* Paper cannot scroll: a diagram prints whole, fitted to the column, as one copy. pack marks the phone copy data-print when the
+   wide layout would print with text too small to read. */
+@media print {
+	.mermaid > svg {
+		min-width: 0;
+	}
+	.mermaid > svg[data-phone]:not([data-print]),
+	.mermaid:has(> svg[data-print]) > svg:not([data-print]) {
 		display: none;
 	}
 }

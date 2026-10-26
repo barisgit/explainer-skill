@@ -362,6 +362,9 @@ const PIPELINE = `flowchart LR
 	interp --> store[("Store")]
 	flag --> store`;
 
+/** A flowchart a phone shows top-down but A4 paper fits as written. */
+const SHORT_FLOW = "flowchart LR\n  a[Collect] --> b[Clean] --> c[Model] --> d[Report]";
+
 const SEQUENCE = `sequenceDiagram
 	participant B as Browser
 	participant S as Server
@@ -379,18 +382,23 @@ test("a flowchart too wide for a phone carries a top-down copy with its own ids 
 	const refs = (svg: string) => [...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1]).sort();
 	const height = (svg: string) => Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)?.[1]);
 
-	expect(phone).toStartWith('<svg data-phone id="mm0-phone"');
+	expect(phone).toStartWith('<svg data-phone data-print id="mm0-phone"');
 	expect(phone.match(/ id="[^"]+"/g)?.every((id) => id.startsWith(' id="mm0-phone'))).toBe(true);
 	expect(refs(phone)).toEqual(refs(wide));
 	expect(height(phone)).toBeGreaterThan(2 * height(wide));
 	expect(copiesOf("flowchart LR\n  a[Input] --> b[Output]")).toHaveLength(1);
 	expect(copiesOf(SEQUENCE)).toHaveLength(1);
+	expect(copiesOf(SHORT_FLOW)[1]).toStartWith('<svg data-phone id="mm0-phone"');
 });
 
+/** A page of Mermaid blocks with the theme and link.js, whose pageContract runs `checks`. */
+const diagramPage = (body: string, checks: Record<string, string>) =>
+	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main>${body}</main><script src="kit:link.js"></script><script>${pageContract(checks)}</script></body></html>`;
+
 test("on a phone a wide flowchart shows its top-down copy, and a wide sequence keeps 10 px text and scrolls sideways", async () => {
-	const body = `<pre class="mermaid" id="flow">${PIPELINE}</pre>\n<pre class="mermaid" id="seq">${SEQUENCE}</pre>`;
-	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="kit:theme.css"></head><body><main>${body}</main><script src="kit:link.js"></script><script>${pageContract(
+	const page = diagramPage(
+		`<pre class="mermaid" id="flow">${PIPELINE}</pre>\n<pre class="mermaid" id="seq">${SEQUENCE}</pre>`,
 		{
 			"the phone copy shows on phones only, in the diagram's place": `(() => {
 			const phone = innerWidth < 640;
@@ -404,7 +412,38 @@ test("on a phone a wide flowchart shows its top-down copy, and a wide sequence k
 			"the sequence scrolls sideways on phones only": `(innerWidth < 640) === (document.querySelector("#seq").scrollWidth > document.querySelector("#seq").clientWidth + 1)`,
 			"a diagram and its phone copy do not link each other's parts": `!document.querySelector(".is-linked")`,
 		},
-	)}</script></body></html>`;
+	);
 
 	expect(await packAndRun(dir, "phone", page)).toEqual([]);
+}, 30_000);
+
+test("on paper every diagram prints whole as one copy, the top-down one where the wide one would be too small to read", async () => {
+	const participants = Array.from(
+		{ length: 10 },
+		(_, i) => `  participant P${i} as Participant ${i}`,
+	);
+	const messages = Array.from({ length: 9 }, (_, i) => `  P${i}->>P${i + 1}: step ${i}`);
+	const page = diagramPage(
+		[
+			`<pre class="mermaid" id="seq">sequenceDiagram\n${[...participants, ...messages].join("\n")}</pre>`,
+			`<pre class="mermaid" id="flow">${PIPELINE}</pre>`,
+			`<pre class="mermaid" id="short">${SHORT_FLOW}</pre>`,
+		].join("\n"),
+		{
+			"each diagram prints one copy": `[...document.querySelectorAll(".mermaid")].every((block) =>
+				[...block.children].filter((svg) => getComputedStyle(svg).display !== "none").length === 1)`,
+			"each printed copy fits its block, which does not scroll": `[...document.querySelectorAll(".mermaid")].every((block) => {
+				const box = getComputedStyle(block);
+				const column = block.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight);
+				return block.scrollWidth <= block.clientWidth + 1
+					&& [...block.children].every((svg) => svg.getBoundingClientRect().width <= column + 1);
+			})`,
+			"a flowchart too wide to read on paper prints top-down": `getComputedStyle(document.querySelector("#flow > svg[data-phone]")).display !== "none"`,
+			"one that reads at the paper's width prints as on a wide screen": `getComputedStyle(document.querySelector("#short > svg:not([data-phone])")).display !== "none"`,
+		},
+	);
+
+	// A4 with Chrome's default margins: the page box is 717 px wide.
+	const paper = { width: 717, height: 1123, mobile: false };
+	expect(await packAndRun(dir, "paper", page, { media: "print", widths: [paper] })).toEqual([]);
 }, 30_000);

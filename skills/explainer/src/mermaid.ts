@@ -2,8 +2,8 @@ import { renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.
 
 /**
  * A rendered diagram: its SVG, which follows light and dark through the kit's tokens; for a wide flowchart or state diagram the
- * copy phones show instead (svg[data-phone], placed right after it: see phoneLayout); and the data-ref ids of its parts, which
- * both copies carry.
+ * copy phones show instead (svg[data-phone], placed right after it: see phoneLayout), which also prints in the SVG's place when
+ * it carries data-print (see printAttr); and the data-ref ids of its parts, which both copies carry.
  */
 export interface Diagram {
 	svg: string;
@@ -17,6 +17,11 @@ const SCALE = 1.2;
 export const READABLE_PX = 10;
 /** The width a diagram block gives its SVG on a 390 px phone: the viewport less the page's and the block's 16 px insets. */
 const PHONE_COLUMN_PX = 326;
+/**
+ * The width a diagram block gives its SVG on A4 paper with Chrome's default margins: the 717 px page box less the page's gutters
+ * (4vw each) and the block's 16 px insets. US Letter is wider, so a diagram that fits A4 fits it too.
+ */
+const PRINT_COLUMN_PX = 627;
 
 /** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, and see `flows`. */
 type Family = "flowchart" | "state" | "sequence" | "other";
@@ -289,6 +294,12 @@ function phoneLayout(
 	return readableWidth(across) < needed ? across : undefined;
 }
 
+/**
+ * The attribute that makes a diagram's phone copy print instead of the wide layout: paper cannot scroll, so theme.css fits the
+ * printed copy to the column, and the wide layout prints only while that keeps its text readable (it is the shorter of the two).
+ */
+const printAttr = (svg: string) => (readableWidth(svg) > PRINT_COLUMN_PX ? "data-print " : "");
+
 /** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */
 function renderOne(source: string, n: number): Diagram {
 	const body = stripPreamble(source);
@@ -308,7 +319,11 @@ function renderOne(source: string, n: number): Diagram {
 
 	const svg = annotateParts(inline(raw, `mm${n}`));
 	const phone =
-		across && annotateParts(inline(across, `mm${n}-phone`)).replace(/^<svg /, "<svg data-phone ");
+		across &&
+		annotateParts(inline(across, `mm${n}-phone`)).replace(
+			/^<svg /,
+			`<svg data-phone ${printAttr(raw)}`,
+		);
 	const refs = [svg, phone ?? ""].flatMap((copy) =>
 		[...copy.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""),
 	);

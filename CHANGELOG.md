@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Mermaid diagrams stay readable on phones. A flowchart or state diagram too wide for a phone gets a second layout across its direction (left to right becomes top-down), shown below 40rem, so left to right is fine to write. Other diagrams shrink until their smallest text is 10 px, then scroll sideways.
+- Mermaid diagrams stay readable on phones. A flowchart or state diagram too wide for a phone gets a second layout across its direction (left to right becomes top-down), shown below 40rem, so left to right is fine to write. Other diagrams shrink until their smallest text is 10 px, then scroll sideways. Printed, each diagram fits the paper whole, top-down when the left-to-right layout would be too small to read.
 - A diagram's width limits are the custom properties `--mermaid-max` and `--mermaid-min` on its `svg`, so one page rule can change them.
 - A circle node with a short label is about the size of a box node, not a large disc.
 - Flowcharts turn back only the edges of a real cycle. An input written after the node it feeds now sits before that node, instead of being looped around it.
