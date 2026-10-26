@@ -211,7 +211,7 @@ index b4a6454e1015b38924cacc674f488d3460861af2..c3f0b98d9784ebebef90507263d56666
  export type { AsciiRenderOptions } from './ascii/index.ts'
  
 diff --git a/src/layout-engine.ts b/src/layout-engine.ts
-index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78f2f748f5 100644
+index 8557308223e16670db3d126d9c55673b6e946598..349c870adcb7077af8755ba7eb0771285eb0c65d 100644
 --- a/src/layout-engine.ts
 +++ b/src/layout-engine.ts
 @@ -30,7 +30,7 @@ import type {
@@ -223,7 +223,23 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
  import { elkLayoutSync } from './elk-instance.ts'
  import { clipEdgeToShape } from './shape-clipping.ts'
  
-@@ -209,10 +209,16 @@ function mermaidToElk(
+@@ -76,10 +76,12 @@ function estimateNodeSize(id: string, label: string, shape: string): { width: nu
+     height = side
+   }
+ 
++  // A circle passes 5 px outside the corners of its label's line box, so a one-glyph operator such as (( × )) is as tall as a
++  // box node beside it (36 px at least). Circling the padded box instead drew it twice that height.
+   if (shape === 'circle' || shape === 'doublecircle') {
+-    const diameter = Math.ceil(Math.sqrt(width * width + height * height)) + 8
+-    width = shape === 'doublecircle' ? diameter + 12 : diameter
+-    height = width
++    const diameter = Math.max(36, Math.ceil(Math.hypot(metrics.width, metrics.height)) + NODE_PADDING.vertical)
++    const side = shape === 'doublecircle' ? diameter + 12 : diameter
++    return { width: side, height: side }
+   }
+ 
+   if (shape === 'hexagon') {
+@@ -209,10 +211,16 @@ function mermaidToElk(
        'elk.layered.highDegreeNodes.threshold': '8',
        'elk.layered.compaction.postCompaction.strategy': 'LEFT_RIGHT_CONSTRAINT_LOCKING',
        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
@@ -240,7 +256,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
      },
      children: [],
      edges: [],
-@@ -259,23 +265,25 @@ function mermaidToElk(
+@@ -259,23 +267,25 @@ function mermaidToElk(
      }
    }
  
@@ -272,7 +288,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
  
    // Add root-level edges
    for (const { index, edge } of edgesBySubgraph.get(null)!) {
-@@ -324,6 +332,23 @@ function mermaidToElk(
+@@ -324,6 +334,23 @@ function mermaidToElk(
    return elkGraph
  }
  
@@ -296,7 +312,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
  /**
   * Convert a MermaidSubgraph to an ELK compound node.
   * Includes internal edges (edges where both endpoints are in this subgraph)
-@@ -353,6 +378,9 @@ function subgraphToElk(
+@@ -353,6 +380,9 @@ function subgraphToElk(
      'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
      'elk.layered.spacing.edgeNodeBetweenLayers': '12',
      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
@@ -306,7 +322,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
      'elk.layered.spacing.nodeNodeBetweenLayers': String(opts.layerSpacing),
      'elk.spacing.nodeNode': String(opts.nodeSpacing),
    }
-@@ -380,24 +408,25 @@ function subgraphToElk(
+@@ -380,24 +410,25 @@ function subgraphToElk(
      }))
    }
  
@@ -338,7 +354,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
  
    // Add internal edges (edges where both endpoints are in this subgraph)
    const internalEdges = edgesBySubgraph.get(sg.id) ?? []
-@@ -776,6 +805,7 @@ function extractEdgesRecursively(
+@@ -776,6 +807,7 @@ function extractEdgesRecursively(
      }
  
      edges.push({
@@ -346,7 +362,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..09a86c330d4bde716779de5e2fe42d78
        source: originalEdge.source,
        target: originalEdge.target,
        label: originalEdge.label,
-@@ -1404,9 +1434,25 @@ export function layoutGraphSync(
+@@ -1404,9 +1436,25 @@ export function layoutGraphSync(
    options: RenderOptions = {}
  ): PositionedGraph {
    const opts = { ...DEFAULTS, ...options }

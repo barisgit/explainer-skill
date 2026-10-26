@@ -201,6 +201,28 @@ test("a long label wraps at Mermaid's 200 px, so a diagram keeps its size on a p
 	expect(node?.[0].match(/<tspan/g)?.length).toBeGreaterThanOrEqual(3);
 });
 
+/** The number in attribute `name` of the first `tag` drawn for node `id`. */
+function shapeAttr(svg: string, id: string, tag: string, name: string): number {
+	const shape = svg.match(new RegExp(`data-id="${id}"[^>]*>\\s*<${tag} [^>]*`))?.[0] ?? "";
+	return Number(shape.match(new RegExp(`\\s${name}="([^"]+)"`))?.[1]);
+}
+
+test.each(["×", "Σ", "AB"])(
+	"a circle around %p is no taller than the box beside it and its padding",
+	(label) => {
+		const svg = svgOf(`flowchart LR\n  a[Input] --> m(("${label}")) --> o[Output]`);
+		const diameter = 2 * shapeAttr(svg, "m", "circle", "r");
+		expect(diameter).toBeLessThanOrEqual(shapeAttr(svg, "a", "rect", "height") + 10);
+	},
+);
+
+test("a circle still holds a long label", () => {
+	const svg = svgOf("flowchart LR\n  a[Mixer stage] --> m((Mixer stage))");
+	// The box is the label's width plus 20 px of padding a side.
+	const labelWidth = shapeAttr(svg, "a", "rect", "width") - 40;
+	expect(2 * shapeAttr(svg, "m", "circle", "r")).toBeGreaterThan(labelWidth + 10);
+});
+
 /** Text as the renderer escapes it in content and attribute values. */
 const escaped = (text: string) =>
 	text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
