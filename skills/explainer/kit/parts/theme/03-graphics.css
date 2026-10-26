@@ -244,3 +244,25 @@
 	opacity: 0.5;
 	stroke-dasharray: 3 3;
 }
+
+/* TanStack Charts (spike, kit TChart): the kit's series colours and text through the library's own variables. */
+.tchart {
+	--tchart-height: clamp(18rem, 48vw, 26rem);
+	--ts-chart-1: var(--c1);
+	--ts-chart-2: var(--c2);
+	--ts-chart-3: var(--c3);
+	--ts-chart-4: var(--c4);
+	--ts-chart-5: var(--c5);
+	--ts-chart-6: var(--c6);
+	--ts-chart-tooltip-background: var(--surface);
+	--ts-chart-tooltip-color: var(--ink);
+	--ts-chart-tooltip-border: 1px solid var(--rule);
+	--ts-chart-tooltip-font: 13px / 1.4 var(--font);
+	inline-size: 100%;
+	min-inline-size: 0;
+	color: var(--ink);
+	font: 13px var(--font);
+}
+.tchart.tall {
+	--tchart-height: clamp(22rem, 60vw, 34rem);
+}

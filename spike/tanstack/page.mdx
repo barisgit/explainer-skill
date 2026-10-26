@@ -1,0 +1,38 @@
+---
+title: TanStack Charts spike
+---
+import { Explore } from "kit";
+import { ChangeT } from "./change.tsx";
+import { Coefficients, hero } from "./fourier.tsx";
+import { WorldMixT } from "./mix.tsx";
+import "../../examples/electricity-mix/page.css";
+
+# TanStack Charts ports of four figures
+
+## World electricity mix (ECharts Chart today)
+
+<WorldMixT />
+
+## Change by source (ECharts Chart today)
+
+<ChangeT />
+
+## Fourier hero (Explore over an ECharts Chart today)
+
+<Explore
+	id="hero"
+	class="hero"
+	label="A square wave or sawtooth and the sum of its first sines, over two periods"
+	controls={[
+		{ id: "wave", label: "Signal to build", choice: { square: "Square wave", saw: "Sawtooth" } },
+		{ id: "terms", label: "Terms in the sum", range: [1, 40, 1], value: 3 },
+		{ id: "parts", label: "Show each sine", toggle: true },
+	]}
+	frame={hero}
+/>
+
+## Coefficients (Plot today)
+
+<figure class="fig" id="fig-coef">
+<Coefficients wave="square" id="coef-square" />
+</figure>

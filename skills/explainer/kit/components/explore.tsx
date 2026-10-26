@@ -22,6 +22,7 @@ import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
 import { Explore as ExploreChart } from "./parts/explore-chart.tsx";
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
+import { Explore as ExploreTChart } from "./parts/explore-tchart.tsx";
 import { Explore as ExploreText } from "./parts/explore-text.tsx";
 import {
 	type ExploreControl,
@@ -64,7 +65,7 @@ interface Shown {
 	caption?: string;
 }
 
-const FRAME_KEYS = new Set(["plot", "chart", "readout", "stats", "caption"]);
+const FRAME_KEYS = new Set(["plot", "chart", "tchart", "readout", "stats", "caption"]);
 /** The most precomputed frames may take in the page; past it, the browser computing them is the better trade. */
 const PRECOMPUTED_LIMIT = 100_000;
 
@@ -190,11 +191,12 @@ function shownFrame([call, frame]: [string, ExploreFrame], kind: "plot" | "chart
 }
 
 /** The figure the frames draw, the same in every one. */
-function figureKind(frames: ExploreFrame[]): "plot" | "chart" | undefined {
+function figureKind(frames: ExploreFrame[]): "plot" | "chart" | "tchart" | undefined {
 	const kinds = new Set(
 		frames.flatMap((f) => [
 			...(f.plot ? ["plot" as const] : []),
 			...(f.chart ? ["chart" as const] : []),
+			...(f.tchart ? ["tchart" as const] : []),
 		]),
 	);
 	return kinds.size > 1
@@ -283,6 +285,15 @@ function precomputed(frames: [string, ExploreFrame][], kind: "plot" | "chart" | 
 	return carried;
 }
 
+/** The island per figure a frame draws. */
+const ISLANDS = { plot: ExplorePlot, chart: ExploreChart, tchart: ExploreTChart };
+
+/** The figure kind precomputed frames may carry: a TanStack definition holds functions, so it needs a live frame. */
+const jsonKind = (kind: keyof typeof ISLANDS | undefined) =>
+	kind === "tchart"
+		? fail('a tchart frame holds functions: export frame from a "use client" module')
+		: kind;
+
 /**
  * Calls frame for every combination of the controls' values (in the browser, only for the starting ones), checks the results,
  * and renders the island for the figure they draw: with the frame function when a client module exports it, else with the
@@ -321,8 +332,8 @@ export function Explore({ controls, frame, base = {}, label, class: extra, id }:
 		label: label ?? "",
 		...(extra ? { class: extra } : {}),
 		...(id ? { id } : {}),
-		...(live ? { frame: fn, base } : precomputed(merged, kind)),
+		...(live ? { frame: fn, base } : precomputed(merged, jsonKind(kind))),
 	};
-	const Island = kind === "plot" ? ExplorePlot : kind === "chart" ? ExploreChart : ExploreText;
+	const Island = kind ? ISLANDS[kind] : ExploreText;
 	return <Island {...data} />;
 }

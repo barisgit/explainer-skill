@@ -6,6 +6,7 @@
  */
 import type { ComponentChildren, JSX } from "preact";
 import { useMemo, useState } from "preact/hooks";
+import type { TChartProps } from "../tchart.tsx";
 import { apply, type Json, merge } from "./frames.ts";
 
 /**
@@ -22,6 +23,8 @@ export type ExploreControl = { id: string; label: string } & (
 export interface ExploreFrame {
 	plot?: PlotOption;
 	chart?: ChartOption;
+	/** Spike: a TanStack Charts definition (kit TChart); only from a frame a "use client" module exports. */
+	tchart?: TChartProps["definition"];
 	readout?: ComponentChildren;
 	stats?: Record<string, ComponentChildren>;
 	caption?: ComponentChildren;
@@ -159,14 +162,14 @@ export function ExploreView({
 	figure,
 }: {
 	data: ExploreData;
-	figure?: (option: PlotOption | ChartOption) => JSX.Element;
+	figure?: (option: PlotOption | ChartOption | TChartProps["definition"]) => JSX.Element;
 }) {
 	const [values, setValues] = useState(data.start);
 	const frame = useFrame(data, values);
 	// Precomputed texts are HTML pack rendered; a frame function's are text or JSX.
 	const content = (text: ComponentChildren) =>
 		"frame" in data ? { children: text } : { dangerouslySetInnerHTML: { __html: String(text) } };
-	const option = frame.plot ?? frame.chart;
+	const option = frame.plot ?? frame.chart ?? frame.tchart;
 	return (
 		<figure class="fig" id={data.id}>
 			<div class="controls">

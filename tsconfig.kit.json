@@ -20,6 +20,7 @@
 		"skills/explainer/example",
 		"test/fixtures/mdx-all",
 		"examples",
+		"spike/tanstack",
 		"kit-types"
 	]
 }
