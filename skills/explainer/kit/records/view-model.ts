@@ -45,6 +45,10 @@ export interface ItemRow {
 	id: string;
 	/** The item's own view (`#item/WP1-02`), when the config has a link. */
 	href?: string;
+	/** The text the row opens to in place (config `detail`); absent when the record has none. */
+	detail?: string;
+	/** The row's data-ref (config `refField`). */
+	ref?: string;
 	cells: readonly Cell[];
 	/** Whether it matches the search and filters (always true without any); the tree highlights matches, the others hide the rest. */
 	match: boolean;

@@ -16,6 +16,19 @@ import {
 } from "./config.ts";
 import { valueProblem } from "./fields.ts";
 import { slug } from "./ids.ts";
+import {
+	isObject,
+	knownKeys,
+	list,
+	NAME,
+	NAME_HINT,
+	prop,
+	type Report,
+	readOptional,
+	readProp,
+	readString,
+	show,
+} from "./read.ts";
 
 /** The most problems the error's message lists; `problems` keeps them all. */
 const MAX_SHOWN = 20;
@@ -39,11 +52,6 @@ export class RecordsConfigError extends Error {
 	}
 }
 
-type Report = (path: string, message: string) => void;
-
-/** A block id, view name or anchor part: safe in a URL hash and an element id, and never mistaken for a `#name/param` route. */
-const NAME = /^[A-Za-z][\w-]*$/;
-const NAME_HINT = "letters, digits, - and _, starting with a letter";
 /** Rejects what could end a CSS declaration where the renderer writes the colour. */
 const COLOR = /^[^;{}<>"'\\]+$/;
 const TOP_KEYS = [
@@ -59,6 +67,8 @@ const TOP_KEYS = [
 	"search",
 	"facets",
 	"link",
+	"detail",
+	"refField",
 ] as const satisfies readonly (keyof RecordsConfig)[];
 /** The properties each field kind takes; the keys are every kind there is. */
 const FIELD_KEYS = {
@@ -70,75 +80,8 @@ const FIELD_KEYS = {
 } as const satisfies Record<FieldKind, readonly string[]>;
 const KINDS = Object.keys(FIELD_KEYS);
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-	typeof v === "object" && v !== null && !Array.isArray(v);
 const isKind = (v: unknown): v is FieldKind => typeof v === "string" && KINDS.includes(v);
 const isView = (v: unknown): v is ViewKind => VIEW_KINDS.some((kind) => kind === v);
-const list = (values: readonly string[]) => values.map((v) => JSON.stringify(v)).join(", ");
-
-/** A value as a message quotes it, cut short. */
-function show(value: unknown): string {
-	const text = JSON.stringify(value) ?? String(value);
-	return text.length > 60 ? `${text.slice(0, 57)}...` : text;
-}
-
-/** `path.key`, or `path["odd key"]` for a key that is not a plain name. */
-function prop(path: string, key: string): string {
-	if (!/^[A-Za-z_$][\w$]*$/.test(key)) {
-		return `${path}[${JSON.stringify(key)}]`;
-	}
-	return path ? `${path}.${key}` : key;
-}
-
-function knownKeys(
-	obj: Record<string, unknown>,
-	allowed: readonly string[],
-	path: string,
-	report: Report,
-) {
-	for (const key of Object.keys(obj)) {
-		if (!allowed.includes(key)) {
-			report(prop(path, key), `unknown property; expected one of ${list(allowed)}`);
-		}
-	}
-}
-
-function readString(
-	value: unknown,
-	path: string,
-	report: Report,
-	rule?: { pattern: RegExp; hint: string },
-): string | undefined {
-	if (typeof value !== "string" || value === "") {
-		report(path, `expected ${rule ? rule.hint : "non-empty text"}; got ${show(value)}`);
-		return undefined;
-	}
-	if (rule && !rule.pattern.test(value)) {
-		report(path, `expected ${rule.hint}; got ${show(value)}`);
-		return undefined;
-	}
-	return value;
-}
-
-type Rule = { pattern: RegExp; hint: string };
-
-/** A required text property of `obj`, checked like readString. */
-const readProp = (
-	obj: Record<string, unknown>,
-	key: string,
-	path: string,
-	report: Report,
-	rule?: Rule,
-) => readString(obj[key], prop(path, key), report, rule);
-
-/** An optional text property of `obj`: undefined when left out, else checked like readString. */
-const readOptional = (
-	obj: Record<string, unknown>,
-	key: string,
-	path: string,
-	report: Report,
-	rule?: Rule,
-) => (obj[key] === undefined ? undefined : readProp(obj, key, path, report, rule));
 
 /** The optional properties of a number or currency field. */
 function readNumberOptions(raw: Record<string, unknown>, path: string, report: Report) {
@@ -264,6 +207,8 @@ interface KeyRules {
 	/** A key the list may name without declaring it as a field (the id field, for search). */
 	extra?: string | undefined;
 	required?: boolean;
+	/** One key in place of a list: problems are reported at `path` itself. */
+	single?: boolean;
 }
 
 /** A list of field keys, each declared once and of an allowed kind. */
@@ -276,26 +221,31 @@ function readKeys(raw: unknown, path: string, report: Report, rules: KeyRules): 
 		return [];
 	}
 	const keys: string[] = [];
-	raw.forEach((key, i) => {
-		const field =
-			typeof key === "string" && Object.hasOwn(rules.fields, key) ? rules.fields[key] : undefined;
-		const at = `${path}[${i}]`;
-		if (typeof key === "string" && key === rules.extra) {
-			keys.push(key);
-		} else if (!(typeof key === "string" && field)) {
-			report(at, `${show(key)} is not a field; the fields are ${list(Object.keys(rules.fields))}`);
-		} else if (rules.kinds && !rules.kinds.includes(field.kind)) {
-			report(
-				at,
-				`${show(key)} is a ${field.kind} field; expected a ${rules.kinds.join(" or ")} field`,
-			);
-		} else if (keys.includes(key)) {
-			report(at, `${show(key)} is listed twice`);
-		} else {
+	raw.forEach((key: unknown, i) => {
+		const problem = keyProblem(key, keys, rules);
+		if (problem) {
+			report(rules.single ? path : `${path}[${i}]`, problem);
+		} else if (typeof key === "string") {
 			keys.push(key);
 		}
 	});
 	return keys;
+}
+
+/** What is wrong with one key of a list, given the keys read before it; undefined for a key to keep. */
+function keyProblem(key: unknown, keys: readonly string[], rules: KeyRules): string | undefined {
+	if (typeof key === "string" && key === rules.extra) {
+		return undefined;
+	}
+	const field =
+		typeof key === "string" && Object.hasOwn(rules.fields, key) ? rules.fields[key] : undefined;
+	if (!(typeof key === "string" && field)) {
+		return `${show(key)} is not a field; the fields are ${list(Object.keys(rules.fields))}`;
+	}
+	if (rules.kinds && !rules.kinds.includes(field.kind)) {
+		return `${show(key)} is a ${field.kind} field; expected a ${rules.kinds.join(" or ")} field`;
+	}
+	return keys.includes(key) ? `${show(key)} is listed twice` : undefined;
 }
 
 function readViews(raw: unknown, grouped: boolean, report: Report): ViewKind[] {
@@ -335,7 +285,7 @@ function readSort(
 	}
 	knownKeys(raw, ["field", "desc"], "sort", report);
 	const { field: key, desc } = raw;
-	const [field] = readKeys([key], "sort.field", report, { fields });
+	const [field] = readKeys([key], "sort.field", report, { fields, single: true });
 	if (desc !== undefined && typeof desc !== "boolean") {
 		report("sort.desc", `expected true or false; got ${show(desc)}`);
 	}
@@ -558,6 +508,7 @@ export function parseConfig(input: unknown): RecordsConfig {
 		pattern: NAME,
 		hint: `a view name: ${NAME_HINT}`,
 	});
+	const { detail, refField } = readRowKeys(input, fields, link, report);
 	const data = idField ? readData(rawData, { idField, fields, groupBy }, report) : [];
 	checkGroupPaths(groups, data, groupBy, report);
 	if (problems.length || id === undefined || idField === undefined) {
@@ -576,5 +527,29 @@ export function parseConfig(input: unknown): RecordsConfig {
 		facets,
 		...(sort ? { sort } : {}),
 		...(link ? { link } : {}),
+		...(detail ? { detail } : {}),
+		...(refField ? { refField } : {}),
 	};
+}
+
+/** `detail` and `refField`, each one field key. A row is a link or a fold, so `detail` and `link` exclude each other. */
+function readRowKeys(
+	input: Record<string, unknown>,
+	fields: Readonly<Record<string, Field>>,
+	link: string | undefined,
+	report: Report,
+) {
+	const { detail: rawDetail, refField: rawRef } = input;
+	const one = (raw: unknown, path: string, kinds: FieldKind[]) =>
+		raw === undefined
+			? undefined
+			: readKeys([raw], path, report, { fields, kinds, single: true })[0];
+	const detail = one(rawDetail, "detail", ["text"]);
+	if (detail && link) {
+		report(
+			"detail",
+			`a row links to its view (link ${show(link)}) or opens in place to its detail, not both; put the detail in the view`,
+		);
+	}
+	return { detail, refField: one(rawRef, "refField", ["text", "category"]) };
 }

@@ -168,3 +168,16 @@ test("a bad config is rejected with every problem, where it is and what to write
 		'data[1].id: "A-1" is also the id of data[0]; ids must be unique',
 	]);
 });
+
+test("a row opens in place to its detail or links to its view, and carries its ref", () => {
+	const { link: _, ...rest } = plan as Record<string, unknown>;
+	const folded = createRecords({ ...rest, detail: "rationale", refField: "owner" });
+	const { body } = folded.view();
+	const first = body.kind === "tree" ? leaves(body.groups)[0] : undefined;
+	expect(first).toMatchObject({ id: "WP0-01", ref: "HO" });
+	expect(first?.detail).toStartWith("RC-1 kick-off took 30 h");
+	expect(first?.href).toBeUndefined();
+	expect(() => createRecords({ ...(plan as object), detail: "rationale" })).toThrow(
+		'detail: a row links to its view (link "item") or opens in place to its detail, not both',
+	);
+});

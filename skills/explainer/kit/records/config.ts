@@ -145,6 +145,16 @@ export interface RecordsConfig {
 	search?: readonly string[];
 	/** Text or category fields the reader can filter by, each value with its count; empty text counts as no value. */
 	facets?: readonly string[];
-	/** The view an item opens: with `"item"`, a row links to `#item/<id>`, the kit's views route, where the item's full text is. */
+	/**
+	 * The view an item opens: with `"item"`, a row links to `#item/<id>`, the kit's views route, where the item's full text is. The
+	 * page writes that View (one filled from the same data, for many records).
+	 */
 	link?: string;
+	/** A text field an item row opens to in place, for records whose full text is a sentence or two; not with `link`. */
+	detail?: string;
+	/**
+	 * A text or category field whose value is each item row's `data-ref`, so the row lights with the prose and diagram parts that
+	 * share it (kit link). Not `ref`, which Preact keeps for itself.
+	 */
+	refField?: string;
 }

@@ -52,12 +52,22 @@ function summaryCells(
 	);
 }
 
+/** A field's value as text, for `detail` and `refField`: empty when the record holds none. */
+function textOf(item: Item, field: string | undefined): string {
+	const value = field === undefined ? undefined : item.record[field];
+	return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
 function itemRow(model: Model, item: Item, columns: readonly Column[], match: boolean): ItemRow {
 	const { link } = model.config;
+	const detail = textOf(item, model.config.detail);
+	const ref = textOf(item, model.config.refField);
 	return {
 		kind: "item",
 		id: item.id,
 		...(link ? { href: `#${link}/${encodeURIComponent(item.id)}` } : {}),
+		...(detail ? { detail } : {}),
+		...(ref ? { ref } : {}),
 		cells: columns.map((c) => model.cell(item, c.field)),
 		match,
 	};
