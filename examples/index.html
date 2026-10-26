@@ -1726,11 +1726,11 @@ details > :last-child:not(summary) {
 }
 
 /* theme part: .tree, hierarchical records as nested <details>: one row per item, its label then its numbers in aligned columns.
-   A row is a <summary>, a link that stands as a row, or the .tree-head that names the columns; every child of a row is a cell, the
-   label first. A row is a grid of the chevron's column, the label's, then the number columns of --tree-cols, one width per column.
-   Each level is indented by the chevron's column and gap, so a child's chevron sits under its parent's label, and the number
-   columns, right-aligned at the row's end, line up across rows and levels. Rows are matched through :where(), so the rules below
-   rise in specificity in source order. */
+   A row is a <summary>, a link that stands as a row, a .tree-row (a record that opens to nothing, or the total), or the
+   .tree-head that names the columns; every child of a row is a cell, the label first. A row is a grid of the chevron's column,
+   the label's, then the columns of --tree-cols, one width per column. Each level is indented by the chevron's column and gap,
+   so a child's chevron sits under its parent's label, and the number columns, right-aligned at the row's end, line up across
+   rows and levels. Rows are matched through :where(), so the rules below rise in specificity in source order. */
 .tree {
 	margin-block: 1.25rem;
 	border-block-end: 1px solid var(--rule);
@@ -1738,7 +1738,7 @@ details > :last-child:not(summary) {
 }
 /* Unset, --tree-cols is one column per number cell, up to six (--tree-n, counted below), each 5rem where the row has room and
    narrower where it has not, so a deep row on a small phone shrinks its columns rather than scrolling sideways. */
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) {
 	--tree-n: 1;
 	display: grid;
 	grid-template-columns: 0.8125rem minmax(0, 1fr) var(
@@ -1752,31 +1752,31 @@ details > :last-child:not(summary) {
 	border-block-start: 1px solid var(--rule);
 	line-height: 1.35;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3)) {
 	--tree-n: 2;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(4)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(4)) {
 	--tree-n: 3;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(5)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(5)) {
 	--tree-n: 4;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(6)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(6)) {
 	--tree-n: 5;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(7)) {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(7)) {
 	--tree-n: 6;
 }
-/* A link row and the head have no chevron: their label starts in its own column, where its sibling summaries' labels do. */
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > :first-child {
+/* A link row, a plain row and the head have no chevron: their label starts in its own column, where its sibling summaries' labels do. */
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > :first-child {
 	grid-column: 2;
 	min-inline-size: 0;
 }
 /* A row of a label alone gives it the row. */
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > :only-child {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > :only-child {
 	grid-column: 2 / -1;
 }
-.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > * + * {
+.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > * + * {
 	min-inline-size: 0;
 	color: var(--muted);
 	font-size: 0.875rem;
@@ -1821,7 +1821,7 @@ details > :last-child:not(summary) {
 	margin-inline-start: 1.3125rem;
 }
 /* A leaf's full text, under its row. */
-.tree details > :not(summary, details, a) {
+.tree details > :not(summary, details, a, .tree-row) {
 	max-inline-size: 66ch;
 	margin-block: 0 0.875rem;
 }
@@ -1830,7 +1830,7 @@ details > :last-child:not(summary) {
 }
 /* Rows run on with no gap between them. */
 .tree details[open] > summary,
-.tree details > :is(details, a):last-child {
+.tree details > :is(details, a, .tree-row):last-child {
 	margin-block-end: 0;
 }
 /* A closed branch that holds a row kit:link.js lights is tinted as the row would be. */
@@ -1841,21 +1841,232 @@ details > :last-child:not(summary) {
    right-aligned; a single number stays on the label's line. The label spans every column, and the first number starts in its own
    column, which the label holds on the first line, so the numbers go to the second. */
 @media (max-width: 40rem) {
-	.tree :where(summary, .tree > a, details > a, .tree > .tree-head) {
+	.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) {
 		row-gap: 0.125rem;
 	}
-	.tree :where(summary, .tree > a, details > a, .tree > .tree-head) > * + * {
+	.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > * + * {
 		font-size: 0.8125rem;
 	}
 	.tree
-		:where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3))
+		:where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3))
 		> :first-child {
 		grid-area: 1 / 2 / 2 / -1;
 	}
 	.tree
-		:where(summary, .tree > a, details > a, .tree > .tree-head):has(> :nth-child(3))
+		:where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3))
 		> :nth-child(2) {
 		grid-column-start: 3;
+	}
+}
+
+/* theme part: .records, the block kit Records renders: its .toolbar, the facets under it (a fieldset of aria-pressed buttons per
+   field), a .legend per coloured category, then the view: a .tree, a .compare.table in .scroll, or a .board of lanes. Pages
+   write none of these classes; everything here is scoped to .records. */
+.records {
+	margin-block: 1.25rem;
+}
+.records > .toolbar > output {
+	color: var(--muted);
+	font: inherit;
+	font-variant-numeric: tabular-nums;
+}
+/* A category's colour before a group's, lane's or facet value's title, as the chip marker draws it. */
+.records .swatch {
+	display: inline-block;
+	inline-size: 0.5625rem;
+	block-size: 0.5625rem;
+	margin-inline-end: 0.4375rem;
+	border-radius: 2px;
+	background: var(--swatch);
+}
+
+/* Facets: one row per field, its name then its values; a pressed value is tinted in the accent. */
+.records > .facets {
+	display: grid;
+	gap: 0.375rem;
+	margin-block: 0 0.75rem;
+	font-size: 0.8125rem;
+}
+.records > .facets > fieldset {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.375rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+/* Floated, the legend is laid out as the first item of the row rather than over the fieldset's border. */
+.records > .facets legend {
+	float: inline-start;
+	margin-inline-end: 0.25rem;
+	padding: 0;
+	color: var(--muted);
+	line-height: 2rem;
+}
+.records > .facets button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	min-block-size: 2rem;
+	padding: 0 0.625rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: var(--surface);
+	color: var(--ink);
+	font: inherit;
+	cursor: pointer;
+}
+.records > .facets button:hover {
+	border-color: var(--rule-strong);
+}
+.records > .facets button[aria-pressed="true"] {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+	font-weight: 600;
+}
+.records > .facets .swatch {
+	margin: 0;
+}
+.records > .facets .count {
+	color: var(--muted);
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Tree: the widths Records computes for its columns, all of them on wide screens and the numbers alone on phones (below). Rows
+   that link to their view keep the ink colour, so ninety links do not shout; the hover underline marks them. */
+.records .tree {
+	--tree-cols: var(--records-cols);
+}
+.records .tree a {
+	color: inherit;
+}
+/* Rows a search or filter leaves out stay in place, faded; a faded group's own rows are not faded twice. */
+.records .tree .miss {
+	opacity: 0.5;
+}
+.records .tree .miss .miss {
+	opacity: 1;
+}
+.records .tree > .tree-row.total {
+	border-block-start-color: var(--rule-strong);
+	font-weight: 600;
+}
+.records .tree > .tree-row.total > * + * {
+	color: var(--ink);
+}
+
+/* Table: each header is a button that sorts by its column; the arrow shows the order in force. */
+.records .compare .sort {
+	min-block-size: 2rem;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: inherit;
+	cursor: pointer;
+}
+.records .compare .sort:hover {
+	color: var(--ink);
+}
+.records .compare [aria-sort] .sort {
+	color: var(--ink);
+}
+.records .compare [aria-sort="ascending"] .sort::after {
+	content: " \2191";
+}
+.records .compare [aria-sort="descending"] .sort::after {
+	content: " \2193";
+}
+.records .compare tfoot :is(th, td) {
+	border-block-start: 1px solid var(--rule-strong);
+	font-weight: 600;
+}
+
+/* Board: a lane per value of the first group field, side by side where they fit, stacked on phones. */
+.records .board {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+	gap: 1rem;
+	margin-block: 1.25rem;
+	align-items: start;
+}
+.records .lane {
+	padding: 0.75rem;
+	border-radius: 0.5rem;
+	background: var(--sunken);
+}
+.records .lane-head {
+	display: grid;
+	gap: 0.125rem;
+	margin: 0 0 0.625rem;
+	color: var(--muted);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+}
+.records .lane-head > :first-child {
+	color: var(--ink);
+	font-size: 0.9375rem;
+	font-weight: 600;
+}
+.records .lane ul {
+	display: grid;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.records .lane li {
+	padding: 0.5rem 0.625rem;
+	border: 1px solid var(--rule);
+	border-radius: 0.375rem;
+	background: var(--surface);
+	font-size: 0.875rem;
+	line-height: 1.35;
+}
+.records .lane li > p {
+	margin: 0;
+}
+.records .lane li a {
+	color: inherit;
+	text-decoration: none;
+}
+.records .lane li a:hover {
+	text-decoration: underline;
+}
+/* The card's other cells, on a line under its label. */
+.records .lane li > p + p {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.125rem 0.75rem;
+	margin-block-start: 0.25rem;
+	color: var(--muted);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Phones: the tree keeps the label and the numbers, a line under it; owners, categories and dates are left to the table, the
+   board and the item's view. The first number starts in its own column, as in a tree with no hidden cells. */
+@media (max-width: 40rem) {
+	.records .tree {
+		--tree-cols: var(--records-cols-narrow);
+	}
+	.records .tree .tag {
+		display: none;
+	}
+	.records .tree :is(summary, a, .tree-row, .tree-head) > :first-child ~ :not(.tag) {
+		grid-column-start: 3;
+	}
+	.records .tree :is(summary, a, .tree-row, .tree-head) > :first-child ~ :not(.tag) ~ :not(.tag) {
+		grid-column-start: auto;
+	}
+}
+
+@media print {
+	.records > :is(.toolbar, .facets) {
+		display: none;
 	}
 }
 
@@ -1871,7 +2082,7 @@ details > :last-child:not(summary) {
    Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
-   optional head: kit Tree renders it) | toolbar (the row over a records section: a .seg view switch, <input
+   optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input
    type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
    Expand all joins its end. Layout only: the page owns their state, and inputs with ids are kept across reloads: kit keep).
    Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour
