@@ -369,7 +369,8 @@ function FacetGroup({ facet, actions }: { facet: Facet; actions: RecordsActions 
 }
 
 /**
- * The block: `div.records.wide` holding the controls (with `actions`), a legend per coloured category, and the view shown.
+ * The block: `div.records.wide` holding the controls (with `actions`) and the view shown. It draws no legend: every coloured
+ * marker sits beside its own word (a group's or lane's title, a facet's or a cell's value).
  * `live` shows the controls, which the island turns on once it runs, so a page read without script shows no dead ones; `root`
  * is the block's element.
  */
@@ -400,18 +401,6 @@ export function RecordsBlock({
 						<FacetGroup key={facet.field} facet={facet} actions={actions} />
 					))}
 				</div>
-			)}
-			{vm.legends.length > 0 && (
-				<p class="legend">
-					{vm.legends.flatMap((legend) =>
-						legend.entries.map((e) => (
-							<span key={`${legend.field}.${e.value}`} class="chip" style={swatchStyle(e.swatch)}>
-								<i />
-								{e.text}
-							</span>
-						)),
-					)}
-				</p>
 			)}
 			{body.kind === "tree" ? (
 				<Tree body={body} ctx={ctx} />

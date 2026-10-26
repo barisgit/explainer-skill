@@ -1,6 +1,6 @@
 /* theme part: .records, the block kit Records renders: its .toolbar, the facets under it (a fieldset of aria-pressed buttons per
-   field), a .legend per coloured category, then the view: a .tree, a .compare.table in .scroll, or a .board of lanes. Pages
-   write none of these classes; everything here is scoped to .records. */
+   field), then the view: a .tree, a .compare.table in .scroll, or a .board of lanes. Pages write none of these classes;
+   everything here is scoped to .records. */
 .records {
 	margin-block: 1.25rem;
 }

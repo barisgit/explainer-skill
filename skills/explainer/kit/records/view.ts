@@ -13,7 +13,6 @@ import type {
 	Header,
 	ItemRow,
 	Lane,
-	Legend,
 	RecordsTexts,
 	RecordsView,
 	TableView,
@@ -247,21 +246,6 @@ function facets(
 	});
 }
 
-/** A legend for each category field the block shows (its columns and groups) that has coloured values. */
-function legends(model: Model): Legend[] {
-	const shown = new Set([...model.config.groupBy, ...model.config.columns]);
-	return [...shown].flatMap((field): Legend[] => {
-		const def = model.config.fields[field];
-		if (def?.kind !== "category") {
-			return [];
-		}
-		const entries = def.values.flatMap((v) =>
-			v.color ? [{ value: v.value, text: v.label ?? v.value, swatch: v.color }] : [],
-		);
-		return entries.length ? [{ field, label: def.label, entries }] : [];
-	});
-}
-
 function viewOptions(model: Model, state: RecordsState, texts: ViewTexts): ViewOption[] {
 	return model.rules.views.map((kind) => ({
 		kind,
@@ -294,7 +278,6 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 		views: viewOptions(model, state, texts),
 		searchable: model.rules.searchable,
 		facets: facets(model, state, result.counts),
-		legends: legends(model),
 		filtering,
 		shown: result.items.length,
 		total: model.items.length,

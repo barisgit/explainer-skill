@@ -67,7 +67,8 @@
 	color: var(--info);
 }
 /* Category marker: a chip that starts with an empty <i> is a square in --swatch (the category's --c colour) before its word, with
-   no tint, so a column of them stays quiet. The same markup keys the categories in a .legend over the records and marks the rows. */
+   no tint, so a column of them stays quiet. The same markup marks the rows, and keys the categories in a .legend where a marker
+   stands without its word. */
 .chip:has(> i:empty:first-child) {
 	padding: 0;
 	background: none;

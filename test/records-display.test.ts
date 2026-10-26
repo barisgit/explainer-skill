@@ -27,6 +27,9 @@ describe("Records", () => {
 		expect(plan.match(/<details id="plan\.\d+"/g)).toHaveLength(3);
 		expect(plan.match(/<a href="#item\/WP/g)).toHaveLength(96);
 		expect(plan).toMatch(/class="tree-row total"[\s\S]*3,116/);
+		// Every coloured marker sits beside its own word (a phase's title, a facet's value), so no legend repeats them.
+		expect(plan).toMatch(/<i class="swatch" style="--swatch: var\(--c1\)"><\/i>Phase 1/);
+		expect(plan.includes('class="legend"')).toBe(false);
 		const owners = /<div class="records wide" id="owners"[^>]*>/.exec(html)?.[0] ?? "";
 		expect(owners).not.toContain("data-records");
 		expect(html).toMatch(/<summary data-ref="JV">[\s\S]*?<\/summary><p>/);

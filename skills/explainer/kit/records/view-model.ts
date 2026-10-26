@@ -147,13 +147,6 @@ export interface Facet {
 	options: readonly FacetOption[];
 }
 
-/** The key to a category's markers: only values with a colour, in the category's order. */
-export interface Legend {
-	field: string;
-	label: string;
-	entries: readonly { value: string; text: string; swatch: string }[];
-}
-
 export interface ViewOption {
 	kind: ViewKind;
 	label: string;
@@ -185,7 +178,6 @@ export interface RecordsView {
 	/** Whether the config gives a search box. */
 	searchable: boolean;
 	facets: readonly Facet[];
-	legends: readonly Legend[];
 	/** A search or filter is active. */
 	filtering: boolean;
 	/** Matching records, all records, and the two as the reader sees them ("12 of 96"). */
