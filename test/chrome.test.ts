@@ -13,6 +13,10 @@ afterAll(() => {
 });
 
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">';
+const plain = dir.write(
+	"plain.html",
+	`<!doctype html><html><head>${VIEWPORT}</head><body><h1>Plain</h1></body></html>`,
+);
 const stalled = dir.write(
 	"stalled.html",
 	`<!doctype html><html><head>${VIEWPORT}</head><body><h1>Stalled</h1><img src="http://127.0.0.1:${held.port}/held.png"></body></html>`,
@@ -104,7 +108,7 @@ test("a load that never ends stops check with one error line naming the load and
 	);
 }, 30_000);
 
-test("--timeout stops check with one error line saying where it was", async () => {
+test("--timeout stops check with one error line saying where it was, and leaves no profile behind", async () => {
 	const tmp = tempDir("tmp-timeout");
 	const result = await runCheck(stalled, tmp, ["--timeout", "1"]);
 	expect(result.code).toBe(1);
@@ -112,4 +116,21 @@ test("--timeout stops check with one error line saying where it was", async () =
 	expect(result.stderr).toBe(
 		"error: check passed its 1 s limit at light desktop, overview, after 0 page(s): raise --timeout for a page with many views or --do steps\n",
 	);
+	expect(readdirSync(tmp)).toEqual([]);
+}, 30_000);
+
+test("check deletes its Chrome profile once Chrome has exited", async () => {
+	const tmp = tempDir("tmp-plain");
+	expect((await runCheck(plain, tmp)).code).toBe(0);
+	expect(readdirSync(tmp)).toEqual([]);
+}, 30_000);
+
+test("check ended by SIGTERM stops Chrome and deletes its profile before it exits", async () => {
+	const tmp = tempDir("tmp-term");
+	const proc = startCheck(stalled, tmp);
+	// The held page keeps check running until the signal.
+	await chromeStarted(tmp);
+	proc.kill("SIGTERM");
+	expect(await proc.exited).toBe(143);
+	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);

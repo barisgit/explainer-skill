@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { homedir, tmpdir, userInfo } from "node:os";
+import { constants, homedir, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 
@@ -40,6 +40,8 @@ const CALL_DEADLINE_MS = 20_000;
 const LOAD_DEADLINE_MS = 10_000;
 /** How long Chrome may take from launch to a page ready to drive. */
 const START_DEADLINE_MS = 20_000;
+/** How long Chrome may take to exit after SIGTERM before it is killed, so its profile can be deleted. */
+const EXIT_GRACE_MS = 5_000;
 /** How long a failed start waits to see whether Chrome is exiting on its own, whose log then explains the failure. */
 const EXIT_NOTICE_MS = 1_000;
 
@@ -348,6 +350,10 @@ async function start(bin: string, profile: string, extra: string[]): Promise<Chr
 	const stop = async () => {
 		stopping = true;
 		proc.kill();
+		await within(exited, EXIT_GRACE_MS, "Chrome did not exit").catch(() => {
+			proc.kill("SIGKILL");
+			return exited;
+		});
 	};
 	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes the sandbox line out of
 	// the tail.
@@ -384,19 +390,51 @@ async function start(bin: string, profile: string, extra: string[]): Promise<Chr
 	}
 }
 
-/** Runs `fn` against the page of a fresh headless Chrome; Chrome and its profile are always cleaned up. */
+/** The cleanups of the Chromes running now, so a signal that ends the process removes them and their profiles too. */
+const running = new Set<() => Promise<void>>();
+
+/** Stops every running Chrome and deletes its profile, then exits as the signal would have. */
+function exitOnSignal(signal: NodeJS.Signals) {
+	void Promise.allSettled([...running].map((cleanup) => cleanup())).finally(() =>
+		process.exit(128 + (constants.signals[signal] ?? 0)),
+	);
+}
+
+let signalsHooked = false;
+function hookSignals() {
+	if (signalsHooked) {
+		return;
+	}
+	signalsHooked = true;
+	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+		process.once(signal, exitOnSignal);
+	}
+}
+
+/**
+ * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its profile deleted once Chrome has exited
+ * (a profile deleted while Chrome shuts down is written again), also when SIGINT, SIGTERM or SIGHUP ends the process.
+ */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
+	let chrome: Chrome | undefined;
+	const cleanup = async () => {
+		await chrome?.stop();
+		rmSync(profile, { recursive: true, force: true });
+	};
+	running.add(cleanup);
+	hookSignals();
 	try {
-		const chrome = await launch(profile);
+		chrome = await launch(profile);
+		const { cdp } = chrome;
 		try {
-			await chrome.cdp.send("Inspector.enable");
-			return await fn(chrome.cdp);
+			await cdp.send("Inspector.enable");
+			return await fn(cdp);
 		} finally {
-			chrome.cdp.close();
-			await chrome.stop();
+			cdp.close();
 		}
 	} finally {
-		rmSync(profile, { recursive: true, force: true });
+		running.delete(cleanup);
+		await cleanup();
 	}
 }
