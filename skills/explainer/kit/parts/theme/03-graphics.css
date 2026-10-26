@@ -117,10 +117,10 @@
 	fill: var(--c);
 }
 
-/* Mermaid blocks: pack renders each to one SVG drawn with the renderer's private variables (--_line, --_node-fill, ...), set here
-   from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no frame or surface of its own:
-   bare or in a plain figure it sits on the tone around it like a chart; a box means controls, so only a panel frames it and gives
-   it the blueprint surface (the panel rule in 02-layout.css). */
+/* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,
+   --_node-fill, ...), set here from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no
+   frame or surface of its own: bare or in a plain figure it sits on the tone around it like a chart; a box means controls, so only
+   a panel frames it and gives it the blueprint surface (the panel rule in 02-layout.css). */
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
