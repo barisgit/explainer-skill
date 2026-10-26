@@ -1047,7 +1047,8 @@ output {
 	color: var(--info);
 }
 /* Category marker: a chip that starts with an empty <i> is a square in --swatch (the category's --c colour) before its word, with
-   no tint, so a column of them stays quiet. The same markup keys the categories in a .legend over the records and marks the rows. */
+   no tint, so a column of them stays quiet. The same markup marks the rows, and keys the categories in a .legend where a marker
+   stands without its word. */
 .chip:has(> i:empty:first-child) {
 	padding: 0;
 	background: none;
@@ -1860,8 +1861,8 @@ details > :last-child:not(summary) {
 }
 
 /* theme part: .records, the block kit Records renders: its .toolbar, the facets under it (a fieldset of aria-pressed buttons per
-   field), a .legend per coloured category, then the view: a .tree, a .compare.table in .scroll, or a .board of lanes. Pages
-   write none of these classes; everything here is scoped to .records. */
+   field), then the view: a .tree, a .compare.table in .scroll, or a .board of lanes. Pages write none of these classes;
+   everything here is scoped to .records. */
 .records {
 	margin-block: 1.25rem;
 }
@@ -1878,6 +1879,19 @@ details > :last-child:not(summary) {
 	margin-inline-end: 0.4375rem;
 	border-radius: 2px;
 	background: var(--swatch);
+}
+
+/* An incomplete sum: ≥ or ? on screen with the words as a tooltip; .vh holds the words for screen readers, out of sight. */
+.records .incomplete {
+	cursor: help;
+}
+.records .vh {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }
 
 /* Facets: one row per field, its name then its values; a pressed value is tinted in the accent. */
@@ -1999,15 +2013,10 @@ details > :last-child:not(summary) {
 	background: var(--sunken);
 }
 .records .lane-head {
-	display: grid;
-	gap: 0.125rem;
 	margin: 0 0 0.625rem;
-	color: var(--muted);
-	font-size: 0.8125rem;
-	font-variant-numeric: tabular-nums;
 }
-.records .lane-head > :first-child {
-	color: var(--ink);
+.records .lane-head > p {
+	margin: 0 0 0.125rem;
 	font-size: 0.9375rem;
 	font-weight: 600;
 }
@@ -2036,15 +2045,50 @@ details > :last-child:not(summary) {
 .records .lane li a:hover {
 	text-decoration: underline;
 }
-/* The card's other cells, on a line under its label. */
-.records .lane li > p + p {
+/* A card's other values and a lane's sums, on a line under the title: each label in small caps before its value. */
+.records .lane dl {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.125rem 0.75rem;
-	margin-block-start: 0.25rem;
+	margin: 0;
 	color: var(--muted);
 	font-size: 0.8125rem;
 	font-variant-numeric: tabular-nums;
+}
+.records .lane li > dl {
+	margin-block-start: 0.25rem;
+}
+.records .lane dl > div {
+	display: flex;
+	align-items: baseline;
+	gap: 0.3125rem;
+}
+.records .lane dt {
+	font-size: 0.6875rem;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+.records .lane dd {
+	margin: 0;
+	color: var(--ink);
+}
+
+/* A record's detail in a table row or on a card: the label is its summary, in line with the other cells, with no rules or
+   space of its own, and the text it opens to reads as prose under it. */
+.records :is(.compare th, .lane li) > details {
+	margin: 0;
+	border: 0;
+}
+.records :is(.compare th, .lane li) > details > summary {
+	min-block-size: 1.5rem;
+	margin: 0;
+	font-size: inherit;
+	font-weight: inherit;
+}
+.records :is(.compare th, .lane li) > details > p {
+	max-inline-size: 60ch;
+	margin: 0.25rem 0 0.375rem;
+	font-weight: 400;
 }
 
 /* Phones: the tree keeps the label and the numbers, a line under it; owners, categories and dates are left to the table, the
