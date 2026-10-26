@@ -26,8 +26,12 @@ function printState(records: Records): RecordsState {
 	return tree.body.kind === "tree" ? tree.body.expandAll : records.initial;
 }
 
-/** Keeps the hash in step with `state` (folds left out); a block inside a view leaves the hash to views.js. */
-function writeHash(records: Records, state: RecordsState) {
+/** Whether the block sits in a drill-down view, which leaves the URL hash to views.js. */
+const inView = (root: { current: HTMLElement | null }) =>
+	Boolean(root.current?.closest("[data-view]"));
+
+/** Keeps the hash in step with `state`, folds left out. */
+function syncHash(records: Records, state: RecordsState) {
 	const want = records.writeHash({ ...state, open: [] });
 	const current = location.hash.slice(1);
 	if (want === records.config.id) {
@@ -48,9 +52,8 @@ function useHash(
 ) {
 	const ready = useRef(false);
 	useEffect(() => {
-		const inView = () => Boolean(root.current?.closest("[data-view]"));
 		const read = () => {
-			const found = inView() ? null : records.readHash(location.hash);
+			const found = inView(root) ? null : records.readHash(location.hash);
 			if (found) {
 				set(found);
 				requestAnimationFrame(() => root.current?.scrollIntoView({ block: "start" }));
@@ -96,8 +99,8 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 	usePrint(setPrinting);
 	useEffect(() => setLive(true), []);
 	useEffect(() => {
-		if (ready.current && !printing && !root.current?.closest("[data-view]")) {
-			writeHash(records, state);
+		if (ready.current && !printing && !inView(root)) {
+			syncHash(records, state);
 		}
 	}, [records, state, printing, ready]);
 	// The reader may close a fold the state keeps open (a group a search opened); a later render opens it again.

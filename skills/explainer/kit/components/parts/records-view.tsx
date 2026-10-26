@@ -246,8 +246,7 @@ function Card({ row, lead }: { row: ItemRow; lead: number }) {
 	);
 }
 
-function Board({ body }: { body: BoardView }) {
-	const lead = leadOf(body.columns);
+function Board({ body, ctx }: { body: BoardView; ctx: Context }) {
 	return (
 		<div class="board">
 			{body.lanes.map((lane) => (
@@ -263,7 +262,7 @@ function Board({ body }: { body: BoardView }) {
 					</p>
 					<ul>
 						{lane.items.map((row) => (
-							<Card key={row.id} row={row} lead={lead} />
+							<Card key={row.id} row={row} lead={ctx.lead} />
 						))}
 					</ul>
 				</div>
@@ -373,7 +372,7 @@ export function RecordsBlock({
 	const ctx: Context = {
 		actions,
 		filtering: vm.filtering,
-		lead: body.kind === "board" ? 1 : leadOf(body.columns),
+		lead: leadOf(body.columns),
 		tags: new Set(body.kind === "tree" ? body.columns.filter(isTag).map((c) => c.field) : []),
 	};
 	return (
@@ -403,7 +402,7 @@ export function RecordsBlock({
 			) : body.kind === "table" ? (
 				<Table body={body} ctx={ctx} />
 			) : (
-				<Board body={body} />
+				<Board body={body} ctx={ctx} />
 			)}
 		</div>
 	);
