@@ -356,7 +356,7 @@ export function copiesOf(source: string): string[] {
 	if (diagram instanceof Error) {
 		throw diagram;
 	}
-	return diagram.svg.split(/(?=<svg )/);
+	return diagram.phone ? [diagram.svg, diagram.phone] : [diagram.svg];
 }
 
 /** The rendered diagram's SVG as wide screens show it, failing the test when the source does not render. */

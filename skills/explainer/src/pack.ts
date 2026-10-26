@@ -59,10 +59,9 @@ const STEPPED = `diagrams do not step; drop data-steps, show the diagram whole a
 
 /**
  * Replaces the source of every `pre.mermaid` (or `div.mermaid`) block with its rendered diagram in a `div`: an SVG whose
- * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy, followed by a phone copy when
- * renderMermaid makes one (see there). The source is the block's
- * text, decoded, as Mermaid reads it in a browser: a ```mermaid fence becomes such a block with its source escaped, so a `<br>`
- * in a label breaks the line. Syntax errors, unsupported types and data-steps or data-step on a block (diagrams do not step)
+ * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy, then the phone copy when
+ * renderMermaid makes one. The source is the block's text, decoded, as Mermaid reads it in a browser: a ```mermaid fence
+ * becomes such a block with its source escaped, so a `<br>` in a label breaks the line. Syntax errors, unsupported types and data-steps or data-step on a block (diagrams do not step)
  * are returned as problems. `diagramRefs` collects every part id.
  */
 function renderMermaidBlocks(
@@ -90,7 +89,7 @@ function renderMermaidBlocks(
 					for (const id of diagram.refs) {
 						diagramRefs.add(id);
 					}
-					end.before(diagram.svg, { html: true });
+					end.before(diagram.svg + (diagram.phone ?? ""), { html: true });
 				});
 			},
 			text(chunk) {

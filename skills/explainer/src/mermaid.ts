@@ -1,23 +1,28 @@
 import { renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.js";
 
 /**
- * A rendered diagram: its SVG, which follows light and dark through the kit's tokens, then for a wide flowchart or state diagram
- * the copy phones show instead (see phoneLayout); and the data-ref ids of its parts, which both copies carry.
+ * A rendered diagram: its SVG, which follows light and dark through the kit's tokens; for a wide flowchart or state diagram the
+ * copy phones show instead (svg[data-phone], placed right after it: see phoneLayout); and the data-ref ids of its parts, which
+ * both copies carry.
  */
 export interface Diagram {
 	svg: string;
+	phone?: string | undefined;
 	refs: string[];
 }
 
 /** The renderer sets node labels at 13 px; drawn 1.2 times larger they read like the page's 16 px text and Mermaid's labels. */
 const SCALE = 1.2;
 /** A diagram shrinks with its column until its smallest text is this size in px; in a narrower column it scrolls sideways. */
-const READABLE_PX = 10;
+export const READABLE_PX = 10;
 /** The width a diagram block gives its SVG on a 390 px phone: the viewport less the page's and the block's 16 px insets. */
 const PHONE_COLUMN_PX = 326;
 
-/** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, `;` as a line break for flowcharts and states. */
+/** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, and see `flows`. */
 type Family = "flowchart" | "state" | "sequence" | "other";
+
+/** Flowcharts and state diagrams: Mermaid reads `;` in them as a line break, and they can be laid out across their direction. */
+const flows = (family: Family) => family === "flowchart" || family === "state";
 
 /** The header keywords pack draws, with their family. */
 const SUPPORTED = new Map<string, Family>([
@@ -261,7 +266,7 @@ function inline(svg: string, id: string): string {
 				(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
 			),
 	}).replace(
-		/^<svg ([^>]*?)width="([\d.]+)" height="[\d.]+" style="[^"]*"/,
+		/^<svg ([^>]*?)width="[\d.]+" height="[\d.]+" style="[^"]*"/,
 		(_, attrs: string) => `<svg id="${id}" ${attrs}width="100%" style="${sizeStyle(svg)}"`,
 	);
 }
@@ -271,12 +276,17 @@ function inline(svg: string, id: string): string {
  * as top-down, TD as left to right), when the diagram would scroll sideways on a phone and the copy is narrower. Phones then
  * read a left-to-right flow top-down, while wide screens keep the shorter left-to-right layout. Undefined otherwise.
  */
-function phoneLayout(family: Family, svg: string, draw: (transpose: boolean) => string) {
-	if ((family !== "flowchart" && family !== "state") || readableWidth(svg) <= PHONE_COLUMN_PX) {
+function phoneLayout(
+	family: Family,
+	svg: string,
+	draw: (transpose: boolean) => string,
+): string | undefined {
+	const needed = readableWidth(svg);
+	if (!flows(family) || needed <= PHONE_COLUMN_PX) {
 		return undefined;
 	}
 	const across = draw(true);
-	return readableWidth(across) < readableWidth(svg) ? across : undefined;
+	return readableWidth(across) < needed ? across : undefined;
 }
 
 /** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */
@@ -289,28 +299,28 @@ function renderOne(source: string, n: number): Diagram {
 		throw new Error(problem);
 	}
 
-	// Mermaid reads ";" as a line break in flowcharts and state diagrams; elsewhere it can be message or label text.
-	const text = family === "flowchart" || family === "state" ? statements : body;
+	// Elsewhere ";" can be message or label text.
+	const text = flows(family) ? statements : body;
 	const draw = (transpose: boolean) =>
 		renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist", transpose });
 	const raw = draw(false);
-	const phone = phoneLayout(family, raw, draw);
-	const svg =
-		annotateParts(inline(raw, `mm${n}`)) +
-		(phone
-			? annotateParts(inline(phone, `mm${n}-phone`)).replace(/^<svg /, "<svg data-phone ")
-			: "");
-	return {
-		svg,
-		refs: [...new Set([...svg.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""))],
-	};
+	const across = phoneLayout(family, raw, draw);
+
+	const svg = annotateParts(inline(raw, `mm${n}`));
+	const phone =
+		across && annotateParts(inline(across, `mm${n}-phone`)).replace(/^<svg /, "<svg data-phone ");
+	const refs = [svg, phone ?? ""].flatMap((copy) =>
+		[...copy.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""),
+	);
+	return { svg, phone, refs: [...new Set(refs)] };
 }
 
 /**
  * Renders one Mermaid source to one inline SVG, plus a phone copy for a wide flowchart or state diagram (phoneLayout), with no
- * browser: beautiful-mermaid parses and lays it out (ELK) in this process, estimating text widths. `n`, the block's place on the
- * page, keeps its ids apart from the other diagrams. A source that fails, or whose type is not supported, returns an Error whose message tells the author what to write instead.
- * Every part carries the data-ref of its Mermaid id (see annotateParts), and colours come from the kit's tokens (theme.css).
+ * browser: beautiful-mermaid parses and lays it out (ELK) in this process, estimating text widths. `n`, the block's place on
+ * the page, keeps its ids apart from the other diagrams. A source that fails, or whose type is not supported, returns an Error
+ * whose message tells the author what to write instead. Every part carries the data-ref of its Mermaid id (see annotateParts),
+ * and colours come from the kit's tokens (theme.css).
  */
 export function renderMermaid(source: string, n = 0): Diagram | Error {
 	try {
