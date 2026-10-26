@@ -1,11 +1,10 @@
 /**
- * Reads a records config from untrusted JSON (a page's script element, MDX props) into a `RecordsConfig`, or throws one
+ * Reads a records config from untrusted JSON (the props an MDX page gives Records) into a `RecordsConfig`, or throws one
  * `RecordsConfigError` that lists every problem at once with its property path, the value found and what to write instead, so
- * `pack` can stop on a mistake instead of the page showing an empty block.
+ * `pack` can stop on a mistake instead of the page showing an empty block. The fields are read first (validate-fields.ts),
+ * then what names them, then the data against them (validate-data.ts).
  */
 import {
-	type CategoryValue,
-	type DataRecord,
 	type Field,
 	type FieldKind,
 	type GroupNote,
@@ -14,7 +13,6 @@ import {
 	VIEW_KINDS,
 	type ViewKind,
 } from "./config.ts";
-import { valueProblem } from "./fields.ts";
 import { slug } from "./ids.ts";
 import {
 	isObject,
@@ -22,13 +20,14 @@ import {
 	list,
 	NAME,
 	NAME_HINT,
-	prop,
 	type Report,
 	readOptional,
 	readProp,
 	readString,
 	show,
 } from "./read.ts";
+import { checkGroupPaths, readData } from "./validate-data.ts";
+import { readFields } from "./validate-fields.ts";
 
 /** The most problems the error's message lists; `problems` keeps them all. */
 const MAX_SHOWN = 20;
@@ -52,8 +51,6 @@ export class RecordsConfigError extends Error {
 	}
 }
 
-/** Rejects what could end a CSS declaration where the renderer writes the colour. */
-const COLOR = /^[^;{}<>"'\\]+$/;
 const TOP_KEYS = [
 	"id",
 	"data",
@@ -70,135 +67,8 @@ const TOP_KEYS = [
 	"detail",
 	"refField",
 ] as const satisfies readonly (keyof RecordsConfig)[];
-/** The properties each field kind takes; the keys are every kind there is. */
-const FIELD_KEYS = {
-	text: ["label", "kind"],
-	number: ["label", "kind", "unit", "digits", "sum"],
-	currency: ["label", "kind", "currency", "digits", "sum"],
-	date: ["label", "kind"],
-	category: ["label", "kind", "values"],
-} as const satisfies Record<FieldKind, readonly string[]>;
-const KINDS = Object.keys(FIELD_KEYS);
 
-const isKind = (v: unknown): v is FieldKind => typeof v === "string" && KINDS.includes(v);
 const isView = (v: unknown): v is ViewKind => VIEW_KINDS.some((kind) => kind === v);
-
-/** The optional properties of a number or currency field. */
-function readNumberOptions(raw: Record<string, unknown>, path: string, report: Report) {
-	const { digits, sum } = raw;
-	if (
-		digits !== undefined &&
-		!(Number.isInteger(digits) && Number(digits) >= 0 && Number(digits) <= 20)
-	) {
-		report(prop(path, "digits"), `expected a whole number from 0 to 20; got ${show(digits)}`);
-	}
-	if (sum !== undefined && typeof sum !== "boolean") {
-		report(prop(path, "sum"), `expected true or false; got ${show(sum)}`);
-	}
-	return {
-		...(typeof digits === "number" ? { digits } : {}),
-		...(typeof sum === "boolean" ? { sum } : {}),
-	};
-}
-
-function readCategoryValue(raw: unknown, path: string, report: Report): CategoryValue | undefined {
-	if (!isObject(raw)) {
-		report(path, `expected { "value": ..., "label": ..., "color": ... }; got ${show(raw)}`);
-		return undefined;
-	}
-	knownKeys(raw, ["value", "label", "color"], path, report);
-	const value = readProp(raw, "value", path, report);
-	const label = readOptional(raw, "label", path, report);
-	const color = readOptional(raw, "color", path, report, {
-		pattern: COLOR,
-		hint: "a CSS colour such as var(--c3) or #2a7",
-	});
-	return value === undefined
-		? undefined
-		: {
-				value,
-				...(label === undefined ? {} : { label }),
-				...(color === undefined ? {} : { color }),
-			};
-}
-
-function readCategoryValues(raw: unknown, path: string, report: Report): CategoryValue[] {
-	if (!Array.isArray(raw) || raw.length === 0) {
-		report(path, `expected a list of the category's values, in order; got ${show(raw)}`);
-		return [];
-	}
-	const values: CategoryValue[] = [];
-	raw.forEach((item, i) => {
-		const value = readCategoryValue(item, `${path}[${i}]`, report);
-		if (value && values.some((v) => v.value === value.value)) {
-			report(`${path}[${i}].value`, `${show(value.value)} is listed twice`);
-		} else if (value) {
-			values.push(value);
-		}
-	});
-	return values;
-}
-
-function readField(raw: unknown, path: string, report: Report): Field | undefined {
-	if (!isObject(raw)) {
-		report(path, `expected { "label": ..., "kind": ... }; got ${show(raw)}`);
-		return undefined;
-	}
-	const { kind } = raw;
-	if (!isKind(kind)) {
-		report(prop(path, "kind"), `expected one of ${list(KINDS)}; got ${show(kind)}`);
-		return undefined;
-	}
-	knownKeys(raw, FIELD_KEYS[kind], path, report);
-	const label = readProp(raw, "label", path, report) ?? "";
-	switch (kind) {
-		case "text":
-		case "date":
-			return { kind, label };
-		case "category": {
-			const { values } = raw;
-			return { kind, label, values: readCategoryValues(values, prop(path, "values"), report) };
-		}
-		case "number": {
-			const unit = readOptional(raw, "unit", path, report);
-			return { kind, label, ...readNumberOptions(raw, path, report), ...(unit ? { unit } : {}) };
-		}
-		case "currency": {
-			const currency = readProp(raw, "currency", path, report, {
-				pattern: /^[A-Z]{3}$/,
-				hint: 'an ISO 4217 code such as "EUR"',
-			});
-			// A missing code is reported above, so this placeholder never reaches a returned config.
-			return { kind, label, currency: currency ?? "XXX", ...readNumberOptions(raw, path, report) };
-		}
-	}
-}
-
-function readFields(raw: unknown, report: Report): Record<string, Field> {
-	if (!isObject(raw) || Object.keys(raw).length === 0) {
-		report(
-			"fields",
-			`expected an object of fields by key, such as { "hours": { "label": "Hours", "kind": "number" } }; got ${show(raw)}`,
-		);
-		return {};
-	}
-	const fields: Record<string, Field> = {};
-	for (const [key, def] of Object.entries(raw)) {
-		// A plain name keeps a key out of the object prototype ("__proto__"), the engine's own column ids and the hash grammar.
-		if (!NAME.test(key)) {
-			report(
-				prop("fields", key),
-				`a field key must be a plain name (${NAME_HINT}); rename it in the data`,
-			);
-			continue;
-		}
-		const field = readField(def, prop("fields", key), report);
-		if (field) {
-			fields[key] = field;
-		}
-	}
-	return fields;
-}
 
 interface KeyRules {
 	fields: Readonly<Record<string, Field>>;
@@ -325,97 +195,6 @@ function readGroups(raw: unknown, levels: number, report: Report): GroupNote[] {
 	});
 }
 
-/** A record's id as text: a non-empty string or a finite number. */
-function idOf(value: unknown): string | undefined {
-	if (typeof value === "string" && value !== "") {
-		return value;
-	}
-	return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
-}
-
-interface DataRules {
-	idField: string;
-	fields: Readonly<Record<string, Field>>;
-	groupBy: readonly string[];
-}
-
-function checkRecord(
-	record: Record<string, unknown>,
-	at: string,
-	rules: DataRules,
-	report: Report,
-) {
-	for (const [key, field] of Object.entries(rules.fields)) {
-		const problem = valueProblem(field, record[key]);
-		if (problem) {
-			report(prop(at, key), `${problem}; got ${show(record[key])}`);
-		}
-	}
-	for (const key of rules.groupBy) {
-		if (record[key] === null || record[key] === undefined) {
-			report(prop(at, key), "every record needs a value in a groupBy field");
-		}
-	}
-}
-
-function readData(raw: unknown, rules: DataRules, report: Report): DataRecord[] {
-	if (!Array.isArray(raw)) {
-		report("data", `expected a list of records; got ${show(raw)}`);
-		return [];
-	}
-	const seen = new Map<string, number>();
-	const records: DataRecord[] = [];
-	raw.forEach((record, i) => {
-		const at = `data[${i}]`;
-		if (!isObject(record)) {
-			report(at, `expected a record object; got ${show(record)}`);
-			return;
-		}
-		const id = idOf(record[rules.idField]);
-		const first = id === undefined ? undefined : seen.get(id);
-		if (id === undefined) {
-			report(
-				prop(at, rules.idField),
-				`expected the record's id, text or a number; got ${show(record[rules.idField])}`,
-			);
-		} else if (first !== undefined) {
-			report(
-				prop(at, rules.idField),
-				`${show(id)} is also the id of data[${first}]; ids must be unique`,
-			);
-		} else {
-			seen.set(id, i);
-		}
-		checkRecord(record, at, rules, report);
-		records.push(record);
-	});
-	return records;
-}
-
-/** Group notes must name groups the data has, or a typo would silently drop the text. */
-function checkGroupPaths(
-	groups: readonly GroupNote[],
-	data: readonly DataRecord[],
-	groupBy: readonly string[],
-	report: Report,
-) {
-	const paths = new Set<string>();
-	for (const record of data) {
-		const values = groupBy.map((key) => String(record[key]));
-		values.forEach((_, depth) => {
-			paths.add(JSON.stringify(values.slice(0, depth + 1)));
-		});
-	}
-	groups.forEach((note, i) => {
-		if (!paths.has(JSON.stringify(note.path))) {
-			report(
-				`groups[${i}].path`,
-				`no record has ${note.path.map((v, d) => `${groupBy[d]} ${show(v)}`).join(" and ")}`,
-			);
-		}
-	});
-}
-
 /** The first column names each record and holds the titles of groups, lanes and the total, so it is neither grouped nor summed. */
 function checkFirstColumn(
 	first: string | undefined,
@@ -481,6 +260,28 @@ function readLists(
 	};
 }
 
+/** `detail` and `refField`, each one field key. A row is a link or a fold, so `detail` and `link` exclude each other. */
+function readRowKeys(
+	input: Record<string, unknown>,
+	fields: Readonly<Record<string, Field>>,
+	link: string | undefined,
+	report: Report,
+) {
+	const { detail: rawDetail, refField: rawRef } = input;
+	const one = (raw: unknown, path: string, kinds: FieldKind[]) =>
+		raw === undefined
+			? undefined
+			: readKeys([raw], path, report, { fields, kinds, single: true })[0];
+	const detail = one(rawDetail, "detail", ["text"]);
+	if (detail && link) {
+		report(
+			"detail",
+			`a row links to its view (link ${show(link)}) or opens in place to its detail, not both; put the detail in the view`,
+		);
+	}
+	return { detail, refField: one(rawRef, "refField", ["text", "category"]) };
+}
+
 /** The config, checked: throws a RecordsConfigError listing every problem, or returns it typed. */
 export function parseConfig(input: unknown): RecordsConfig {
 	if (!isObject(input)) {
@@ -530,26 +331,4 @@ export function parseConfig(input: unknown): RecordsConfig {
 		...(detail ? { detail } : {}),
 		...(refField ? { refField } : {}),
 	};
-}
-
-/** `detail` and `refField`, each one field key. A row is a link or a fold, so `detail` and `link` exclude each other. */
-function readRowKeys(
-	input: Record<string, unknown>,
-	fields: Readonly<Record<string, Field>>,
-	link: string | undefined,
-	report: Report,
-) {
-	const { detail: rawDetail, refField: rawRef } = input;
-	const one = (raw: unknown, path: string, kinds: FieldKind[]) =>
-		raw === undefined
-			? undefined
-			: readKeys([raw], path, report, { fields, kinds, single: true })[0];
-	const detail = one(rawDetail, "detail", ["text"]);
-	if (detail && link) {
-		report(
-			"detail",
-			`a row links to its view (link ${show(link)}) or opens in place to its detail, not both; put the detail in the view`,
-		);
-	}
-	return { detail, refField: one(rawRef, "refField", ["text", "category"]) };
 }
