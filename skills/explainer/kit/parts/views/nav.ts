@@ -7,9 +7,9 @@
                its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
                ("Open", "→") is passed over for the view's heading, else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
-               that step (next person, next item). Each step keeps its label and the sibling list it walks: the links of the
-               view it was opened from, when that view links to it (an item opened from a person walks that person's items), else
-               every sibling. Steps live in the history entry (its Navigation API state; history.state stays the page's), so Back,
+               that step (next person, next item). Each step keeps its label and the sibling list it walks: the rows a records
+               block shows, in its order, when the reader opened it from one; else the links of the view it was opened from,
+               when that view links to it (an item opened from a person walks that person's items); else every sibling. Steps live in the history entry (its Navigation API state; history.state stays the page's), so Back,
                Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
@@ -157,11 +157,31 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		return list.includes(hash) ? list : undefined;
 	}
 
+	/**
+	 * The link the reader last clicked inside a records block, and the rows that block shows as it shows them (sorted, filtered),
+	 * so the view it opens walks those rows. Taken by the next stamp, whatever hash it is for.
+	 */
+	let clicked: { hash: string; list: string[] } | null = null;
+	document.addEventListener(
+		"click",
+		(e) => {
+			const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+			const block = link?.closest(".records");
+			const name = link instanceof HTMLAnchorElement ? nameOf(hashOf(link)) : "";
+			if (link instanceof HTMLAnchorElement && block && names.has(name)) {
+				const shown = linksTo(name, block).filter((a) => !a.classList.contains("miss"));
+				clicked = { hash: hashOf(link), list: unique(shown.map(hashOf)) };
+			}
+		},
+		{ capture: true },
+	);
+
 	/** The trail with `hash` put in: it replaces the step of the same view name and everything after it. */
 	function extended(hash: string): Step[] {
 		const cut = steps.findIndex((s) => nameOf(s.hash) === nameOf(hash));
 		const before = cut < 0 ? steps : steps.slice(0, cut);
-		const list = inheritedList(hash, before.at(-1), steps[cut]);
+		const fromBlock = clicked?.hash === hash && clicked.list.includes(hash) ? clicked.list : null;
+		const list = fromBlock ?? inheritedList(hash, before.at(-1), steps[cut]);
 		return [...before, { hash, label: label(hash), ...(list ? { list } : {}) }];
 	}
 
@@ -177,6 +197,7 @@ window.ViewsNav = ({ views, decode, canonical, kitText }) => {
 		} else {
 			steps = hash ? extended(hash) : [];
 		}
+		clicked = null;
 		try {
 			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
 		} catch {

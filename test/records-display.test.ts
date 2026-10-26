@@ -34,6 +34,18 @@ test("pack prerenders the default tree with its controls hidden, and a block wit
 	expect(html).toMatch(/<summary data-ref="JV">[\s\S]*?<\/summary><p>/);
 });
 
+/** The ids of one owner's records, most labour first, ties in source order: the table sorted by its Labour header. */
+function byLabour(owner: string) {
+	const { data } = JSON.parse(readFileSync(join(FIXTURES, "t6-plan.json"), "utf8")) as {
+		data: { id: string; owner: string; labour: number }[];
+	};
+	return data
+		.filter((r) => r.owner === owner)
+		.sort((a, b) => b.labour - a.labour)
+		.map((r) => r.id)
+		.join(" ");
+}
+
 test("search, facets, views and sort go in the hash; links apply a state; an item view returns to it; Expand all and print open the tree", async () => {
 	const contract = `${SETTLED}
 const $ = (selector) => document.querySelector(selector);
@@ -62,7 +74,9 @@ var contract = settled.then(frames).then(async () => {
 	expect(location.hash === "#plan?view=table&f.owner=JV" && block().querySelectorAll("tbody tr").length === 19, "the table shows the filtered rows");
 	block().querySelector("th:last-child button.sort").click();
 	await frames();
-	expect(/sort=/.test(location.hash) && $("#plan th:last-child").getAttribute("aria-sort"), "a header sorts, in the hash");
+	const order = [...block().querySelectorAll("tbody tr a")].map((a) => a.getAttribute("href").slice(6)).join(" ");
+	expect(location.hash === "#plan?view=table&sort=-labour&f.owner=JV" && $("#plan th:last-child").getAttribute("aria-sort") === "descending", "a number header sorts largest first, in the hash");
+	expect(order === ${JSON.stringify(byLabour("JV"))}, "the rows follow the sort: " + order);
 	block().querySelector(".reset").click();
 	await frames();
 	block().querySelector(".seg label:nth-child(1) input").click();
@@ -70,11 +84,12 @@ var contract = settled.then(frames).then(async () => {
 	await navigated(() => $("a[href='#plan?f.owner=JV']").click());
 	const pressed = [...block().querySelectorAll(".facets button[aria-pressed=true]")].map((b) => b.textContent);
 	expect(pressed.length === 1 && pressed[0].startsWith("Jonas Vireo") && shown() === "19 of 96", "a link of the page's applies its state");
-	const first = block().querySelector(".tree a:not(.miss)");
+	const [first, second] = block().querySelectorAll(".tree a:not(.miss)");
 	await navigated(() => first.click());
 	const view = $(".view.active");
 	expect(view && view.querySelector("h1").textContent.startsWith(first.getAttribute("href").split("/")[1]), "a row opens its item view");
-	expect(view && view.querySelector(".sibs [rel=next]"), "the item view has previous/next");
+	const sibs = view && [...view.querySelector(".sibs").children].map((el) => el.getAttribute("href") ?? el.textContent).join(" ");
+	expect(sibs === " 1 / 19 " + second.getAttribute("href"), "previous/next walk the 19 rows the filter shows: " + sibs);
 	await navigated(() => history.back());
 	expect(location.hash === "#plan?f.owner=JV" && shown() === "19 of 96", "Back from the item returns to the filtered list");
 	block().querySelector(".reset").click();
@@ -105,6 +120,45 @@ var contract = settled.then(frames).then(async () => {
 	);
 	expect(await runPacked(output)).toEqual([]);
 }, 60_000);
+
+test("previous and next in an item view walk the rows of the block it was opened from, as sorted, through a reload", async () => {
+	// A link to the same item before the block, which the page's link order alone would walk first.
+	const page = fixturePage().replace(
+		"<Records {...plan} />",
+		"Start with [the bench rig](#item/WP3-05).\n\n<Records {...plan} />",
+	);
+	const output = await packedMdx(dir, "walk", page);
+	const rows = `[...document.querySelectorAll("#plan tbody tr a")].map((a) => a.getAttribute("href"))`;
+	const sibs = `({ prev: document.querySelector(".view.active [rel=prev]")?.getAttribute("href"), count: document.querySelector(".view.active .sibs .count")?.textContent, next: document.querySelector(".view.active [rel=next]")?.getAttribute("href") })`;
+	const seen = await inPage(output, async (cdp) => {
+		const sorted = await act<string[]>(cdp, `location.hash = "plan?view=table&sort=-labour"`, rows);
+		const at = sorted.indexOf("#item/WP3-05") + 1;
+		const opened = await act(
+			cdp,
+			`document.querySelectorAll("#plan tbody tr a")[${at}].click()`,
+			sibs,
+		);
+		await load(cdp);
+		const reloaded = await cdp.evaluate(sibs);
+		return { sorted, at, opened, reloaded };
+	});
+	const { sorted, at } = seen;
+	const labour = new Map(
+		(
+			JSON.parse(readFileSync(join(FIXTURES, "t6-plan.json"), "utf8")).data as {
+				id: string;
+				labour: number;
+			}[]
+		).map((r) => [`#item/${r.id}`, r.labour]),
+	);
+	// The table's rows, most labour first.
+	expect(sorted).toHaveLength(96);
+	expect(sorted.map((h) => labour.get(h))).toEqual([...labour.values()].sort((a, b) => b - a));
+	const walk = { prev: sorted[at - 1], count: `${at + 1} / 96`, next: sorted[at + 1] };
+	expect(at).toBeGreaterThan(1);
+	expect(seen.opened).toEqual(walk);
+	expect(seen.reloaded).toEqual(walk);
+}, 30_000);
 
 let fixture: Promise<string> | undefined;
 /** The fixture page packed once, for the tests that drive it in the browser. */
