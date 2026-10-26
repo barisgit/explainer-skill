@@ -11,6 +11,10 @@ export const isObject = (v: unknown): v is Record<string, unknown> =>
 	typeof v === "object" && v !== null && !Array.isArray(v);
 export const list = (values: readonly string[]) => values.map((v) => JSON.stringify(v)).join(", ");
 
+/** The object's own value at `key`: a record that leaves out a field named `constructor` holds nothing there, not Object. */
+export const own = (obj: Readonly<Record<string, unknown>>, key: string): unknown =>
+	Object.hasOwn(obj, key) ? obj[key] : undefined;
+
 /** A value as a message quotes it, cut short. */
 export function show(value: unknown): string {
 	const text = JSON.stringify(value) ?? String(value);

@@ -25,6 +25,7 @@ import {
 } from "../../vendor/table-core.js";
 import type { DataRecord, Value } from "./config.ts";
 import type { FieldBehaviour } from "./fields.ts";
+import { own } from "./read.ts";
 
 /** One record as the core holds it: its id, its place in the source, and the folded text the search looks in. */
 export interface Item {
@@ -57,7 +58,7 @@ export interface Narrowing {
 
 /** The records' value in a field, as a Value: anything else (undeclared shapes) reads as unknown. */
 export function readValue(record: DataRecord, key: string): Value {
-	const value = record[key];
+	const value = own(record, key);
 	return typeof value === "string" || typeof value === "number" ? value : null;
 }
 

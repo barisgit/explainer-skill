@@ -1,7 +1,7 @@
 /** Checks a config's `data` against its fields and group notes, for validate.ts. */
 import type { DataRecord, Field, GroupNote } from "./config.ts";
 import { valueProblem } from "./fields.ts";
-import { isObject, prop, type Report, show } from "./read.ts";
+import { isObject, own, prop, type Report, show } from "./read.ts";
 
 /** A record's id as text: a non-empty string or a finite number. */
 function idOf(value: unknown): string | undefined {
@@ -25,13 +25,14 @@ function checkRecord(
 	report: Report,
 ) {
 	for (const [key, field] of Object.entries(rules.fields)) {
-		const problem = valueProblem(field, record[key]);
+		const value = own(record, key);
+		const problem = valueProblem(field, value);
 		if (problem) {
-			report(prop(at, key), `${problem}; got ${show(record[key])}`);
+			report(prop(at, key), `${problem}; got ${show(value)}`);
 		}
 	}
 	for (const key of rules.groupBy) {
-		if (record[key] === null || record[key] === undefined) {
+		if ((own(record, key) ?? null) === null) {
 			report(prop(at, key), "every record needs a value in a groupBy field");
 		}
 	}
@@ -51,12 +52,13 @@ export function readData(raw: unknown, rules: DataRules, report: Report): DataRe
 			report(at, `expected a record object; got ${show(record)}`);
 			return;
 		}
-		const id = idOf(record[rules.idField]);
+		const given = own(record, rules.idField);
+		const id = idOf(given);
 		const first = id === undefined ? undefined : seen.get(id);
 		if (id === undefined) {
 			report(
 				prop(at, rules.idField),
-				`expected the record's id, text or a number; got ${show(record[rules.idField])}`,
+				`expected the record's id, text or a number; got ${show(given)}`,
 			);
 		} else if (first !== undefined) {
 			report(
@@ -81,7 +83,7 @@ export function checkGroupPaths(
 ) {
 	const paths = new Set<string>();
 	for (const record of data) {
-		const values = groupBy.map((key) => String(record[key]));
+		const values = groupBy.map((key) => String(own(record, key)));
 		values.forEach((_, depth) => {
 			paths.add(JSON.stringify(values.slice(0, depth + 1)));
 		});

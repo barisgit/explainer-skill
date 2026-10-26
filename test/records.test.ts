@@ -169,6 +169,38 @@ test("a bad config is rejected with every problem, where it is and what to write
 	]);
 });
 
+test("a field named like an object's built-in property reads only the record's own value", () => {
+	// Every object inherits "constructor" and "toString"; a record that leaves them out holds no value there.
+	const built = createRecords({
+		id: "own",
+		idField: "id",
+		fields: {
+			id: { label: "Id", kind: "text" },
+			constructor: { label: "Builder", kind: "number", sum: true },
+			toString: { label: "Kind", kind: "text" },
+		},
+		columns: ["id", "constructor", "toString"],
+		groupBy: ["toString"],
+		views: ["tree", "table"],
+		data: [
+			{ id: "a", constructor: 2, toString: "x" },
+			{ id: "b", toString: "x" },
+		],
+	});
+	const { body } = built.view({ ...built.initial, view: "table" });
+	expect(body.kind === "table" && body.rows.map((r) => r.cells[1]?.value)).toEqual([2, null]);
+	expect(() =>
+		createRecords({
+			id: "own",
+			idField: "id",
+			fields: { id: { label: "Id", kind: "text" }, toString: { label: "Kind", kind: "text" } },
+			columns: ["id"],
+			groupBy: ["toString"],
+			data: [{ id: "a" }],
+		}),
+	).toThrow("data[0].toString: every record needs a value in a groupBy field");
+});
+
 test("a row opens in place to its detail or links to its view, and carries its ref", () => {
 	const { link: _, ...rest } = plan as Record<string, unknown>;
 	const folded = createRecords({ ...rest, detail: "rationale", refField: "owner" });
