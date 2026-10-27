@@ -7,7 +7,7 @@
  * A Chart is drawn by ECharts with its SVG renderer (vendor/echarts-ssr.js), from the option and theme charts.js makes
  * (kit/parts/charts/option.ts). Every colour expression, the kit's tokens included, goes in as a stand-in colour and comes out
  * as the expression again (stand-ins.ts), so the SVG follows light and dark, a page's token overrides and the tone under it, as
- * a Plot does. What pack draws is exact or absent: a figure with a colour pack cannot write exactly is not drawn here.
+ * a Plot does. What pack draws is exact or absent: a figure with a colour or a height pack cannot tell is not drawn here.
  * A Plot is drawn by plot.js's own code (kit/parts/plot/draw.ts). Text is measured in Geist (geist.ts).
  */
 import { join } from "node:path";
@@ -15,7 +15,7 @@ import type * as EChartsSsr from "../../vendor/echarts-ssr.js";
 import { textWidth } from "../geist.ts";
 import { runKitPart } from "../kit.ts";
 import { SKILL_ROOT } from "../paths.ts";
-import { type Place, pageHeights, type Viewport } from "./chart-heights.ts";
+import { type PageHeight, type Place, pageHeights, type Viewport } from "./chart-heights.ts";
 import { kitSvg, shorterPaths } from "./drawn-svg.ts";
 import { type ChartColours, standIns } from "./stand-ins.ts";
 
@@ -64,8 +64,8 @@ const PHONE = { width: 390, height: 844 };
 /**
  * The sizes theme.css gives `.chart` (block-size clamp(18rem, 48vw, 26rem), .tall clamp(22rem, 60vw, 34rem)) in the page's
  * column at check's desktop (1440) and phone (390) widths, and in half the desktop column, as two figures side by side are.
- * A height the page's own CSS gives the chart replaces the theme's where pack can work it out (chart-heights.ts); otherwise
- * the drawing scales to fit until the kit script draws it at its size.
+ * A height the page's own CSS gives the chart replaces the theme's (chart-heights.ts); where pack cannot tell that height, it
+ * draws nothing, and the kit script draws the figure as the page loads.
  */
 const COPIES: Copy[] = [
 	{ fit: "", width: 1054, height: 416, tall: 544, viewport: DESKTOP },
@@ -192,33 +192,50 @@ function chartColours(option: unknown): ChartColours {
 /** The drawer pack renders a page in `lang` with (kit/components/parts/drawn.ts's Drawer). */
 export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	const pageHeight = pageHeights(stylesheets);
-	/** The height of a copy of the figure on `place`: the page's own for it, else the theme's. */
-	const heightOf = (copy: Copy, place: Place) =>
-		pageHeight(place, copy.viewport) ?? (place.classes.includes("tall") ? copy.tall : copy.height);
+	/** The heights of the copies of the figure on `place`, or undefined when pack cannot tell one of them. */
+	function heightsOf(place: Place): number[] | undefined {
+		const heights = COPIES.map((copy): PageHeight => {
+			const height = pageHeight(place, copy.viewport);
+			return height === "theme"
+				? place.classes.includes("tall")
+					? copy.tall
+					: copy.height
+				: height;
+		});
+		return heights.every((h) => typeof h === "number") ? heights : undefined;
+	}
 	const chartsOption = runKitPart("charts/option.ts", "ChartsOption") as ChartsOptionPart;
 	const plots = (runKitPart("plot/draw.ts", "PlotDraw") as PlotDrawPart)({ lang: () => lang });
 	return {
 		chart: orNothing((option: Option, place: Place) => {
+			const heights = heightsOf(place);
+			if (!heights) {
+				return "";
+			}
 			// Each chart has stand-ins of its own, clear of the colours its option writes as they are.
 			const { color, paintOf } = standIns(chartColours(option));
 			const charts = chartsOption({ color, lang: () => lang });
 			const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
 			const resolved = charts.resolveOption(option);
-			const copies = COPIES.map((copy) => {
-				const height = heightOf(copy, place);
+			const copies = COPIES.map((copy, i) => {
+				const height = heights[i] as number;
 				return kitSvg(chartSvg(resolved, theme, copy.width, height), svgTag(copy, height), paintOf);
 			});
 			return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 		}),
 		plot: orNothing((option: Option, place: Place) => {
+			const heights = heightsOf(place);
+			if (!heights) {
+				return "";
+			}
 			// Every series starts switched on; plot.js marks its buttons so as it draws.
 			const legend = plots
 				.legendMarkup(option)
 				.replace(/<button /g, '<button aria-pressed="true" ');
 			const shown = plots.switchedOn(option.series ?? [], new Set());
 			const width = (s: unknown) => textWidth(String(s), PLOT_FONT, 500);
-			const copies = COPIES.map((copy) => {
-				const H = heightOf(copy, place) - PLOT_LEGEND.padding - (legend ? PLOT_LEGEND.row : 0);
+			const copies = COPIES.map((copy, i) => {
+				const H = (heights[i] as number) - PLOT_LEGEND.padding - (legend ? PLOT_LEGEND.row : 0);
 				return `${svgTag(copy, H)}${shorterPaths(plots.render(option, copy.width, H, width, shown))}</svg>`;
 			});
 			return `<ul class="plot-legend">${legend}</ul><div class="plot-area">${drawnCopies(copies)}</div>`;

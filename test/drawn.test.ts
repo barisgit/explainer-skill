@@ -113,47 +113,6 @@ describe("a Chart and a Plot drawn at pack time", () => {
 		expect(html).not.toContain('stop-color="none"');
 	}, 30_000);
 
-	test("take the height the page's CSS gives the element where pack can work it out, else the theme's", async () => {
-		const sized = await packedMdx(
-			dir,
-			"sized",
-			`import { Chart, Plot } from "kit";
-import "./sized.css";
-
-# Sized
-
-<Chart class="short" label="Short" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />
-
-<Plot id="low" label="Low" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
-
-<Chart class="tall" label="Tall" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />
-`,
-			{
-				"sized.css": `/* .short in a media query is not read: pack cannot tell the window */
-.chart.short { block-size: clamp(10rem, 20vw, 14rem); }
-@media (min-width: 60rem) { .chart.short { block-size: 30rem; } }
-#low { height: 200px; }
-.page .chart { block-size: 5rem; }
-`,
-			},
-		);
-		const viewBoxes = [
-			...readFileSync(sized, "utf8").matchAll(/<svg viewBox="0 0 (\d+) (\d+)"( data-fit="\w+")?>/g),
-		].map((m) => `${m[1]}x${m[2]}`);
-		// Chart .short: 14rem on a desktop, 10rem on a phone; the Plot's area is 200 px less its padding; .tall is the theme's.
-		expect(viewBoxes).toEqual([
-			"1054x224",
-			"527x224",
-			"356x160",
-			"1054x192",
-			"527x192",
-			"356x192",
-			"1054x544",
-			"527x544",
-			"356x352",
-		]);
-	}, 30_000);
-
 	test("give way to the live chart and plot, whose tooltip and legends work", async () => {
 		const state = await inPage(output, async (cdp) => {
 			const step = async (name: string) =>
@@ -209,6 +168,96 @@ describe("what pack draws is exact, or nothing", () => {
 		expect(figures.get("literal")).toContain('fill="#ed5c93"');
 		expect(figures.get("literal")).not.toContain("var(--under)");
 	}, 30_000);
+
+	test("take the height the page's CSS gives the element, by specificity and !important, else no drawing", async () => {
+		const sized = await packedMdx(
+			dir,
+			"sized",
+			`import { Chart, Plot } from "kit";
+import "./sized.css";
+
+# Sized
+
+<Chart id="small" label="Small" option={BARS} />
+
+<Chart id="loud" class="loud" label="Loud" option={BARS} />
+
+<Plot id="low" label="Low" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+
+<Chart class="tall" label="Tall" option={BARS} />
+
+export const BARS = { xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] };
+`,
+			{
+				"sized.css": `#small { block-size: 100px; }
+.chart { block-size: 300px; }
+.chart.loud { block-size: clamp(10rem, 20vw, 14rem) !important; }
+#loud { block-size: 50px; }
+#low { height: 200px; }
+`,
+			},
+		);
+		const figures = drawnFigures(sized);
+		// The id outranks the later class; !important outranks the id (14rem on a desktop, 10rem on a phone); the Plot's area is
+		// its 200 px less the padding; .tall takes the page's .chart, which outranks the theme's layer.
+		expect(viewBoxes(figures.get("small"))).toEqual(["1054x100", "527x100", "356x100"]);
+		expect(viewBoxes(figures.get("loud"))).toEqual(["1054x224", "527x224", "356x160"]);
+		expect(viewBoxes(figures.get("low"))).toEqual(["1054x192", "527x192", "356x192"]);
+		expect(viewBoxes(figures.get("figure-4"))).toEqual(["1054x300", "527x300", "356x300"]);
+		// With scripts off, the copy showing fills its element at its drawn size, so its text is as large as the live chart's.
+		const scales = await withPage(async (cdp) => {
+			await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+			await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+			const found: number[] = [];
+			for (const viewport of WIDTHS) {
+				await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
+				await cdp.load(`file://${sized}`);
+				found.push(...(await cdp.evaluate<number[]>(DRAWN_SCALES)));
+			}
+			return found;
+		});
+		expect(scales).toHaveLength(WIDTHS.length * 4);
+		for (const scale of scales) {
+			expect(scale).toBeGreaterThan(0.9);
+			expect(scale).toBeLessThan(1.1);
+		}
+	}, 60_000);
+
+	test("draw nothing where a page rule might set the height and pack cannot tell what it comes to", async () => {
+		const figures = drawnFigures(
+			await packedMdx(
+				dir,
+				"unsized",
+				`import { Chart, Plot } from "kit";
+import "./unsized.css";
+
+# Unsized
+
+<Chart id="nested" label="Nested" option={BARS} />
+
+<Chart id="queried" class="queried" label="Queried" option={BARS} />
+
+<Plot id="relative" class="relative" label="Relative" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+
+<Chart id="free" label="Free" option={BARS} />
+
+export const BARS = { xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] };
+`,
+				{
+					"unsized.css": `.page #nested { block-size: 5rem; }
+@media (min-width: 60rem) { .queried { block-size: 30rem; } }
+.relative { block-size: 50%; }
+.key svg { block-size: 1rem; }
+`,
+				},
+			),
+		);
+		expect(figures.get("nested")).toBeUndefined();
+		expect(figures.get("queried")).toBeUndefined();
+		expect(figures.get("relative")).toBeUndefined();
+		// No rule could reach this one (an svg is not a chart), so the theme's height stands.
+		expect(viewBoxes(figures.get("free"))).toEqual(["1054x416", "527x416", "356x288"]);
+	}, 30_000);
 });
 
 /**
@@ -230,6 +279,17 @@ function drawnFigures(path: string): Map<string, string | undefined> {
 		}),
 	);
 }
+
+/** The width and height of each copy's viewBox in a figure's drawn markup. */
+const viewBoxes = (drawn: string | undefined) =>
+	[...(drawn ?? "").matchAll(/<svg viewBox="0 0 (\d+) (\d+)"/g)].map((m) => `${m[1]}x${m[2]}`);
+
+/** Page expression: for each drawn copy showing, how much it is scaled to fit its element (1 when drawn at the element's size). */
+const DRAWN_SCALES = `[...document.querySelectorAll(".chart-drawn > svg")].filter((svg) => svg.getBoundingClientRect().width > 0).map((svg) => {
+	const box = svg.parentElement.getBoundingClientRect();
+	const [, , width, height] = svg.getAttribute("viewBox").split(" ").map(Number);
+	return Math.min(box.width / width, box.height / height);
+})`;
 
 /**
  * Page expression: how many drawn copies are left, whether ECharts mounted the chart, the plot's live lines, and whether the
