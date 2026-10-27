@@ -16,6 +16,11 @@ jobs:
       - run: bun install --frozen-lockfile
         env:
           HUSKY: "0"
+      # A runner is a fresh VM whose first Chrome launch reads the 446 MB install from a cold disk: 6 to 9 s measured, 7 to 17 s in the
+      # first Chrome test of most runs and over check's 20 s DevTools deadline in three of them (#107). One launch here, outside
+      # any deadline, leaves the tests a warm Chrome.
+      - name: Warm up Chrome
+        run: time timeout 120 google-chrome --headless=new --no-sandbox --disable-gpu --user-data-dir="$(mktemp -d)" --dump-dom about:blank > /dev/null 2>&1
       # The runner's preinstalled Google Chrome (/usr/bin/google-chrome) drives check; pack renders Mermaid without it.
       # Ubuntu 24.04 restricts the user namespaces Chrome's sandbox needs, so this also covers the no-sandbox retry.
       - run: bun run ci

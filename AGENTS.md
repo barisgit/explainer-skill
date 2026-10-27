@@ -54,7 +54,7 @@ Showcase assets stay in `examples/`, never in `skills/explainer/`, because insta
 
 The pre-commit hook (husky + lint-staged) runs Biome with fixes on the staged files, then the typecheck; about 2 s, no Chrome. It keeps partially staged hunks. lint-staged backs up through `git stash`, which worktrees share, so run commits of different worktrees one at a time. Never use `--no-verify`.
 
-`.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. The runner restricts user namespaces, so CI exercises the no-sandbox retry.
+`.github/workflows/ci.yml` runs `bun install --frozen-lockfile` and `bun run ci` on ubuntu-latest. The runner restricts user namespaces, so CI exercises the no-sandbox retry. A step before the tests launches Chrome once: a fresh runner's first launch takes 6 to 17 s and sometimes over `check`'s 20 s deadline (#107), the 20 s staying for users.
 
 ## Decisions
 
