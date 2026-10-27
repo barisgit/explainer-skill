@@ -203,7 +203,7 @@ export class Cdp {
 		this.listeners.set(event, [...(this.listeners.get(event) ?? []), fn]);
 	}
 	/** Resolves on the next `event`; `what` names it in the error when it does not come within `deadline` ms. */
-	once(event: keyof CdpEvents, what: string = event, deadline = CALL_DEADLINE_MS): Promise<void> {
+	private once(event: keyof CdpEvents, what: string, deadline: number): Promise<void> {
 		return this.wait<void>(`${what} did not come in ${seconds(deadline)}`, deadline, (ok) => {
 			const listener = () => ok();
 			this.on(event, listener);

@@ -33,16 +33,12 @@ export async function open(
 			{ name: "prefers-reduced-motion", value: reduceMotion ? "reduce" : "no-preference" },
 		],
 	});
-	const blank = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url: "about:blank" });
-	await blank;
+	await cdp.load("about:blank");
 	await cdp.send("Storage.clearDataForOrigin", {
 		origin: "file://",
 		storageTypes: "local_storage",
 	});
-	const loaded = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url });
-	await loaded;
+	await cdp.load(url);
 	await settle(800);
 }
 

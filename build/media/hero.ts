@@ -55,9 +55,7 @@ export async function renderHero(
 	await cdp.send("Emulation.setDefaultBackgroundColorOverride", {
 		color: { r: 0, g: 0, b: 0, a: 0 },
 	});
-	const loaded = cdp.once("Page.loadEventFired");
-	await cdp.send("Page.navigate", { url: `file://${page}` });
-	await loaded;
+	await cdp.load(`file://${page}`);
 	await settle(500);
 	await screenshot(cdp, out);
 }

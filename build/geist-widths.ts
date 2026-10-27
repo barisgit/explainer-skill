@@ -43,10 +43,8 @@ const MEASURE = `(async () => {
 try {
 	const table = await withPage(async (cdp) => {
 		await cdp.send("Runtime.enable");
-		const loaded = cdp.once("Page.loadEventFired");
 		await cdp.send("Page.enable");
-		await cdp.send("Page.navigate", { url: pathToFileURL(page).href });
-		await loaded;
+		await cdp.load(pathToFileURL(page).href);
 		return cdp.evaluate<{ sans: Record<string, number[]>; loaded: boolean }>(MEASURE, true);
 	});
 	if (!table.loaded) {
