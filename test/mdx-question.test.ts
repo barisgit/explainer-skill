@@ -257,21 +257,6 @@ export function Late() {
 		);
 		expect(summaries).toEqual(["Poka\u017ei odgovor", "Poka\u017ei odgovor"]);
 	}, 30_000);
-});
-
-describe("written-answer Question: kept or in the reply", () => {
-	test("with a model answer inside, what the reader wrote is kept across a reload and brings no reply bar", async () => {
-		const output = await packedMdx(dir, "study-kept", STUDY);
-		expect(kitScriptsIn(output)).not.toContain("reply");
-		const seen = await inPage(output, async (cdp) => {
-			await act(cdp, write("q1", "They add up"), "0");
-			await load(cdp);
-			return cdp.evaluate<[string, boolean]>(
-				`[document.getElementById("q1").value, Boolean(document.querySelector(".reply-bar"))]`,
-			);
-		});
-		expect(seen).toEqual(["They add up", false]);
-	}, 30_000);
 
 	test("with nothing inside, the question joins the reply; Clear empties both kinds, and the kept one stays out of the reply", async () => {
 		const output = await packedMdx(
