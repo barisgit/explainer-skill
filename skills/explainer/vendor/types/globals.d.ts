@@ -87,16 +87,35 @@ interface KeepNotes {
 	restore(saved: unknown): void;
 }
 
-/** keep.js's keeper, which reply.js drives: the controls it keeps, and its save, clear and touch calls. */
+/** A Clear button's texts, read at each use so kitLabels may be set later: its idle text, and the prompt announced once armed. */
+interface KeepClearTexts {
+	label(): string;
+	prompt(): string;
+}
+
+/** A Clear button that asks first, and the live region that announces it; its owner places both. */
+interface KeepClearButton {
+	button: HTMLButtonElement;
+	status: HTMLElement;
+	/** Shows or hides the button; hiding cancels a pending confirm. */
+	show(visible: boolean): void;
+}
+
+/** keep.js's keeper, which reply.js drives: the controls it keeps, its save, clear and touch calls, and its Clear button. */
 interface KeepApi {
 	/** CSS selector of the controls that can be kept. */
 	selector: string;
 	/** A label's text without the controls inside it. */
 	ownText(label: HTMLLabelElement): string;
-	/** After any change: adopts new controls, saves, returns whether anything for the reply is kept (a self-check's choice is not). */
-	update(): boolean;
+	/**
+	 * After any change: adopts new controls, saves, returns whether anything is kept. Unless `inBar` (the caller shows Clear in
+	 * its reply bar), keep.js shows its own Clear while anything is.
+	 */
+	update(inBar: boolean): boolean;
 	/** Every control back to its default (with input and change events), saved state dropped; notes are the owner's to empty. */
 	clear(): void;
+	/** The Clear button keep.js shows alone, for an owner's own place and texts: a press arms it, a second calls `onClear`. */
+	clearButton(texts: KeepClearTexts, onClear: () => void): KeepClearButton;
 	/** The reader acted on a control, even if the value equals the default. */
 	touch(el: ReplyControl): void;
 	touched(el: ReplyControl): boolean;
