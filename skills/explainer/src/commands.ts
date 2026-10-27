@@ -328,7 +328,7 @@ export const COMMANDS: Record<string, Command> = {
 			"--view <what>    choose drill-down views to capture. The report lists every view hash found (links and static views) and which were captured. Default: the first hash of each view name, at most 6 names. --view all = every hash found (one PNG set each: slower). A hash (repo/mobile) captures exactly the hashes given; repeatable. none = overview only. Hashes only a script navigates to are never found: pass them as --view name/param.",
 			"--tag <name>     add to the PNG names so states do not overwrite each other; with --quick too (kind-desktop.png)",
 			"--out <dir>      screenshot directory, created if missing (default: a new temp directory, printed in the report; nothing is written next to the file)",
-			`--timeout <s>    stop after this many seconds (default ${DEFAULT_TIMEOUT_SECONDS}): Chrome is stopped, nothing is reported, and the error says where the run was`,
+			`--timeout <s>    stop after this many seconds, Chrome's start-up included (default ${DEFAULT_TIMEOUT_SECONDS}): Chrome is stopped, nothing is reported, and the error says where the run was`,
 			"--json           machine-readable result on stdout",
 		],
 		examples: [

@@ -52,8 +52,8 @@ const startCheck = (file: string, tmp: string, args: string[] = [], env: object 
 		{ stdout: "pipe", stderr: "pipe", env: { ...process.env, TMPDIR: tmp, ...env } },
 	);
 
-async function runCheck(file: string, tmp: string, args: string[] = []) {
-	const proc = startCheck(file, tmp, args);
+async function runCheck(file: string, tmp: string, args: string[] = [], env: object = {}) {
+	const proc = startCheck(file, tmp, args, env);
 	const [stdout, stderr, code] = await Promise.all([
 		new Response(proc.stdout).text(),
 		new Response(proc.stderr).text(),
@@ -128,6 +128,22 @@ test("--timeout stops check with one error line saying where it was, and leaves 
 	expect(result.stderr).toBe(
 		"error: check passed its 1 s limit at light desktop, overview, after 0 page(s): raise --timeout for a page with many views or --do steps\n",
 	);
+	expect(readdirSync(tmp)).toEqual([]);
+}, 30_000);
+
+test("--timeout counts Chrome's start-up: a Chrome that hangs while it starts stops check at the limit", async () => {
+	const tmp = tempDir("tmp-timeout-start");
+	const started = performance.now();
+	const result = await runCheck(stalled, tmp, ["--timeout", "1"], {
+		CHROME: fakeChrome,
+		FAKE_CHROME: "silent",
+	});
+	expect(result.stderr).toBe(
+		"error: check passed its 1 s limit while starting Chrome, after 0 page(s): raise --timeout for a page with many views or --do steps\n",
+	);
+	expect(result.code).toBe(1);
+	// The limit plus the stand-in's shutdown, far below the 20 s start-up deadline.
+	expect(performance.now() - started).toBeLessThan(10_000);
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 

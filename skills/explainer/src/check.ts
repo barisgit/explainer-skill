@@ -211,8 +211,8 @@ interface Run {
 	/** The drill-down hashes to capture, set once by the first overview pass (light, desktop) and reused for every other screen. */
 	viewHashes: string[];
 	stepNotes: Set<string>;
-	/** What the run is doing now ("dark narrow, view #fix/none"), for an error that stops it. */
-	at: string;
+	/** Where the run is now ("at dark narrow, view #fix/none", or STARTING), for an error that stops it. */
+	where: string;
 }
 
 /**
@@ -341,7 +341,7 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name, vp } = screen;
 	const { opts } = run;
-	run.at = `${theme} ${name}, overview`;
+	run.where = `at ${theme} ${name}, overview`;
 	run.log.reset();
 	await open(run, "");
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
@@ -370,7 +370,7 @@ async function shootOverview(run: Run, screen: Screen) {
 /** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
 async function shootView(run: Run, screen: Screen, hash: string) {
 	const { theme, name, vp } = screen;
-	run.at = `${theme} ${name}, view ${hash}`;
+	run.where = `at ${theme} ${name}, view ${hash}`;
 	run.log.reset();
 	await open(run, hash);
 	if (
@@ -424,28 +424,21 @@ async function shootAll(run: Run, themes: readonly string[]) {
 	}
 }
 
+/** Where a run is until its first screen: the overall limit's error and any other name the place with it. */
+const STARTING = "while starting Chrome";
+
 /**
- * Runs shootAll within the run's overall limit. Past it, every pending and later Chrome call fails with the limit's error, which
- * says where the run was; any other ChromeError gets the same `at` added, so a stalled call names the screen it stalled on.
+ * Runs shootAll; a ChromeError other than the overall limit's (`limit.reason`, which says where the run was itself) gets the run's
+ * `where` added, so a stalled call names the screen it stalled on.
  */
-async function shootWithin(run: Run, themes: readonly string[]) {
-	const { timeoutSeconds } = run.opts;
-	let stopped: ChromeError | undefined;
-	const limit = setTimeout(() => {
-		stopped = new ChromeError(
-			`check passed its ${timeoutSeconds} s limit at ${run.at}, after ${run.shots.length} page(s): raise --timeout for a page with many views or --do steps`,
-		);
-		run.cdp.abort(stopped);
-	}, timeoutSeconds * 1000);
+async function shootNamingWhere(run: Run, themes: readonly string[], limit: AbortSignal) {
 	try {
 		await shootAll(run, themes);
 	} catch (error) {
-		if (error instanceof ChromeError && error !== stopped) {
-			throw new ChromeError(`${error.message} (at ${run.at})`);
+		if (error instanceof ChromeError && error !== limit.reason) {
+			throw new ChromeError(`${error.message} (${run.where})`);
 		}
 		throw error;
-	} finally {
-		clearTimeout(limit);
 	}
 }
 
@@ -468,26 +461,36 @@ export async function check(
 	mkdirSync(outDir, { recursive: true });
 	const themes = opts.quick ? THEMES.slice(0, 1) : THEMES;
 	const stem = `${basename(file).replace(/\.html?$/, "")}${opts.tag ? `-${opts.tag}` : ""}`;
-	const shots: Shot[] = [];
-	const views: ViewReport = { found: [], captured: [], uncaptured: [], templates: [] };
-	const stepNotes = new Set<string>();
-	await withPage((cdp) =>
-		shootWithin(
-			{
+	// The limit runs from before Chrome starts, so a Chrome that hangs while starting is stopped at it too.
+	let current: Run | undefined;
+	const limit = new AbortController();
+	const timer = setTimeout(() => {
+		limit.abort(
+			new ChromeError(
+				`check passed its ${opts.timeoutSeconds} s limit ${current?.where ?? STARTING}, after ${current?.shots.length ?? 0} page(s): raise --timeout for a page with many views or --do steps`,
+			),
+		);
+	}, opts.timeoutSeconds * 1000);
+	try {
+		return await withPage(async (cdp) => {
+			const run: Run = {
 				cdp,
 				log: new PageLog(cdp),
 				url: `file://${resolve(file)}`,
 				outDir,
 				stem,
 				opts,
-				shots,
-				views,
+				shots: [],
+				views: { found: [], captured: [], uncaptured: [], templates: [] },
 				viewHashes: [],
-				stepNotes,
-				at: "starting",
-			},
-			themes,
-		),
-	);
-	return { shots, views, stepNotes: [...stepNotes] };
+				stepNotes: new Set(),
+				where: STARTING,
+			};
+			current = run;
+			await shootNamingWhere(run, themes, limit.signal);
+			return { shots: run.shots, views: run.views, stepNotes: [...run.stepNotes] };
+		}, limit.signal);
+	} finally {
+		clearTimeout(timer);
+	}
 }

@@ -75,16 +75,16 @@ interface Owner {
  * once without it. The tradeoff is acceptable because Chrome only ever opens a local page: the
  * one being checked, or a build script's own.
  */
-async function launch(profile: string, owner: Owner): Promise<Cdp> {
+async function launch(profile: string, owner: Owner, limit?: AbortSignal): Promise<Cdp> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
 		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
 	}
 	try {
-		return await start(bin, profile, owner, []);
+		return await start(bin, profile, owner, [], limit);
 	} catch (error) {
 		if (error instanceof SandboxUnavailable) {
-			return await start(bin, profile, owner, ["--no-sandbox"]);
+			return await start(bin, profile, owner, ["--no-sandbox"], limit);
 		}
 		throw error;
 	}
@@ -101,12 +101,20 @@ const lastLine = (log: string) =>
 /**
  * Spawns Chrome and attaches to a new page over the debugging pipe. The pipe is also why Chrome cannot outlive this process:
  * when it ends, however it ends (a test runner's or an agent's SIGKILL included), the pipe closes and Chrome exits, where a
- * Chrome driven over a port kept running and spun a CPU core. The process is `owner`'s from the moment it is spawned.
+ * Chrome driven over a port kept running and spun a CPU core. The process is `owner`'s from the moment it is spawned. Once
+ * `limit` aborts, the start fails with its reason, and so does every later call of the returned client.
  */
-async function start(bin: string, profile: string, owner: Owner, extra: string[]): Promise<Cdp> {
+async function start(
+	bin: string,
+	profile: string,
+	owner: Owner,
+	extra: string[],
+	limit: AbortSignal | undefined,
+): Promise<Cdp> {
 	if (owner.closing) {
 		throw new ChromeError("Chrome was not started: check is stopping");
 	}
+	limit?.throwIfAborted();
 	const proc = spawn(
 		bin,
 		[...FLAGS, `--user-data-dir=${profile}`, ...extra, "about:blank"],
@@ -147,7 +155,7 @@ async function start(bin: string, profile: string, owner: Owner, extra: string[]
 			throw exitError();
 		}
 	});
-	const cdp = new Cdp(proc.stdio[4] as Readable, proc.stdio[3] as Writable);
+	const cdp = new Cdp(proc.stdio[4] as Readable, proc.stdio[3] as Writable, limit);
 	try {
 		await within(
 			Promise.race([cdp.attachPage(), exitedEarly]),
@@ -156,6 +164,10 @@ async function start(bin: string, profile: string, owner: Owner, extra: string[]
 		);
 		return cdp;
 	} catch (error) {
+		if (limit?.aborted) {
+			await stop();
+			throw error;
+		}
 		// The closed pipe can be reported before the exit: an exit Chrome chose (nothing has called `stop` yet) explains the
 		// failure better, and decides the sandbox retry.
 		const chose = await within(exited, EXIT_NOTICE_MS, "").then(
@@ -195,9 +207,10 @@ function hookSignals() {
 /**
  * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its profile deleted once Chrome has exited
  * (a profile deleted while Chrome shuts down is written again), also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's
- * start-up included. withPage and a signal share one cleanup, which runs once.
+ * start-up included. withPage and a signal share one cleanup, which runs once. Once `limit` aborts, Chrome's start-up or the
+ * page's next or pending call fails with its reason (a ChromeError), and the cleanup runs within Chrome's exit grace.
  */
-export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
+export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSignal): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
 	const owner: Owner = { closing: false };
 	let cleaning: Promise<void> | undefined;
@@ -212,7 +225,7 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	running.add(cleanup);
 	hookSignals();
 	try {
-		const cdp = await launch(profile, owner);
+		const cdp = await launch(profile, owner, limit);
 		try {
 			await cdp.send("Inspector.enable");
 			return await fn(cdp);

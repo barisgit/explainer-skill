@@ -73,8 +73,8 @@ export function within<T>(work: Promise<T>, ms: number, message: string): Promis
  * Minimal Chrome DevTools Protocol client over Chrome's debugging pipe (`--remote-debugging-pipe`: JSON messages ended by a NUL
  * byte, written to Chrome's fd 3 and read from its fd 4): request/response plus event subscription. It starts on the browser
  * target, and `attachPage` then points every call and event at one page. Every call and awaited event has a deadline, and once
- * the connection is lost (Chrome exited, the page crashed or closed, or `abort` was called) every pending and later call fails
- * with that reason instead of waiting forever.
+ * the connection is lost (Chrome exited, the page crashed or closed, `abort` was called or the caller's limit passed) every
+ * pending and later call fails with that reason instead of waiting forever.
  */
 export class Cdp {
 	private id = 0;
@@ -86,8 +86,19 @@ export class Cdp {
 	/** The page's session once attachPage has run; until then calls go to the browser. */
 	private sessionId: string | undefined;
 	private readonly output: Writable;
-	constructor(input: Readable, output: Writable) {
+	/** `limit`, when given, aborts the client (see `abort`) with its reason, which must then be a ChromeError. */
+	constructor(input: Readable, output: Writable, limit?: AbortSignal) {
 		this.output = output;
+		const stop = () =>
+			this.abort(
+				limit?.reason instanceof ChromeError
+					? limit.reason
+					: new ChromeError(String(limit?.reason)),
+			);
+		if (limit?.aborted) {
+			stop();
+		}
+		limit?.addEventListener("abort", stop, { once: true });
 		const closed = () => this.abort(new ChromeError(CONNECTION_CLOSED));
 		output.on("error", closed);
 		input.on("error", closed).on("close", closed);
