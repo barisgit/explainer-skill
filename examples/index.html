@@ -394,6 +394,41 @@ h3,
 .chart.tall {
 	block-size: clamp(22rem, 60vw, 34rem);
 }
+/* A Chart or Plot as pack drew it (.chart-drawn), there before the kit script draws it at the element's size: copies drawn for
+   a desktop column, half of one and a phone (svg[data-fit]), scaled to the element, the one nearest its width shown. */
+.chart:has(> .chart-drawn) {
+	position: relative;
+}
+.chart-drawn {
+	position: absolute;
+	inset: 0;
+	container-type: size;
+}
+.chart-drawn > svg {
+	position: absolute;
+	inset: 0;
+	inline-size: 100%;
+	block-size: 100%;
+	display: none;
+}
+.chart-drawn text {
+	font-family: var(--font);
+}
+@container (width >= 46rem) {
+	.chart-drawn > svg:not([data-fit]) {
+		display: block;
+	}
+}
+@container (27.5rem <= width < 46rem) {
+	.chart-drawn > svg[data-fit="half"] {
+		display: block;
+	}
+}
+@container (width < 27.5rem) {
+	.chart-drawn > svg[data-fit="phone"] {
+		display: block;
+	}
+}
 
 /* Plots (kit:plot.js) on the same .chart element: a legend row above an SVG that fills the rest, drawn at pixel size so text stays 13 px. */
 .plot {
