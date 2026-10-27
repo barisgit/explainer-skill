@@ -130,12 +130,18 @@ function* viewsIn(node: Nodes): Generator<MdxJsxFlowElement> {
 	}
 }
 
-/** The value of a JSX element's attribute when it is written as a plain string, as `id="usage"`. */
+/** A string written as a JavaScript literal without escapes or `${}`: `"usage"`, `'usage'` or `usage` in backquotes. */
+const STRING_LITERAL = /^\s*(?:"([^"\\]*)"|'([^'\\]*)'|`([^`\\$]*)`)\s*$/;
+
+/** The value of a JSX element's attribute when it is a constant string: `id="usage"` or `id={"usage"}`. */
 const stringAttribute = (node: MdxJsxFlowElement, name: string): string | undefined => {
 	const found = node.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
-	return found?.type === "mdxJsxAttribute" && typeof found.value === "string"
-		? found.value
-		: undefined;
+	const value = found?.type === "mdxJsxAttribute" ? found.value : undefined;
+	if (typeof value === "string" || value === undefined || value === null) {
+		return value ?? undefined;
+	}
+	const [, ...quoted] = STRING_LITERAL.exec(value.value) ?? [];
+	return quoted.find((text) => text !== undefined);
 };
 
 /**

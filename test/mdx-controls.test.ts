@@ -251,9 +251,9 @@ describe("the line of chosen values", () => {
 
 # State
 
-<Controls id="set" controls={[{ id: "on", label: "Cached", toggle: true }, { id: "n", label: "Days", range: [1, 3, 1] }]} />
+<Controls id={'set'} controls={[{ id: "on", label: "Cached", toggle: true }, { id: "n", label: "Days", range: [1, 3, 1] }]} />
 
-<Explore id="near" use="set" frame={(on, n) => ({ readout: on + " " + n })} />
+<Explore id="near" use={"set"} frame={(on, n) => ({ readout: on + " " + n })} />
 
 Between the controls and the next figure.
 
