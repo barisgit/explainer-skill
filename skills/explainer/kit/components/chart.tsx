@@ -14,7 +14,8 @@
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
    pack draws the chart into the page as SVG, shown until ECharts draws it, with scripts off and in print. The option's functions
-   run in pack too: a chart whose functions fail there (reading the page, say) is left to ECharts, as is what setup changes.
+   run in pack too: a chart whose functions fail there (reading the page, say) is left to ECharts, as is one whose height or
+   colours pack cannot tell exactly, and what setup changes.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
    scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
