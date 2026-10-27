@@ -1,0 +1,38 @@
+# Schematics from a netlist placed relative to pins
+
+The netlist again, each part placed by one of its pins relative to a pin already placed (`b@U1.OUTPUT 4,0`: Q1's base 4 steps right of U1's OUTPUT); the router draws every wire. The <span data-ref="R_SC">sense resistor</span> and the <span data-ref="R3">R3</span>/<span data-ref="R4">R4</span> divider set the fold-back knee.
+
+## µA723 with fold-back current limiting
+
+```schematic
+netlist µA723 regulator with fold-back current limiting
+U1 ic µA723 @0,0 top V_{CC+}=vi V_C=vi left REF=ref IN+=inp right OUTPUT=drv V_Z "CURR LIM"=cl "CURR SENS"=vo IN−=vo bottom V_{CC−}=0 "FREQ COMP"=comp
+VI port vi V_I @U1.VCC+ -6,-5
+Q1 vi drv e 2N3055 b@U1.OUTPUT 4,0
+R_SC e vo a@Q1.e 2,2
+R3 e cl a@Q1.e 0,4 v
+R4 cl 0 a@R3.b 0,2 v
+R1 ref inp a@U1.REF -4,2 v
+R2 inp 0 a@R1.b v
+C1 comp 0 1000 pF a@U1.FREQCOMP 0,3 v
+VO port vo V_O @R_SC.b 6,0
+```
+
+## Common-emitter amplifier
+
+The <span data-ref="Q1">transistor</span> amplifies; <span data-ref="R_E">R_E</span> sets its bias current.
+
+```schematic
+netlist Common-emitter amplifier
+Q1 c b e BC547 @0,0
+R_C vcc c 4.7k b@Q1.c 0,-1 v
+R1 vcc b 47k a@R_C.a -8,0 v
+R2 b 0 10k a@R1.b 0,6 v
+C1 in b 10 µF b@Q1.b -8,0
+VIN port in v_in @C1.a -4,0
+VCC port vcc V_CC @R1.a -12,-2
+R_E e 0 1k a@Q1.e 0,3 v
+C_E e 0 100 µF a@R_E.a 6,0 v
+C2 c out 10 µF a@Q1.c 4,0
+VOUT port out v_out @C2.b 4,0
+```

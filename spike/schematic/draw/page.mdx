@@ -1,0 +1,73 @@
+# Schematics drawn element by element
+
+Schemdraw's way: each element starts where the last ended unless `at` moves it, and runs in a direction for a length or to an anchor. The <span data-ref="R_SC">sense resistor</span> and the <span data-ref="R3">R3</span>/<span data-ref="R4">R4</span> divider set the fold-back knee.
+
+## µA723 with fold-back current limiting
+
+```schematic
+draw µA723 regulator with fold-back current limiting
+U1: ic µA723 top V_{CC+} V_C left REF IN+ right OUTPUT V_Z "CURR LIM" "CURR SENS" IN− bottom V_{CC−} "FREQ COMP"
+vcc: line up 3 at U1.VCC+
+line up toy vcc at U1.VC
+line right 4 at U1.OUTPUT
+Q1: npn anchor b value 2N3055
+line up toy vcc at Q1.c
+line left tox vcc
+line left 3
+VI: port label V_I
+R_SC: resistor right at Q1.e
+vo: line right 3
+VO: port label V_O
+R3: resistor down at Q1.e
+R4: resistor down
+line down 2
+ground
+line right 2 at U1.CURRLIM
+line down toy R3.end
+line right tox R3.end
+cs: line right 1 at U1.CURRSENS
+line down 5
+line right tox vo.start
+line up to vo.start
+line right tox cs at U1.IN-
+line left 4 at U1.REF
+R1: resistor down
+line left 2 at U1.IN+
+line down toy R1.end
+line left tox R1.end
+R2: resistor down at R1.end
+ground
+ground at U1.VCC-
+C1: capacitor down at U1.FREQCOMP value "1000 pF"
+ground
+```
+
+## Common-emitter amplifier
+
+The <span data-ref="Q1">transistor</span> amplifies; <span data-ref="R_E">R_E</span> sets its bias current.
+
+```schematic
+draw Common-emitter amplifier
+Q1: npn anchor b value BC547
+R_C: resistor up at Q1.c value 4.7k
+vcc: line left 8
+R1: resistor down at vcc value 47k
+bn: line down toy Q1.b
+line right to Q1.b at bn
+R2: resistor down at bn value 10k
+ground
+C1: capacitor left at bn value "10 µF"
+line left 2
+VIN: port label v_in
+line left 4 at vcc
+VCC: port label V_CC
+R_E: resistor down at Q1.e value 1k
+ground
+line right 6 at Q1.e
+C_E: capacitor down value "100 µF"
+ground
+line right 4 at Q1.c
+C2: capacitor right value "10 µF"
+line right 2
+VOUT: port label v_out
+```

@@ -1,0 +1,38 @@
+# Schematics from a netlist, placed by ELK
+
+The parts and their connections only, in SPICE order; ELK places and wires them. The <span data-ref="R_SC">sense resistor</span> and the <span data-ref="R3">R3</span>/<span data-ref="R4">R4</span> divider set the fold-back knee.
+
+## µA723 with fold-back current limiting
+
+```schematic
+netlist µA723 regulator with fold-back current limiting
+VI port vi V_I
+U1 ic µA723 top V_{CC+}=vi V_C=vi left REF=ref IN+=inp right OUTPUT=drv V_Z "CURR LIM"=cl "CURR SENS"=vo IN−=vo bottom V_{CC−}=0 "FREQ COMP"=comp
+Q1 vi drv e 2N3055
+R_SC e vo
+R3 e cl
+R4 cl 0
+R1 ref inp
+R2 inp 0
+C1 comp 0 1000 pF
+VO port vo V_O
+```
+
+## Common-emitter amplifier
+
+The <span data-ref="Q1">transistor</span> amplifies; <span data-ref="R_E">R_E</span> sets its bias current.
+
+```schematic
+netlist Common-emitter amplifier
+VCC port vcc V_CC
+VIN port in v_in
+C1 in b 10 µF
+R1 vcc b 47k
+R2 b 0 10k
+Q1 c b e BC547
+R_C vcc c 4.7k
+R_E e 0 1k
+C_E e 0 100 µF
+C2 c out 10 µF
+VOUT port out v_out
+```
