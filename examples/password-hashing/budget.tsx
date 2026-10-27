@@ -263,6 +263,7 @@ export function Budget() {
 			<p class="verdict-note">{result.why}</p>
 			<Chart
 				id="budget-chart"
+				height="clamp(22rem, 52vw, 27rem)"
 				label="Memory needed by each OWASP Argon2id and scrypt setting, against the memory available per login"
 				option={option}
 				setup={openView}

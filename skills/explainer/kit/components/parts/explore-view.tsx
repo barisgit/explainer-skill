@@ -42,6 +42,7 @@ export type ExploreData = {
 	start: number[];
 	label: string;
 	class?: string;
+	height?: string;
 	id?: string;
 } & ({ first: Json; patches: Json[]; at: number[] } | { frame: FrameFunction; base: ExploreFrame });
 

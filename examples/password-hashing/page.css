@@ -2,12 +2,6 @@
 :root {
 	--accent: light-dark(#0f6b5c, #5fd3bd);
 }
-#budget-chart {
-	block-size: clamp(22rem, 52vw, 27rem);
-}
-.settings-chart {
-	block-size: clamp(14rem, 36vw, 18rem);
-}
 .presets {
 	margin: 0;
 	display: flex;

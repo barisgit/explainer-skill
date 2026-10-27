@@ -315,7 +315,7 @@ export function CoalRanking({ children }: { children?: ComponentChildren }) {
 				</dl>
 				<Chart
 					id="rank"
-					class="moves"
+					height="clamp(20rem, 52vw, 28rem)"
 					label="Countries ranked by change in coal use over the chosen period"
 					option={view.option}
 					setup={openPlace}

@@ -2,14 +2,6 @@
 :root {
 	--accent: light-dark(#1f5fbf, #7fb0ff);
 }
-.chart.hero {
-	block-size: clamp(20rem, 40vw, 26rem);
-}
-#gibbs-chart,
-#peak-chart,
-#sym-chart {
-	block-size: clamp(16rem, 34vw, 21rem);
-}
 
 /* The coefficients figure: the switch shows one wave's derivation and plot; print shows both. A derivation's lines align left. */
 @media screen {

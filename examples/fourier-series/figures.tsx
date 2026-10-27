@@ -268,6 +268,7 @@ export function Gibbs({ children }: { children?: ComponentChildren }) {
 				</dl>
 				<Chart
 					id="gibbs-chart"
+					height="clamp(16rem, 34vw, 21rem)"
 					label="Partial sum of the square wave near its jump at zero, with the target and the limit of the peak"
 					option={near}
 				/>
@@ -291,6 +292,7 @@ export function Gibbs({ children }: { children?: ComponentChildren }) {
 				<figure class="fig">
 					<Chart
 						id="peak-chart"
+						height="clamp(16rem, 34vw, 21rem)"
 						label="Highest point of the square-wave partial sum against the number of terms, levelling off at 1.179"
 						option={peaks}
 					/>
@@ -414,6 +416,7 @@ export function Symmetry({ children }: { children?: ComponentChildren }) {
 				</dl>
 				<Chart
 					id="sym-chart"
+					height="clamp(16rem, 34vw, 21rem)"
 					label="The chosen signal on one period, with its even part and odd part"
 					option={s.chart}
 				/>

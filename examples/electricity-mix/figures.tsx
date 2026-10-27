@@ -145,7 +145,7 @@ export function MixFigure(props: {
 					onPick={setMode}
 				/>
 			</div>
-			<Chart id={props.id} class="mix" label={props.label} option={option} />
+			<Chart id={props.id} height="clamp(22rem, 40vw, 24rem)" label={props.label} option={option} />
 			<figcaption>{props.caption}</figcaption>
 		</figure>
 	);
@@ -492,7 +492,7 @@ export function ChangeExplorer({ children }: { children?: ComponentChildren }) {
 				</dl>
 				<Chart
 					id="moves"
-					class="moves"
+					height="clamp(20rem, 52vw, 28rem)"
 					label="Change in electricity generation by source for the chosen place"
 					option={view.option}
 				/>

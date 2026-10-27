@@ -16,8 +16,10 @@
        legend false hides the legend (by default it shows when two or more series have a name)
      label   the accessible name (role="img")
      class   more classes after "chart plot", e.g. "tall"
+     height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them. Size a plot with this, not with CSS on .chart
    The plot fills the element at its pixel size and redraws on resize, so text stays 13 px from phone to desktop; light and dark switch
-   with no redraw. pack draws it into the page first, so it shows with scripts off and in print, where it can tell its height. A new
+   with no redraw. pack draws it into the page first, so it shows with scripts off and in print, unless a page rule sizes its element or its
+   legend wraps into rows pack cannot count. A new
    option redraws at once: series is replaced whole, other keys merge into the plot (x and y one level deeper).
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
@@ -26,13 +28,14 @@
    component or exported by a "use client" module: format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
-import { drawnInside, placeOf } from "./parts/drawn.ts";
+import { drawnInside, heightStyle, placeOf } from "./parts/drawn.ts";
 
 export interface PlotProps {
 	option: PlotOption;
 	label: string;
 	class?: string;
 	id?: string;
+	height?: string;
 }
 
 /**
@@ -40,7 +43,7 @@ export interface PlotProps {
  * its size; a changed `option` is applied with set(), and unmounting stops its resize observer. plot.js replaces the element's
  * children, so in the browser the element renders none of its own.
  */
-export function Plot({ option, label, class: extra, id }: PlotProps) {
+export function Plot({ option, label, class: extra, id, height }: PlotProps) {
 	const element = useRef<HTMLDivElement>(null);
 	// This component's name shadows the kit's global Plot here, so the global is reached through window.
 	const handle = useRef<ReturnType<typeof window.Plot.make> | null>(null);
@@ -65,9 +68,10 @@ export function Plot({ option, label, class: extra, id }: PlotProps) {
 			ref={element}
 			class={classes}
 			id={id}
+			style={heightStyle(height)}
 			role="img"
 			aria-label={label}
-			{...drawnInside((drawer) => drawer.plot(option, placeOf(classes, id)))}
+			{...drawnInside((drawer) => drawer.plot(option, placeOf(classes, id, height)))}
 		/>
 	);
 }

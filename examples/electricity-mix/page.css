@@ -11,12 +11,6 @@
 	--s-bio: light-dark(#6b9a2e, #9bcf5a);
 	--s-other: light-dark(#cc79a7, #e08fc0);
 }
-.chart.mix {
-	block-size: clamp(22rem, 40vw, 24rem);
-}
-.chart.moves {
-	block-size: clamp(20rem, 52vw, 28rem);
-}
 .presets {
 	margin: 0;
 }

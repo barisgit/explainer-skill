@@ -188,7 +188,7 @@ Winner of the 2015 Password Hashing Competition. The Argon2id variant balances r
 <AlgoStats algo="argon2id" />
 
 <figure class="fig">
-<Chart class="settings-chart" label="OWASP's Argon2id settings: memory against passes" option={settingsChart("argon2id")} />
+<Chart height="clamp(14rem, 36vw, 18rem)" label="OWASP's Argon2id settings: memory against passes" option={settingsChart("argon2id")} />
 <figcaption>Vertical axis: passes (t). Horizontal axis: nominal memory in MiB. OWASP's settings trade memory against passes.</figcaption>
 </figure>
 
@@ -216,7 +216,7 @@ A password-based key derivation function by Colin Percival. OWASP calls Argon2id
 <AlgoStats algo="scrypt" />
 
 <figure class="fig">
-<Chart class="settings-chart" label="OWASP's scrypt settings: memory against parallelism" option={settingsChart("scrypt")} />
+<Chart height="clamp(14rem, 36vw, 18rem)" label="OWASP's scrypt settings: memory against parallelism" option={settingsChart("scrypt")} />
 <figcaption>Vertical axis: parallelism (p). Horizontal axis: nominal memory in MiB. OWASP's settings trade memory against parallelism.</figcaption>
 </figure>
 
@@ -262,7 +262,7 @@ Permitted by NIST SP 800-63B-4 and with FIPS-140 validated implementations, so O
 <AlgoStats algo="pbkdf2" />
 
 <figure class="fig">
-<Chart class="settings-chart" label="Iterations OWASP gives PBKDF2 for each inner hash" option={iterationsChart()} />
+<Chart height="clamp(14rem, 36vw, 18rem)" label="Iterations OWASP gives PBKDF2 for each inner hash" option={iterationsChart()} />
 <figcaption>Iterations OWASP gives for each inner hash. Grey is legacy only.</figcaption>
 </figure>
 

@@ -4,10 +4,11 @@
  * module it renders one page with; in the browser there is none, and the kit scripts draw over what pack drew.
  */
 
-/** The figure's element, by what a page's CSS can size it by: its classes and id. */
+/** The figure's element, by what sizes it: its classes, its id (which a page's CSS may name) and its `height` prop. */
 export interface Place {
 	classes: readonly string[];
 	id: string | undefined;
+	height: string | undefined;
 }
 
 /** Draws a figure as markup for the inside of its element, sized for `place` as the theme and the page's CSS size it. */
@@ -33,8 +34,17 @@ export function drawnInside(draw: (drawer: Drawer) => string): {
 	return { dangerouslySetInnerHTML: { __html: drawer ? draw(drawer) : "" } };
 }
 
-/** The place of a figure whose element has the classes `classes` (one string, as in class="...") and `id`. */
-export const placeOf = (classes: string, id: string | undefined): Place => ({
+/** The place of a figure whose element has the classes `classes` (one string, as in class="..."), `id` and `height`. */
+export const placeOf = (
+	classes: string,
+	id: string | undefined,
+	height: string | undefined,
+): Place => ({
 	classes: classes.split(/\s+/).filter(Boolean),
 	id,
+	height,
 });
+
+/** The style attribute that gives an element the `height` prop as its block size. */
+export const heightStyle = (height: string | undefined) =>
+	height ? `block-size:${height}` : undefined;

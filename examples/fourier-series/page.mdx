@@ -11,7 +11,7 @@ import "./page.css";
 Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕, … (scaled by 4/π for a wave of height ±1), add up to a square wave. Drag the slider to add terms, switch to the sawtooth, and tick the box to see each sine.
 
 <Explore
-	class="hero"
+	height="clamp(20rem, 40vw, 26rem)"
 	label="A square wave or sawtooth and the sum of its first sines, over two periods"
 	controls={[
 		{ id: "wave", label: "Signal to build", choice: { square: "Square wave", saw: "Sawtooth" } },

@@ -5,30 +5,35 @@
              series follow its list, other components merge into what the chart shows.
      label   the accessible name (role="img")
      class   more classes after "chart", e.g. "tall"
+     height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them, e.g. "clamp(16rem, 34vw, 21rem)". Size a
+             chart with this, not with CSS on .chart, which pack cannot draw.
      setup   (chart) => void, run after every (re)mount: chart.on("click", ...).
    Colours: write "var(--accent)" or "color-mix(in srgb, var(--accent) 20%, transparent)" in any colour option (color, borderColor,
-     fill, colorStops[].color, ...); they are resolved when the chart mounts, so they follow light/dark.
+     fill, colorStops[].color, ...); they are resolved when the chart mounts, so they follow light/dark. A bare token is an opaque
+     colour: keep palette tokens opaque, as pack mixes them (a visualMap range) like color-mix() does.
    Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
      { currency: "EUR", compact: true } (written for the page's lang), or one text per data item or tick: ["Low", "", "Peak"].
    Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
    pack draws the chart into the page as SVG, shown until ECharts draws it, with scripts off and in print. The option's functions
-   run in pack too: a chart whose functions fail there (reading the page, say) is left to ECharts, as is one whose height or
-   colours pack cannot tell exactly, and what setup changes.
+   run in pack too. ECharts alone draws a chart whose functions fail there (reading the page, say), whose colours are
+   functions or transformed (colorAlpha, colorLightness, a visualMap's opacity), whose element a page rule sizes (height,
+   padding, border on it) or whose height is not a plain length; so does what setup changes.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
    scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
    or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
-import { drawnInside, placeOf } from "./parts/drawn.ts";
+import { drawnInside, heightStyle, placeOf } from "./parts/drawn.ts";
 
 export interface ChartProps {
 	option: ChartOption;
 	label: string;
 	class?: string;
 	id?: string;
+	height?: string;
 	setup?: (chart: ECharts) => void;
 }
 
@@ -55,7 +60,7 @@ function copy(value: unknown): unknown {
  * Renders `<div class="chart" role="img">` holding the chart as pack drew it, and makes the live chart on it in the browser,
  * which takes the drawn one's place; a changed `option` is applied with set(), and unmounting disposes the chart.
  */
-export function Chart({ option, label, class: extra, id, setup }: ChartProps) {
+export function Chart({ option, label, class: extra, id, height, setup }: ChartProps) {
 	const element = useRef<HTMLDivElement>(null);
 	const handle = useRef<ChartHandle | null>(null);
 	// The latest setup runs on every remount, without re-applying the option when an inline setup changes identity.
@@ -84,9 +89,10 @@ export function Chart({ option, label, class: extra, id, setup }: ChartProps) {
 			ref={element}
 			class={classes}
 			id={id}
+			style={heightStyle(height)}
 			role="img"
 			aria-label={label}
-			{...drawnInside((drawer) => drawer.chart(copy(option), placeOf(classes, id)))}
+			{...drawnInside((drawer) => drawer.chart(copy(option), placeOf(classes, id, height)))}
 		/>
 	);
 }

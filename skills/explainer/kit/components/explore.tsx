@@ -13,11 +13,12 @@
      base      what every frame shares (axes, colours, the caption); a frame's keys merge over it
      label     the figure's accessible name
      class     more classes on the plot or chart, e.g. "tall"
+     height    the plot or chart's height, as in kit Chart: "clamp(16rem, 34vw, 21rem)"
    Where frame runs: exported from a module whose first line is "use client", it ships and runs in the browser on each change
    (base is then JSON); use that for sliders over model curves. Otherwise pack calls it for every combination and the page
    carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
    Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page, and the
-   starting frame is in the page as SVG, as a Plot's or Chart's is. */
+   starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart). */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
@@ -53,6 +54,7 @@ export interface ExploreProps {
 	base?: ExploreFrame;
 	label?: string;
 	class?: string;
+	height?: string;
 	id?: string;
 }
 
@@ -284,12 +286,24 @@ function precomputed(frames: [string, ExploreFrame][], kind: "plot" | "chart" | 
 	return carried;
 }
 
+/** The entries of `props` that have a value. */
+const present = (props: Record<string, string | undefined>) =>
+	Object.fromEntries(Object.entries(props).filter(([, value]) => value));
+
 /**
  * Calls frame for every combination of the controls' values (in the browser, only for the starting ones), checks the results,
  * and renders the island for the figure they draw: with the frame function when a client module exports it, else with the
  * frames precomputed. Inside your own client component frame always runs in the browser.
  */
-export function Explore({ controls, frame, base = {}, label, class: extra, id }: ExploreProps) {
+export function Explore({
+	controls,
+	frame,
+	base = {},
+	label,
+	class: extra,
+	height,
+	id,
+}: ExploreProps) {
 	if (!controls.length || typeof frame !== "function") {
 		fail("needs controls (a range, a choice or a toggle) and frame, a function of their values");
 	}
@@ -320,8 +334,7 @@ export function Explore({ controls, frame, base = {}, label, class: extra, id }:
 		controls: shown,
 		start,
 		label: label ?? "",
-		...(extra ? { class: extra } : {}),
-		...(id ? { id } : {}),
+		...present({ class: extra, height, id }),
 		...(live ? { frame: fn, base } : precomputed(merged, kind)),
 	};
 	const Island = kind === "plot" ? ExplorePlot : kind === "chart" ? ExploreChart : ExploreText;

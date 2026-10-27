@@ -12,6 +12,7 @@ export function Explore(data: ExploreData) {
 					option={option as PlotOption}
 					label={data.label}
 					{...(data.class ? { class: data.class } : {})}
+					{...(data.height ? { height: data.height } : {})}
 				/>
 			)}
 		/>
