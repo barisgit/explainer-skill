@@ -2910,7 +2910,8 @@ li a {
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept. With reply (kit reply) the reader's notes are kept too, and its Clear button puts every control back to its
-   default, again with events; a self-check's choice is kept but alone brings no Clear button. */
+   default, again with events; a self-check's answer (a kit Question's choice, or its written answer beside a model one) is kept but
+   alone brings no Clear button. */
 (() => {
   const selector = "input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
   const clean = (s) => s.replace(/\s+/g, " ").trim();
