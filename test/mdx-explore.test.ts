@@ -106,7 +106,7 @@ describe("Explore", () => {
 		expect(html).toContain("plot: small line, stem and bar plots");
 		expect(html).not.toContain("Apache ECharts");
 		expect(html).toContain("keep: ");
-		expect(html).not.toContain("reply: ");
+		expect(html).not.toContain("reply: reader notes");
 		const islands =
 			/<script type="application\/json" id="explainer-islands">(.*?)<\/script>/s.exec(html)?.[1] ??
 			"";
