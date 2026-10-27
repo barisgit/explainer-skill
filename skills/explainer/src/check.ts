@@ -454,9 +454,10 @@ async function shootWithin(run: Run, themes: readonly string[]) {
  * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
  * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
- * Reports console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had still not drawn at
- * the settle deadline (problems), and warnings
- * (console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a missing viewport meta, tall diagrams and charts, steppers that change only their captions). Reduced motion is emulated so animations are finished in the shots.
+ * Reports as problems console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had
+ * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
+ * missing viewport meta, tall diagrams and charts, and steppers that change only their captions. Reduced motion is emulated so animations are
+ * finished in the shots.
  * A ChromeError ends the run with no result: Chrome failed to start or stalled, or the run passed `opts.timeoutSeconds`.
  */
 export async function check(

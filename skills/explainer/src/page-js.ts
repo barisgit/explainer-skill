@@ -94,6 +94,7 @@ export const SETTLE_JS = `(() => {
 		await frames();
 		waiting = "the page's fonts";
 		await document.fonts.ready;
+		// "": the deadline names the charts still undrawn.
 		waiting = "";
 		while (undrawn().length) await frame();
 		waiting = "an animation frame";
