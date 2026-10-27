@@ -58,10 +58,13 @@ const FLAGS = [
 /** Chrome cannot create its sandbox on this host; `launch` retries without it. */
 class SandboxUnavailable extends ChromeError {}
 
-/** A running Chrome: the client attached to its page, and `stop`, which resolves once the process has exited. */
-interface Chrome {
-	cdp: Cdp;
-	stop: () => Promise<void>;
+/**
+ * What withPage owns of its Chrome: `stop` of the process spawned last, set as soon as it exists and resolving once it has exited,
+ * and `closing`, set when cleanup begins, after which no Chrome may be spawned for the profile.
+ */
+interface Owner {
+	stop?: () => Promise<void>;
+	closing: boolean;
 }
 
 /**
@@ -72,16 +75,16 @@ interface Chrome {
  * once without it. The tradeoff is acceptable because Chrome only ever opens a local page: the
  * one being checked, or a build script's own.
  */
-async function launch(profile: string): Promise<Chrome> {
+async function launch(profile: string, owner: Owner): Promise<Cdp> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
 		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
 	}
 	try {
-		return await start(bin, profile, []);
+		return await start(bin, profile, owner, []);
 	} catch (error) {
 		if (error instanceof SandboxUnavailable) {
-			return await start(bin, profile, ["--no-sandbox"]);
+			return await start(bin, profile, owner, ["--no-sandbox"]);
 		}
 		throw error;
 	}
@@ -98,9 +101,12 @@ const lastLine = (log: string) =>
 /**
  * Spawns Chrome and attaches to a new page over the debugging pipe. The pipe is also why Chrome cannot outlive this process:
  * when it ends, however it ends (a test runner's or an agent's SIGKILL included), the pipe closes and Chrome exits, where a
- * Chrome driven over a port kept running and spun a CPU core.
+ * Chrome driven over a port kept running and spun a CPU core. The process is `owner`'s from the moment it is spawned.
  */
-async function start(bin: string, profile: string, extra: string[]): Promise<Chrome> {
+async function start(bin: string, profile: string, owner: Owner, extra: string[]): Promise<Cdp> {
+	if (owner.closing) {
+		throw new ChromeError("Chrome was not started: check is stopping");
+	}
 	const proc = spawn(
 		bin,
 		[...FLAGS, `--user-data-dir=${profile}`, ...extra, "about:blank"],
@@ -127,6 +133,7 @@ async function start(bin: string, profile: string, extra: string[]): Promise<Chr
 			return exited;
 		});
 	};
+	owner.stop = stop;
 	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes the sandbox line out of
 	// the tail.
 	const exitError = () =>
@@ -147,7 +154,7 @@ async function start(bin: string, profile: string, extra: string[]): Promise<Chr
 			START_DEADLINE_MS,
 			`Chrome did not start in ${seconds(START_DEADLINE_MS)}`,
 		);
-		return { cdp, stop };
+		return cdp;
 	} catch (error) {
 		// The closed pipe can be reported before the exit: an exit Chrome chose (nothing has called `stop` yet) explains the
 		// failure better, and decides the sandbox retry.
@@ -160,7 +167,10 @@ async function start(bin: string, profile: string, extra: string[]): Promise<Chr
 	}
 }
 
-/** The cleanups of the Chromes running now, so a signal that ends the process removes them and their profiles too. */
+/**
+ * The cleanups of the Chromes withPage owns now, so a signal that ends the process removes them and their profiles too. A cleanup
+ * stays here until it has finished, so a signal during withPage's own cleanup still waits for it.
+ */
 const running = new Set<() => Promise<void>>();
 
 /** Stops every running Chrome and deletes its profile, then exits as the signal would have. */
@@ -184,20 +194,25 @@ function hookSignals() {
 
 /**
  * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its profile deleted once Chrome has exited
- * (a profile deleted while Chrome shuts down is written again), also when SIGINT, SIGTERM or SIGHUP ends the process.
+ * (a profile deleted while Chrome shuts down is written again), also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's
+ * start-up included. withPage and a signal share one cleanup, which runs once.
  */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
-	let chrome: Chrome | undefined;
-	const cleanup = async () => {
-		await chrome?.stop();
-		rmSync(profile, { recursive: true, force: true });
+	const owner: Owner = { closing: false };
+	let cleaning: Promise<void> | undefined;
+	const cleanup = () => {
+		cleaning ??= (async () => {
+			owner.closing = true;
+			await owner.stop?.();
+			rmSync(profile, { recursive: true, force: true });
+		})().finally(() => running.delete(cleanup));
+		return cleaning;
 	};
 	running.add(cleanup);
 	hookSignals();
 	try {
-		chrome = await launch(profile);
-		const { cdp } = chrome;
+		const cdp = await launch(profile, owner);
 		try {
 			await cdp.send("Inspector.enable");
 			return await fn(cdp);
@@ -205,7 +220,6 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
 			cdp.close();
 		}
 	} finally {
-		running.delete(cleanup);
 		await cleanup();
 	}
 }
