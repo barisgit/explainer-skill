@@ -49,17 +49,21 @@ type PlotDrawPart = (env: { lang: () => string }) => PlotDraw;
 
 /**
  * A copy's size and the data-fit theme.css shows it by (none for the desktop copy), in CSS pixels, with the window a height
- * written in vw or vh is worked out at, and the narrowest element width that shows it (theme.css's container queries).
+ * written in vw or vh is worked out at, and the element widths that show it: theme.css's container queries, bounded by the
+ * narrowest and widest an element has (NARROWEST, WIDEST).
  */
 interface Copy {
 	fit: string;
 	width: number;
-	shownFrom: number;
+	shown: readonly [number, number];
 	height: number;
 	tall: number;
 	viewport: Viewport;
 }
 
+/** The narrowest element: a 320 px window less its gutters. The widest: a `.wide` figure (81rem). */
+const NARROWEST = 288;
+const WIDEST = 1296;
 const DESKTOP = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
 
@@ -70,9 +74,9 @@ const PHONE = { width: 390, height: 844 };
  * to the kit script, which draws it as the page loads.
  */
 const COPIES: Copy[] = [
-	{ fit: "", width: 1054, shownFrom: 736, height: 416, tall: 544, viewport: DESKTOP },
-	{ fit: "half", width: 527, shownFrom: 440, height: 416, tall: 544, viewport: DESKTOP },
-	{ fit: "phone", width: 356, shownFrom: 356, height: 288, tall: 352, viewport: PHONE },
+	{ fit: "", width: 1054, shown: [736, WIDEST], height: 416, tall: 544, viewport: DESKTOP },
+	{ fit: "half", width: 527, shown: [440, 736], height: 416, tall: 544, viewport: DESKTOP },
+	{ fit: "phone", width: 356, shown: [NARROWEST, 440], height: 288, tall: 352, viewport: PHONE },
 ];
 /** The opening tag of a copy's svg, sized by its viewBox. */
 const svgTag = (copy: Copy, height: number) =>
@@ -159,14 +163,17 @@ function orNothing<T extends unknown[]>(draw: (...args: T) => string): (...args:
 /** The buttons of a plot's legend as plot.js writes them, each with its swatch's width and its label. */
 function legendItems(legend: string): { swatch: number; label: string }[] {
 	return [...legend.matchAll(/<i class="([^"]*)"[^>]*><\/i>([^<]*)<\/button>/g)].map(
-		([, kind, label]) => ({
+		([, kind, escaped]) => ({
 			swatch: /\b(?:bar|stem)\b/.test(kind as string) ? LEGEND.swatch.box : LEGEND.swatch.line,
-			label: label as string,
+			label: escaped as string,
 		}),
 	);
 }
 
-/** How many rows the legend wraps into in an element `width` wide, when its labels are set at `weight`. */
+/**
+ * How many rows the legend wraps into in an element `width` wide, when its labels are set at `weight`. Never more at a greater
+ * width, so equal rows at both ends of a range of widths are the rows between them.
+ */
 function legendRows(items: ReturnType<typeof legendItems>, width: number, weight: number): number {
 	let rows = 1;
 	let used = 0;
@@ -233,10 +240,10 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			const shown = plots.switchedOn(option.series ?? [], new Set());
 			const width = (s: unknown) => textWidth(String(s), PLOT_FONT, 500);
 			const copies = COPIES.map((copy, i) => {
-				// The legend wraps by the element's width, which a copy is shown over a range of: the area is the same height
-				// only where its rows are, for labels set lighter or heavier than measured.
+				// The legend wraps by the element's width, which a copy is shown over a range of, for labels set lighter or heavier
+				// than measured: the area is the same height only where the rows are the same across all of it.
 				const rows = new Set(
-					[copy.shownFrom, copy.width].flatMap((w) =>
+					copy.shown.flatMap((w) =>
 						[400, 500].map((weight) => (items.length ? legendRows(items, w, weight) : 0)),
 					),
 				);
