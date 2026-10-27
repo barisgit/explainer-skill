@@ -466,20 +466,19 @@ describe("kit scripts", () => {
 		expect(kept).toBe(true);
 	}, 30_000);
 
-	test("a self-check a client component renders later brings keep.js and not reply.js", async () => {
-		dir.write(
-			"check-later.tsx",
-			revealing(
-				"Question",
-				`<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>`,
-			),
-		);
-		const output = await pack(
-			"check-later",
-			'import { Reveal } from "./check-later.tsx";\n\n# Check\n\n<Reveal />\n',
-		);
-		expect(kitScriptsIn(output)).toEqual(["keep"]);
-	});
+	test("a self-check a client component renders later, chosen or written beside a model answer, brings keep.js and not reply.js", async () => {
+		const scripts = async (name: string, jsx: string) => {
+			dir.write(`${name}.tsx`, revealing("Question", jsx));
+			const page = `import { Reveal } from "./${name}.tsx";\n\n# Check\n\n<Reveal />\n`;
+			return kitScriptsIn(await pack(name, page));
+		};
+		const unit = `<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>`;
+		expect(await scripts("check-later", unit)).toEqual(["keep"]);
+		const why = `<Question name="why" legend="Why?"><p>Because.</p></Question>`;
+		expect(await scripts("study-later", why)).toEqual(["keep"]);
+		// With nothing inside, a written Question joins the reply.
+		expect(await scripts("ask-later", `<Question name="why" legend="Why?" />`)).toContain("reply");
+	}, 30_000);
 
 	test("a control a client component renders later brings keep.js when it has an id, however its props are written", async () => {
 		const later = (props: string) => `"use client";

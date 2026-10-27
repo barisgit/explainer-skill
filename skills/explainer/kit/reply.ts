@@ -20,7 +20,7 @@
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }.
    Keeping (kit keep): the reader's answers and notes are kept across reloads. The "Clear answers and notes" button (shown while
-   anything is answered, a note exists, or answers wait for a control not yet shown; a self-check's choice does not count) asks first: one click turns it red ("Clear
+   anything is answered, a note exists, or answers wait for a control not yet shown; a self-check's answer does not count) asks first: one click turns it red ("Clear
    everything?"), a second within 4 s puts every control back to its default, with input and change events, and drops the notes
    and the saved copy. Escape, leaving the button or the wait cancels.
    Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in the

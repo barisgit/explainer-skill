@@ -8,7 +8,8 @@
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept. With reply (kit reply) the reader's notes are kept too, and its Clear button puts every control back to its
-   default, again with events; a self-check's choice is kept but alone brings no Clear button. */
+   default, again with events; a self-check's answer (a kit Question's choice, or its written answer beside a model one) is kept but
+   alone brings no Clear button. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const selector =
@@ -52,10 +53,10 @@
 	interface Saved {
 		value: unknown;
 		sig: string;
-		/** A self-check's choice: kept, but not an answer for the reply, so it alone shows no Clear button. Saved, since the control may not be shown yet. */
+		/** A self-check's answer: kept, but not an answer for the reply, so it alone shows no Clear button. Saved, since the control may not be shown yet. */
 		check?: true;
 	}
-	/** Where a kit Question that is a self-check keeps its options. */
+	/** Where a kit Question that is a self-check keeps its options or its text box. */
 	const SELF_CHECK = "fieldset.self-check";
 	const isRadio = (c: Control): c is HTMLInputElement => c.type === "radio";
 	const isToggle = (c: Control): c is HTMLInputElement => isRadio(c) || c.type === "checkbox";
@@ -313,7 +314,7 @@
 
 	/**
 	 * Brings the saved copy in line with the page and says whether anything for the reply is kept: answers, answers waiting for a
-	 * control that is not shown yet, or notes. A self-check's choice is saved but does not count. Before the restore only the notes
+	 * control that is not shown yet, or notes. A self-check's answer is saved but does not count. Before the restore only the notes
 	 * are known, and nothing is written.
 	 */
 	function update() {

@@ -10,8 +10,9 @@
      checked   the value (or values) chosen to begin with
      answer    the right value: a self-check. Choosing marks the right option and a wrong choice, and opens the explanation
                written inside the Question; it is not part of the reply and brings no Reply button
-   Without options the reader writes the answer in a text box (its id is the name, written as above) that joins the reply; what is written inside
-   the Question is the model answer, behind a fold the reader opens when ready (kitLabels.showAnswer), which Expand all leaves shut.
+   Without options the reader writes the answer in a text box (its id is the name, written as above). What is written inside the Question
+   is the model answer, behind a fold the reader opens when ready (kitLabels.showAnswer), which Expand all leaves shut; such a Question
+   is a self-check too: kept, but not in the reply. With nothing inside, the written answer joins the reply.
    A reply question the reader never touched is sent as "(default)", one with nothing chosen as "no answer".
    For a panel whose controls' current values join the reply, put data-reply on any element around plain controls with ids:
    <div class="controls" data-reply="Requirements"><label class="field"><span>Max latency</span><input id="lat" type="range" /></label></div> */
@@ -90,8 +91,9 @@ function selfCheckProblem(
  * Renders a question in one of three forms. With `options`: `<fieldset data-reply="">` with its legend and a `.seg` of radios,
  * or checkboxes when `multiple`; with `answer` as well, a `<fieldset class="self-check">` whose right option carries
  * `data-right` and whose children follow in a `.explain` that the theme shows once an option is chosen. Without `options`: a
- * `<fieldset class="written" data-reply="">` with a textarea and the children in a `details.answer`, the fold kit views.js's
- * Expand all skips. A repeated value, or props that do not fit the form, throw.
+ * `<fieldset class="written">` with a textarea; with children it is also a self-check (`class="written self-check"`, kept
+ * but out of the reply) and holds them in a `details.answer`, the fold kit views.js's Expand all skips; without, it is
+ * `data-reply`. A repeated value, or props that do not fit the form, throw.
  */
 export function Question(props: QuestionProps) {
 	const { name, options } = props;
@@ -102,14 +104,20 @@ export function Question(props: QuestionProps) {
 	return options === undefined ? <Written {...props} /> : <Choice {...props} options={options} />;
 }
 
-/** A written answer: the legend names the text box (aria-labelledby), since a fieldset's legend names only the group. */
+/**
+ * A written answer: the legend names the text box (aria-labelledby), since a fieldset's legend names only the group. The
+ * children decide its form, as kit-scripts.ts's questionScripts reads them in client code.
+ */
 function Written({ name, legend, children }: QuestionProps) {
 	const id = idPart(name);
+	const selfCheck = children !== undefined;
 	return (
-		<fieldset class="written" data-reply="">
+		<fieldset
+			{...(selfCheck ? { class: "written self-check" } : { class: "written", "data-reply": "" })}
+		>
 			<legend id={`${id}-legend`}>{legend}</legend>
 			<textarea id={id} rows={3} aria-labelledby={`${id}-legend`} />
-			{children !== undefined && (
+			{selfCheck && (
 				<details class="answer">
 					<summary>{kitText("showAnswer")}</summary>
 					{children}

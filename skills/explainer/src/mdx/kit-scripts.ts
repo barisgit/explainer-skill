@@ -3,9 +3,9 @@
  * prerendered HTML holds that markup, or when its client code can write it later: the code is searched for the same markup as
  * it appears in compiled JSX and DOM calls (`"data-reply"`, `dataset.reply`, `Charts.make`). The kit components are markup
  * generators, so their code holds the markers too and needs no list of its own; a new attribute a kit script reads needs a row.
- * Question is the exception: which markup it writes depends on its props (a self-check writes no data-reply), so the client
- * code is scanned with Question left as an import, and its calls decide. Markup a client component builds from computed names
- * (`"data-" + kind`) is not found.
+ * Question is the exception: which markup it writes depends on its props (a self-check, chosen or written, writes no
+ * data-reply), so the client code is scanned with Question left as an import, and its calls decide. Markup a client component
+ * builds from computed names (`"data-" + kind`) is not found.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -186,9 +186,9 @@ export function scriptsInCode(code: string): Set<KitScript> {
 }
 
 /**
- * The kit scripts the Questions in a client scan need. A self-check, called with options and an answer written as a string and
- * no spread, needs keep.js alone; any other use of Question (other props, or the component passed on) needs what Question's own
- * code does.
+ * The kit scripts the Questions in a client scan need. A self-check, called with no spread and either options and an answer
+ * written as a string, or no options and children that are surely there (a string, a list, an element), needs keep.js alone; any
+ * other use of Question (other props, or the component passed on) needs what Question's own code does.
  */
 function questionScripts(code: string): KitScript[] {
 	const imported = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*"${QUESTION_IMPORT}";?`).exec(
@@ -214,20 +214,38 @@ function questionScripts(code: string): KitScript[] {
 /** Where a call's first argument ends and an object literal second one opens: `jsx(Question, {`. */
 const OBJECT_ARGUMENT = /\s*,\s*\{/y;
 
-/** Whether the use of Question at `code[start, end)` is a call such as jsx(Question, { options, answer: "b" }), a self-check. */
+/**
+ * A value that is never undefined, as the bundler writes it: a string, a list, or a JSX element (which it marks pure). A
+ * variable or an expression such as `open && "x"` may be undefined.
+ */
+const DEFINED_VALUE = /["'`[]|\/\* @__PURE__ \*\//y;
+
+/** Whether compiled code has a value that is never undefined at `index`. */
+function definedAt(code: string, index: number | undefined): boolean {
+	if (index === undefined) {
+		return false;
+	}
+	DEFINED_VALUE.lastIndex = index;
+	return DEFINED_VALUE.test(code);
+}
+
+/**
+ * Whether the use of Question at `code[start, end)` is a call that writes a self-check: jsx(Question, { options, answer: "b" }),
+ * or a written answer with its model answer inside, jsx(Question, { name, legend, children: jsx("p", ...) }).
+ */
 function selfCheckCall(code: string, start: number, end: number): boolean {
 	OBJECT_ARGUMENT.lastIndex = end;
 	if (!(/\(\s*$/.test(code.slice(Math.max(0, start - 20), start)) && OBJECT_ARGUMENT.test(code))) {
 		return false;
 	}
 	const props = objectProps(code, OBJECT_ARGUMENT.lastIndex - 1);
+	if (props.has("...")) {
+		return false;
+	}
 	const answer = props.get("answer");
-	return (
-		props.has("options") &&
-		!props.has("...") &&
-		answer !== undefined &&
-		/["'`]/.test(code[answer] ?? "")
-	);
+	return props.has("options")
+		? answer !== undefined && /["'`]/.test(code[answer] ?? "")
+		: definedAt(code, props.get("children"));
 }
 
 let questionNeeds: Set<KitScript> | undefined;

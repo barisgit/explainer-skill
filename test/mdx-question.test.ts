@@ -182,6 +182,10 @@ Each harmonic fixes **more** of the error.
 <Question name="q4" legend="Where is the bump?">Next to the jump.</Question>
 `;
 
+/** Page code that writes `text` in the text box `id` as the reader would, with an input event. */
+const write = (id: string, text: string) =>
+	`(() => { const box = document.getElementById("${id}"); box.value = "${text}"; box.dispatchEvent(new Event("input", { bubbles: true })); })()`;
+
 describe("written-answer Question", () => {
 	test("a text box named by the legend, the answer behind its own fold, which Expand all never opens", async () => {
 		const output = await packedMdx(dir, "study", STUDY);
@@ -212,25 +216,6 @@ describe("written-answer Question", () => {
 		// A section whose folds are all answers gets no Expand all; beside plain folds, Expand all opens only those.
 		expect(seen.buttons).toEqual([0, 1]);
 		expect(seen.expanded).toEqual(["false,false,true,true,false,false", "Collapse all"]);
-	}, 30_000);
-
-	test("what the reader wrote is kept across a reload and is sent in the reply under the question", async () => {
-		const output = await packedMdx(dir, "study-reply", STUDY);
-		const seen = await inPage(output, async (cdp) => {
-			await act(
-				cdp,
-				`const box = document.getElementById("q1"); box.value = "They add up"; box.dispatchEvent(new Event("input", { bubbles: true }))`,
-				"0",
-			);
-			await load(cdp);
-			return act<[string, string[]]>(
-				cdp,
-				`document.querySelector(".reply-bar .primary").click()`,
-				`[document.getElementById("q1").value, document.querySelector(".reply-md").textContent.split("\\n").filter((line) => line.startsWith("- "))]`,
-			);
-		});
-		expect(seen[0]).toBe("They add up");
-		expect(seen[1]).toContain("- Why do sines build a square wave? They add up");
 	}, 30_000);
 
 	test("the props that pick among options fail without options, saying what to write instead", async () => {
@@ -271,5 +256,46 @@ export function Late() {
 			),
 		);
 		expect(summaries).toEqual(["Poka\u017ei odgovor", "Poka\u017ei odgovor"]);
+	}, 30_000);
+});
+
+describe("written-answer Question: kept or in the reply", () => {
+	test("with a model answer inside, what the reader wrote is kept across a reload and brings no reply bar", async () => {
+		const output = await packedMdx(dir, "study-kept", STUDY);
+		expect(kitScriptsIn(output)).not.toContain("reply");
+		const seen = await inPage(output, async (cdp) => {
+			await act(cdp, write("q1", "They add up"), "0");
+			await load(cdp);
+			return cdp.evaluate<[string, boolean]>(
+				`[document.getElementById("q1").value, Boolean(document.querySelector(".reply-bar"))]`,
+			);
+		});
+		expect(seen).toEqual(["They add up", false]);
+	}, 30_000);
+
+	test("with nothing inside, the question joins the reply; Clear empties both kinds, and the kept one stays out of the reply", async () => {
+		const output = await packedMdx(
+			dir,
+			"study-ask",
+			'import { Question } from "kit";\n\n# Ask\n\n<Question name="ask" legend="What should change?" />\n\n<Question name="own" legend="Why?">Because.</Question>\n',
+		);
+		const seen = await inPage(output, async (cdp) => {
+			await act(cdp, `${write("ask", "Shorter")}; ${write("own", "Mine")}`, "0");
+			const reply = await act<string[]>(
+				cdp,
+				`document.querySelector(".reply-bar .primary").click()`,
+				`document.querySelector(".reply-md").textContent.split("\\n").filter((line) => line.startsWith("- "))`,
+			);
+			const clear = `document.querySelector(".reply-dialog").close(); document.querySelector(".reply-bar .btn:not(.primary)")`;
+			await act(cdp, `${clear}.click()`, "0");
+			const cleared = await act<string[]>(
+				cdp,
+				`${clear}.click()`,
+				`["ask", "own"].map((id) => document.getElementById(id).value)`,
+			);
+			return { reply, cleared };
+		});
+		expect(seen.reply).toEqual(["- What should change? Shorter"]);
+		expect(seen.cleared).toEqual(["", ""]);
 	}, 30_000);
 });

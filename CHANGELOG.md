@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A written `Question` with a model answer inside is a self-check: what the reader writes is kept on the page, stays out of the reply and brings no Reply bar. One with nothing inside still joins the reply.
+
 ## v0.10.0
 
 One collection of records, shown as a grouped tree, a sortable table or a board, is one component: `Records`. It replaces `Tree`. Mermaid diagrams stay readable on phones and in print.
