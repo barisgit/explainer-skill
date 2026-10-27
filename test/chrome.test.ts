@@ -112,6 +112,10 @@ async function chromeStarted(tmp: string) {
 const chromesIn = (tmp: string) =>
 	Bun.spawnSync(["pgrep", "-f", tmp]).stdout.toString().trim().split("\n").filter(Boolean);
 
+/** Whether a Chrome started in `tmp` is running: withPage's directory there holds its profile, where it writes `started`. */
+const chromeStartedIn = (tmp: string) =>
+	readdirSync(tmp).some((dir) => existsSync(join(tmp, dir, "profile", "started")));
+
 /** Waits up to 5 s for every Chrome started in `tmp` to exit, so what the test sees next includes all they wrote. */
 async function chromesGone(tmp: string) {
 	const end = performance.now() + 5000;
@@ -197,36 +201,28 @@ test("withPage deletes Chrome's profile only once Chrome has exited, so nothing 
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 
-test("withPage removes no directory but Chrome's own singleton directory, whatever path the profile's link spells", async () => {
-	const outer = tempDir("tmp-dotdot");
-	const job = join(outer, "job");
-	mkdirSync(job);
-	writeFileSync(join(outer, "kept"), "");
-	const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");
-	// The link's directory, spelled job/.., is the temp directory's parent: removing it would remove the temp directory too.
-	const proc = Bun.spawn(
-		[
-			process.execPath,
-			"-e",
-			`await (await import(${JSON.stringify(chrome)})).withPage(async () => {});`,
-		],
-		{
-			env: {
-				...process.env,
-				CHROME: fakeChrome,
-				TMPDIR: job,
-				FAKE_SINGLETON: `${job}/../SingletonSocket`,
-			},
-		},
-	);
-	expect(await proc.exited).toBe(0);
-	await chromesGone(outer);
-	// The stand-in's socket stays: it lies outside the temp directory, which is all cleanup may touch.
-	expect(readdirSync(outer).sort()).toEqual(["SingletonSocket", "job", "kept"]);
-	expect(readdirSync(job)).toEqual([]);
-}, 30_000);
+// Chrome on macOS copes with a socket path past the limit.
+test.skipIf(process.platform !== "linux")(
+	"withPage in a temp directory too deep for Chrome's socket fails with one line saying what to change, and leaves nothing",
+	async () => {
+		const tmp = tempDir(`tmp-deep-${"d".repeat(60)}`);
+		const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");
+		const script = `await (await import(${JSON.stringify(chrome)})).withPage(async () => {}).catch((error) => console.log(String(error)));`;
+		const proc = Bun.spawn([process.execPath, "-e", script], {
+			env: { ...process.env, CHROME: fakeChrome, TMPDIR: tmp },
+			stdout: "pipe",
+		});
+		expect(await proc.exited).toBe(0);
+		expect(await new Response(proc.stdout).text()).toBe(
+			`Error: Chrome cannot start in a temp directory this deep (${tmp}): its socket's path would pass the Unix limit, so set TMPDIR to a shorter one, such as /tmp\n`,
+		);
+		await chromesGone(tmp);
+		expect(readdirSync(tmp)).toEqual([]);
+	},
+	30_000,
+);
 
-test("withPage whose Chrome leaves a process that never exits kills its group once, keeps the profile and says where, within a bound", async () => {
+test("withPage whose Chrome leaves a process that never exits kills its group once, keeps its files and says where, within a bound", async () => {
 	const tmp = tempDir("tmp-stuck");
 	const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");
 	// A zombie helper (adopted by a PID 1 that does not reap) stays in Chrome's group after SIGKILL: here the group probe says
@@ -252,18 +248,18 @@ test("withPage whose Chrome leaves a process that never exits kills its group on
 	// Chrome's 5 s exit grace is not needed here (the stand-in exits on SIGTERM), so this is the helpers' grace and the kill's.
 	expect(performance.now() - started).toBeLessThan(5_000);
 	expect(await new Response(proc.stdout).text()).toBe("1\n");
-	const profile = readdirSync(tmp).find((name) => name.startsWith("artifact-chrome-"));
+	const [kept] = readdirSync(tmp);
 	expect(await new Response(proc.stderr).text()).toBe(
-		`warning: Chrome's processes did not all exit, so its profile is kept: ${join(tmp, profile ?? "")}\n`,
+		`warning: Chrome's processes did not all exit, so its files are kept: ${join(tmp, kept ?? "")}\n`,
 	);
-	expect(existsSync(join(tmp, profile ?? "", "started"))).toBe(true);
+	expect(existsSync(join(tmp, kept ?? "", "profile", "started"))).toBe(true);
 	await chromesGone(tmp);
 }, 30_000);
 
 test("check ended by SIGTERM while Chrome starts stops that Chrome and deletes its profile after it exits", async () => {
 	const tmp = tempDir("tmp-term-start");
 	const proc = startCheck(stalled, tmp, [], { CHROME: fakeChrome, FAKE_CHROME: "silent" });
-	while (!readdirSync(tmp).some((profile) => existsSync(join(tmp, profile, "started")))) {
+	while (!chromeStartedIn(tmp)) {
 		await Bun.sleep(20);
 	}
 	proc.kill("SIGTERM");
@@ -308,7 +304,7 @@ async function startGroup(tmp: string, out: string) {
 			done({ code: code ?? 128 + (signal ? constants.signals[signal] : 0), stderr }),
 		),
 	);
-	while (!readdirSync(tmp).some((profile) => existsSync(join(tmp, profile, "started")))) {
+	while (!chromeStartedIn(tmp)) {
 		await Bun.sleep(20);
 	}
 	return { pid: proc.pid ?? 0, exited };

@@ -4,9 +4,11 @@
  * (`Target.createTarget` and `Target.attachToTarget` with ids), or none at all when FAKE_CHROME is "silent", as a Chrome that hangs
  * while it starts. It writes `started` into its profile once running, and when told to stop (SIGTERM, or the pipe closing) it waits
  * EXIT_WRITE_MS and then writes `written-at-exit` into the profile, as a real Chrome flushes its profile while it shuts down. As
- * Chrome does on Linux, it keeps a SingletonSocket in a directory of its own in the temp directory, linked from the profile, and
- * leaves that directory behind when it exits; FAKE_SINGLETON, when set, is the link's target instead. And as Chrome's helper processes can, a helper it starts outlives it: it writes
- * `written-by-helper` into the profile EXIT_WRITE_MS after the stand-in has exited.
+ * Chrome does, it leaves a directory behind in its temp directory (a singleton socket's, a URL fetcher's), which it takes from
+ * TMPDIR on Linux and from MAC_CHROMIUM_TMPDIR on macOS, where Chrome otherwise ignores TMPDIR for the system's temp directory;
+ * the stand-in refuses to start there without it, since the tests could not see what it left. As Chrome on Linux does, it aborts
+ * when its singleton socket's path in that directory would pass the 107 characters a Unix socket may have. And as Chrome's helper processes
+ * can, a helper it starts outlives it: it writes `written-by-helper` into the profile EXIT_WRITE_MS after the stand-in has exited.
  */
 import { spawn } from "node:child_process";
 import {
@@ -14,10 +16,8 @@ import {
 	createWriteStream,
 	mkdirSync,
 	mkdtempSync,
-	symlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** How long the stand-in takes to shut down: long enough that a profile deleted before it exits is written again. */
@@ -27,11 +27,21 @@ const profile = process.argv.find((arg) => arg.startsWith("--user-data-dir="))?.
 if (!profile) {
 	throw new Error("fake Chrome needs --user-data-dir");
 }
-const { FAKE_CHROME, FAKE_SINGLETON } = process.env;
-const singleton =
-	FAKE_SINGLETON ?? join(mkdtempSync(join(tmpdir(), "org.chromium.Chromium.")), "SingletonSocket");
-writeFileSync(singleton, "");
-symlinkSync(singleton, join(profile, "SingletonSocket"));
+const { FAKE_CHROME, TMPDIR, MAC_CHROMIUM_TMPDIR } = process.env;
+const temp = process.platform === "darwin" ? MAC_CHROMIUM_TMPDIR : TMPDIR;
+if (!temp) {
+	throw new Error(
+		"fake Chrome: no temp directory of its own, so Chrome would write into the system's",
+	);
+}
+if (
+	process.platform === "linux" &&
+	join(temp, "org.chromium.Chromium.XXXXXX", "SingletonSocket").length > 107
+) {
+	process.stderr.write(`FATAL:process_singleton_posix.cc(313)] Socket path too long: ${temp}\n`);
+	process.kill(process.pid, "SIGABRT");
+}
+writeFileSync(join(mkdtempSync(join(temp, "org.chromium.Chromium.")), "SingletonSocket"), "");
 spawn(
 	"sh",
 	[

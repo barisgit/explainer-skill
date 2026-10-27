@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readlinkSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { Cdp, ChromeError, seconds, within } from "./cdp.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
@@ -82,16 +82,16 @@ interface Owner {
  * once without it. The tradeoff is acceptable because Chrome only ever opens a local page: the
  * one being checked, or a build script's own.
  */
-async function launch(profile: string, owner: Owner, limit?: AbortSignal): Promise<Cdp> {
+async function launch(dir: string, owner: Owner, limit?: AbortSignal): Promise<Cdp> {
 	const bin = CHROME_PATHS.find((p) => p && existsSync(p));
 	if (!bin) {
 		throw new ChromeError("no Chrome found: set CHROME=/path/to/chrome");
 	}
 	try {
-		return await start(bin, profile, owner, [], limit);
+		return await start(bin, dir, owner, [], limit);
 	} catch (error) {
 		if (error instanceof SandboxUnavailable) {
-			return await start(bin, profile, owner, ["--no-sandbox"], limit);
+			return await start(bin, dir, owner, ["--no-sandbox"], limit);
 		}
 		throw error;
 	}
@@ -163,7 +163,7 @@ const lastLine = (log: string) =>
  */
 async function start(
 	bin: string,
-	profile: string,
+	dir: string,
 	owner: Owner,
 	extra: string[],
 	limit: AbortSignal | undefined,
@@ -172,17 +172,20 @@ async function start(
 		throw new ChromeError("Chrome was not started: check is stopping");
 	}
 	limit?.throwIfAborted();
+	const profile = join(dir, "profile");
 	const proc = spawn(
 		bin,
 		[...FLAGS, `--user-data-dir=${profile}`, ...extra, "about:blank"],
 		// Chrome still adds keychain items at launch despite --use-mock-keychain, and macOS shows a
 		// "Keychain Not Found" dialog when HOME has none (a sandboxed HOME, such as verify:install's).
 		// The account's own home always has its keychain; the profile stays in --user-data-dir.
+		// Chrome's temp directory is `dir` too (see withPage): Chrome on Linux reads TMPDIR, and on macOS MAC_CHROMIUM_TMPDIR,
+		// without which it uses the system's temp directory whatever TMPDIR says.
 		// detached: Chrome and its helpers get a process group of their own, so stop can wait for every one of them, and a
 		// terminal's Ctrl-C or GNU timeout's group signal reaches check alone, which then stops Chrome in order.
 		{
 			stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"],
-			env: { ...process.env, HOME: userInfo().homedir },
+			env: { ...process.env, HOME: userInfo().homedir, TMPDIR: dir, MAC_CHROMIUM_TMPDIR: dir },
 			detached: true,
 		},
 	);
@@ -206,14 +209,21 @@ async function start(
 		return stopped;
 	};
 	owner.stop = stop;
-	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes the sandbox line out of
-	// the tail.
-	const exitError = () =>
-		log.includes("No usable sandbox")
-			? new SandboxUnavailable("Chrome has no usable sandbox")
-			: new ChromeError(
-					`Chrome exited before it started (code ${proc.exitCode}): ${lastLine(log)}`,
-				);
+	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes these lines out of the
+	// tail.
+	const exitError = () => {
+		if (log.includes("No usable sandbox")) {
+			return new SandboxUnavailable("Chrome has no usable sandbox");
+		}
+		if (log.includes("Socket path too long")) {
+			return new ChromeError(
+				`Chrome cannot start in a temp directory this deep (${tmpdir()}): its socket's path would pass the Unix limit, so set TMPDIR to a shorter one, such as /tmp`,
+			);
+		}
+		return new ChromeError(
+			`Chrome exited before it started (code ${proc.exitCode}): ${lastLine(log)}`,
+		);
+	};
 	const exitedEarly = exited.then(() => {
 		if (!stopping) {
 			throw exitError();
@@ -244,34 +254,19 @@ async function start(
 }
 
 /**
- * Deletes Chrome's profile and, on Linux, the directory Chrome keeps its process-singleton socket in: Chrome makes it in the temp
- * directory (`org.chromium.Chromium.XXXXXX`), links it from the profile's SingletonSocket, and leaves it behind whenever it exits,
- * so every run left one. The link's directory is resolved first (a target spelled `tmp/job/..` names `tmp`), and only a direct
- * child of the resolved temp directory is removed, never the temp directory itself.
- */
-function removeProfile(profile: string) {
-	try {
-		const target = resolve(profile, readlinkSync(join(profile, "SingletonSocket")));
-		const socketDir = realpathSync(dirname(target));
-		const temp = realpathSync(tmpdir());
-		if (socketDir !== temp && dirname(socketDir) === temp) {
-			rmSync(socketDir, { recursive: true, force: true });
-		}
-	} catch {
-		// No link (macOS, or a Chrome that never got that far), or its directory is gone already.
-	}
-	rmSync(profile, { recursive: true, force: true });
-}
-
-/**
- * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its profile deleted once Chrome has exited
- * (a profile deleted while Chrome shuts down is written again; one that a process outlives is kept, with a warning), also when
+ * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its directory deleted once Chrome has exited (a profile deleted while Chrome shuts down is written again; files that a process
+ * outlives are kept, with a warning), also when
  * SIGINT, SIGTERM or SIGHUP ends the process, Chrome's start-up included. withPage and a signal share one cleanup, which runs once.
  * Once `limit` aborts, Chrome's start-up or the page's next or pending call fails with its reason (a ChromeError), and the
  * cleanup runs within Chrome's exit grace and the group's.
  */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSignal): Promise<T> {
-	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
+	// Chrome's directory: its profile, and its temp directory in place of the system's. Chrome leaves directories there whenever
+	// it exits (on Linux its singleton socket's, and Google Chrome a `com.google.Chrome.chrome_chrome_url_fetcher_.*` one per
+	// launch, thousands in a day of checks), so they go with the profile. The name is short because on Linux Chrome aborts
+	// ("Socket path too long") when its singleton socket's path in there passes the 107 characters a Unix socket may have.
+	const dir = mkdtempSync(join(tmpdir(), "chrome-"));
+	mkdirSync(join(dir, "profile"));
 	const owner: Owner = { closing: false, stuck: false };
 	let cleaning: Promise<void> | undefined;
 	const cleanup = () => {
@@ -280,17 +275,17 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSig
 			await owner.stop?.();
 			if (owner.stuck) {
 				console.error(
-					`warning: Chrome's processes did not all exit, so its profile is kept: ${profile}`,
+					`warning: Chrome's processes did not all exit, so its files are kept: ${dir}`,
 				);
 			} else {
-				removeProfile(profile);
+				rmSync(dir, { recursive: true, force: true });
 			}
 		})().finally(() => release());
 		return cleaning;
 	};
 	const release = cleanUpOnSignal(cleanup);
 	try {
-		const cdp = await launch(profile, owner, limit);
+		const cdp = await launch(dir, owner, limit);
 		try {
 			await cdp.send("Inspector.enable");
 			return await fn(cdp);

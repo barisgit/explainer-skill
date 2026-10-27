@@ -28,8 +28,9 @@ One collection of records, shown as a grouped tree, a sortable table or a board,
 - A `check` that stops with an error, or is ended by Ctrl-C or SIGTERM, leaves `--out` as it was: the PNGs of a run move there only once it has finished.
 - `--tag` takes a name without a path separator; `--tag ../x` is a usage error, since it would write PNGs outside `--out`.
 - `--timeout <seconds>` (default 600) limits the whole run, Chrome's start-up included: `error: check passed its 600 s limit at light desktop, view #plan/a, after 324 page(s): raise --timeout for a page with many views or --do steps`.
-- Chrome exits with `check` however `check` ends, and its profile is deleted (also on Ctrl-C or SIGTERM, sent once or twice, and on Linux with the directory Chrome keeps its singleton socket in). Before, every run left a profile of up to 150 MB in the temp directory, and a `check` killed by a timeout left a Chrome running that used a CPU core.
+- Chrome exits with `check` however `check` ends, and its profile and temp files are deleted (also on Ctrl-C or SIGTERM, sent once or twice). Before, every run left a profile of up to 150 MB in the temp directory, and with Google Chrome a `com.google.Chrome.chrome_chrome_url_fetcher_.*` directory, and a `check` killed by a timeout left a Chrome running that used a CPU core.
 - Chrome no longer downloads components or models while it checks a page.
+- On Linux, a `TMPDIR` too deep for the socket Chrome keeps there (about 50 characters) stops `check` with `error: Chrome cannot start in a temp directory this deep (…): … set TMPDIR to a shorter one, such as /tmp`, instead of Chrome's stack trace.
 
 ## v0.9.0
 
