@@ -1,8 +1,9 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./cdp.ts";
 import { ChromeError } from "./cdp.ts";
 import { withPage } from "./chrome.ts";
+import { cleanUpOnSignal } from "./on-signal.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import {
 	DISCOVER_JS,
@@ -203,6 +204,7 @@ interface Run {
 	cdp: Cdp;
 	log: PageLog;
 	url: string;
+	/** Where the run writes its PNGs: the staging directory (see staged), whose files move into --out once the run has succeeded. */
 	outDir: string;
 	stem: string;
 	opts: CheckOptions;
@@ -449,6 +451,38 @@ async function shootNamingWhere(run: Run, themes: readonly string[], limit: Abor
 }
 
 /**
+ * Runs `write` with a fresh staging directory inside `outDir` for every file it writes, and moves those files into `outDir` only
+ * once it has succeeded, replacing files of the same name: a run that fails, or that a signal ends, leaves `outDir` as it was.
+ * Staging inside `outDir` keeps the move a rename within one file system.
+ */
+async function staged<T>(outDir: string, write: (staging: string) => Promise<T>): Promise<T> {
+	const staging = mkdtempSync(join(outDir, ".check-"));
+	const remove = async () => rmSync(staging, { recursive: true, force: true });
+	const release = cleanUpOnSignal(remove);
+	try {
+		const result = await write(staging);
+		for (const name of readdirSync(staging)) {
+			renameSync(join(staging, name), join(outDir, name));
+		}
+		return result;
+	} finally {
+		await remove();
+		release();
+	}
+}
+
+/** `shots` with each PNG path moved from the staging directory into `outDir`, where staged puts the files. */
+function inOutDir(shots: Shot[], outDir: string): Shot[] {
+	const moved = (png: string) => join(outDir, basename(png));
+	return shots.map((shot) => ({
+		...shot,
+		png: moved(shot.png),
+		first: shot.first && { ...shot.first, png: moved(shot.first.png) },
+		elements: shot.elements.map((element) => ({ ...element, png: moved(element.png) })),
+	}));
+}
+
+/**
  * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
  * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
@@ -457,7 +491,8 @@ async function shootNamingWhere(run: Run, themes: readonly string[], limit: Abor
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
  * missing viewport meta, tall diagrams and charts, and steppers that change only their captions. Reduced motion is emulated so animations are
  * finished in the shots.
- * A ChromeError ends the run with no result: Chrome failed to start or stalled, or the run passed `opts.timeoutSeconds`.
+ * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed
+ * `opts.timeoutSeconds`. The PNGs of a run that succeeds replace those of the same name in `outDir`.
  */
 export async function check(
 	file: string,
@@ -478,24 +513,27 @@ export async function check(
 		);
 	}, opts.timeoutSeconds * 1000);
 	try {
-		return await withPage(async (cdp) => {
-			const run: Run = {
-				cdp,
-				log: new PageLog(cdp),
-				url: `file://${resolve(file)}`,
-				outDir,
-				stem,
-				opts,
-				shots: [],
-				views: { found: [], captured: [], uncaptured: [], templates: [] },
-				viewHashes: [],
-				stepNotes: new Set(),
-				where: STARTING,
-			};
-			current = run;
-			await shootNamingWhere(run, themes, limit.signal);
-			return { shots: run.shots, views: run.views, stepNotes: [...run.stepNotes] };
-		}, limit.signal);
+		const result = await staged(outDir, (staging) =>
+			withPage(async (cdp) => {
+				const run: Run = {
+					cdp,
+					log: new PageLog(cdp),
+					url: `file://${resolve(file)}`,
+					outDir: staging,
+					stem,
+					opts,
+					shots: [],
+					views: { found: [], captured: [], uncaptured: [], templates: [] },
+					viewHashes: [],
+					stepNotes: new Set(),
+					where: STARTING,
+				};
+				current = run;
+				await shootNamingWhere(run, themes, limit.signal);
+				return { shots: run.shots, views: run.views, stepNotes: [...run.stepNotes] };
+			}, limit.signal),
+		);
+		return { ...result, shots: inOutDir(result.shots, outDir) };
 	} finally {
 		clearTimeout(timer);
 	}

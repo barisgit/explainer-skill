@@ -1,5 +1,12 @@
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { ChromeError } from "../skills/explainer/src/cdp.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
@@ -52,8 +59,7 @@ const startCheck = (file: string, tmp: string, args: string[] = [], env: object 
 			"check",
 			file,
 			"--quick",
-			"--out",
-			dir.path("shots"),
+			...(args.includes("--out") ? [] : ["--out", dir.path("shots")]),
 			...args,
 		],
 		{ stdout: "pipe", stderr: "pipe", env: { ...process.env, TMPDIR: tmp, ...env } },
@@ -118,13 +124,25 @@ test("Chrome exits when the check driving it is killed, so no Chrome outlives a 
 	await chromesGone(tmp);
 }, 30_000);
 
-test("a load that never ends stops check with one error line naming the screen and the --do step it was in", async () => {
-	const result = await runCheck(stalledReload, tempDir("tmp-stalled"), ["--do", "reload"]);
+test("a load that never ends stops check with one error line naming the screen and the --do step it was in, and writes no PNG", async () => {
+	// The desktop is captured before the narrow screen stalls. Its PNG has the name of a file already in --out, which must keep
+	// what it had, as must the other file there.
+	const out = tempDir("out-stalled");
+	writeFileSync(join(out, "desktop.png"), "before");
+	writeFileSync(join(out, "notes.txt"), "mine");
+	const result = await runCheck(stalledReload, tempDir("tmp-stalled"), [
+		"--do",
+		"reload",
+		"--out",
+		out,
+	]);
 	expect(result.code).toBe(1);
 	expect(result.stdout).toBe("");
 	expect(result.stderr).toBe(
 		"error: the load event after a reload did not come in 10 s (at light narrow, overview, --do step 1: reload)\n",
 	);
+	expect(readdirSync(out).sort()).toEqual(["desktop.png", "notes.txt"]);
+	expect(readFileSync(join(out, "desktop.png"), "utf8")).toBe("before");
 }, 30_000);
 
 test("--timeout stops check with one error line saying where it was, and leaves no profile behind", async () => {
@@ -182,12 +200,14 @@ test("check ended by SIGTERM while Chrome starts stops that Chrome and deletes i
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 
-test("check ended by SIGTERM stops Chrome and deletes its profile before it exits", async () => {
+test("check ended by SIGTERM stops Chrome and deletes its profile and unfinished shots before it exits", async () => {
 	const tmp = tempDir("tmp-term");
-	const proc = startCheck(stalled, tmp);
+	const out = tempDir("out-term");
+	const proc = startCheck(stalled, tmp, ["--out", out]);
 	// The held page keeps check running until the signal.
 	await chromeStarted(tmp);
 	proc.kill("SIGTERM");
 	expect(await proc.exited).toBe(143);
 	expect(readdirSync(tmp)).toEqual([]);
+	expect(readdirSync(out)).toEqual([]);
 }, 30_000);
