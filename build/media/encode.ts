@@ -13,6 +13,34 @@ async function ffmpeg(args: string[]) {
 	}
 }
 
+/** The ffmpeg encoders the media needs: libwebp for the stills, libwebp_anim for the clips. */
+const ENCODERS = ["libwebp", "libwebp_anim"];
+
+/**
+ * Throws, naming what is missing, unless ffmpeg is on PATH with every encoder in ENCODERS. A run calls it before it touches
+ * `examples/media/`, so an ffmpeg that cannot write WebP leaves the published media as they were.
+ */
+export async function checkEncoders() {
+	let listing: string;
+	try {
+		const proc = Bun.spawn(["ffmpeg", "-hide_banner", "-encoders"], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		[listing] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+	} catch {
+		throw new Error("ffmpeg is not on PATH: install one built with libwebp");
+	}
+	// Each encoder is a line of flags, its name and its description: " V....D libwebp_anim  libwebp WebP image".
+	const listed = new Set(listing.split("\n").map((line) => line.trim().split(/\s+/)[1]));
+	const missing = ENCODERS.filter((name) => !listed.has(name));
+	if (missing.length) {
+		throw new Error(
+			`ffmpeg has no ${missing.join(" or ")} encoder, which the WebP media need: use an ffmpeg built with libwebp`,
+		);
+	}
+}
+
 export const sizeOf = (file: string) => statSync(file).size;
 
 /**

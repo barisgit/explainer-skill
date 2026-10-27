@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { record } from "./media/clip.ts";
-import { encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
+import { checkEncoders, encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
 import { renderHero } from "./media/hero.ts";
 import { open, screenshot } from "./media/page.ts";
 import { type Example, type Size, THEMES, type Theme } from "./media/types.ts";
@@ -190,6 +190,7 @@ async function main(args: string[]) {
 			`no example named ${names.join(", ")}; known: ${EXAMPLES.map((e) => e.name).join(", ")}`,
 		);
 	}
+	await checkEncoders();
 	if (examples.length === EXAMPLES.length) {
 		// A full run owns the directory: files from renamed or removed scenes go, so none is published stale.
 		rmSync(OUT, { recursive: true, force: true });
