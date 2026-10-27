@@ -4571,10 +4571,10 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
    value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept. Once anything is saved, a Clear answers button at the end of the page puts every control back to its
-   default, again with events, and drops the saved copy; a first press only asks, a second within 4 s clears. With reply (kit
-   reply) the reader's notes are kept too, and on a page that asks for replies (reply: true, a data-reply control, or a note) the
-   same button sits in the reply bar instead.
+   <details> are not kept. Once a Question's answer is saved, a Clear answers button at the end of the page puts the answers back
+   to their defaults, again with events, and drops their saved copy; a first press only asks, a second within 4 s clears. Other
+   controls stay kept without a button. With reply (kit reply) the reader's notes are kept too, and on a page that asks for
+   replies (reply: true, a data-reply control, or a note) a Clear in the reply bar takes its place and clears every control.
    Labels: clearAnswers "Clear answers", clearAnswersPrompt "Press again to clear all answers." (announced), and for both
    buttons clearConfirm "Clear everything?" and clearCancelled "Clear cancelled." (announced). */
 (() => {
@@ -4608,7 +4608,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const isMultiSelect = (c) => c instanceof HTMLSelectElement && c.multiple;
   const signature = (c) => clean(`${c.type}|${c.getAttribute("aria-label") || c.labels?.[0] && ownText(c.labels[0]) || c.closest(".field")?.firstElementChild?.textContent || c.name || "placeholder" in c && c.placeholder || ""}`);
   const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
-  let touched = new WeakSet;
+  const touched = new WeakSet;
   const defaults = new Map;
   let pending = {};
   const taken = new Map;
@@ -4660,6 +4660,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       return { el, key, ...entry };
     });
   }
+  const isAnswer = (c) => c.closest(".self-check") !== null;
   const moved = (u) => !same(readControl(u.el), u.initial);
   const answered = (u) => moved(u) || touched.has(u.el);
   function announce(c) {
@@ -4733,7 +4734,11 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     }
     const controls = { ...pending };
     for (const u of present.filter(answered)) {
-      controls[u.key] = { value: readControl(u.el), sig: u.sig };
+      controls[u.key] = {
+        value: readControl(u.el),
+        sig: u.sig,
+        ...isAnswer(u.el) && { answer: true }
+      };
     }
     keptById = Object.fromEntries(Object.entries(controls).filter(([key]) => key.startsWith("#")));
     return { controls, notes: notes.list() };
@@ -4763,12 +4768,21 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     ready = true;
     onChange();
   }
-  function clear() {
-    apply(units().filter(moved).map((u) => ({ el: u.el, value: u.initial })));
-    touched = new WeakSet;
-    pending = {};
-    keptById = {};
-    taken.clear();
+  function clear(answersOnly = false) {
+    const chosen = (u) => !answersOnly || isAnswer(u.el);
+    const present = units().filter(chosen);
+    apply(present.filter(moved).map((u) => ({ el: u.el, value: u.initial })));
+    for (const u of present) {
+      touched.delete(u.el);
+    }
+    for (const saved of [pending, keptById]) {
+      for (const [key, entry] of Object.entries(saved)) {
+        if (!answersOnly || entry.answer) {
+          delete saved[key];
+          taken.delete(key);
+        }
+      }
+    }
     onChange();
   }
   function save() {
@@ -4787,12 +4801,12 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     if (!state) {
       return notes.list().length > 0;
     }
-    const kept = !empty(state);
-    if (kept && !inBar) {
+    const answers = !inBar && Object.values(state.controls).some((c) => c.answer);
+    if (answers) {
       own ??= ownClear();
     }
-    own?.show(kept && !inBar);
-    return kept;
+    own?.show(answers);
+    return !empty(state);
   }
   const CONFIRM_MS = 4000;
   function clearButton(texts, onClear) {
@@ -4853,7 +4867,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     };
     const made = clearButton(texts, () => {
       notes.restore([]);
-      clear();
+      clear(true);
     });
     const box = document.createElement("div");
     box.className = "keep-clear";
