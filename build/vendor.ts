@@ -77,7 +77,7 @@ mkdirSync(join(skill, "vendor"), { recursive: true });
 writeFileSync(
 	join(skill, "vendor/echarts-ssr.js"),
 	echartsHeader
-		.replace("global echarts", "ES module exporting init and setPlatformAPI")
+		.replace("global echarts", "ES module exporting init, setPlatformAPI and ownColors")
 		.replace("Canvas renderer", "SVG renderer, for pack") +
 		(await bundle(join(import.meta.dir, "echarts-ssr-entry.ts"), "bun", "esm")),
 );
