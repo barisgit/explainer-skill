@@ -321,6 +321,7 @@ import "./rootfont.css";
 
 <Plot id="straddles" height="300px" label="Straddles" option={${LEGEND_PLOT(["Voltage", "Current", "Power draw", "Efficiency"])}} />
 
+<Plot id="entities" height="300px" label="Entities" option={${LEGEND_PLOT(["&&&&", "&&&&", "&&&&"])}} />
 
 <Plot id="many" label="Many" option={${LEGEND_PLOT(["Mean load on the main feeder", "Peak load on the main feeder", "Mean load on the spare feeder", "Peak load on the spare feeder", "Mean load on the backup", "Peak load on the backup"])}} />
 `,
@@ -330,6 +331,8 @@ import "./rootfont.css";
 		expect(viewBoxes(figures.get("one-row"))).toEqual(["1054x377.8", "527x377.8", "356x249.8"]);
 		// Four names wrap on the narrowest phone but fit one row at 420 px, where the phone copy is shown as well.
 		expect(figures.get("straddles")).toBeUndefined();
+		// Rows are counted on the text a reader sees: "&&&&" is not "&#38;&#38;&#38;&#38;".
+		expect(viewBoxes(figures.get("entities"))).toEqual(["1054x261.8", "527x261.8", "356x261.8"]);
 		// Six long names take one row, two or three by the width the copy is shown at.
 		expect(figures.get("many")).toBeUndefined();
 		await expectFitted(legends, 2);

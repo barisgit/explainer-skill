@@ -165,7 +165,10 @@ function legendItems(legend: string): { swatch: number; label: string }[] {
 	return [...legend.matchAll(/<i class="([^"]*)"[^>]*><\/i>([^<]*)<\/button>/g)].map(
 		([, kind, escaped]) => ({
 			swatch: /\b(?:bar|stem)\b/.test(kind as string) ? LEGEND.swatch.box : LEGEND.swatch.line,
-			label: escaped as string,
+			// plot.js writes &, <, > and " as numeric references; the reader sees the characters.
+			label: (escaped as string).replace(/&#(\d+);/g, (_, code: string) =>
+				String.fromCharCode(Number(code)),
+			),
 		}),
 	);
 }
