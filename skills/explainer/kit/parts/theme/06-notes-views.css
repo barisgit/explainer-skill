@@ -154,4 +154,8 @@ details > :last-child:not(summary) {
 	.fig {
 		break-inside: avoid;
 	}
+	/* A Controls' panel holds nothing else, so it would print as an empty box. */
+	.fig:has(> .controls:only-child) {
+		display: none;
+	}
 }

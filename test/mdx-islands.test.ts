@@ -417,6 +417,10 @@ const COMPONENT_USES: Record<string, { use: string; scripts: string[] }> = {
 		use: `<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />`,
 		scripts: ["echarts", "charts"],
 	},
+	Controls: {
+		use: `<Controls id="set" controls={[{ id: "n", label: "N", toggle: true }]} />`,
+		scripts: ["keep"],
+	},
 	Explore: {
 		use: `<Explore label="Bars" controls={[{ id: "n", label: "N", toggle: true }]} frame={(on) => ({ plot: { categories: ["a"], series: [{ type: "bar", data: [on ? 2 : 1] }] } })} />`,
 		scripts: ["plot", "keep"],

@@ -1,4 +1,4 @@
-/* Explore: a slider, choice or toggles switching a plot or chart and readout through your function.
+/* Explore: sliders, choices or toggles switching a plot, chart or readout through your function; Controls shares them across figures.
    <Explore label="Envelope against g(t)" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
      frame={envelope} />
      controls  one or more, each with a label and an id (its value is kept across reloads):
@@ -18,11 +18,21 @@
    (base is then JSON); use that for sliders over model curves. Otherwise pack calls it for every combination and the page
    carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
    Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page, and the
-   starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart). */
+   starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart).
+   Controls: one set of controls for figures in different sections. Write <Controls id="usage" controls={[...]} /> once, where the
+   reader should find it, then <Explore use="usage" label="..." frame={daily} /> after it, in any section, in place of controls:
+   every Explore that uses it follows the same choices, shows no controls of its own, and takes the same props (a frame
+   that computes in the browser, base, height, a readout or stats alone). frame gets all the set's values, in the order the
+   controls are written, so list first the ones most figures read: (period, host) => ... may leave the later ones out. A frame
+   is called for every combination of all the set's values, and each Explore carries its own frames (100 KB), so add a
+   control for what changes the figures, not for what one figure shows; a slider of many steps among others is a case for a
+   frame from a "use client" module. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
+import { Controls as ControlsIsland } from "./parts/controls-island.tsx";
 import { Explore as ExploreChart } from "./parts/explore-chart.tsx";
+import { type ExploreControlProps, parseControls } from "./parts/explore-controls.ts";
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
 import { Explore as ExploreText } from "./parts/explore-text.tsx";
 import {
@@ -35,20 +45,17 @@ import {
 	valueCount,
 	withBase,
 } from "./parts/explore-view.tsx";
-import { numberText } from "./parts/format.ts";
 import { diff, isPoint, type Json } from "./parts/frames.ts";
+import { declaredSets, sharedControls } from "./parts/shared-controls.ts";
 
-export type { ExploreFrame, ExploreValue };
+export type { ExploreControlProps, ExploreFrame, ExploreValue };
 
-/** One control as the page writes it. */
-export type ExploreControlProps = { id: string; label: string } & (
-	| { range: readonly [number, number, number]; value?: number; format?: NumberFormat }
-	| { choice: readonly string[] | Readonly<Record<string, string>>; value?: string }
-	| { toggle: true; value?: boolean }
-);
+/** The controls an Explore follows: its own, or the set of the Controls whose `id` is `use`. */
+type ExploreControls =
+	| { controls: readonly ExploreControlProps[]; use?: never }
+	| { use: string; controls?: never };
 
-export interface ExploreProps {
-	controls: readonly ExploreControlProps[];
+export type ExploreProps = ExploreControls & {
 	/** The frame for the controls' values; `never[]` lets a function with narrower parameters ((kind: Kind, m: number)) through. */
 	frame: (...values: never[]) => ExploreFrame;
 	base?: ExploreFrame;
@@ -56,6 +63,12 @@ export interface ExploreProps {
 	class?: string;
 	height?: string;
 	id?: string;
+};
+
+/** What Controls takes: the set's `id`, which Explores name in `use`, and the controls as Explore writes them. */
+export interface ControlsProps {
+	id: string;
+	controls: readonly ExploreControlProps[];
 }
 
 /** A precomputed frame as the island gets it (explore-view.tsx): the figure's option as JSON, and HTML for the rest. */
@@ -77,60 +90,6 @@ const fail = (message: string): never => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
-
-/** Decimals a number is written with: 2 for 0.05, 7 for 1e-7 (JavaScript writes small and large numbers with an exponent). */
-function decimals(n: number): number {
-	const [digits = "", exponent = "0"] = String(n).split("e");
-	return Math.max(0, (digits.split(".")[1] ?? "").length - Number(exponent));
-}
-
-/** The range's slider as the island gets it, its readout written in `format` for the page's lang. */
-function rangeControl(id: string, [min, max, step]: readonly number[], format?: NumberFormat) {
-	if (min === undefined || max === undefined || step === undefined || !(step > 0)) {
-		return fail(`control "${id}": range is [min, max, step] with a step above 0`);
-	}
-	const count = Math.round((max - min) / step) + 1;
-	if (count < 2 || Math.abs(min + (count - 1) * step - max) > step * 1e-6) {
-		return fail(
-			`control "${id}": range [${min}, ${max}, ${step}] needs max to be min plus whole steps`,
-		);
-	}
-	const digits = Math.max(decimals(min), decimals(step));
-	const text = numberText({ digits, ...format });
-	const texts = Array.from({ length: count }, (_, i) => text(+(min + i * step).toFixed(digits)));
-	return { range: { min, step, digits, texts } };
-}
-
-/** The control as the island gets it, and the index of the value it starts on. */
-function control(spec: ExploreControlProps): { control: ExploreControl; start: number } {
-	const { id, label } = spec;
-	if (!id || !label) {
-		return fail("every control needs an id, which keeps its value across reloads, and a label");
-	}
-	if ("range" in spec) {
-		const shown = rangeControl(id, spec.range, spec.format);
-		const { min, step, texts } = shown.range;
-		const at = Math.round(((spec.value ?? min) - min) / step);
-		return {
-			control: { id, label, ...shown },
-			start: Math.min(Math.max(at, 0), texts.length - 1),
-		};
-	}
-	if ("choice" in spec) {
-		const [values, texts] = Array.isArray(spec.choice)
-			? [[...spec.choice], [...spec.choice]]
-			: [Object.keys(spec.choice), Object.values(spec.choice)];
-		const start = spec.value === undefined ? 0 : values.indexOf(spec.value);
-		if (values.length < 2 || start < 0) {
-			return fail(`control "${id}": choice needs two or more values, and value one of them`);
-		}
-		return { control: { id, label, choice: texts, values }, start };
-	}
-	if (spec.toggle !== true) {
-		return fail(`control "${id}" needs range, choice or toggle: true`);
-	}
-	return { control: { id, label, toggle: true }, start: spec.value ? 1 : 0 };
-}
 
 /** Every combination of the controls' value indices, the first control outermost: the order explore-view.tsx indexes frames in. */
 const combinations = (controls: ExploreControl[]): number[][] =>
@@ -290,26 +249,46 @@ function precomputed(frames: [string, ExploreFrame][], kind: "plot" | "chart" | 
 const present = (props: Record<string, string | undefined>) =>
 	Object.fromEntries(Object.entries(props).filter(([, value]) => value));
 
+/** The controls an Explore follows, and the index each starts on: the set `use` names (which Controls declared above), or its own. */
+function followed({ controls, use }: ExploreControls) {
+	if (use === undefined) {
+		return controls?.length
+			? parseControls(controls, fail)
+			: fail(
+					"needs controls (a range, a choice or a toggle) or use, the id of a Controls above it",
+				);
+	}
+	if (controls) {
+		fail(`takes controls or use, not both: use="${use}" follows the controls of that Controls`);
+	}
+	const set = sharedControls(use);
+	if (!set) {
+		const above = declaredSets();
+		return fail(
+			`use="${use}" finds no <Controls id="${use}"> above it: write the Controls before the figures that follow it${above.length ? ` (above it: ${above.join(", ")})` : ""}`,
+		);
+	}
+	return set;
+}
+
 /**
  * Calls frame for every combination of the controls' values (in the browser, only for the starting ones), checks the results,
  * and renders the island for the figure they draw: with the frame function when a client module exports it, else with the
  * frames precomputed. Inside your own client component frame always runs in the browser.
  */
 export function Explore({
-	controls,
 	frame,
 	base = {},
 	label,
 	class: extra,
 	height,
 	id,
+	...own
 }: ExploreProps) {
-	if (!controls.length || typeof frame !== "function") {
-		fail("needs controls (a range, a choice or a toggle) and frame, a function of their values");
+	if (typeof frame !== "function") {
+		fail("needs frame, a function of the controls' values");
 	}
-	const made = controls.map(control);
-	const shown = made.map((m) => m.control);
-	const start = made.map((m) => m.start);
+	const { controls: shown, start } = followed(own);
 	const live = isClientExport(frame) || typeof document !== "undefined";
 	const fn = frame as FrameFunction;
 	const combos = typeof document === "undefined" ? combinations(shown) : [start];
@@ -331,12 +310,28 @@ export function Explore({
 		);
 	}
 	const data: ExploreData = {
-		controls: shown,
-		start,
+		...(own.use === undefined ? { controls: shown, start } : { use: own.use }),
 		label: label ?? "",
 		...present({ class: extra, height, id }),
 		...(live ? { frame: fn, base } : precomputed(merged, kind)),
 	};
 	const Island = kind === "plot" ? ExplorePlot : kind === "chart" ? ExploreChart : ExploreText;
 	return <Island {...data} />;
+}
+
+/**
+ * The row of controls that Explores with `use` of its `id` follow. Its island declares the set as it renders, so an Explore
+ * after it in the page finds the controls, and every one of them updates as the reader chooses.
+ */
+export function Controls({ id, controls }: ControlsProps) {
+	const failed = (message: string): never => {
+		throw new Error(`<Controls${id ? ` id="${id}"` : ""}> ${message}`);
+	};
+	if (!id) {
+		failed("needs an id, which the Explores that follow it name in use");
+	}
+	if (!controls?.length) {
+		failed("needs controls (a range, a choice or a toggle)");
+	}
+	return <ControlsIsland id={id} {...parseControls(controls, failed)} />;
 }

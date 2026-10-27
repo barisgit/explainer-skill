@@ -179,9 +179,13 @@ const FEATURES: Feature[] = [
 	},
 ];
 
+/** Components documented with another one: `kit Controls` prints Explore's, which Controls belongs to. */
+const DOCUMENTED_WITH: Record<string, string> = { controls: "explore" };
+
 /** The documentation `kit <topic>` prints: a component's (any case) or a feature's (kit:reply.js and reply.js name reply). */
 function topicDoc(topic: string): string | undefined {
-	const key = topic.replace(/^kit:/, "").replace(/\.js$/, "").toLowerCase();
+	const named = topic.replace(/^kit:/, "").replace(/\.js$/, "").toLowerCase();
+	const key = DOCUMENTED_WITH[named] ?? named;
 	const component = components().find((c) => c.name.toLowerCase() === key);
 	if (component) {
 		return kitHeader(component.file);

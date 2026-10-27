@@ -1,0 +1,25 @@
+---
+title: Token use, last month
+---
+import { Controls, Explore } from "kit";
+import { CONTROLS, cost, daily, ranking } from "./usage.ts";
+
+# A coding assistant used 340 million tokens in March, three quarters of them served from cache
+
+Made-up numbers for two machines and two harnesses. Change the period, host, harness or view once: every figure below follows.
+
+<Controls id="usage" controls={CONTROLS} />
+
+## Daily use
+
+Weekends are quiet.
+
+<Explore use="usage" label="Tokens per day" frame={daily} />
+
+## Models
+
+<Explore use="usage" label="Tokens by model" frame={ranking} />
+
+## Cost
+
+<Explore use="usage" frame={cost} />

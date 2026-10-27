@@ -20,7 +20,7 @@
    A control with an id keeps its value across reloads (kit keep); in such a component, set its state in onInput or onChange
    with a functional update (setState((s) => ...)), which the restore and Clear fire too. */
 export { Chart } from "./chart.tsx";
-export { Explore } from "./explore.tsx";
+export { Controls, Explore } from "./explore.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
 export { Records, type RecordsProps } from "./records.tsx";

@@ -1,12 +1,14 @@
 /*
- * The browser side of Explore: its controls, stats, readout, figure and caption for the frame the controls choose, taken from
- * the frames pack computed or computed here by the page's frame function. explore-plot.tsx, explore-chart.tsx and
+ * The browser side of Explore: its controls (or, with `use`, the ones Controls shows elsewhere on the page), stats, readout,
+ * figure and caption for the frame the controls choose, taken from the frames pack computed or computed here by the page's
+ * frame function. explore-plot.tsx, explore-chart.tsx and
  * explore-text.tsx are the client modules around it, one per figure, so a page carries the kit scripts of the figure it shows
  * and no other.
  */
 import type { ComponentChildren, JSX } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { apply, type Json, merge } from "./frames.ts";
+import { type SharedControls, sharedControls, useShared } from "./shared-controls.ts";
 
 /**
  * A control as the island gets it; a range's values are min + i * step, i < texts.length, shown as texts[i]; a choice's are
@@ -34,17 +36,17 @@ export type ExploreValue = number | string | boolean;
 export type FrameFunction = (...values: ExploreValue[]) => ExploreFrame;
 
 /**
- * Explore's island props. Precomputed: the first frame, the distinct patches against it and which patch each frame takes (frames
- * in row-major order), their texts HTML. Live: the frame function, a client module's export, and the JSON base under its frames.
+ * Explore's island props. Its controls, with the index each starts on, or `use`, the id of the Controls whose set it follows.
+ * Precomputed: the first frame, the distinct patches against it and which patch each frame takes (frames in row-major order),
+ * their texts HTML. Live: the frame function, a client module's export, and the JSON base under its frames.
  */
 export type ExploreData = {
-	controls: ExploreControl[];
-	start: number[];
 	label: string;
 	class?: string;
 	height?: string;
 	id?: string;
-} & ({ first: Json; patches: Json[]; at: number[] } | { frame: FrameFunction; base: ExploreFrame });
+} & ({ controls: ExploreControl[]; start: number[] } | { use: string }) &
+	({ first: Json; patches: Json[]; at: number[] } | { frame: FrameFunction; base: ExploreFrame });
 
 /** How many values a control has. */
 export const valueCount = (control: ExploreControl): number =>
@@ -135,26 +137,69 @@ function Control({
 	);
 }
 
-/** The frame the controls' value indices choose: a patch applied to the first frame, or the frame function's result. */
-function useFrame(data: ExploreData, values: number[]): ExploreFrame {
-	const index = data.controls.reduce(
-		(n, control, c) => n * valueCount(control) + (values[c] ?? 0),
-		0,
+/** The controls' row; `set` takes the control's index and the index of the value the reader chose. */
+export function ControlRow({
+	controls,
+	values,
+	set,
+}: {
+	controls: ExploreControl[];
+	values: number[];
+	set: (c: number, value: number) => void;
+}) {
+	return (
+		<div class="controls">
+			{controls.map((control, c) => (
+				<Control control={control} value={values[c] ?? 0} set={(v) => set(c, v)} />
+			))}
+		</div>
 	);
+}
+
+/** The frame the controls' value indices choose: a patch applied to the first frame, or the frame function's result. */
+function useFrame(data: ExploreData, controls: ExploreControl[], values: number[]): ExploreFrame {
+	const index = controls.reduce((n, control, c) => n * valueCount(control) + (values[c] ?? 0), 0);
 	// data is the island's props, the same object for its life, so the frame is computed again only when a value changes.
 	return useMemo(
 		() =>
 			"frame" in data
-				? withBase(
-						data.base,
-						data.frame(...data.controls.map((c, i) => valueAt(c, values[i] ?? 0))),
-					)
+				? withBase(data.base, data.frame(...controls.map((c, i) => valueAt(c, values[i] ?? 0))))
 				: (apply(data.first, data.patches[data.at[index] ?? 0] ?? {}) as ExploreFrame),
-		[data, values, index],
+		[data, controls, values, index],
 	);
 }
 
-/** Explore's figure: the controls' row, then the frame they choose; `figure` draws the frame's option (none for text only). */
+/** The set `use` names, which Controls declared as it rendered earlier in the page. */
+function sharedSet(use: string): SharedControls {
+	const set = sharedControls(use);
+	if (!set) {
+		throw new Error(`<Explore use="${use}"> found no <Controls id="${use}"> above it in the page`);
+	}
+	return set;
+}
+
+/**
+ * The controls Explore follows and the indices chosen in them: its own, which it shows (`row`), or the set `use` names, which
+ * Controls shows. A hook per source is always called, so the order of hooks never changes.
+ */
+function useControls(data: ExploreData) {
+	const shared = "use" in data ? sharedSet(data.use) : undefined;
+	const [own, setOwn] = useState("start" in data ? data.start : []);
+	const [chosen, choose] = useShared(shared);
+	return {
+		controls: shared?.controls ?? ("controls" in data ? data.controls : []),
+		values: chosen ?? own,
+		set: shared
+			? choose
+			: (c: number, value: number) => setOwn((now) => now.map((old, i) => (i === c ? value : old))),
+		shows: !shared,
+	};
+}
+
+/**
+ * Explore's figure: its controls' row unless a Controls shows them, then the frame they choose; `figure` draws the frame's
+ * option (none for text only).
+ */
 export function ExploreView({
 	data,
 	figure,
@@ -162,23 +207,15 @@ export function ExploreView({
 	data: ExploreData;
 	figure?: (option: PlotOption | ChartOption) => JSX.Element;
 }) {
-	const [values, setValues] = useState(data.start);
-	const frame = useFrame(data, values);
+	const { controls, values, set, shows } = useControls(data);
+	const frame = useFrame(data, controls, values);
 	// Precomputed texts are HTML pack rendered; a frame function's are text or JSX.
 	const content = (text: ComponentChildren) =>
 		"frame" in data ? { children: text } : { dangerouslySetInnerHTML: { __html: String(text) } };
 	const option = frame.plot ?? frame.chart;
 	return (
 		<figure class="fig" id={data.id}>
-			<div class="controls">
-				{data.controls.map((control, c) => (
-					<Control
-						control={control}
-						value={values[c] ?? 0}
-						set={(v) => setValues((now) => now.map((old, i) => (i === c ? v : old)))}
-					/>
-				))}
-			</div>
+			{shows && <ControlRow controls={controls} values={values} set={set} />}
 			{frame.stats && (
 				<dl class="stats" aria-live="polite">
 					{Object.entries(frame.stats).map(([term, value]) => (
