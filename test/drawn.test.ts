@@ -134,6 +134,13 @@ describe("a Chart and a Plot drawn at pack time", () => {
 	}, 60_000);
 });
 
+const OPTION = `{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "bar", data: [1, 3] }] }`;
+const CHART = (extra: string) =>
+	`{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, ${extra} }`;
+/** A Plot whose legend has four names: it takes one row from half a column up, and two on a phone. */
+const LEGEND_PLOT = (names: string[]) =>
+	`{ series: [${names.map((name, i) => `{ name: "${name}", data: [[0, ${i}], [1, ${i + 1}]] }`).join(", ")}] }`;
+
 describe("what pack draws is exact, or nothing", () => {
 	test("a colour pack cannot read back exactly leaves its figure to the live chart", async () => {
 		const figures = drawnFigures(
@@ -141,26 +148,48 @@ describe("what pack draws is exact, or nothing", () => {
 				dir,
 				"unreadable",
 				`import { Chart } from "kit";
+import { paint } from "./paint.tsx";
 
 # Unreadable
 
 <Chart id="to-literal" label="Token to literal" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: { type: "category", data: ["x"] }, visualMap: { min: 0, max: 10, inRange: { color: ["var(--c2)", "#ff0000"] } }, series: [{ type: "heatmap", data: [[0, 0, 0], [1, 0, 3]] }] }} />
 
-<Chart id="lightness" label="Lightness" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, visualMap: { show: false, min: 0, max: 10, inRange: { colorLightness: [0.2, 0.8] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "var(--c2)" } }] }} />
+<Chart id="callback" label="Callback" option={${CHART('series: [{ type: "bar", data: [1, 3], itemStyle: { color: paint } }]')}} />
 
-<Chart id="replaced-alpha" label="Replaced alpha" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, visualMap: { show: false, min: 0, max: 10, inRange: { colorAlpha: [0.4, 0.4] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)" } }] }} />
+<Chart id="lightness" label="Lightness" option={${CHART('visualMap: { show: false, min: 0, max: 10, inRange: { colorLightness: [0.2, 0.8] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "var(--c2)" } }]')}} />
 
-<Chart id="multiplied-alpha" label="Multiplied alpha" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "line", data: [1, 3], areaStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)", opacity: 0.4 } }] }} />
+<Chart id="alpha-replaced" label="Alpha replaced" option={${CHART('visualMap: { show: false, min: 0, max: 10, inRange: { colorAlpha: [0.4, 0.4] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)" } }]')}} />
 
-<Chart id="literal" label="Literal" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "#ed5c93" } }] }} />
+<Chart id="alpha-restored" label="Alpha restored" option={${CHART('visualMap: { show: false, min: 0, max: 10, inRange: { colorAlpha: [1, 1] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)" } }]')}} />
+
+<Chart id="translucent-mix" label="Translucent mix" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: { type: "category", data: ["x"] }, visualMap: { min: 0, max: 10, inRange: { color: ["var(--c2)", "color-mix(in srgb, var(--c5) 30%, transparent)"] } }, series: [{ type: "heatmap", data: [[0, 0, 0], [1, 0, 3]] }] }} />
+
+<Chart id="mark-area" label="Mark area" option={${CHART('series: [{ type: "bar", data: [1, 3], itemStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)" }, markArea: { data: [[{ xAxis: "a" }, { xAxis: "b" }]] } }]')}} />
+
+<Chart id="mark-area-token" label="Mark area, opaque token" option={${CHART('series: [{ type: "bar", data: [1, 3], itemStyle: { color: "var(--c2)" }, markArea: { data: [[{ xAxis: "a" }, { xAxis: "b" }]] } }]')}} />
+
+<Chart id="multiplied-alpha" label="Multiplied alpha" option={${CHART('series: [{ type: "line", data: [1, 3], areaStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)", opacity: 0.4 } }]')}} />
+
+<Chart id="literal" label="Literal" option={${CHART('series: [{ type: "bar", data: [1, 3], itemStyle: { color: "#ed5c93" } }]')}} />
 `,
+				{ "paint.tsx": `"use client";\nexport const paint = () => "#b26d3c";\n` },
 			),
 		);
-		// A token mixed with a literal, a lightness change and a replaced alpha are colours no CSS expression gives exactly.
-		expect(figures.get("to-literal")).toBeUndefined();
-		expect(figures.get("lightness")).toBeUndefined();
-		expect(figures.get("replaced-alpha")).toBeUndefined();
-		// An opacity multiplies the expression's own alpha, in the drawing as on the canvas.
+		// A token mixed with a literal or a translucent colour, a colour function, a transform of alpha or lightness and a
+		// markArea over a colour that may be translucent are colours no CSS expression gives exactly.
+		for (const id of [
+			"to-literal",
+			"callback",
+			"lightness",
+			"alpha-replaced",
+			"alpha-restored",
+			"translucent-mix",
+			"mark-area",
+		]) {
+			expect(figures.get(id), id).toBeUndefined();
+		}
+		// An opaque token under a markArea, and an opacity over an expression's own alpha (which multiplies it, as on the canvas), are exact.
+		expect(figures.get("mark-area-token")).toContain("var(--c2)");
 		expect(figures.get("multiplied-alpha")).toMatch(
 			/fill-opacity="0.4" style="fill:color-mix\(in srgb, var\(--c2\) 50%, transparent\)"/,
 		);
@@ -169,61 +198,39 @@ describe("what pack draws is exact, or nothing", () => {
 		expect(figures.get("literal")).not.toContain("var(--under)");
 	}, 30_000);
 
-	test("take the height the page's CSS gives the element, by specificity and !important, else no drawing", async () => {
+	test("take the height from the kit: the theme's, tall, or the height prop; with scripts off the drawing fits its element", async () => {
 		const sized = await packedMdx(
 			dir,
 			"sized",
 			`import { Chart, Plot } from "kit";
-import "./sized.css";
 
 # Sized
 
-<Chart id="small" label="Small" option={BARS} />
+<Chart id="theme" label="Theme" option={${OPTION}} />
 
-<Chart id="loud" class="loud" label="Loud" option={BARS} />
+<Chart id="tall" class="tall" label="Tall" option={${OPTION}} />
 
-<Plot id="low" label="Low" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+<Chart id="short" height="100px" label="Short" option={${OPTION}} />
 
-<Chart class="tall" label="Tall" option={BARS} />
+<Chart id="clamped" height="clamp(10rem, 20vw, 14rem)" label="Clamped" option={${OPTION}} />
 
-export const BARS = { xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] };
+<Plot id="plot" height="200px" label="Plot" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+
+<Chart id="percent" height="50%" label="Percent" option={${OPTION}} />
 `,
-			{
-				"sized.css": `#small { block-size: 100px; }
-.chart { block-size: 300px; }
-.chart.loud { block-size: clamp(10rem, 20vw, 14rem) !important; }
-#loud { block-size: 50px; }
-#low { height: 200px; }
-`,
-			},
 		);
 		const figures = drawnFigures(sized);
-		// The id outranks the later class; !important outranks the id (14rem on a desktop, 10rem on a phone); the Plot's area is
-		// its 200 px less the padding; .tall takes the page's .chart, which outranks the theme's layer.
-		expect(viewBoxes(figures.get("small"))).toEqual(["1054x100", "527x100", "356x100"]);
-		expect(viewBoxes(figures.get("loud"))).toEqual(["1054x224", "527x224", "356x160"]);
-		expect(viewBoxes(figures.get("low"))).toEqual(["1054x192", "527x192", "356x192"]);
-		expect(viewBoxes(figures.get("figure-4"))).toEqual(["1054x300", "527x300", "356x300"]);
-		// With scripts off, the copy showing fills its element at its drawn size, so its text is as large as the live chart's.
-		const scales = await withPage(async (cdp) => {
-			await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
-			await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
-			const found: number[] = [];
-			for (const viewport of WIDTHS) {
-				await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
-				await cdp.load(`file://${sized}`);
-				found.push(...(await cdp.evaluate<number[]>(DRAWN_SCALES)));
-			}
-			return found;
-		});
-		expect(scales).toHaveLength(WIDTHS.length * 4);
-		for (const scale of scales) {
-			expect(scale).toBeGreaterThan(0.9);
-			expect(scale).toBeLessThan(1.1);
-		}
+		// The Plot's area is its 200 px less the legend's padding; a height that is no plain length is the live chart's to draw.
+		expect(viewBoxes(figures.get("theme"))).toEqual(["1054x416", "527x416", "356x288"]);
+		expect(viewBoxes(figures.get("tall"))).toEqual(["1054x544", "527x544", "356x352"]);
+		expect(viewBoxes(figures.get("short"))).toEqual(["1054x100", "527x100", "356x100"]);
+		expect(viewBoxes(figures.get("clamped"))).toEqual(["1054x224", "527x224", "356x160"]);
+		expect(viewBoxes(figures.get("plot"))).toEqual(["1054x192", "527x192", "356x192"]);
+		expect(figures.get("percent")).toBeUndefined();
+		await expectFitted(sized, 5);
 	}, 60_000);
 
-	test("draw nothing where a page rule might set the height and pack cannot tell what it comes to", async () => {
+	test("draw nothing where a page rule may change the element's box", async () => {
 		const figures = drawnFigures(
 			await packedMdx(
 				dir,
@@ -233,32 +240,107 @@ import "./unsized.css";
 
 # Unsized
 
-<Chart id="nested" label="Nested" option={BARS} />
+<Chart id="sized" label="Sized" option={${OPTION}} />
 
-<Chart id="queried" class="queried" label="Queried" option={BARS} />
+<Chart id="nested" label="Nested" option={${OPTION}} />
+
+<Chart id="queried" class="queried" label="Queried" option={${OPTION}} />
+
+<Chart id="padded" class="padded" label="Padded" option={${OPTION}} />
+
+<Chart id="bordered" class="bordered" label="Bordered" option={${OPTION}} />
+
+<Chart id="reset" class="reset" label="Reset" option={${OPTION}} />
 
 <Plot id="relative" class="relative" label="Relative" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
 
-<Chart id="free" label="Free" option={BARS} />
-
-export const BARS = { xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] };
+<Chart id="free" label="Free" option={${OPTION}} />
 `,
 				{
-					"unsized.css": `.page #nested { block-size: 5rem; }
+					"unsized.css": `#sized { block-size: 100px; }
+.chart { color: red; }
+.page #nested { block-size: 5rem; }
 @media (min-width: 60rem) { .queried { block-size: 30rem; } }
+.padded { padding: 2rem; }
+.bordered { border: 1px solid; }
+.reset { all: revert-layer; }
 .relative { block-size: 50%; }
-.key svg { block-size: 1rem; }
+.key svg { block-size: 1rem; padding: 1rem; }
+[data-step] { inline-size: max-content; }
 `,
 				},
 			),
 		);
-		expect(figures.get("nested")).toBeUndefined();
-		expect(figures.get("queried")).toBeUndefined();
-		expect(figures.get("relative")).toBeUndefined();
-		// No rule could reach this one (an svg is not a chart), so the theme's height stands.
+		for (const id of ["sized", "nested", "queried", "padded", "bordered", "reset", "relative"]) {
+			expect(figures.get(id), id).toBeUndefined();
+		}
+		// No rule that sets a size or a border reaches this one (an svg or a [data-step] is not a chart; a colour changes no box): the theme's height stands.
 		expect(viewBoxes(figures.get("free"))).toEqual(["1054x416", "527x416", "356x288"]);
 	}, 30_000);
+
+	test("draw nothing where a page rule may set the root font size rem is read against", async () => {
+		const figures = drawnFigures(
+			await packedMdx(
+				dir,
+				"rootfont",
+				`import { Chart } from "kit";
+import "./rootfont.css";
+
+# Root font
+
+<Chart id="chart" label="Chart" option={${OPTION}} />
+`,
+				{ "rootfont.css": ":root { font-size: 20px; }\n" },
+			),
+		);
+		expect(figures.get("chart")).toBeUndefined();
+	}, 30_000);
+
+	test("count the rows a plot's legend wraps into at each width, and draw nothing where they are not the same across a copy's widths", async () => {
+		const legends = await packedMdx(
+			dir,
+			"legends",
+			`import { Plot } from "kit";
+
+# Legends
+
+<Plot id="one-row" label="One row" option={${LEGEND_PLOT(["Load", "Peak"])}} />
+
+<Plot id="phone-wraps" label="Phone wraps" option={${LEGEND_PLOT(["Voltage", "Current", "Power draw", "Efficiency"])}} />
+
+<Plot id="many" label="Many" option={${LEGEND_PLOT(["Mean load on the main feeder", "Peak load on the main feeder", "Mean load on the spare feeder", "Peak load on the spare feeder", "Mean load on the backup", "Peak load on the backup"])}} />
+`,
+		);
+		const figures = drawnFigures(legends);
+		// One row of 30.2 px and 8 px of padding above the area; the phone's second row, where the legend needs it.
+		expect(viewBoxes(figures.get("one-row"))).toEqual(["1054x377.8", "527x377.8", "356x249.8"]);
+		expect(viewBoxes(figures.get("phone-wraps"))).toEqual(["1054x377.8", "527x377.8", "356x219.6"]);
+		// Six long names take one row, two or three by the width the copy is shown at.
+		expect(figures.get("many")).toBeUndefined();
+		await expectFitted(legends, 2);
+	}, 60_000);
 });
+
+/** Opens the page with scripts off at each width, and expects its `count` drawn copies showing to fit their elements at the drawn size. */
+async function expectFitted(path: string, count: number): Promise<void> {
+	// With scripts off, the copy showing fills its element at its drawn size, so its text is as large as the live chart's.
+	const scales = await withPage(async (cdp) => {
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		const found: number[] = [];
+		for (const viewport of WIDTHS) {
+			await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
+			await cdp.load(`file://${path}`);
+			found.push(...(await cdp.evaluate<number[]>(DRAWN_SCALES)));
+		}
+		return found;
+	});
+	expect(scales).toHaveLength(WIDTHS.length * count);
+	for (const scale of scales) {
+		expect(scale).toBeGreaterThan(0.98);
+		expect(scale).toBeLessThan(1.02);
+	}
+}
 
 /**
  * The markup pack drew inside each figure of a packed page, by the figure's id ("figure-N", counted from 1, for one without),
@@ -282,7 +364,9 @@ function drawnFigures(path: string): Map<string, string | undefined> {
 
 /** The width and height of each copy's viewBox in a figure's drawn markup. */
 const viewBoxes = (drawn: string | undefined) =>
-	[...(drawn ?? "").matchAll(/<svg viewBox="0 0 (\d+) (\d+)"/g)].map((m) => `${m[1]}x${m[2]}`);
+	[...(drawn ?? "").matchAll(/<svg viewBox="0 0 ([\d.]+) ([\d.]+)"/g)].map(
+		(m) => `${m[1]}x${m[2]}`,
+	);
 
 /** Page expression: for each drawn copy showing, how much it is scaled to fit its element (1 when drawn at the element's size). */
 const DRAWN_SCALES = `[...document.querySelectorAll(".chart-drawn > svg")].filter((svg) => svg.getBoundingClientRect().width > 0).map((svg) => {

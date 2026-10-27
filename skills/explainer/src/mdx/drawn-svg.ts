@@ -5,16 +5,8 @@
 
 import type { PaintOf } from "./stand-ins.ts";
 
-/** The SVG attributes that hold a colour, each with the attribute that gives it an opacity. */
-const PAINT: Record<string, string> = {
-	fill: "fill-opacity",
-	stroke: "stroke-opacity",
-	"stop-color": "stop-opacity",
-	"flood-color": "flood-opacity",
-};
-
-/** Whether an opacity attribute value, when there is one, lets what is under it through. */
-const seeThrough = (value: string | undefined) => value !== undefined && Number(value) < 1;
+/** The SVG attributes that hold a colour. */
+const PAINT = new Set(["fill", "stroke", "stop-color", "flood-color"]);
 
 /**
  * An element's opening tag with each stand-in colour among its paint attributes moved into its style as the expression, which
@@ -22,22 +14,14 @@ const seeThrough = (value: string | undefined) => value !== undefined && Number(
  * expression gives exactly.
  */
 function cssPaint(tag: string, paintOf: PaintOf): string | undefined {
-	const attributes = new Map(
-		[...tag.matchAll(/\s([\w-]+)="([^"]*)"/g)].map((m) => [m[1] as string, m[2] as string]),
-	);
 	const styles: string[] = [];
 	let exact = true;
 	const rest = tag.replace(/\s([\w-]+)="([^"]*)"/g, (whole, name: string, value: string) => {
-		const opacity = PAINT[name];
-		if (opacity === undefined) {
+		if (!PAINT.has(name)) {
 			return whole;
 		}
-		const translucent =
-			seeThrough(attributes.get(opacity)) || seeThrough(attributes.get("opacity"));
-		const css = paintOf(value, translucent);
-		if (css === undefined) {
-			exact = false;
-		}
+		const css = paintOf(value);
+		exact &&= css !== undefined;
 		if (!css) {
 			return whole;
 		}

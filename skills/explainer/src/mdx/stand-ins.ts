@@ -5,8 +5,8 @@
  *
  * ECharts also derives colours: a visualMap or a gradient it samples mixes two of the colours listed with it linearly in sRGB.
  * The stand-ins are spread through the colour cube, far from each other, from the colours the option writes as they are, and
- * from the lines between any two, so such a mix is read back as a color-mix() of the two expressions, which mixes the same way. Any other
- * colour derived from a stand-in (mixed with a literal, lightened, its alpha replaced) has no exact expression: the drawing is
+ * from the lines between any two, so a mix of two opaque expressions is read back as a color-mix() of them, which mixes the same
+ * way. Any other colour (mixed with a literal, or of a stand-in that is none of those) has no exact expression: the drawing is
  * then not to be trusted, and draw.ts leaves the figure to the kit script.
  */
 
@@ -56,15 +56,6 @@ function rgbOf(value: string): Rgb | undefined {
 	return color ? [color.r, color.g, color.b] : undefined;
 }
 
-/** The alpha an SVG colour value writes (rgba(...) or #rrggbbaa), 1 when it writes none. */
-function alphaOf(value: string): number {
-	const rgba = /^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)$/.exec(value);
-	if (rgba) {
-		return Number(rgba[1]);
-	}
-	return /^#[0-9a-f]{8}$/i.test(value) ? Number.parseInt(value.slice(7), 16) / 255 : 1;
-}
-
 /** The next value of a fixed sequence (a linear congruential generator), so a chart's stand-ins are the same on every pack. */
 const next = (seed: number) => (seed * 1103515245 + 12345) % 2 ** 31;
 
@@ -78,22 +69,20 @@ export interface ChartColours {
 	 */
 	literals: readonly string[];
 	/**
-	 * The expressions the option lists together (a visualMap's range, a gradient's stops), which ECharts may mix: only their
-	 * mixes are read back as such.
+	 * The opaque expressions the option lists together (a visualMap's range, a gradient's stops), which ECharts may mix: only
+	 * their mixes are read back as such, as a mix with a translucent colour differs in CSS.
 	 */
 	mixes: readonly (readonly string[])[];
-	/** Whether ECharts may replace a colour's alpha rather than multiply it (colorAlpha, a markArea's fill). */
-	replacesAlpha: boolean;
 }
 
 /**
  * How the drawing writes one paint attribute's value: `css` for the expression it stood in for, set in the element's style; null
  * for a value kept as it is; undefined when no expression gives that colour exactly.
  */
-export type PaintOf = (value: string, translucent: boolean) => string | null | undefined;
+export type PaintOf = (value: string) => string | null | undefined;
 
 /** The stand-ins of one chart: `color` gives an expression's, `paintOf` reads an SVG paint value back. */
-export function standIns({ literals, mixes, replacesAlpha }: ChartColours) {
+export function standIns({ literals, mixes }: ChartColours) {
 	const kept = literals.map(rgbOf).filter((rgb) => rgb !== undefined);
 	const expressions: string[] = [];
 	const rgbs: Rgb[] = [];
@@ -159,26 +148,16 @@ export function standIns({ literals, mixes, replacesAlpha }: ChartColours) {
 		return best && `color-mix(in srgb, ${best.a} ${percent(1 - best.t)}, ${best.b})`;
 	}
 
-	/**
-	 * A stand-in's expression with the alpha ECharts gave it, which multiplies the expression's own as it does on the canvas;
-	 * undefined where ECharts may have replaced that alpha instead, which no expression can say without knowing its own.
-	 */
-	const paintOf: PaintOf = (value, translucent) => {
+	/** A stand-in's expression, or a mix of two; null for a value kept as it is, undefined for a colour no expression gives. */
+	const paintOf: PaintOf = (value) => {
 		if (KEYWORDS.test(value)) {
 			return null;
 		}
 		const rgb = rgbOf(value);
-		const expression = rgb && expressionFor(rgb);
-		if (!expression) {
-			return rgb && kept.some((k) => apart(rgb, k) === 0) ? null : undefined;
-		}
-		const alpha = alphaOf(value);
-		if (replacesAlpha && (translucent || alpha < 1)) {
+		if (!rgb || Bun.color(value, "{rgba}")?.a !== 1) {
 			return undefined;
 		}
-		return alpha < 1
-			? `color-mix(in srgb, ${expression} ${percent(alpha)}, transparent)`
-			: expression;
+		return expressionFor(rgb) ?? (kept.some((k) => apart(rgb, k) === 0) ? null : undefined);
 	};
 	return { color, paintOf };
 }
