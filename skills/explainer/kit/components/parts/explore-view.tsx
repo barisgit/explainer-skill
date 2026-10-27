@@ -1,14 +1,19 @@
 /*
  * The browser side of Explore: its controls (or, with `use`, the ones Controls shows elsewhere on the page), stats, readout,
  * figure and caption for the frame the controls choose, taken from the frames pack computed or computed here by the page's
- * frame function. explore-plot.tsx, explore-chart.tsx and
- * explore-text.tsx are the client modules around it, one per figure, so a page carries the kit scripts of the figure it shows
- * and no other.
+ * frame function. explore-plot.tsx, explore-chart.tsx and explore-text.tsx are the client modules around it, one per figure,
+ * so a page carries the kit scripts of the figure it shows and no other.
  */
 import type { ComponentChildren, JSX } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { apply, type Json, merge } from "./frames.ts";
-import { anchorOf, type SharedControls, sharedControls, useShared } from "./shared-controls.ts";
+import {
+	anchorOf,
+	type ControlSet,
+	newControlSet,
+	sharedControls,
+	useControlSet,
+} from "./shared-controls.ts";
 
 /**
  * A control as the island gets it; a range's values are min + i * step, i < texts.length, shown as texts[i]; a choice's are
@@ -211,31 +216,25 @@ function ControlsState({
 	);
 }
 
-/** The set `use` names, which Controls declared as it rendered earlier in the page. */
-function sharedSet(use: string): SharedControls {
-	const set = sharedControls(use);
-	if (!set) {
-		throw new Error(`<Explore use="${use}"> found no <Controls id="${use}"> above it in the page`);
-	}
-	return set;
-}
-
 /**
- * The controls Explore follows and the indices chosen in them: its own, which it shows (`row`), or the set `use` names, which
- * Controls shows. A hook per source is always called, so the order of hooks never changes.
+ * The set of controls Explore follows and the indices chosen in it: the set `use` names, which Controls declared as it
+ * rendered earlier in the page and shows, or its own controls, which Explore shows (`shows`).
  */
 function useControls(data: ExploreData) {
-	const shared = "use" in data ? sharedSet(data.use) : undefined;
-	const [own, setOwn] = useState("start" in data ? data.start : []);
-	const [chosen, choose] = useShared(shared);
-	return {
-		controls: shared?.controls ?? ("controls" in data ? data.controls : []),
-		values: chosen ?? own,
-		set: shared
-			? choose
-			: (c: number, value: number) => setOwn((now) => now.map((old, i) => (i === c ? value : old))),
-		shows: !shared,
-	};
+	const [set] = useState<ControlSet>(() => {
+		if (!("use" in data)) {
+			return newControlSet(data.controls, data.start);
+		}
+		const shared = sharedControls(data.use);
+		if (!shared) {
+			throw new Error(
+				`<Explore use="${data.use}"> found no <Controls id="${data.use}"> above it in the page`,
+			);
+		}
+		return shared;
+	});
+	const [values, choose] = useControlSet(set);
+	return { controls: set.controls, values, choose, shows: !("use" in data) };
 }
 
 /**
@@ -249,7 +248,7 @@ export function ExploreView({
 	data: ExploreData;
 	figure?: (option: PlotOption | ChartOption) => JSX.Element;
 }) {
-	const { controls, values, set, shows } = useControls(data);
+	const { controls, values, choose, shows } = useControls(data);
 	const frame = useFrame(data, controls, values);
 	// Precomputed texts are HTML pack rendered; a frame function's are text or JSX.
 	const content = (text: ComponentChildren) =>
@@ -258,7 +257,7 @@ export function ExploreView({
 	return (
 		<figure class="fig" id={data.id}>
 			{"use" in data && <ControlsState use={data.use} controls={controls} values={values} />}
-			{shows && <ControlRow controls={controls} values={values} set={set} />}
+			{shows && <ControlRow controls={controls} values={values} set={choose} />}
 			{frame.stats && (
 				<dl class="stats" aria-live="polite">
 					{Object.entries(frame.stats).map(([term, value]) => (

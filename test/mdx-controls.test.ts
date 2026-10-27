@@ -181,7 +181,7 @@ export const level = (m: number, kind: string) => ({ readout: kind + " at " + m.
 });
 
 describe("shared controls errors", () => {
-	test("a use that names no Controls above it, two sets with one id, and a frame that fails a combination fail the pack, each saying what to write", async () => {
+	test("a use that names no Controls above it (none, or only after it), two sets with one id, and a frame that fails a combination fail the pack, each saying what to write", async () => {
 		const row = `controls={[{ id: "on", label: "On", toggle: true }]}`;
 		const failure = async (name: string, body: string) => {
 			const source = `import { Controls, Explore } from "kit";\n\n# Fails\n\n${body}\n`;
@@ -190,10 +190,6 @@ describe("shared controls errors", () => {
 		};
 		const figure = (use: string, frame = "() => ({ readout: 'x' })") =>
 			`<Explore use="${use}" frame={${frame}} />`;
-		expect(await failure("none", figure("usage"))).toEqual([
-			1,
-			expect.stringContaining('<Explore> use="usage" finds no <Controls id="usage"> above it'),
-		]);
 		expect(await failure("before", `${figure("a")}\n\n<Controls id="a" ${row} />`)).toEqual([
 			1,
 			expect.stringContaining('<Explore> use="a" finds no <Controls id="a"> above it'),

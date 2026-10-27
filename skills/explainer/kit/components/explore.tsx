@@ -20,14 +20,13 @@
    Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page, and the
    starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart).
    Controls: one set of controls for figures in different sections. Write <Controls id="usage" controls={[...]} /> once, where the
-   reader should find it, then <Explore use="usage" label="..." frame={daily} /> after it, in any section, in place of controls:
-   every Explore that uses it follows the same choices, shows no controls of its own, and takes the same props (a frame
-   that computes in the browser, base, height, a readout or stats alone). frame gets all the set's values, in the order the
-   controls are written, so list first the ones most figures read: (period, host) => ... may leave the later ones out. A frame
-   is called for every combination of all the set's values, and each Explore carries its own frames (100 KB), so add a
-   control for what changes the figures, not for what one figure shows; a slider of many steps among others is a case for a
-   frame from a "use client" module. Each such figure shows a line of the chosen values that links back to the controls, except one
-   right under them. A frame that turns something back on says so: legend: { show: view === "breakdown" }, not {}. */
+   reader should find it, then <Explore use="usage" label="..." frame={daily} /> after it, in any section, in place of controls.
+   Every such Explore follows the same choices, takes the other props as usual (a "use client" frame, base, height, a readout or
+   stats alone) and shows a line of the chosen values that links back to the controls, except right under them. frame gets all
+   the set's values in the order written, so list first the ones most figures read: (period, host) => ... may leave later ones
+   out. It is called for every combination, and each Explore carries its own frames (100 KB): add a control for what changes the
+   figures, not for what one figure shows; a slider of many steps among others suits a "use client" frame. A frame that turns
+   something back on says so: legend: { show: view === "breakdown" }, not {}. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
