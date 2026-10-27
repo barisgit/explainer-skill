@@ -22,7 +22,8 @@
    Controls: one set of controls for figures in different sections. Write <Controls id="usage" controls={[...]} /> once, where the
    reader should find it, then <Explore use="usage" label="..." frame={daily} /> after it, in any section, in place of controls.
    Every such Explore follows the same choices, takes the other props as usual (a "use client" frame, base, height, a readout or
-   stats alone) and shows a line of the chosen values that links back to the controls, except right under them. frame gets all
+   stats alone) and shows a line of the chosen values that links back to the controls, except right under them. Put a Controls
+   and its Explores in one place: the page outside the Views, or one View, or one record of a filled View. frame gets all
    the set's values in the order written, so list first the ones most figures read: (period, host) => ... may leave later ones
    out. It is called for every combination, and each Explore carries its own frames (100 KB): add a control for what changes the
    figures, not for what one figure shows; a slider of many steps among others suits a "use client" frame. A frame that turns
@@ -46,7 +47,8 @@ import {
 	withBase,
 } from "./parts/explore-view.tsx";
 import { diff, isPoint, type Json } from "./parts/frames.ts";
-import { declaredSets, sharedControls } from "./parts/shared-controls.ts";
+import { type Place, usePlace } from "./parts/place.ts";
+import { sharedControls } from "./parts/shared-controls.ts";
 
 export type { ExploreControlProps, ExploreFrame, ExploreValue };
 
@@ -63,6 +65,8 @@ export type ExploreProps = ExploreControls & {
 	class?: string;
 	height?: string;
 	id?: string;
+	/** Set by pack on an Explore with `use` written right under its Controls, which leaves out its line on screen. */
+	under?: boolean;
 };
 
 /** What Controls takes: the set's `id`, which Explores name in `use`, and the controls as Explore writes them. */
@@ -79,6 +83,15 @@ interface Shown {
 	stats?: Record<string, string>;
 	caption?: string;
 }
+
+/** The English texts the component adds, by kitLabels key; `kit labels` lists them with the kit scripts' own. */
+const LABELS = {
+	off: "off",
+};
+
+/** The page's text for `key`, else the English one (the page's frontmatter labels are kitLabels, in pack and in the browser). */
+const kitText = (key: keyof typeof LABELS) =>
+	(typeof kitLabels === "undefined" ? undefined : kitLabels?.[key]) || LABELS[key];
 
 const FRAME_KEYS = new Set(["plot", "chart", "readout", "stats", "caption"]);
 /** The most precomputed frames may take in the page; past it, the browser computing them is the better trade. */
@@ -250,7 +263,7 @@ const present = (props: Record<string, string | undefined>) =>
 	Object.fromEntries(Object.entries(props).filter(([, value]) => value));
 
 /** The controls an Explore follows, and the index each starts on: the set `use` names (which Controls declared above), or its own. */
-function followed({ controls, use }: ExploreControls) {
+function followed({ controls, use }: ExploreControls, place: Place) {
 	if (use === undefined) {
 		return controls?.length
 			? parseControls(controls, fail)
@@ -261,11 +274,11 @@ function followed({ controls, use }: ExploreControls) {
 	if (controls) {
 		fail(`takes controls or use, not both: use="${use}" follows the controls of that Controls`);
 	}
-	const set = sharedControls(use);
+	const set = sharedControls(place, use);
 	if (!set) {
-		const above = declaredSets();
+		const above = [...place.sets.keys()];
 		return fail(
-			`use="${use}" finds no <Controls id="${use}"> above it: write the Controls before the figures that follow it${above.length ? ` (above it: ${above.join(", ")})` : ""}`,
+			`use="${use}" finds no <Controls id="${use}"> above it in the same place (the page outside its Views, or one View, or one record): write the Controls before the figures that follow it, in the same place${above.length ? ` (above it: ${above.join(", ")})` : ""}`,
 		);
 	}
 	return set;
@@ -283,12 +296,14 @@ export function Explore({
 	class: extra,
 	height,
 	id,
+	under,
 	...own
 }: ExploreProps) {
 	if (typeof frame !== "function") {
 		fail("needs frame, a function of the controls' values");
 	}
-	const { controls: shown, start } = followed(own);
+	const place = usePlace();
+	const { controls: shown, start } = followed(own, place);
 	const live = isClientExport(frame) || typeof document !== "undefined";
 	const fn = frame as FrameFunction;
 	const combos = typeof document === "undefined" ? combinations(shown) : [start];
@@ -310,7 +325,14 @@ export function Explore({
 		);
 	}
 	const data: ExploreData = {
-		...(own.use === undefined ? { controls: shown, start } : { use: own.use }),
+		...(own.use === undefined
+			? { controls: shown, start }
+			: {
+					use: own.use,
+					off: kitText("off"),
+					...(place.name && { scope: place.name }),
+					...(under && { under }),
+				}),
 		label: label ?? "",
 		...present({ class: extra, height, id }),
 		...(live ? { frame: fn, base } : precomputed(merged, kind)),
@@ -321,9 +343,10 @@ export function Explore({
 
 /**
  * The row of controls that Explores with `use` of its `id` follow. Its island declares the set as it renders, so an Explore
- * after it in the page finds the controls, and every one of them updates as the reader chooses.
+ * after it in the same place (parts/place.ts) finds the controls, and every one of them updates as the reader chooses.
  */
 export function Controls({ id, controls }: ControlsProps) {
+	const place = usePlace();
 	const failed = (message: string): never => {
 		throw new Error(`<Controls${id ? ` id="${id}"` : ""}> ${message}`);
 	};
@@ -333,5 +356,15 @@ export function Controls({ id, controls }: ControlsProps) {
 	if (!controls?.length) {
 		failed("needs controls (a range, a choice or a toggle)");
 	}
-	return <ControlsIsland id={id} {...parseControls(controls, failed)} />;
+	// Pack finds a second Controls with the id; in the browser a client component renders again and again, so it must not.
+	if (typeof document === "undefined" && place.sets.has(id)) {
+		failed("is on the page twice: give each set its own id");
+	}
+	return (
+		<ControlsIsland
+			id={id}
+			{...parseControls(controls, failed)}
+			{...(place.name && { scope: place.name })}
+		/>
+	);
 }

@@ -28,8 +28,10 @@
    view's heading. Previous and next walk the views of its kind (the ones the view it was opened from links to, else all of
    them); a page with views inside views (two or more view names) gets a contents rail of its sections. A section with two or
    more folds gets Expand all. A View belongs to the page: put client components inside it, not a View inside a client component
-   or a record. */
+   or a record. A Controls and the Explores that follow it (kit Explore) belong together: all on the page outside the views, or all in
+   one view or record. */
 import { type ComponentChildren, h } from "preact";
+import { PlaceContext, placeNamed } from "./parts/place.ts";
 import { type Fillable, viewBody } from "./view-body.ts";
 
 /** A record of a filled view: its id is the param that opens it. */
@@ -103,11 +105,14 @@ export function View<T extends ViewRecord>(props: ViewProps<T>) {
 		return h(VIEW_MARKER, null, filledView(props));
 	}
 	const { name, param, back, id, children } = props;
+	const at = param === undefined ? name : route(name, param);
 	return h(
 		VIEW_MARKER,
 		null,
-		<section class="view" data-view={param === undefined ? name : route(name, param)} id={id}>
-			{viewBody(children, back)}
+		<section class="view" data-view={at} id={id}>
+			<PlaceContext.Provider value={placeNamed(at)}>
+				{viewBody(children, back)}
+			</PlaceContext.Provider>
 		</section>,
 	);
 }

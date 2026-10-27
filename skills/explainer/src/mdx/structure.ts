@@ -130,6 +130,33 @@ function* viewsIn(node: Nodes): Generator<MdxJsxFlowElement> {
 	}
 }
 
+/** The value of a JSX element's attribute when it is written as a plain string, as `id="usage"`. */
+const stringAttribute = (node: MdxJsxFlowElement, name: string): string | undefined => {
+	const found = node.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
+	return found?.type === "mdxJsxAttribute" && typeof found.value === "string"
+		? found.value
+		: undefined;
+};
+
+/**
+ * Marks each `<Explore use="x">` written right after `<Controls id="x">` with `under`: the controls are in sight there, so the
+ * figure's line of chosen values is left out on screen. Only pack sees the order the page was written in, and CSS cannot tell
+ * which Controls a figure follows, so a Controls of another set between them would hide the line wrongly.
+ */
+function markUnder(node: Nodes) {
+	if (!("children" in node)) {
+		return;
+	}
+	for (const [i, child] of node.children.entries()) {
+		const next = node.children[i + 1];
+		const id = isJsx(child, "Controls") ? stringAttribute(child, "id") : undefined;
+		if (id !== undefined && next && isJsx(next, "Explore") && stringAttribute(next, "use") === id) {
+			next.attributes.push({ type: "mdxJsxAttribute", name: "under", value: null });
+		}
+		markUnder(child);
+	}
+}
+
 /**
  * Reshapes an MDX page's tree into the page skeleton the theme and views.js expect: the content goes into `<div data-overview>`
  * with the masthead and sections laid out, and each `<View>` written in Markdown gets its sections laid out the same way.
@@ -147,5 +174,6 @@ export function structurePage(tree: Root): string | undefined {
 		...tree.children.filter((node) => !isFlow(node)),
 		element("div", { "data-overview": "" }, layout(content, true)),
 	];
+	markUnder(tree);
 	return title && textOf(title);
 }

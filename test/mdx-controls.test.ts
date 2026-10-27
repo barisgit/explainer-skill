@@ -183,9 +183,9 @@ export const level = (m: number, kind: string) => ({ readout: kind + " at " + m.
 describe("shared controls errors", () => {
 	test("a use that names no Controls above it (none, or only after it), two sets with one id, and a frame that fails a combination fail the pack, each saying what to write", async () => {
 		const row = `controls={[{ id: "on", label: "On", toggle: true }]}`;
-		const failure = async (name: string, body: string) => {
-			const source = `import { Controls, Explore } from "kit";\n\n# Fails\n\n${body}\n`;
-			const { result } = await packMdx(dir, name, source);
+		const failure = async (name: string, body: string, files: Record<string, string> = {}) => {
+			const source = `import { Controls, Explore, View } from "kit";\n\n# Fails\n\n${body}\n`;
+			const { result } = await packMdx(dir, name, source, files);
 			return [result.code, result.stderr.trim()];
 		};
 		const figure = (use: string, frame = "() => ({ readout: 'x' })") =>
@@ -206,6 +206,25 @@ describe("shared controls errors", () => {
 		expect(
 			await failure("twice", `<Controls id="a" ${row} />\n\n<Controls id="a" ${row} />`),
 		).toEqual([1, expect.stringContaining('<Controls id="a"> is on the page twice')]);
+		// A reader changes the controls of the place a figure is in: the page, one View, one record.
+		const inView = `\n\n<View name="v" back="Fails">\n\n# V\n\n${figure("a")}\n\n</View>`;
+		const place = [
+			1,
+			expect.stringContaining('finds no <Controls id="a"> above it in the same place'),
+		];
+		expect(await failure("other-view", `<Controls id="a" ${row} />${inView}`)).toEqual(place);
+		expect(
+			await failure(
+				"in-record",
+				`import { Item } from "./record.tsx";\n\n${figure("a")}\n\n<View name="r" records={[{ id: "x" }]} render={Item} back="Fails" />`,
+				{
+					"record.tsx": `"use client";
+import { Controls } from "kit";
+export const Item = () => <><h1>R</h1><Controls id="a" controls={[{ id: "on", label: "On", toggle: true }]} /></>;
+`,
+				},
+			),
+		).toEqual(place);
 		expect(await failure("empty", '<Controls id="a" controls={[]} />')).toEqual([
 			1,
 			expect.stringContaining('<Controls id="a"> needs controls'),
@@ -254,4 +273,134 @@ Between the controls and the next figure.
 			printed: ["Cached Days 1", "Cached Days 1"],
 		});
 	}, 30_000);
+
+	test("is in a figure that follows another set's controls, and says a toggle is off when nothing else is said", async () => {
+		const page = `import { Controls, Explore } from "kit";
+
+# State
+
+<Controls id="a" controls={[{ id: "cached", label: "Cached", toggle: true }]} />
+
+<Controls id="b" controls={[{ id: "other", label: "Other", toggle: true }]} />
+
+<Explore id="far" use="a" frame={(on) => ({ readout: String(on) })} />
+`;
+		const output = await packedMdx(dir, "state-off", page);
+		const line = `(() => { const p = document.querySelector("#far > .controls-state"); return p.offsetParent !== null ? p.textContent : "hidden"; })()`;
+		const state = await inPage(output, async (cdp) => {
+			const off = await cdp.evaluate<string>(line);
+			const on = await act<string>(cdp, `document.getElementById("cached").click()`, line);
+			await cdp.send("Emulation.setEmulatedMedia", { media: "print" });
+			return { off, on, printed: await cdp.evaluate<string>(line) };
+		});
+		expect(state).toEqual({ off: "Cached off", on: "Cached", printed: "Cached" });
+	}, 30_000);
+});
+
+describe("where a set of controls lives", () => {
+	test("a parent re-rendering, a View in its own place and a record opened again each keep their Controls and Explores working", async () => {
+		const page = `import { Controls, Explore, View } from "kit";
+import { Item, Panel } from "./places.tsx";
+
+# Places
+
+<Panel />
+
+<ul><li><a href="#tab">Tab</a></li><li><a href="#item/a">A</a></li><li><a href="#item/b">B</a></li></ul>
+
+<View name="tab" back="Places">
+
+# Tab
+
+<Controls id="t" controls={[{ id: "t-on", label: "Flag", toggle: true }]} />
+
+Between the controls and the figure.
+
+<Explore id="t-out" use="t" frame={(on) => ({ readout: "tab:" + on })} />
+
+</View>
+
+<View name="item" records={[{ id: "a" }, { id: "b" }]} render={Item} back="Places" />
+`;
+		dir.write(
+			"places.tsx",
+			`"use client";
+import { useState } from "preact/hooks";
+import { Controls, Explore } from "kit";
+export function Panel() {
+	const [n, setN] = useState(0);
+	return (
+		<section>
+			<h2>Panel</h2>
+			<button type="button" id="again" onClick={() => setN(n + 1)}>Again {n}</button>
+			<Controls id="p" controls={[{ id: "p-on", label: "Panel flag", toggle: true }]} />
+			<Explore id="p-out" use="p" frame={(on) => ({ readout: "panel:" + on })} />
+		</section>
+	);
+}
+export function Item({ record }: { record: { id: string } }) {
+	return (
+		<>
+			<h1>Item {record.id}</h1>
+			<Controls id="r" controls={[{ id: "r-" + record.id, label: "Flag " + record.id, toggle: true }]} />
+			<p>Between the controls and the figure.</p>
+			<Explore id={"out-" + record.id} use="r" frame={(on) => ({ readout: record.id + ":" + on })} />
+		</>
+	);
+}
+`,
+		);
+		const output = await packedMdx(dir, "places", page);
+		const readout = (id: string) =>
+			`document.querySelector("#${id} > p:not(.controls-state)")?.textContent`;
+		const seen = `[document.getElementById("again").textContent, ${readout("p-out")}]`;
+		const state = await inPage(output, async (cdp) => {
+			const here = (hash: string, id: string, control: string) =>
+				act<(string | boolean)[]>(
+					cdp,
+					`location.hash = ${JSON.stringify(hash)}`,
+					`[${readout(id)}, document.getElementById("${control}")?.checked]`,
+				);
+			const start = await cdp.evaluate<string[]>(seen);
+			const rerendered = await act<string[]>(cdp, `document.getElementById("again").click()`, seen);
+			const flagged = await act<string[]>(cdp, `document.getElementById("p-on").click()`, seen);
+			const tab = await here("#tab", "t-out", "t-on");
+			const tabOn = await act<string[]>(
+				cdp,
+				`document.getElementById("t-on").click()`,
+				`[${readout("t-out")}]`,
+			);
+			const link = await cdp.evaluate<string>(
+				`(() => { const a = document.querySelector("#t-out .controls-state a"); return a.getAttribute("href") + (document.querySelector('[data-view="tab"]').querySelector(a.getAttribute("href")) ? " in the view" : " elsewhere"); })()`,
+			);
+			const a = await here("#item/a", "out-a", "r-a");
+			const aOn = await act<string[]>(
+				cdp,
+				`document.getElementById("r-a").click()`,
+				`[${readout("out-a")}]`,
+			);
+			const b = await here("#item/b", "out-b", "r-b");
+			const again = await here("#item/a", "out-a", "r-a");
+			const againOn = await act<string[]>(
+				cdp,
+				`document.getElementById("r-a").click()`,
+				`[${readout("out-a")}]`,
+			);
+			return { start, rerendered, flagged, tab, tabOn, link, a, aOn, b, again, againOn };
+		});
+		expect(state).toEqual({
+			start: ["Again 0", "panel:false"],
+			rerendered: ["Again 1", "panel:false"],
+			flagged: ["Again 1", "panel:true"],
+			tab: ["tab:false", false],
+			tabOn: ["tab:true"],
+			link: "#t-controls in the view",
+			a: ["a:false", false],
+			aOn: ["a:true"],
+			b: ["b:false", false],
+			// The flag was kept (keep restores a control by its id), and the set follows it again.
+			again: ["a:true", true],
+			againOn: ["a:false"],
+		});
+	}, 60_000);
 });

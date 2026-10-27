@@ -11,6 +11,8 @@ import {
 	toChildArray,
 	type VNode,
 } from "preact";
+import { useState } from "preact/hooks";
+import { anonymousPlace, PlaceContext } from "./parts/place.ts";
 
 /** A filled view's `render` as the kit calls it, for any record. */
 export type DrawRecord = (props: { record: unknown }) => ComponentChildren;
@@ -62,7 +64,8 @@ export function viewBody(children: ComponentChildren, back: string | undefined):
 /**
  * One record of a filled view, laid out as a static View lays out its children; an unknown param (no record) shows the head
  * alone. `render` is called rather than rendered, so its output can be split into head and rest: its hooks are this
- * component's, which the browser keys by the param, so each record starts with fresh state.
+ * component's, which the browser keys by the param, so each record starts with fresh state, and a place of its own for the
+ * Controls it draws.
  */
 export function FilledRecord({
 	render,
@@ -72,10 +75,15 @@ export function FilledRecord({
 	render: DrawRecord;
 	record: unknown;
 	back: string | undefined;
-}): VNode {
+}): ComponentChildren {
+	const [place] = useState(anonymousPlace);
 	const out = record === undefined ? null : render({ record });
-	return viewBody(
-		isElement(out, Fragment) ? (out.props as { children?: ComponentChildren }).children : out,
-		back,
+	return h(
+		PlaceContext.Provider,
+		{ value: place },
+		viewBody(
+			isElement(out, Fragment) ? (out.props as { children?: ComponentChildren }).children : out,
+			back,
+		),
 	);
 }

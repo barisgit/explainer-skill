@@ -1,11 +1,12 @@
 /*
  * Sets of controls and the values chosen in them, shared by the islands that show or follow a set: an Explore's own controls,
  * or those a Controls declares for the Explores with `use`. One module serves pack's render and the browser's, where every
- * island is in one bundle, so the islands reach the same sets; Controls' island declares its set as it renders, before the
- * islands after it in the page.
+ * island is in one bundle, so the islands of a place (place.ts) reach the same sets; Controls' island declares its set as it
+ * renders, before the islands after it in the place.
  */
 import { useEffect, useState } from "preact/hooks";
-import type { ExploreControl } from "./explore-view.tsx";
+import type { ExploreControl } from "./control.ts";
+import type { Place } from "./place.ts";
 
 /** A row of controls and the index of the value chosen for each; the islands that show or follow it listen for a choice. */
 export interface ControlSet {
@@ -27,36 +28,37 @@ export const newControlSet = (controls: ExploreControl[], start: number[]): Cont
 export const withValue = (values: number[], c: number, value: number): number[] =>
 	values.map((old, i) => (i === c ? value : old));
 
-const sets = new Map<string, ControlSet>();
-
 /** The id of the element that shows the set `id`'s controls, which the Explores that follow it link to. */
 export const anchorOf = (id: string): string => `${id}-controls`;
 
-/** The ids of the sets declared so far, for messages. */
-export const declaredSets = (): string[] => [...sets.keys()];
-
-/** The set called `id`, or undefined when no Controls with that id has rendered yet. */
-export const sharedControls = (id: string): ControlSet | undefined => sets.get(id);
+/** The set called `id` in `place`, or undefined when no Controls with that id has rendered there yet. */
+export const sharedControls = (place: Place, id: string): ControlSet | undefined =>
+	place.sets.get(id);
 
 /**
- * Declares the set `id` with its `controls` (the island's props, so the same array on every render of it) and returns it;
- * declaring it again with the same array is the island rendering again. A second Controls with the id is an error.
+ * The set `id` of `place` for a Controls island: made on its first render and kept for as long as the island is mounted, so a
+ * re-render of the island or of its parent finds the same set, and a Controls shown again later starts afresh.
  */
-export function declareControls(
+export function useDeclaredControls(
+	place: Place,
 	id: string,
 	controls: ExploreControl[],
 	start: number[],
 ): ControlSet {
-	const known = sets.get(id);
-	if (!known) {
-		const declared = newControlSet(controls, start);
-		sets.set(id, declared);
+	const [set] = useState(() => {
+		const declared = place.sets.get(id) ?? newControlSet(controls, start);
+		place.sets.set(id, declared);
 		return declared;
-	}
-	if (known.controls !== controls) {
-		throw new Error(`<Controls id="${id}"> is on the page twice: give each set its own id`);
-	}
-	return known;
+	});
+	useEffect(
+		() => () => {
+			if (place.sets.get(id) === set) {
+				place.sets.delete(id);
+			}
+		},
+		[place, id, set],
+	);
+	return set;
 }
 
 /** The indices chosen in `set` and the function that chooses one, re-rendering the island on a change. */

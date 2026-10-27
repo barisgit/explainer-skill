@@ -6,7 +6,9 @@
  */
 import type { ComponentChildren, JSX } from "preact";
 import { useMemo, useState } from "preact/hooks";
+import type { ExploreControl } from "./control.ts";
 import { apply, type Json, merge } from "./frames.ts";
+import { usePlace } from "./place.ts";
 import {
 	anchorOf,
 	type ControlSet,
@@ -15,15 +17,7 @@ import {
 	useControlSet,
 } from "./shared-controls.ts";
 
-/**
- * A control as the island gets it; a range's values are min + i * step, i < texts.length, shown as texts[i]; a choice's are
- * `values`, shown as `choice`.
- */
-export type ExploreControl = { id: string; label: string } & (
-	| { range: { min: number; step: number; digits: number; texts: string[] } }
-	| { choice: string[]; values: string[] }
-	| { toggle: true }
-);
+export type { ExploreControl };
 
 /** What one frame shows; in a page's frame function, readout, stats and caption are text or JSX. */
 export interface ExploreFrame {
@@ -41,7 +35,9 @@ export type ExploreValue = number | string | boolean;
 export type FrameFunction = (...values: ExploreValue[]) => ExploreFrame;
 
 /**
- * Explore's island props. Its controls, with the index each starts on, or `use`, the id of the Controls whose set it follows.
+ * Explore's island props. Its controls, with the index each starts on, or `use`, the id of the Controls whose set it follows
+ * (in the View named `scope`, else on the page; `under` when it is written right under them; `off` is the text of a toggle
+ * that is off).
  * Precomputed: the first frame, the distinct patches against it and which patch each frame takes (frames in row-major order),
  * their texts HTML. Live: the frame function, a client module's export, and the JSON base under its frames.
  */
@@ -50,7 +46,10 @@ export type ExploreData = {
 	class?: string;
 	height?: string;
 	id?: string;
-} & ({ controls: ExploreControl[]; start: number[] } | { use: string }) &
+} & (
+	| { controls: ExploreControl[]; start: number[] }
+	| { use: string; off: string; scope?: string; under?: boolean }
+) &
 	({ first: Json; patches: Json[]; at: number[] } | { frame: FrameFunction; base: ExploreFrame });
 
 /** How many values a control has. */
@@ -175,11 +174,12 @@ function useFrame(data: ExploreData, controls: ExploreControl[], values: number[
 }
 
 /**
- * What the chosen values say, in control order: a choice's or range's text, a toggle's label while it is on (off says nothing).
- * A range's text follows its label, since a number alone says nothing.
+ * What the chosen values say, in control order: a choice's or range's text, a toggle's label while it is on. A range's text
+ * follows its label, since a number alone says nothing. When that leaves nothing (every control a toggle, all off), the line
+ * says each is `off`.
  */
-function chosenTexts(controls: ExploreControl[], values: number[]): string[] {
-	return controls.flatMap((control, c) => {
+function chosenTexts(controls: ExploreControl[], values: number[], off: string): string[] {
+	const texts = controls.flatMap((control, c) => {
 		const value = values[c] ?? 0;
 		if ("range" in control) {
 			return [`${control.label} ${control.range.texts[value]}`];
@@ -189,46 +189,51 @@ function chosenTexts(controls: ExploreControl[], values: number[]): string[] {
 		}
 		return value === 1 ? [control.label] : [];
 	});
+	return texts.length > 0 ? texts : controls.map(({ label }) => `${label} ${off}`);
 }
 
 /**
  * The line that tells a figure following a Controls what it shows, and links to the controls to change it. Spaces separate the
- * values, so a screen reader reads them as a list; the theme writes the dots.
+ * values, so a screen reader reads them as a list; the theme writes the dots. A figure right under its Controls (`under`)
+ * shows it in print only.
  */
 function ControlsState({
 	use,
 	controls,
 	values,
+	off,
+	under,
 }: {
 	use: string;
 	controls: ExploreControl[];
 	values: number[];
+	off: string;
+	under: boolean;
 }) {
-	const texts = chosenTexts(controls, values);
+	const texts = chosenTexts(controls, values, off);
 	return (
-		texts.length > 0 && (
-			<p class="controls-state">
-				<a href={`#${anchorOf(use)}`}>
-					{texts.flatMap((text, i) => (i ? [" ", <span>{text}</span>] : [<span>{text}</span>]))}
-				</a>
-			</p>
-		)
+		<p class="controls-state" data-under={under ? "" : undefined}>
+			<a href={`#${anchorOf(use)}`}>
+				{texts.flatMap((text, i) => (i ? [" ", <span>{text}</span>] : [<span>{text}</span>]))}
+			</a>
+		</p>
 	);
 }
 
 /**
  * The set of controls Explore follows and the indices chosen in it: the set `use` names, which Controls declared as it
- * rendered earlier in the page and shows, or its own controls, which Explore shows (`shows`).
+ * rendered earlier in the same place and shows, or its own controls, which Explore shows (`shows`).
  */
 function useControls(data: ExploreData) {
+	const place = usePlace("use" in data ? data.scope : undefined);
 	const [set] = useState<ControlSet>(() => {
 		if (!("use" in data)) {
 			return newControlSet(data.controls, data.start);
 		}
-		const shared = sharedControls(data.use);
+		const shared = sharedControls(place, data.use);
 		if (!shared) {
 			throw new Error(
-				`<Explore use="${data.use}"> found no <Controls id="${data.use}"> above it in the page`,
+				`<Explore use="${data.use}"> found no <Controls id="${data.use}"> above it in its place`,
 			);
 		}
 		return shared;
@@ -256,7 +261,15 @@ export function ExploreView({
 	const option = frame.plot ?? frame.chart;
 	return (
 		<figure class="fig" id={data.id}>
-			{"use" in data && <ControlsState use={data.use} controls={controls} values={values} />}
+			{"use" in data && (
+				<ControlsState
+					use={data.use}
+					controls={controls}
+					values={values}
+					off={data.off}
+					under={data.under === true}
+				/>
+			)}
 			{shows && <ControlRow controls={controls} values={values} set={choose} />}
 			{frame.stats && (
 				<dl class="stats" aria-live="polite">

@@ -14,7 +14,7 @@
 	border-block-end: 0;
 }
 /* What a figure that follows a Controls shows, and the way back to them. On screen it is left out of a figure right under its
-   Controls, where the controls are in sight; printed, the controls are not, so every figure says it. */
+   Controls (pack marks it, data-under), where the controls are in sight; printed, the controls are not, so every figure says it. */
 .controls-state {
 	padding-block: 0.5rem 0;
 	font-size: 0.8125rem;
@@ -32,7 +32,7 @@
 	content: "· " / "";
 }
 @media screen {
-	.fig:has(> .controls:only-child) + .fig > .controls-state {
+	.controls-state[data-under] {
 		display: none;
 	}
 }
