@@ -7,10 +7,10 @@
    value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept. Once anything is saved, a Clear answers button at the end of the page puts every control back to its
-   default, again with events, and drops the saved copy; a first press only asks, a second within 4 s clears. With reply (kit
-   reply) the reader's notes are kept too, and on a page that asks for replies (reply: true, a data-reply control, or a note) the
-   same button sits in the reply bar instead.
+   <details> are not kept. Once a Question's answer is saved, a Clear answers button at the end of the page puts the answers back
+   to their defaults, again with events, and drops their saved copy; a first press only asks, a second within 4 s clears. Other
+   controls stay kept without a button. With reply (kit reply) the reader's notes are kept too, and on a page that asks for
+   replies (reply: true, a data-reply control, or a note) a Clear in the reply bar takes its place and clears every control.
    Labels: clearAnswers "Clear answers", clearAnswersPrompt "Press again to clear all answers." (announced), and for both
    buttons clearConfirm "Clear everything?" and clearCancelled "Clear cancelled." (announced). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
@@ -61,10 +61,11 @@
 		el: Control;
 		value: Value;
 	}
-	/** A saved entry no control has taken yet. */
+	/** A saved entry no control has taken yet. `answer` marks a Question's answer, which the Clear button is for. */
 	interface Saved {
 		value: unknown;
 		sig: string;
+		answer?: true;
 	}
 	const isRadio = (c: Control): c is HTMLInputElement => c.type === "radio";
 	const isToggle = (c: Control): c is HTMLInputElement => isRadio(c) || c.type === "checkbox";
@@ -86,7 +87,7 @@
 	// Chrome gives every file:// page one origin, so the page's own address is what tells their saved state apart.
 	const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
 	/** The controls the reader has touched, which a value equal to the default cannot show. */
-	let touched = new WeakSet<Control>();
+	const touched = new WeakSet<Control>();
 	/** What the markup declares for each key, recorded when a control with that key is first seen: { initial, sig }. A control the page rebuilds the same way, with its current value in the markup, is still compared with the authored one. */
 	const defaults = new Map<string, { initial: Value; sig: string }>();
 	/** Saved entries { value, sig } by key that no control has taken for good yet. */
@@ -159,6 +160,8 @@
 		});
 	}
 
+	/** True for a control inside a self-check Question (a choice, or a written answer with a model answer). */
+	const isAnswer = (c: Control) => c.closest(".self-check") !== null;
 	const moved = (u: Unit) => !same(readControl(u.el), u.initial);
 	/** Answered: moved off the default, or chosen by the reader even where that equals it. */
 	const answered = (u: Unit) => moved(u) || touched.has(u.el);
@@ -262,7 +265,11 @@
 		}
 		const controls = { ...pending };
 		for (const u of present.filter(answered)) {
-			controls[u.key] = { value: readControl(u.el), sig: u.sig };
+			controls[u.key] = {
+				value: readControl(u.el),
+				sig: u.sig,
+				...(isAnswer(u.el) && { answer: true as const }),
+			};
 		}
 		keptById = Object.fromEntries(Object.entries(controls).filter(([key]) => key.startsWith("#")));
 		return { controls, notes: notes.list() };
@@ -305,17 +312,25 @@
 		onChange();
 	}
 
-	/** Puts every control back to its default (the page hears it), forgets what was touched and everything saved. */
-	function clear() {
-		apply(
-			units()
-				.filter(moved)
-				.map((u) => ({ el: u.el, value: u.initial })),
-		);
-		touched = new WeakSet();
-		pending = {};
-		keptById = {};
-		taken.clear();
+	/**
+	 * Puts the controls back to their defaults (the page hears it), forgets that the reader touched them and drops what is saved
+	 * for them, waiting entries included: every control, or with `answersOnly` just those of Question answers.
+	 */
+	function clear(answersOnly = false) {
+		const chosen = (u: { el: Control }) => !answersOnly || isAnswer(u.el);
+		const present = units().filter(chosen);
+		apply(present.filter(moved).map((u) => ({ el: u.el, value: u.initial })));
+		for (const u of present) {
+			touched.delete(u.el);
+		}
+		for (const saved of [pending, keptById]) {
+			for (const [key, entry] of Object.entries(saved)) {
+				if (!answersOnly || entry.answer) {
+					delete saved[key];
+					taken.delete(key);
+				}
+			}
+		}
 		onChange();
 	}
 
@@ -333,21 +348,22 @@
 	}
 
 	/**
-	 * Saves and says whether anything is kept: answers, answers waiting for a control that is not shown yet, or notes. Unless
-	 * `inBar` (reply.js shows the reply bar, with its own Clear), keep.js's own Clear shows while anything is, so the page has
-	 * exactly one Clear. Before the restore only the notes are known, and nothing is saved or shown.
+	 * Saves and says whether anything is kept: controls, those waiting for a control that is not shown yet, or notes. Unless
+	 * `inBar` (reply.js shows the reply bar, with its own Clear), keep.js's own Clear shows while a Question's answer is kept, so
+	 * the page has at most one Clear and plain controls stay kept without one. Before the restore only the notes are known, and
+	 * nothing is saved or shown.
 	 */
 	function update(inBar: boolean) {
 		const state = save();
 		if (!state) {
 			return notes.list().length > 0;
 		}
-		const kept = !empty(state);
-		if (kept && !inBar) {
+		const answers = !inBar && Object.values(state.controls).some((c) => c.answer);
+		if (answers) {
 			own ??= ownClear();
 		}
-		own?.show(kept && !inBar);
-		return kept;
+		own?.show(answers);
+		return !empty(state);
 	}
 
 	/** How long an armed Clear waits for its second press. */
@@ -419,7 +435,8 @@
 
 	/**
 	 * keep.js's own Clear, at the end of the page's main column: below everything it clears, so showing it moves nothing the reader
-	 * is looking at. Notes saved by an earlier version of the page that had reply.js go too.
+	 * is looking at. It clears the Question answers only; other controls stay as the reader set them. Notes saved by an earlier
+	 * version of the page that had reply.js go too.
 	 */
 	function ownClear(): KeepClearButton {
 		const texts = {
@@ -428,7 +445,7 @@
 		};
 		const made = clearButton(texts, () => {
 			notes.restore([]);
-			clear();
+			clear(true);
 		});
 		const box = document.createElement("div");
 		box.className = "keep-clear";

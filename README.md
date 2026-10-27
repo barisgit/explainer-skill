@@ -107,7 +107,7 @@ flowchart TD
   <img alt="Electricity page: switching the coal ranking to TWh, then opening the United States view and going back" src="examples/media/electricity-mix-coal-ranking-light.webp">
 </picture>
 
-**Questions the reader answers.** A `Question` checks a choice on the spot, takes a written answer, or joins one Markdown reply the reader sends back to the agent, together with notes on selected text or diagram parts. Inputs and notes survive a reload, with a Clear button to start over.
+**Questions the reader answers.** A `Question` checks a choice on the spot, takes a written answer, or joins one Markdown reply the reader sends back to the agent, together with notes on selected text or diagram parts. Inputs and notes survive a reload; a Clear button starts the answers over.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/password-hashing-presets-dark.webp">

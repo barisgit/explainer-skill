@@ -109,11 +109,14 @@ interface KeepApi {
 	ownText(label: HTMLLabelElement): string;
 	/**
 	 * After any change: adopts new controls, saves, returns whether anything is kept. Unless `inBar` (the caller shows Clear in
-	 * its reply bar), keep.js shows its own Clear while anything is.
+	 * its reply bar), keep.js shows its own Clear while a Question's answer is kept.
 	 */
 	update(inBar: boolean): boolean;
-	/** Every control back to its default (with input and change events), saved state dropped; notes are the owner's to empty. */
-	clear(): void;
+	/**
+	 * Every control back to its default (with input and change events), saved state dropped; notes are the owner's to empty. With
+	 * `answersOnly`, just the controls of Question answers.
+	 */
+	clear(answersOnly?: boolean): void;
 	/** The Clear button keep.js shows alone, for an owner's own place and texts: a press arms it, a second calls `onClear`. */
 	clearButton(texts: KeepClearTexts, onClear: () => void): KeepClearButton;
 	/** The reader acted on a control, even if the value equals the default. */

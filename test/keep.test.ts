@@ -121,3 +121,41 @@ export function Ask() {
 		cleared: [false, false, true, false],
 	});
 }, 30_000);
+
+const GAIN = `<label>Gain <input id="gain" type="range" min="0" max="10" value="5" /></label>`;
+const SLIDE = `const g = document.getElementById("gain"); g.value = "8"; g.dispatchEvent(new Event("input", { bubbles: true }))`;
+/** The slider's value, whether keep's own Clear shows, the self-check's choice and how many pages have saved state. */
+const GAIN_STATE = `[document.getElementById("gain").value, Boolean(document.querySelector(".keep-clear .btn")?.checkVisibility()), document.getElementById("unit-kWh")?.checked ?? null, Object.keys(localStorage).filter((k) => k.startsWith("explainer:")).length]`;
+
+test("a page with controls but no Question keeps them silently, with no Clear", async () => {
+	const output = await packedMdx(dir, "controls-only", `# Controls\n\n${GAIN}\n`);
+	const seen = await inPage(output, async (cdp) => {
+		const moved = await act(cdp, SLIDE, GAIN_STATE);
+		await load(cdp);
+		return { moved, reloaded: await act(cdp, "", GAIN_STATE) };
+	});
+	// [slider, Clear shown, choice, pages with saved state]
+	expect(seen).toEqual({ moved: ["8", false, null, 1], reloaded: ["8", false, null, 1] });
+}, 30_000);
+
+test("Clear answers belongs to the Question answers: moving a control brings none, and clearing leaves the control as the reader set it", async () => {
+	const output = await packedMdx(
+		dir,
+		"controls-and-question",
+		`import { Question } from "kit";\n\n# Both\n\n${GAIN}\n\n<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>\n`,
+	);
+	const seen = await inPage(output, async (cdp) => {
+		const moved = await act(cdp, SLIDE, GAIN_STATE);
+		const chosen = await act(cdp, `document.getElementById("unit-kWh").click()`, GAIN_STATE);
+		await load(cdp);
+		const reloaded = await act(cdp, "", GAIN_STATE);
+		await act(cdp, CLICK, "0");
+		return { moved, chosen, reloaded, cleared: await act(cdp, CLICK, GAIN_STATE) };
+	});
+	expect(seen).toEqual({
+		moved: ["8", false, false, 1],
+		chosen: ["8", true, true, 1],
+		reloaded: ["8", true, true, 1],
+		cleared: ["8", false, false, 1],
+	});
+}, 30_000);
