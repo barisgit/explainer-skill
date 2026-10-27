@@ -8,7 +8,7 @@
 import type { ComponentChildren, JSX } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { apply, type Json, merge } from "./frames.ts";
-import { type SharedControls, sharedControls, useShared } from "./shared-controls.ts";
+import { anchorOf, type SharedControls, sharedControls, useShared } from "./shared-controls.ts";
 
 /**
  * A control as the island gets it; a range's values are min + i * step, i < texts.length, shown as texts[i]; a choice's are
@@ -169,6 +169,48 @@ function useFrame(data: ExploreData, controls: ExploreControl[], values: number[
 	);
 }
 
+/**
+ * What the chosen values say, in control order: a choice's or range's text, a toggle's label while it is on (off says nothing).
+ * A range's text follows its label, since a number alone says nothing.
+ */
+function chosenTexts(controls: ExploreControl[], values: number[]): string[] {
+	return controls.flatMap((control, c) => {
+		const value = values[c] ?? 0;
+		if ("range" in control) {
+			return [`${control.label} ${control.range.texts[value]}`];
+		}
+		if ("choice" in control) {
+			return [control.choice[value] ?? ""];
+		}
+		return value === 1 ? [control.label] : [];
+	});
+}
+
+/**
+ * The line that tells a figure following a Controls what it shows, and links to the controls to change it. Spaces separate the
+ * values, so a screen reader reads them as a list; the theme writes the dots.
+ */
+function ControlsState({
+	use,
+	controls,
+	values,
+}: {
+	use: string;
+	controls: ExploreControl[];
+	values: number[];
+}) {
+	const texts = chosenTexts(controls, values);
+	return (
+		texts.length > 0 && (
+			<p class="controls-state">
+				<a href={`#${anchorOf(use)}`}>
+					{texts.flatMap((text, i) => (i ? [" ", <span>{text}</span>] : [<span>{text}</span>]))}
+				</a>
+			</p>
+		)
+	);
+}
+
 /** The set `use` names, which Controls declared as it rendered earlier in the page. */
 function sharedSet(use: string): SharedControls {
 	const set = sharedControls(use);
@@ -215,6 +257,7 @@ export function ExploreView({
 	const option = frame.plot ?? frame.chart;
 	return (
 		<figure class="fig" id={data.id}>
+			{"use" in data && <ControlsState use={data.use} controls={controls} values={values} />}
 			{shows && <ControlRow controls={controls} values={values} set={set} />}
 			{frame.stats && (
 				<dl class="stats" aria-live="polite">

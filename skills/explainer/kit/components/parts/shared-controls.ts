@@ -17,6 +17,9 @@ export interface SharedControls {
 
 const sets = new Map<string, SharedControls>();
 
+/** The id of the element that shows the set `id`'s controls, which the Explores that follow it link to. */
+export const anchorOf = (id: string): string => `${id}-controls`;
+
 /** The ids of the sets declared so far, for messages. */
 export const declaredSets = (): string[] => [...sets.keys()];
 

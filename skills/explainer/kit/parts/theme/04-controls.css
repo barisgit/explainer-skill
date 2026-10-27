@@ -13,6 +13,29 @@
 	padding-block-end: 0.25rem;
 	border-block-end: 0;
 }
+/* What a figure that follows a Controls shows, and the way back to them. On screen it is left out of a figure right under its
+   Controls, where the controls are in sight; printed, the controls are not, so every figure says it. */
+.controls-state {
+	padding-block: 0.5rem 0;
+	font-size: 0.8125rem;
+	color: var(--muted);
+}
+.controls-state a {
+	color: inherit;
+	text-decoration: underline dotted;
+	text-underline-offset: 0.25em;
+}
+.controls-state a:hover {
+	color: var(--ink);
+}
+.controls-state span + span::before {
+	content: "· " / "";
+}
+@media screen {
+	.fig:has(> .controls:only-child) + .fig > .controls-state {
+		display: none;
+	}
+}
 .field {
 	display: inline-flex;
 	flex-wrap: wrap;

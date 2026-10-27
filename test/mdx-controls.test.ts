@@ -23,6 +23,9 @@ interface ReportState {
 	days: number;
 	series: number[];
 	stats: string[];
+	/** What each figure's line of chosen values says, and where its link goes. */
+	says: string[];
+	links: string[];
 	overflow: boolean;
 }
 
@@ -37,6 +40,8 @@ const REPORT_STATE = `(() => {
 		days: option(daily).xAxis[0].data.length,
 		series: [option(daily).series.length, option(ranking).series.length],
 		stats: [stats(daily), stats(cost)],
+		says: [...document.querySelectorAll(".controls-state")].map((p) => p.textContent),
+		links: [...document.querySelectorAll(".controls-state a")].map((a) => a.getAttribute("href") + (document.querySelector(a.getAttribute("href")) ? " found" : " missing")),
 		overflow: document.documentElement.scrollWidth > innerWidth,
 	};
 })()`;
@@ -95,14 +100,31 @@ describe("shared controls", () => {
 			expect([start, breakdown, week, keyed, reloaded].map((s) => s.overflow)).toEqual(
 				Array(5).fill(false),
 			);
-			expect(start).toMatchObject({ picked: "30 days,all,all,total", days: 30, series: [1, 1] });
+			expect(start).toMatchObject({
+				picked: "30 days,all,all,total",
+				days: 30,
+				series: [1, 1],
+				// Each figure says what it shows and links to the controls, which sit above the first section.
+				says: Array(3).fill("30 days All All Total"),
+				links: Array(3).fill("#usage-controls found"),
+			});
 			// Breakdown splits the daily bars by model (4) and the ranking by kind of token (3); nothing else changes.
 			expect(breakdown).toMatchObject({ days: 30, series: [4, 3], stats: start.stats });
 			// A week keeps the breakdown and changes the days, the stats of the daily figure and of the cost figure.
-			expect(week).toMatchObject({ picked: "7 days,all,all,breakdown", days: 7, series: [4, 3] });
+			expect(week).toMatchObject({
+				picked: "7 days,all,all,breakdown",
+				days: 7,
+				series: [4, 3],
+				says: Array(3).fill("7 days All All Breakdown"),
+			});
 			expect(week.stats).not.toEqual(breakdown.stats);
 			// The arrow key moves the host from "All" to Mac.
-			expect(keyed).toMatchObject({ picked: "7 days,Mac,all,breakdown", days: 7, series: [4, 3] });
+			expect(keyed).toMatchObject({
+				picked: "7 days,Mac,all,breakdown",
+				days: 7,
+				series: [4, 3],
+				says: Array(3).fill("7 days Mac All Breakdown"),
+			});
 			expect(keyed.stats).not.toEqual(week.stats);
 			expect(reloaded).toEqual(keyed);
 		}
@@ -140,7 +162,7 @@ export const level = (m: number, kind: string) => ({ readout: kind + " at " + m.
 			)?.[1] ?? "";
 		// Each island carries its references to the frame, not the controls again.
 		expect(islands.length).toBeLessThan(1_200);
-		const seen = `[document.querySelector("#curve svg path.line").getAttribute("d"), document.querySelector("#level > p").textContent, document.getElementById("m").value]`;
+		const seen = `[document.querySelector("#curve svg path.line").getAttribute("d"), document.querySelector("#level > p:not(.controls-state)").textContent, document.getElementById("m").value]`;
 		const state = await inPage(output, async (cdp) => {
 			const start = await cdp.evaluate<string[]>(seen);
 			await cdp.evaluate(`document.getElementById("m").focus()`);
@@ -206,4 +228,34 @@ describe("shared controls errors", () => {
 			),
 		).toEqual([1, expect.stringMatching(/<Explore> frames would take \d+ KB of the page/)]);
 	}, 60_000);
+});
+
+describe("the line of chosen values", () => {
+	test("is left out of a figure right under its controls on screen, is in every figure in print, and a toggle says its label only while on", async () => {
+		const page = `import { Controls, Explore } from "kit";
+
+# State
+
+<Controls id="set" controls={[{ id: "on", label: "Cached", toggle: true }, { id: "n", label: "Days", range: [1, 3, 1] }]} />
+
+<Explore id="near" use="set" frame={(on, n) => ({ readout: on + " " + n })} />
+
+Between the controls and the next figure.
+
+<Explore id="far" use="set" frame={(on, n) => ({ readout: on + " " + n })} />
+`;
+		const output = await packedMdx(dir, "state", page);
+		const lines = `["near", "far"].map((id) => { const p = document.querySelector("#" + id + " > .controls-state"); return p && p.offsetParent !== null ? p.textContent : "hidden"; })`;
+		const state = await inPage(output, async (cdp) => {
+			const start = await cdp.evaluate<string[]>(lines);
+			const on = await act<string[]>(cdp, `document.getElementById("on").click()`, lines);
+			await cdp.send("Emulation.setEmulatedMedia", { media: "print" });
+			return { start, on, printed: await cdp.evaluate<string[]>(lines) };
+		});
+		expect(state).toEqual({
+			start: ["hidden", "Days 1"],
+			on: ["hidden", "Cached Days 1"],
+			printed: ["Cached Days 1", "Cached Days 1"],
+		});
+	}, 30_000);
 });

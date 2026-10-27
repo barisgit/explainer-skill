@@ -26,7 +26,8 @@
    controls are written, so list first the ones most figures read: (period, host) => ... may leave the later ones out. A frame
    is called for every combination of all the set's values, and each Explore carries its own frames (100 KB), so add a
    control for what changes the figures, not for what one figure shows; a slider of many steps among others is a case for a
-   frame from a "use client" module. */
+   frame from a "use client" module. Each such figure shows a line of the chosen values that links back to the controls, except one
+   right under them. A frame that turns something back on says so: legend: { show: view === "breakdown" }, not {}. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
