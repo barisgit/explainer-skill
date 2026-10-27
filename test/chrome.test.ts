@@ -18,6 +18,13 @@ const stalled = dir.write(
 	"stalled.html",
 	`<!doctype html><html><head>${VIEWPORT}</head><body><h1>Stalled</h1><img src="http://127.0.0.1:${held.port}/held.png"></body></html>`,
 );
+/** Loads at once but on a narrow screen holds a reload: check captures the desktop, then stalls in the narrow screen's --do reload. */
+const stalledReload = dir.write(
+	"stalled-reload.html",
+	`<!doctype html><html><head>${VIEWPORT}</head><body><h1>Stalled reload</h1><script>
+if (performance.getEntriesByType("navigation")[0].type === "reload" && innerWidth < 600) document.write('<img src="http://127.0.0.1:${held.port}/held.png">');
+</script></body></html>`,
+);
 
 /** A fresh, empty temp directory for one check run, so the test sees exactly what that run leaves in it. */
 function tempDir(name: string): string {
@@ -111,12 +118,12 @@ test("Chrome exits when the check driving it is killed, so no Chrome outlives a 
 	await chromesGone(tmp);
 }, 30_000);
 
-test("a load that never ends stops check with one error line naming the load and the screen", async () => {
-	const result = await runCheck(stalled, tempDir("tmp-stalled"));
+test("a load that never ends stops check with one error line naming the screen and the --do step it was in", async () => {
+	const result = await runCheck(stalledReload, tempDir("tmp-stalled"), ["--do", "reload"]);
 	expect(result.code).toBe(1);
 	expect(result.stdout).toBe("");
 	expect(result.stderr).toBe(
-		`error: the load event of file://${stalled} did not come in 10 s (at light desktop, overview)\n`,
+		"error: the load event after a reload did not come in 10 s (at light narrow, overview, --do step 1: reload)\n",
 	);
 }, 30_000);
 

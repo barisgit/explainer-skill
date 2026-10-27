@@ -317,11 +317,16 @@ function shotPart(ordinal: number, selector: string, index: number | undefined) 
 	return `shot${ordinal}-${slug}${index === undefined ? "" : `-${index}`}`;
 }
 
-/** Runs the `--do` steps in order, recording their problems and notes; returns the PNGs the shot: steps wrote. */
+/**
+ * Runs the `--do` steps in order, recording their problems and notes; returns the PNGs the shot: steps wrote. While a step runs,
+ * `run.where` names it with its ordinal, so an error that stops check in a step says which.
+ */
 async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 	const elements: ElementShot[] = [];
+	const { where } = run;
 	let ordinal = 0;
-	for (const step of run.opts.steps) {
+	for (const [i, step] of run.opts.steps.entries()) {
+		run.where = `${where}, --do step ${i + 1}: ${step}`;
 		const shot = step.startsWith("shot:") ? ++ordinal : 0;
 		const result = await runStep(run.cdp, step, (selector, index) =>
 			overviewPng(run, screen, shotPart(shot, selector, index)),
@@ -334,6 +339,7 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 		}
 		elements.push(...(result.pngs ?? []).map((png) => ({ step, png })));
 	}
+	run.where = where;
 	return elements;
 }
 
