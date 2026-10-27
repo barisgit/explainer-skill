@@ -2154,7 +2154,7 @@ details > :last-child:not(summary) {
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation, trees); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
-/* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js). Tokens only.
+/* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js), keep's Clear (kit:keep.js). Tokens only.
    Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
 [data-live] [data-step] {
@@ -2238,7 +2238,8 @@ body:has(> .reply-bar) {
 .reply-hint {
 	box-shadow: 0 10px 24px -10px var(--lift);
 }
-.reply-bar .btn.is-armed {
+/* A Clear button asking for its second press, in the reply bar or keep's own. */
+.btn.is-armed {
 	color: var(--bg);
 	background: var(--bad);
 	border-color: var(--bad);
@@ -2332,6 +2333,12 @@ dialog.reply-dialog[open] {
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
+/* keep's own Clear, on a page without a reply bar: last in the main column, after a rule like a section's. */
+.keep-clear {
+	margin-block-start: 3rem;
+	padding-block-start: 1.5rem;
+	border-block-start: 1px solid var(--rule);
+}
 .reply-invisible {
 	position: absolute;
 	opacity: 0;
@@ -2344,8 +2351,9 @@ dialog.reply-dialog[open] {
 	[data-live] [data-captions] > li {
 		display: list-item;
 	}
-	.reply-ui {
-		/* biome-ignore lint/complexity/noImportantStyles: the reply controls never print, whatever display they set */
+	.reply-ui,
+	.keep-clear {
+		/* biome-ignore lint/complexity/noImportantStyles: the reply and clear controls never print, whatever display they set */
 		display: none !important;
 	}
 	body:has(> .reply-bar) {
