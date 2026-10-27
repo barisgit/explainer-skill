@@ -4,7 +4,7 @@ An agent skill, `explainer`, that builds one self-contained, interactive HTML pa
 
 ## Requirements
 
-- Bun 1.4.3 (`curl -fsSL https://bun.sh/install | bash`). The CLI uses Bun's built-in `HTMLRewriter` and `import.meta.dir`; there is no npm install step for users. `node skills/explainer/cli.ts` prints an install hint and exits 2.
+- Bun 1.4.3 or newer; CI pins 1.4.3 (`curl -fsSL https://bun.sh/install | bash`). The CLI uses Bun's built-in `HTMLRewriter` and `import.meta.dir`; there is no npm install step for users. `node skills/explainer/cli.ts` prints an install hint and exits 2.
 - Google Chrome or Chromium for `check` (`CHROME=/path` overrides the search, which also finds agent-browser and Playwright downloads; CI uses the runner's Chrome). `src/chrome.ts` retries without the sandbox when Chrome reports none is usable.
 
 ## Layout

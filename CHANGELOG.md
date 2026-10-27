@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.11.0
 
-A `Chart` or `Plot` is in the packed page as SVG whenever `pack` can draw it exactly: it shows before the scripts run, with scripts off, and in print. One it cannot (below) appears when the script draws it, as before.
+A `Chart` or `Plot` is in the packed page as SVG whenever `pack` can draw it exactly: it shows before the scripts run, with scripts off, and in print. One it cannot (below) appears when the script draws it, as before. One set of `Controls` can drive figures in several sections, and a written `Question` with a model answer inside is a self-check that stays on the page.
 
 ### What an author does differently
 
