@@ -17,7 +17,8 @@
      label   the accessible name (role="img")
      class   more classes after "chart plot", e.g. "tall"
    The plot fills the element at its pixel size and redraws on resize, so text stays 13 px from phone to desktop; light and dark switch
-   with no redraw. pack draws it into the page first, so it shows with scripts off and in print. A new option redraws at once: series is replaced whole, other keys merge into the plot (x and y one level deeper).
+   with no redraw. pack draws it into the page first, so it shows with scripts off and in print. A new option redraws at once: series
+   is replaced whole, other keys merge into the plot (x and y one level deeper).
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
    Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series.
