@@ -44,14 +44,16 @@ export const TIMERS_URL = "explainer-check-timers.js";
 const TIMERS_KEY = `Symbol.for("explainer.check.timers")`;
 
 /**
- * Page script for every new document (Page.addScriptToEvaluateOnNewDocument): wraps setTimeout and clearTimeout to track the
- * timers due within SHORT_TIMER_MS, the work a page defers by a moment (a restore after load, a redraw after a click, a test's
- * contract), so SETTLE_JS can wait for that work instead of for a fixed time. It keeps the original setTimeout for its own waits.
+ * Page script for every new document (Page.addScriptToEvaluateOnNewDocument): wraps setTimeout to track the timers due within
+ * SHORT_TIMER_MS, the work a page defers by a moment (a restore after load, a redraw after a click, a test's contract), so
+ * SETTLE_JS can wait for that work instead of for a fixed time. Timeouts and intervals share one id pool, so clearTimeout and
+ * clearInterval each cancel either and both stop tracking the id. It keeps the original setTimeout for its own waits.
  */
 export const TIMERS_JS = `(() => {
 	if (window[${TIMERS_KEY}]) return;
 	const set = window.setTimeout.bind(window);
-	const clear = window.clearTimeout.bind(window);
+	const clearTimeout = window.clearTimeout.bind(window);
+	const clearInterval = window.clearInterval.bind(window);
 	const pending = new Set();
 	window.setTimeout = function (handler, ms, ...args) {
 		const id = set(function () {
@@ -61,7 +63,8 @@ export const TIMERS_JS = `(() => {
 		if (!(Number(ms) > ${SHORT_TIMER_MS})) pending.add(id);
 		return id;
 	};
-	window.clearTimeout = (id) => { pending.delete(id); clear(id); };
+	window.clearTimeout = (id) => { pending.delete(id); clearTimeout(id); };
+	window.clearInterval = (id) => { pending.delete(id); clearInterval(id); };
 	window[${TIMERS_KEY}] = {
 		set,
 		/**
