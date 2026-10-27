@@ -14,7 +14,9 @@ import {
 	options,
 	type VNode,
 } from "preact";
+import { useContext } from "preact/hooks";
 import { renderToString } from "preact-render-to-string";
+import { type Place, PlaceContext } from "../components/parts/place.ts";
 import {
 	type DrawRecord,
 	type Fillable,
@@ -42,6 +44,8 @@ export interface Island {
 	name: string;
 	props: Record<string, unknown>;
 	refs?: ClientRef[];
+	/** The name of the View the island sits in, for the Controls it holds (components/parts/place.ts). */
+	place?: string;
 	view?: string;
 	drawn?: Record<string, string>;
 }
@@ -49,13 +53,14 @@ export interface Island {
 /**
  * An Island as pack writes it into the page for islands/client.ts, with its modules as indexes into the client bundle's list:
  * `m` the module, `e` the export name, `p` the props; `r` the client functions that go into the props, each as [path, module,
- * export name]; `v` the filled View it draws, for an island without markup.
+ * export name]; `s` the name of the View it sits in; `v` the filled View it draws, for an island without markup.
  */
 export interface IslandData {
 	m: number;
 	e: string;
 	p: Record<string, unknown>;
 	r?: [(string | number)[], number, string][];
+	s?: string;
 	v?: string;
 }
 
@@ -101,6 +106,7 @@ export function island(module: string, name: string, value: unknown, kit = false
 		children,
 		...props
 	}: Record<string, unknown> & { children?: ComponentChildren }) {
+		const place = useContext(PlaceContext);
 		if (depth) {
 			return h(Component, { ...props, children });
 		}
@@ -117,10 +123,15 @@ export function island(module: string, name: string, value: unknown, kit = false
 			);
 		}
 		return prerendered(
-			{ module, name, props: json, ...(refs.length ? { refs } : {}) },
+			{
+				module,
+				name,
+				props: json,
+				...(refs.length ? { refs } : {}),
+				...(place?.name ? { place: place.name } : {}),
+			},
 			props,
-			Component,
-			label,
+			{ Component, label, place },
 			children,
 		);
 	}
@@ -147,8 +158,11 @@ export function island(module: string, name: string, value: unknown, kit = false
 function prerendered(
 	entry: Island,
 	props: Record<string, unknown>,
-	Component: ComponentType<Record<string, unknown>>,
-	label: string,
+	{
+		Component,
+		label,
+		place,
+	}: { Component: ComponentType<Record<string, unknown>>; label: string; place: Place | undefined },
 	children: ComponentChildren,
 ) {
 	// Numbered before its slot renders, so an island in the slot comes after it, in page order.
@@ -157,7 +171,9 @@ function prerendered(
 	depth++;
 	let html: string;
 	try {
-		html = renderToString(h(Component, slot ? { ...props, children: slot.vnode } : props));
+		// Rendered on its own, an island gets the place of the View it sits in from here, as the browser gives it (client.ts).
+		const rendered = h(Component, slot ? { ...props, children: slot.vnode } : props);
+		html = renderToString(h(PlaceContext.Provider, { value: place }, rendered));
 	} finally {
 		depth--;
 	}

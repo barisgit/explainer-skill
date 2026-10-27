@@ -8,14 +8,12 @@ export function Controls({
 	id,
 	controls,
 	start,
-	scope,
 }: {
 	id: string;
 	controls: ExploreControl[];
 	start: number[];
-	scope?: string;
 }) {
-	const set = useDeclaredControls(usePlace(scope), id, controls, start);
+	const set = useDeclaredControls(usePlace(), id, controls, start);
 	const [values, choose] = useControlSet(set);
 	return (
 		<div class="fig" id={anchorOf(id)}>

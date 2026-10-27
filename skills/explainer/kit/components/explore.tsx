@@ -330,7 +330,6 @@ export function Explore({
 			: {
 					use: own.use,
 					off: kitText("off"),
-					...(place.name && { scope: place.name }),
 					...(under && { under }),
 				}),
 		label: label ?? "",
@@ -360,11 +359,5 @@ export function Controls({ id, controls }: ControlsProps) {
 	if (typeof document === "undefined" && place.sets.has(id)) {
 		failed("is on the page twice: give each set its own id");
 	}
-	return (
-		<ControlsIsland
-			id={id}
-			{...parseControls(controls, failed)}
-			{...(place.name && { scope: place.name })}
-		/>
-	);
+	return <ControlsIsland id={id} {...parseControls(controls, failed)} />;
 }

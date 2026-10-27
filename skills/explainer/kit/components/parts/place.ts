@@ -1,8 +1,8 @@
 /*
  * The place a Controls and the Explores that follow it share: the page outside every View, one View, or one record of a filled
  * View. A reader changes the controls of the place they are looking at, so a `use` finds its Controls only there. A View
- * and a record provide their place as context; a client component at the page (a separate render root, which no context
- * reaches) gets the place by the name its static Controls or Explore passes it as the island prop `scope`.
+ * and a record provide their place as context; a client component is a render root of its own, so pack and the browser
+ * give it the place of the View it sits in (kit/islands), and the page's when it sits outside every View.
  */
 import { createContext } from "preact";
 import { useContext } from "preact/hooks";
@@ -28,6 +28,5 @@ export function placeNamed(name: string): Place {
 	return known;
 }
 
-/** The place a component renders in: the one a View or record provided, else the page's or the View named by `scope`. */
-export const usePlace = (scope?: string): Place =>
-	useContext(PlaceContext) ?? placeNamed(scope ?? "");
+/** The place a component renders in: the one a View or record provided, else the page's. */
+export const usePlace = (): Place => useContext(PlaceContext) ?? placeNamed("");

@@ -14,6 +14,7 @@ import {
 	render,
 	type VNode,
 } from "preact";
+import { PlaceContext, placeNamed } from "../components/parts/place.ts";
 import { type DrawRecord, FilledRecord, type FillProps } from "../components/view-body.ts";
 import "./bare-data.ts";
 import type { IslandData } from "./server.ts";
@@ -181,7 +182,7 @@ export function hydrateIslands(modules: Record<string, unknown>[]): void {
 	);
 	// All markers are found before any island renders, since rendering changes the DOM between them.
 	const found = markers();
-	for (const [n, { m, e, p: json, r, v }] of data.entries()) {
+	for (const [n, { m, e, p: json, r, s, v }] of data.entries()) {
 		const p = withRefs(json, r, modules);
 		const component = modules[m]?.[e];
 		const { island, slot } = found.get(n) ?? {};
@@ -195,6 +196,11 @@ export function hydrateIslands(modules: Record<string, unknown>[]): void {
 		}
 		// An island comes before the islands in its slot, so its slot goes back into the page before they hydrate.
 		const props = slot ? { ...p, children: takeSlot(slot) } : p;
-		hydrate(h(component as ComponentType<Record<string, unknown>>, props), range(...island));
+		const root = h(component as ComponentType<Record<string, unknown>>, props);
+		// The place of the View the island sits in, which a static island gets from its parent (kit/islands/server.ts).
+		hydrate(
+			s === undefined ? root : h(PlaceContext.Provider, { value: placeNamed(s) }, root),
+			range(...island),
+		);
 	}
 }

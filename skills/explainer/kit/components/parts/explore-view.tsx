@@ -36,8 +36,7 @@ export type FrameFunction = (...values: ExploreValue[]) => ExploreFrame;
 
 /**
  * Explore's island props. Its controls, with the index each starts on, or `use`, the id of the Controls whose set it follows
- * (in the View named `scope`, else on the page; `under` when it is written right under them; `off` is the text of a toggle
- * that is off).
+ * (`under` when it is written right under them; `off` is the text of a toggle that is off).
  * Precomputed: the first frame, the distinct patches against it and which patch each frame takes (frames in row-major order),
  * their texts HTML. Live: the frame function, a client module's export, and the JSON base under its frames.
  */
@@ -48,7 +47,7 @@ export type ExploreData = {
 	id?: string;
 } & (
 	| { controls: ExploreControl[]; start: number[] }
-	| { use: string; off: string; scope?: string; under?: boolean }
+	| { use: string; off: string; under?: boolean }
 ) &
 	({ first: Json; patches: Json[]; at: number[] } | { frame: FrameFunction; base: ExploreFrame });
 
@@ -225,7 +224,7 @@ function ControlsState({
  * rendered earlier in the same place and shows, or its own controls, which Explore shows (`shows`).
  */
 function useControls(data: ExploreData) {
-	const place = usePlace("use" in data ? data.scope : undefined);
+	const place = usePlace();
 	const [set] = useState<ControlSet>(() => {
 		if (!("use" in data)) {
 			return newControlSet(data.controls, data.start);

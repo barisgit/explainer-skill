@@ -193,11 +193,12 @@ async function recordIds(html: string, islands: Island[]): Promise<string[]> {
 
 /** The islands as the page carries them for kit/islands/client.ts, each module named by its index in `modules`. */
 const islandData = (islands: Island[], modules: string[]): IslandData[] =>
-	islands.map(({ module, name, props, refs, view }) => ({
+	islands.map(({ module, name, props, refs, place, view }) => ({
 		m: modules.indexOf(module),
 		e: name,
 		p: props,
 		...(refs ? { r: refs.map((ref) => [ref.path, modules.indexOf(ref.module), ref.name]) } : {}),
+		...(place === undefined ? {} : { s: place }),
 		...(view === undefined ? {} : { v: view }),
 	}));
 

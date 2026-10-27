@@ -225,6 +225,22 @@ export const Item = () => <><h1>R</h1><Controls id="a" controls={[{ id: "on", la
 				},
 			),
 		).toEqual(place);
+		// A client component in a View is in that View's place.
+		expect(
+			await failure(
+				"client-in-view",
+				`import { Panel } from "./panel.tsx";\n\n<View name="v" back="Fails">\n\n# V\n\n<Panel />\n\n</View>\n\n<Explore id="o" use="in" frame={() => ({ readout: "x" })} />`,
+				{
+					"panel.tsx": `"use client";
+import { Controls } from "kit";
+export const Panel = () => <Controls id="in" controls={[{ id: "on", label: "On", toggle: true }]} />;
+`,
+				},
+			),
+		).toEqual([
+			1,
+			expect.stringContaining('finds no <Controls id="in"> above it in the same place'),
+		]);
 		expect(await failure("empty", '<Controls id="a" controls={[]} />')).toEqual([
 			1,
 			expect.stringContaining('<Controls id="a"> needs controls'),
@@ -300,7 +316,7 @@ Between the controls and the next figure.
 describe("where a set of controls lives", () => {
 	test("a parent re-rendering, a View in its own place and a record opened again each keep their Controls and Explores working", async () => {
 		const page = `import { Controls, Explore, View } from "kit";
-import { Item, Panel } from "./places.tsx";
+import { Inside, Item, Panel } from "./places.tsx";
 
 # Places
 
@@ -313,6 +329,8 @@ import { Item, Panel } from "./places.tsx";
 # Tab
 
 <Controls id="t" controls={[{ id: "t-on", label: "Flag", toggle: true }]} />
+
+<Inside />
 
 Between the controls and the figure.
 
@@ -336,6 +354,14 @@ export function Panel() {
 			<Controls id="p" controls={[{ id: "p-on", label: "Panel flag", toggle: true }]} />
 			<Explore id="p-out" use="p" frame={(on) => ({ readout: "panel:" + on })} />
 		</section>
+	);
+}
+export function Inside() {
+	return (
+		<>
+			<Controls id="i" controls={[{ id: "i-on", label: "Inside flag", toggle: true }]} />
+			<Explore id="i-out" use="i" frame={(on) => ({ readout: "inside:" + on })} />
+		</>
 	);
 }
 export function Item({ record }: { record: { id: string } }) {
@@ -370,6 +396,11 @@ export function Item({ record }: { record: { id: string } }) {
 				`document.getElementById("t-on").click()`,
 				`[${readout("t-out")}]`,
 			);
+			const inside = await act<string[]>(
+				cdp,
+				`document.getElementById("i-on").click()`,
+				`[${readout("i-out")}]`,
+			);
 			const link = await cdp.evaluate<string>(
 				`(() => { const a = document.querySelector("#t-out .controls-state a"); return a.getAttribute("href") + (document.querySelector('[data-view="tab"]').querySelector(a.getAttribute("href")) ? " in the view" : " elsewhere"); })()`,
 			);
@@ -386,7 +417,7 @@ export function Item({ record }: { record: { id: string } }) {
 				`document.getElementById("r-a").click()`,
 				`[${readout("out-a")}]`,
 			);
-			return { start, rerendered, flagged, tab, tabOn, link, a, aOn, b, again, againOn };
+			return { start, rerendered, flagged, tab, tabOn, inside, link, a, aOn, b, again, againOn };
 		});
 		expect(state).toEqual({
 			start: ["Again 0", "panel:false"],
@@ -394,6 +425,7 @@ export function Item({ record }: { record: { id: string } }) {
 			flagged: ["Again 1", "panel:true"],
 			tab: ["tab:false", false],
 			tabOn: ["tab:true"],
+			inside: ["inside:true"],
 			link: "#t-controls in the view",
 			a: ["a:false", false],
 			aOn: ["a:true"],
