@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import {
 	chmodSync,
 	existsSync,
@@ -7,6 +8,7 @@ import {
 	readFileSync,
 	writeFileSync,
 } from "node:fs";
+import { constants } from "node:os";
 import { join } from "node:path";
 import { ChromeError } from "../skills/explainer/src/cdp.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
@@ -208,6 +210,66 @@ test("check ended by SIGTERM stops Chrome and deletes its profile and unfinished
 	await chromeStarted(tmp);
 	proc.kill("SIGTERM");
 	expect(await proc.exited).toBe(143);
+	expect(readdirSync(tmp)).toEqual([]);
+	expect(readdirSync(out)).toEqual([]);
+}, 30_000);
+
+/**
+ * Starts `check --quick` on the stalled page with the stand-in Chrome, as the leader of its own process group so the test can
+ * signal check and its Chrome together, as a terminal's Ctrl-C or GNU timeout does. Resolves once the stand-in runs, with check's
+ * exit (its code, or 128 + the signal that killed it) and stderr.
+ */
+async function startGroup(tmp: string, out: string) {
+	const proc = spawn(
+		process.execPath,
+		[join(SKILL_DIR, "cli.ts"), "check", stalled, "--quick", "--out", out],
+		{
+			detached: true,
+			stdio: ["ignore", "ignore", "pipe"],
+			env: { ...process.env, TMPDIR: tmp, CHROME: fakeChrome },
+		},
+	);
+	let stderr = "";
+	proc.stderr?.on("data", (d) => {
+		stderr += d;
+	});
+	const exited = new Promise<{ code: number; stderr: string }>((done) =>
+		proc.once("exit", (code, signal) =>
+			done({ code: code ?? 128 + (signal ? constants.signals[signal] : 0), stderr }),
+		),
+	);
+	while (!readdirSync(tmp).some((profile) => existsSync(join(tmp, profile, "started")))) {
+		await Bun.sleep(20);
+	}
+	return { pid: proc.pid ?? 0, exited };
+}
+
+test("check and its Chrome ended by one signal, which check gets twice as GNU timeout sends it, still remove the profile and unfinished shots", async () => {
+	const tmp = tempDir("tmp-group");
+	const out = tempDir("out-group");
+	const { pid, exited } = await startGroup(tmp, out);
+	// GNU timeout signals its child, then the child's whole process group: check gets SIGTERM twice, its Chrome once. The second
+	// comes while check is still waiting for its Chrome to exit.
+	process.kill(pid, "SIGTERM");
+	await Bun.sleep(100);
+	process.kill(-pid, "SIGTERM");
+	expect(await exited).toEqual({ code: 143, stderr: "" });
+	await chromesGone(tmp);
+	expect(readdirSync(tmp)).toEqual([]);
+	expect(readdirSync(out)).toEqual([]);
+}, 30_000);
+
+test("check whose Chrome exits before check handles its signal still removes the profile and unfinished shots", async () => {
+	const tmp = tempDir("tmp-chrome-first");
+	const out = tempDir("out-chrome-first");
+	const { pid, exited } = await startGroup(tmp, out);
+	for (const chrome of chromesIn(tmp)) {
+		process.kill(Number(chrome), "SIGKILL");
+	}
+	process.kill(pid, "SIGTERM");
+	// Either the signal or Chrome's lost connection ends check first; neither may leave a file behind.
+	expect([1, 143]).toContain((await exited).code);
+	await chromesGone(tmp);
 	expect(readdirSync(tmp)).toEqual([]);
 	expect(readdirSync(out)).toEqual([]);
 }, 30_000);

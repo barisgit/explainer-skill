@@ -1,5 +1,6 @@
 import { ChromeError } from "./cdp.ts";
 import { CLI, COMMANDS, type Command, usage } from "./commands.ts";
+import { signalExit } from "./on-signal.ts";
 
 function help(name?: string): string {
 	const c = name ? COMMANDS[name] : undefined;
@@ -69,6 +70,7 @@ if ("error" in parsed) {
 try {
 	process.exit(await command.run(parsed.args, parsed.flags));
 } catch (e) {
+	await signalExit();
 	if (!(e instanceof ChromeError)) {
 		throw e;
 	}
