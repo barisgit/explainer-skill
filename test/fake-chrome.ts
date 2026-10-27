@@ -5,8 +5,10 @@
  * while it starts. It writes `started` into its profile once running, and when told to stop (SIGTERM, or the pipe closing) it waits
  * EXIT_WRITE_MS and then writes `written-at-exit` into the profile, as a real Chrome flushes its profile while it shuts down. As
  * Chrome does on Linux, it keeps a SingletonSocket in a directory of its own in the temp directory, linked from the profile, and
- * leaves that directory behind when it exits.
+ * leaves that directory behind when it exits. And as Chrome's helper processes can, a helper it starts outlives it: it writes
+ * `written-by-helper` into the profile EXIT_WRITE_MS after the stand-in has exited.
  */
+import { spawn } from "node:child_process";
 import {
 	createReadStream,
 	createWriteStream,
@@ -28,6 +30,17 @@ if (!profile) {
 const singleton = join(mkdtempSync(join(tmpdir(), "org.chromium.Chromium.")), "SingletonSocket");
 writeFileSync(singleton, "");
 symlinkSync(singleton, join(profile, "SingletonSocket"));
+spawn(
+	"sh",
+	[
+		"-c",
+		'while kill -0 "$0" 2>/dev/null; do sleep 0.05; done; sleep "$2"; mkdir -p "$1" && : > "$1/written-by-helper"',
+		String(process.pid),
+		profile,
+		String(EXIT_WRITE_MS / 1000),
+	],
+	{ stdio: "ignore" },
+).unref();
 writeFileSync(join(profile, "started"), "");
 
 const commands = createReadStream("", { fd: 3 });

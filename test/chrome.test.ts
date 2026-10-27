@@ -171,6 +171,7 @@ test("--timeout counts Chrome's start-up: a Chrome that hangs while it starts st
 	expect(result.code).toBe(1);
 	// The limit plus the stand-in's shutdown, far below the 20 s start-up deadline.
 	expect(performance.now() - started).toBeLessThan(10_000);
+	await chromesGone(tmp);
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 
@@ -248,9 +249,13 @@ test("check and its Chrome ended by one signal, which check gets twice as GNU ti
 	const tmp = tempDir("tmp-group");
 	const out = tempDir("out-group");
 	const { pid, exited } = await startGroup(tmp, out);
-	// GNU timeout signals its child, then the child's whole process group: check gets SIGTERM twice, its Chrome once. The second
-	// comes while check is still waiting for its Chrome to exit.
+	// GNU timeout signals its child, then the child's process group: check gets SIGTERM twice, the second while it is still
+	// waiting for its Chrome to exit. Chrome runs in a group of its own, so it gets the signal only from a kill sent to every
+	// process involved, as here.
 	process.kill(pid, "SIGTERM");
+	for (const chrome of chromesIn(tmp)) {
+		process.kill(Number(chrome), "SIGTERM");
+	}
 	await Bun.sleep(100);
 	process.kill(-pid, "SIGTERM");
 	expect(await exited).toEqual({ code: 143, stderr: "" });

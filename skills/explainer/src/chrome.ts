@@ -37,6 +37,8 @@ export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const START_DEADLINE_MS = 20_000;
 /** How long Chrome may take to exit after SIGTERM before it is killed, so its profile can be deleted. */
 const EXIT_GRACE_MS = 5_000;
+/** How often stop looks whether Chrome's helpers have exited. */
+const GROUP_POLL_MS = 10;
 /** How long a failed start waits to see whether Chrome is exiting on its own, whose log then explains the failure. */
 const EXIT_NOTICE_MS = 1_000;
 
@@ -91,6 +93,35 @@ async function launch(profile: string, owner: Owner, limit?: AbortSignal): Promi
 	}
 }
 
+/** Whether any process of the process group `pgid` still exists. */
+function groupAlive(pgid: number): boolean {
+	try {
+		process.kill(-pgid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Resolves once every process of Chrome's group (`pgid`, Chrome's own pid) has exited. Chrome's helpers can outlive its main
+ * process by a few milliseconds and write into the profile meanwhile (on Linux a profile deleted right after the main process
+ * exited came back in about one run in five), so the profile is deleted only after this. Helpers still there after EXIT_GRACE_MS
+ * are killed.
+ */
+async function groupGone(pgid: number | undefined) {
+	if (pgid === undefined) {
+		return;
+	}
+	const end = performance.now() + EXIT_GRACE_MS;
+	while (groupAlive(pgid)) {
+		if (performance.now() > end) {
+			process.kill(-pgid, "SIGKILL");
+		}
+		await settle(GROUP_POLL_MS);
+	}
+}
+
 /** The last line of Chrome's log that says something, for a one-line error. */
 const lastLine = (log: string) =>
 	log
@@ -122,9 +153,12 @@ async function start(
 		// Chrome still adds keychain items at launch despite --use-mock-keychain, and macOS shows a
 		// "Keychain Not Found" dialog when HOME has none (a sandboxed HOME, such as verify:install's).
 		// The account's own home always has its keychain; the profile stays in --user-data-dir.
+		// detached: Chrome and its helpers get a process group of their own, so stop can wait for every one of them, and a
+		// terminal's Ctrl-C or GNU timeout's group signal reaches check alone, which then stops Chrome in order.
 		{
 			stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"],
 			env: { ...process.env, HOME: userInfo().homedir },
+			detached: true,
 		},
 	);
 	let log = "";
@@ -141,6 +175,7 @@ async function start(
 			proc.kill("SIGKILL");
 			return exited;
 		});
+		await groupGone(proc.pid);
 	};
 	owner.stop = stop;
 	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes the sandbox line out of
