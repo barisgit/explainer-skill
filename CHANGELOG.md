@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- A written `Question` with a model answer inside is a self-check: what the reader writes is kept on the page, stays out of the reply and brings no Reply bar. One with nothing inside still joins the reply.
+- A written `Question` with a model answer inside is a self-check: what the reader writes is kept on the page, stays out of the reply and brings no Reply bar. One with nothing inside still joins the reply. A page that keeps answers without a Reply bar gets a Clear answers button at its end once something is saved, which asks before it clears (new label keys `clearAnswers`, `clearAnswersPrompt`).
 
 ## v0.10.0
 

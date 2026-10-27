@@ -19,14 +19,13 @@
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }.
-   Keeping (kit keep): the reader's answers and notes are kept across reloads. The "Clear answers and notes" button (shown while
-   anything is answered, a note exists, or answers wait for a control not yet shown; a self-check's answer does not count) asks first: one click turns it red ("Clear
-   everything?"), a second within 4 s puts every control back to its default, with input and change events, and drops the notes
-   and the saved copy. Escape, leaving the button or the wait cancels.
+   Keeping (kit keep): the reader's answers and notes are kept across reloads. The bar holds keep's Clear button as "Clear answers
+   and notes", shown while anything is answered, a note exists, or answers wait for a control not yet shown (a self-check's answer
+   does not count); confirmed, it also drops the notes.
    Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in the
    page's frontmatter labels, one key: text per line (reply: Odgovor). Keys here:
-   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearConfirm "Clear everything?", clearPrompt "Press
-   again to clear all answers and notes." and clearCancelled "Clear cancelled." (announced), yourReply "Your reply" (the dialog),
+   reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearPrompt "Press again to clear all
+   answers and notes." (announced; kit keep lists the confirm's other texts), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
@@ -43,9 +42,7 @@
 	const LABELS = {
 		reply: "Reply",
 		clear: "Clear answers and notes",
-		clearConfirm: "Clear everything?",
 		clearPrompt: "Press again to clear all answers and notes.",
-		clearCancelled: "Clear cancelled.",
 		yourReply: "Your reply",
 		close: "Close",
 		copyReply: "Copy reply",
@@ -280,12 +277,13 @@
 			dialog.showModal();
 		},
 	});
-	const CONFIRM_MS = 4000;
-	const clear = h("button", { type: "button", class: "btn", onclick: onClear });
-	// A live region announces the state change: screen readers do not reliably re-read a focused button whose text changed.
-	const announce = h("span", { role: "status", class: "reply-invisible" });
+	// keep.js's Clear, with texts that name the notes it clears too.
+	const clear = keep.clearButton(
+		{ label: () => kitText("clear"), prompt: () => kitText("clearPrompt") },
+		clearAll,
+	);
 	const bar = document.body.appendChild(
-		h("div", { class: "reply-ui reply-bar" }, announce, clear, button),
+		h("div", { class: "reply-ui reply-bar" }, clear.status, clear.button, button),
 	);
 	// The page keeps the strip's height free at its top (theme.css); a hidden strip keeps the room it last took, so showing it again does not move the page.
 	new ResizeObserver(() => {
@@ -295,42 +293,6 @@
 		}
 	}).observe(bar);
 	const asked = Boolean(document.querySelector("[data-reply]"));
-	let confirmTimer = 0;
-
-	/** Clearing is irreversible, so the first click only asks; a second click while armed clears. */
-	function onClear() {
-		if (!clear.classList.contains("is-armed")) {
-			arm();
-			return;
-		}
-		disarm();
-		clearAll();
-	}
-
-	function arm() {
-		// The longer label sets the button's width; pin it so the bar does not shift under the pointer.
-		clear.style.inlineSize = `${clear.getBoundingClientRect().width}px`;
-		clear.classList.add("is-armed");
-		clear.textContent = kitText("clearConfirm");
-		announce.textContent = kitText("clearPrompt");
-		confirmTimer = window.setTimeout(() => disarm(kitText("clearCancelled")), CONFIRM_MS);
-	}
-
-	/** Back to the idle label; `message` is announced for a cancel the reader did not make by moving on. */
-	function disarm(message = "") {
-		clearTimeout(confirmTimer);
-		clear.classList.remove("is-armed");
-		clear.style.inlineSize = "";
-		clear.textContent = kitText("clear");
-		announce.textContent = message;
-	}
-
-	clear.addEventListener("blur", () => disarm());
-	document.addEventListener("keydown", (e) => {
-		if (e.key === "Escape" && clear.classList.contains("is-armed")) {
-			disarm(kitText("clearCancelled"));
-		}
-	});
 
 	function clearAll() {
 		notes.length = 0;
@@ -345,14 +307,8 @@
 		const kept = keep.update();
 		const count = filledNotes().length + answers().filter((a) => a.touched).length;
 		button.hidden = !count && !asked;
-		clear.hidden = !kept;
-		if (clear.hidden) {
-			disarm();
-		}
-		bar.hidden = button.hidden && clear.hidden;
-		if (!clear.classList.contains("is-armed")) {
-			clear.textContent = kitText("clear");
-		}
+		clear.show(kept);
+		bar.hidden = button.hidden && !kept;
 		button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
 	}
 

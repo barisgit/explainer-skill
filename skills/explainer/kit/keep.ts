@@ -7,11 +7,24 @@
    value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept. With reply (kit reply) the reader's notes are kept too, and its Clear button puts every control back to its
-   default, again with events; a self-check's answer (a kit Question's choice, or its written answer beside a model one) is kept but
-   alone brings no Clear button. */
+   <details> are not kept. Once anything is saved, a Clear answers button at the end of the page puts every control back to its
+   default, again with events, and drops the saved copy. It asks first: one click turns it red ("Clear everything?"), a second
+   within 4 s clears; Escape, leaving the button or the wait cancels. With reply (kit reply) the reader's notes are kept too, and
+   the same button sits in the reply bar instead, where a self-check's answer (a kit Question's choice, or its written answer
+   beside a model one) alone does not bring it.
+   Labels: clearAnswers "Clear answers", clearAnswersPrompt "Press again to clear all answers." (announced), and for both
+   buttons clearConfirm "Clear everything?" and clearCancelled "Clear cancelled." (announced). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
+	/** The English texts, by kitLabels key. */
+	const LABELS = {
+		clearAnswers: "Clear answers",
+		clearAnswersPrompt: "Press again to clear all answers.",
+		clearConfirm: "Clear everything?",
+		clearCancelled: "Clear cancelled.",
+	};
+	/** The page's text for `key`, else the English one. Read at each use, so kitLabels may be set after this script. */
+	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
 	const selector =
 		"input:not([type=button], [type=submit], [type=reset], [type=hidden], [type=file], [type=password], [type=image]), select, textarea";
 	const clean = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -32,8 +45,8 @@
 			storedNotes = saved;
 		},
 	};
-	/** Called when something changed outside reply.js's own calls; alone, keep.js saves then. */
-	let onChange: () => void = () => void update();
+	/** Called when something changed outside reply.js's own calls; alone, keep.js saves then and shows its own Clear. */
+	let onChange: () => void = () => updateAlone();
 	/** What a control is, by its own label and kind alone (never its group's): a saved value is put only into a control with the same one. */
 	type Control = ReplyControl;
 	/** What a control holds: checked, selected values (multiple select), or its text. */
@@ -312,23 +325,134 @@
 		onChange();
 	}
 
-	/**
-	 * Brings the saved copy in line with the page and says whether anything for the reply is kept: answers, answers waiting for a
-	 * control that is not shown yet, or notes. A self-check's answer is saved but does not count. Before the restore only the notes
-	 * are known, and nothing is written.
-	 */
-	function update() {
+	/** Brings the saved copy in line with the page and returns what it saved; before the restore nothing is known or written. */
+	function save(): State | undefined {
 		if (!ready) {
-			return notes.list().length > 0;
+			return undefined;
 		}
 		if (!applying) {
 			adopt();
 		}
 		const state = snapshot();
 		persist(state);
+		return state;
+	}
+
+	/**
+	 * Saves and says whether anything for the reply is kept: answers, answers waiting for a control that is not shown yet, or
+	 * notes. A self-check's answer is saved but does not count. Before the restore only the notes are known.
+	 */
+	function update() {
+		const state = save();
+		if (!state) {
+			return notes.list().length > 0;
+		}
 		return (
 			state.notes.length > 0 || Object.values(state.controls).some((entry) => entry.check !== true)
 		);
+	}
+
+	/** How long an armed Clear waits for its second press. */
+	const CONFIRM_MS = 4000;
+
+	/**
+	 * A Clear button that asks first, since clearing cannot be undone: one press arms it (red, clearConfirm, `texts.prompt`
+	 * announced), a second within CONFIRM_MS disarms it and calls `onClear`; Escape, leaving the button or the wait cancels.
+	 */
+	function clearButton(texts: KeepClearTexts, onClear: () => void): KeepClearButton {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "btn";
+		// A live region announces the state change: screen readers do not reliably re-read a focused button whose text changed.
+		const status = document.createElement("span");
+		status.setAttribute("role", "status");
+		status.className = "reply-invisible";
+		let timer = 0;
+		const armed = () => button.classList.contains("is-armed");
+
+		function arm() {
+			// The button never narrows under the pointer: a shorter confirm keeps the idle width, a longer one widens it on one line.
+			button.style.minInlineSize = `${button.getBoundingClientRect().width}px`;
+			button.classList.add("is-armed");
+			button.textContent = kitText("clearConfirm");
+			status.textContent = texts.prompt();
+			timer = window.setTimeout(() => disarm(kitText("clearCancelled")), CONFIRM_MS);
+		}
+
+		/** Back to the idle label; `message` is announced for a cancel the reader did not make by moving on. */
+		function disarm(message = "") {
+			clearTimeout(timer);
+			button.classList.remove("is-armed");
+			button.style.minInlineSize = "";
+			button.textContent = texts.label();
+			status.textContent = message;
+		}
+
+		button.addEventListener("click", () => {
+			if (!armed()) {
+				arm();
+				return;
+			}
+			disarm();
+			onClear();
+		});
+		button.addEventListener("blur", () => disarm());
+		document.addEventListener("keydown", (e) => {
+			if (e.key === "Escape" && armed()) {
+				disarm(kitText("clearCancelled"));
+			}
+		});
+		return {
+			button,
+			status,
+			show(visible) {
+				button.hidden = !visible;
+				if (!visible) {
+					disarm();
+				} else if (!armed()) {
+					button.textContent = texts.label();
+				}
+			},
+		};
+	}
+
+	/** keep.js's own Clear on a page without reply.js, made the first time something is saved. */
+	let own: KeepClearButton | undefined;
+
+	/**
+	 * keep.js's own Clear, at the end of the page's main column: below everything it clears, so showing it moves nothing the reader
+	 * is looking at. Notes saved by an earlier version of the page that had reply.js go too.
+	 */
+	function ownClear(): KeepClearButton {
+		const texts = {
+			label: () => kitText("clearAnswers"),
+			prompt: () => kitText("clearAnswersPrompt"),
+		};
+		const made = clearButton(texts, () => {
+			notes.restore([]);
+			clear();
+		});
+		const box = document.createElement("div");
+		box.className = "keep-clear";
+		box.append(made.status, made.button);
+		(document.querySelector("main") ?? document.body).append(box);
+		return {
+			...made,
+			show(visible) {
+				box.hidden = !visible;
+				made.show(visible);
+			},
+		};
+	}
+
+	/** Alone: saves, and offers Clear while anything is saved, a self-check's answer included, since nothing else clears it. */
+	function updateAlone() {
+		const state = save();
+		if (!state || (empty(state) && !own)) {
+			return;
+		}
+		own ??= ownClear();
+		own.show(!empty(state));
 	}
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
@@ -364,6 +488,7 @@
 		ownText,
 		update,
 		clear,
+		clearButton,
 		touch: (el) => touched.add(el),
 		touched: (el) => touched.has(el),
 		attach(owner) {

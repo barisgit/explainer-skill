@@ -293,9 +293,15 @@ describe("written-answer Question: kept or in the reply", () => {
 				`${clear}.click()`,
 				`["ask", "own"].map((id) => document.getElementById(id).value)`,
 			);
-			return { reply, cleared };
+			return {
+				reply,
+				cleared,
+				second: await cdp.evaluate(`document.querySelectorAll(".keep-clear").length`),
+			};
 		});
 		expect(seen.reply).toEqual(["- What should change? Shorter"]);
 		expect(seen.cleared).toEqual(["", ""]);
+		// The reply bar's Clear is the page's only one.
+		expect(seen.second).toBe(0);
 	}, 30_000);
 });
