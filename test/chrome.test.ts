@@ -191,6 +191,35 @@ test("withPage deletes Chrome's profile only once Chrome has exited, so nothing 
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 
+test("withPage removes no directory but Chrome's own singleton directory, whatever path the profile's link spells", async () => {
+	const outer = tempDir("tmp-dotdot");
+	const job = join(outer, "job");
+	mkdirSync(job);
+	writeFileSync(join(outer, "kept"), "");
+	const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");
+	// The link's directory, spelled job/.., is the temp directory's parent: removing it would remove the temp directory too.
+	const proc = Bun.spawn(
+		[
+			process.execPath,
+			"-e",
+			`await (await import(${JSON.stringify(chrome)})).withPage(async () => {});`,
+		],
+		{
+			env: {
+				...process.env,
+				CHROME: fakeChrome,
+				TMPDIR: job,
+				FAKE_SINGLETON: `${job}/../SingletonSocket`,
+			},
+		},
+	);
+	expect(await proc.exited).toBe(0);
+	await chromesGone(outer);
+	// The stand-in's socket stays: it lies outside the temp directory, which is all cleanup may touch.
+	expect(readdirSync(outer).sort()).toEqual(["SingletonSocket", "job", "kept"]);
+	expect(readdirSync(job)).toEqual([]);
+}, 30_000);
+
 test("withPage whose Chrome leaves a process that never exits kills its group once, keeps the profile and says where, within a bound", async () => {
 	const tmp = tempDir("tmp-stuck");
 	const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");

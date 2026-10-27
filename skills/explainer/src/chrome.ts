@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readlinkSync, realpathSync, rmSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { Cdp, ChromeError, seconds, within } from "./cdp.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
@@ -246,12 +246,15 @@ async function start(
 /**
  * Deletes Chrome's profile and, on Linux, the directory Chrome keeps its process-singleton socket in: Chrome makes it in the temp
  * directory (`org.chromium.Chromium.XXXXXX`), links it from the profile's SingletonSocket, and leaves it behind whenever it exits,
- * so every run left one. Only a directory of the temp directory that this profile links to is removed.
+ * so every run left one. The link's directory is resolved first (a target spelled `tmp/job/..` names `tmp`), and only a direct
+ * child of the resolved temp directory is removed, never the temp directory itself.
  */
 function removeProfile(profile: string) {
 	try {
-		const socketDir = dirname(readlinkSync(join(profile, "SingletonSocket")));
-		if (realpathSync(dirname(socketDir)) === realpathSync(tmpdir())) {
+		const target = resolve(profile, readlinkSync(join(profile, "SingletonSocket")));
+		const socketDir = realpathSync(dirname(target));
+		const temp = realpathSync(tmpdir());
+		if (socketDir !== temp && dirname(socketDir) === temp) {
 			rmSync(socketDir, { recursive: true, force: true });
 		}
 	} catch {
