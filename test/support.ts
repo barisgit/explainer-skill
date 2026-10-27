@@ -7,6 +7,7 @@ import { withPage } from "../skills/explainer/src/chrome.ts";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
 import { packPage } from "../skills/explainer/src/pack.ts";
 import { PackError } from "../skills/explainer/src/pack-error.ts";
+import { SETTLE_JS } from "../skills/explainer/src/page-js.ts";
 import { runStep, type ShotPath } from "../skills/explainer/src/steps.ts";
 
 /** The skill directory as an installer would copy it. */
@@ -270,47 +271,23 @@ export function runPacked(
  */
 export const FRAMES = `new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame))`;
 
-/** How long DRAWN waits for a chart before it fails the test, far above any real mount. */
-const DRAW_DEADLINE_MS = 10_000;
-
 /**
- * Page expression: a promise of the moment every Chart the reader can see is drawn, that is each `.chart` with a width (plots
- * aside, which plot.js draws as it makes them) has its ECharts instance. Charts.make mounts a chart on its first resize once its
- * font has loaded, which no frame or task orders, so this polls each frame; past the deadline it rejects, naming the charts.
+ * Page expression: waits as check does after a load or a step (SETTLE_JS: frames, the fonts, every chart the reader can see drawn,
+ * frames again) and rejects with what is still missing at its deadline, so the test fails naming it.
  */
-const DRAWN = `new Promise((drawn, failed) => {
-	const deadline = performance.now() + ${DRAW_DEADLINE_MS};
-	const poll = () => {
-		const empty = window.echarts ? [...document.querySelectorAll(".chart:not(.plot)")].filter((el) => el.clientWidth && !echarts.getInstanceByDom(el)) : [];
-		if (!empty.length) drawn();
-		else if (performance.now() > deadline) failed(new Error("charts not drawn in ${DRAW_DEADLINE_MS} ms: " + empty.map((el) => el.id || el.getAttribute("aria-label")).join(", ")));
-		else requestAnimationFrame(poll);
-	};
-	poll();
-})`;
+const SETTLE = `(${SETTLE_JS}).then((missing) => { if (missing) throw new Error(missing); })`;
 
-/**
- * Opens `url` (or reloads, keeping storage) and waits until the page has settled: the load event; FRAMES, after which the islands'
- * first effects (which make the charts and plots and start their fonts) and keep.js's restore have run; the fonts; DRAWN; then
- * FRAMES again for the effects and redraws those start.
- */
+/** Opens `url` (or reloads, keeping storage) and waits until the page has settled (SETTLE). */
 export async function load(cdp: Cdp, url?: string) {
 	await cdp.load(url);
-	await cdp.evaluate(
-		`${FRAMES}.then(() => document.fonts.ready).then(() => ${DRAWN}).then(() => ${FRAMES})`,
-		true,
-	);
+	await cdp.evaluate(SETTLE, true);
 }
 
 /**
- * Runs `action` in the page, waits for the re-render and the redraws it starts (FRAMES, DRAWN for a chart it shows or mounts,
- * FRAMES), and returns the page's `state` expression.
+ * Runs `action` in the page, waits for the re-render and the redraws it starts (SETTLE), and returns the page's `state` expression.
  */
 export const act = <T>(cdp: Cdp, action: string, state: string) =>
-	cdp.evaluate<T>(
-		`(() => { ${action} })(), ${FRAMES}.then(() => ${DRAWN}).then(() => ${FRAMES}).then(() => (${state}))`,
-		true,
-	);
+	cdp.evaluate<T>(`(() => { ${action} })(), ${SETTLE}.then(() => (${state}))`, true);
 
 /** How long `until` waits for its condition, far above any write a test waits for. */
 const UNTIL_DEADLINE_MS = 3000;
