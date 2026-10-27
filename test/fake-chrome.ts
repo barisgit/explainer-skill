@@ -3,9 +3,19 @@
  * shows only by chance. It speaks just enough of the debugging pipe for withPage: it answers every call with an empty result
  * (`Target.createTarget` and `Target.attachToTarget` with ids), or none at all when FAKE_CHROME is "silent", as a Chrome that hangs
  * while it starts. It writes `started` into its profile once running, and when told to stop (SIGTERM, or the pipe closing) it waits
- * EXIT_WRITE_MS and then writes `written-at-exit` into the profile, as a real Chrome flushes its profile while it shuts down.
+ * EXIT_WRITE_MS and then writes `written-at-exit` into the profile, as a real Chrome flushes its profile while it shuts down. As
+ * Chrome does on Linux, it keeps a SingletonSocket in a directory of its own in the temp directory, linked from the profile, and
+ * leaves that directory behind when it exits.
  */
-import { createReadStream, createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import {
+	createReadStream,
+	createWriteStream,
+	mkdirSync,
+	mkdtempSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** How long the stand-in takes to shut down: long enough that a profile deleted before it exits is written again. */
@@ -15,6 +25,9 @@ const profile = process.argv.find((arg) => arg.startsWith("--user-data-dir="))?.
 if (!profile) {
 	throw new Error("fake Chrome needs --user-data-dir");
 }
+const singleton = join(mkdtempSync(join(tmpdir(), "org.chromium.Chromium.")), "SingletonSocket");
+writeFileSync(singleton, "");
+symlinkSync(singleton, join(profile, "SingletonSocket"));
 writeFileSync(join(profile, "started"), "");
 
 const commands = createReadStream("", { fd: 3 });
