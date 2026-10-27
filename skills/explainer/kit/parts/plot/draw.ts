@@ -1,5 +1,5 @@
 /* plot draw: what kit:plot.js draws, not referenced from pages: pack joins it in front of plot.js, and runs it itself to draw each
-   plot into the page (src/mdx/draw-plot.ts). PlotDraw({ lang }) gives render(option, W, H, textWidth, shown), the SVG content,
+   plot into the page (src/mdx/draw.ts). PlotDraw({ lang }) gives render(option, W, H, textWidth, shown), the SVG content,
    legendMarkup(option), the legend's buttons, and switchedOn(series, off), which series the legend leaves on; numbers are
    written in lang(), and textWidth measures a label at the plot's 13 px. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions

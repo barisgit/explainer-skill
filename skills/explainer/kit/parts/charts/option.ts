@@ -1,5 +1,5 @@
 /* charts option: the option a Chart's ECharts draws, not referenced from pages: pack joins it in front of charts.js, and runs it
-   itself to draw each chart into the page (src/mdx/draw-chart.ts). ChartsOption({ color, lang }) gives
+   itself to draw each chart into the page (src/mdx/draw.ts). ChartsOption({ color, lang }) gives
      resolveOption(option)  a copy of the option with every colour expression under a colour key made color(expression), and
                             every JSON formatter a function writing numbers in lang()
      theme({ under, font, animation })  the ECharts theme from the kit's tokens, each as color("var(--token)"); under is the
