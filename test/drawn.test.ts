@@ -1,0 +1,198 @@
+import { afterAll, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { withPage } from "../skills/explainer/src/chrome.ts";
+import { runStep } from "../skills/explainer/src/steps.ts";
+import { inPage, packedMdx, scratch, WIDTHS } from "./support.ts";
+
+const dir = scratch();
+afterAll(dir.cleanup);
+
+/** A Chart with a legend, a tooltip and a token colour, and a Plot with a legend, written as authors write them. */
+const PAGE = `import { Chart, Plot } from "kit";
+
+# Drawn
+
+<Chart id="bars" label="Load by day" option={{ legend: {}, tooltip: { trigger: "axis" }, xAxis: { type: "category", data: ["Mon", "Tue"] }, yAxis: {}, series: [{ name: "Load", type: "bar", data: [1, 2], itemStyle: { color: "var(--c3)" } }] }} />
+
+<Plot id="lines" label="Two lines" option={{ series: [{ name: "Rising", data: [[0, 0], [1, 2]] }, { name: "Flat", data: [[0, 1], [1, 1]] }] }} />
+`;
+
+const output = await packedMdx(dir, "drawn", PAGE);
+
+/**
+ * Page expression, run with the page's scripts off: for each figure, how many drawn copies show and how wide the one showing is
+ * against its element, its texts, and the colour of the bar against the colour --c3 has in the scheme.
+ */
+const DRAWN_STATE = `(() => {
+	const shown = (id) => [...document.querySelectorAll("#" + id + " .chart-drawn > svg")].filter((svg) => svg.getBoundingClientRect().width > 0);
+	const share = (id) => Math.round((shown(id)[0]?.getBoundingClientRect().width ?? 0) / document.getElementById(id).getBoundingClientRect().width * 10) / 10;
+	const probe = document.createElement("i");
+	probe.style.color = "var(--c3)";
+	document.body.append(probe);
+	const c3 = getComputedStyle(probe).color;
+	probe.remove();
+	const bar = shown("bars")[0]?.querySelector("path[style*='--c3']");
+	return {
+		copies: [shown("bars").length, shown("lines").length],
+		widths: [share("bars"), share("lines")],
+		texts: shown("bars").concat(shown("lines")).flatMap((svg) => [...svg.querySelectorAll("text")].map((t) => t.textContent)),
+		bar: bar ? getComputedStyle(bar).fill : "none",
+		c3,
+	};
+})()`;
+
+interface DrawnState {
+	copies: number[];
+	widths: number[];
+	texts: string[];
+	bar: string;
+	c3: string;
+}
+
+/** DRAWN_STATE at each width in light and dark, and as the page prints, with the page's scripts off. */
+function drawnStates(): Promise<Record<string, DrawnState>> {
+	return withPage(async (cdp) => {
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		const states: Record<string, DrawnState> = {};
+		for (const viewport of WIDTHS) {
+			await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1 });
+			for (const media of ["screen", "print"]) {
+				for (const scheme of ["light", "dark"]) {
+					await cdp.send("Emulation.setEmulatedMedia", {
+						media,
+						features: [{ name: "prefers-color-scheme", value: scheme }],
+					});
+					await cdp.load(`file://${output}`);
+					states[`${viewport.width} ${media} ${scheme}`] =
+						await cdp.evaluate<DrawnState>(DRAWN_STATE);
+				}
+			}
+		}
+		return states;
+	});
+}
+
+describe("a Chart and a Plot drawn at pack time", () => {
+	test("show with scripts off at every width, in print, in light and dark, coloured by the scheme's tokens", async () => {
+		const states = await drawnStates();
+		const bars = new Set<string>();
+		for (const [where, state] of Object.entries(states)) {
+			expect({ where, copies: state.copies, bar: state.bar }).toEqual({
+				where,
+				copies: [1, 1],
+				bar: state.c3,
+			});
+			expect({ where, narrowest: Math.min(...state.widths) >= 0.7 }).toEqual({
+				where,
+				narrowest: true,
+			});
+			expect(state.texts).toEqual(expect.arrayContaining(["Mon", "Tue", "Load"]));
+			bars.add(state.bar);
+		}
+		// The bar follows the scheme: --c3 is a different colour in dark.
+		expect(bars.size).toBe(2);
+	}, 60_000);
+
+	test("colours ECharts mixes from two tokens, as a visualMap does, are those tokens mixed; a fade to transparent keeps its hue", async () => {
+		const mixed = await packedMdx(
+			dir,
+			"mixed",
+			`import { Chart } from "kit";
+
+# Mixed
+
+<Chart label="Heat" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: { type: "category", data: ["x"] }, visualMap: { min: 0, max: 10, inRange: { color: ["var(--c2)", "var(--c5)"] } }, series: [{ type: "heatmap", data: [[0, 0, 0], [1, 0, 3]] }] }} />
+
+<Chart label="Area" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "line", data: [1, 3], areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "var(--c1)" }, { offset: 1, color: "transparent" }] } } }] }} />
+`,
+		);
+		const html = readFileSync(mixed, "utf8");
+		expect(html).toMatch(/fill:color-mix\(in srgb, var\(--c2\) 70(\.\d)?%, var\(--c5\)\)/);
+		expect(html).toContain('<stop offset="100%" style="stop-color:var(--c1)" stop-opacity="0">');
+		expect(html).not.toContain('stop-color="none"');
+	}, 30_000);
+
+	test("take the height the page's CSS gives the element where pack can work it out, else the theme's", async () => {
+		const sized = await packedMdx(
+			dir,
+			"sized",
+			`import { Chart, Plot } from "kit";
+import "./sized.css";
+
+# Sized
+
+<Chart class="short" label="Short" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />
+
+<Plot id="low" label="Low" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+
+<Chart class="tall" label="Tall" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />
+`,
+			{
+				"sized.css": `/* .short in a media query is not read: pack cannot tell the window */
+.chart.short { block-size: clamp(10rem, 20vw, 14rem); }
+@media (min-width: 60rem) { .chart.short { block-size: 30rem; } }
+#low { height: 200px; }
+.page .chart { block-size: 5rem; }
+`,
+			},
+		);
+		const viewBoxes = [
+			...readFileSync(sized, "utf8").matchAll(/<svg viewBox="0 0 (\d+) (\d+)"( data-fit="\w+")?>/g),
+		].map((m) => `${m[1]}x${m[2]}`);
+		// Chart .short: 14rem on a desktop, 10rem on a phone; the Plot's area is 200 px less its padding; .tall is the theme's.
+		expect(viewBoxes).toEqual([
+			"1054x224",
+			"527x224",
+			"356x160",
+			"1054x192",
+			"527x192",
+			"356x192",
+			"1054x544",
+			"527x544",
+			"356x352",
+		]);
+	}, 30_000);
+
+	test("give way to the live chart and plot, whose tooltip and legends work", async () => {
+		const state = await inPage(output, async (cdp) => {
+			const step = async (name: string) =>
+				(await runStep(cdp, name, () => dir.path("unused.png"))).problem ?? "";
+			const live = await cdp.evaluate(LIVE_STATE);
+			const hovered = await step("hover:#bars");
+			const tooltip = await cdp.evaluate(TOOLTIP);
+			const clicked = await step("click:#lines .plot-legend button");
+			const legend = await cdp.evaluate(PLOT_LEGEND);
+			return { live, hovered, tooltip, clicked, legend };
+		});
+		expect(state).toEqual({
+			live: { drawn: 0, chart: true, plotLines: 2, onTop: true },
+			hovered: "",
+			tooltip: true,
+			clicked: "",
+			legend: { pressed: "false", lines: 1 },
+		});
+	}, 60_000);
+});
+
+/**
+ * Page expression: how many drawn copies are left, whether ECharts mounted the chart, the plot's live lines, and whether the
+ * chart's middle reaches the live chart rather than a copy over it.
+ */
+const LIVE_STATE = `(() => {
+	const chart = document.getElementById("bars");
+	const box = chart.getBoundingClientRect();
+	const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+	return {
+		drawn: document.querySelectorAll(".chart-drawn").length,
+		chart: Boolean(echarts.getInstanceByDom(chart)),
+		plotLines: document.querySelectorAll("#lines svg path.line").length,
+		onTop: hit?.tagName === "CANVAS" && chart.contains(hit),
+	};
+})()`;
+
+/** Page expression: whether ECharts' tooltip shows the hovered day's bar. */
+const TOOLTIP = `[...document.querySelectorAll("#bars div")].some((d) => getComputedStyle(d).display !== "none" && getComputedStyle(d).opacity !== "0" && /Load/.test(d.textContent) && /Mon|Tue/.test(d.textContent))`;
+
+/** Page expression: the first legend button's state and the lines the plot draws after it was pressed. */
+const PLOT_LEGEND = `({ pressed: document.querySelector("#lines .plot-legend button").getAttribute("aria-pressed"), lines: document.querySelectorAll("#lines svg path.line").length })`;

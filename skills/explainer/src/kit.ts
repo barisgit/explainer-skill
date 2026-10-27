@@ -125,6 +125,18 @@ const transpiler = new Bun.Transpiler({ loader: "ts" });
 const script = (source: string): string =>
 	`${leadingComment(source).trim()}\n${transpiler.transformSync(source)}`;
 
+/**
+ * Runs a kit part (`kit/parts/<path>`) in this process, for pack to draw what the page's script would draw: the part's types are
+ * stripped and its code run with a plain object as `window`, on which the part hangs its function; returns what it hung there
+ * under `name`. Such a part touches nothing of the page until that function is called, and the caller passes in what it needs.
+ */
+export function runKitPart(path: string, name: string): unknown {
+	const window: Record<string, unknown> = {};
+	const code = transpiler.transformSync(readFileSync(join(KIT_DIR, "parts", path), "utf8"));
+	new Function("window", code)(window);
+	return window[name];
+}
+
 /** Whether a resolved path is one of the kit's files (a part included) rather than a page's own. */
 export const isKitFile = (path: string): boolean => path.startsWith(KIT_DIR + sep);
 

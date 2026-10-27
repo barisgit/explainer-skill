@@ -185,6 +185,32 @@ declare var ViewsNav: (options: {
 	show(view: HTMLElement | null, hash: string): void;
 };
 declare var ViewsFolds: (kitText: KitText<"expandAll" | "collapseAll">) => () => void;
+declare var ChartsOption: (env: {
+	/** The colour ECharts gets for a CSS colour expression: var(--token), color-mix(...) or light-dark(...). */
+	color: (expression: string) => string;
+	/** The language numbers are written in. */
+	lang: () => string;
+}) => {
+	resolveOption<T>(option: T): T;
+	theme(place: { under: string; font: string; animation: boolean }): ChartOption;
+};
+declare var PlotDraw: (env: {
+	/** The language numbers are written in. */
+	lang: () => string;
+}) => {
+	/** The SVG content for the option at W x H pixels, with series i drawn when shown[i]; textWidth measures a label in px. */
+	render(
+		option: PlotOption,
+		W: number,
+		H: number,
+		textWidth: (s: unknown) => number,
+		shown: boolean[],
+	): string;
+	/** The legend's buttons, or "" when it shows none; button i switches series i. */
+	legendMarkup(option: PlotOption): string;
+	/** Per series: whether it is switched on, given the names switched off. */
+	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
+};
 
 // An image or font a page's module imports is its data: URL, which pack embeds: import icon from "./icon.svg" (src/data-uri.ts).
 declare module "*.png" {

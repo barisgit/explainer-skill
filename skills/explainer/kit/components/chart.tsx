@@ -11,13 +11,18 @@
    Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
      { currency: "EUR", compact: true } (written for the page's lang), or one text per data item or tick: ["Low", "", "Peak"].
    Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
-     Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
+     Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
+     with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
+   pack draws the chart into the page as SVG, so it shows before ECharts runs, with scripts off and in print; the live chart
+   takes its place at the element's size. The option's functions run in pack too; a chart whose functions throw there (they read
+   the page) is left to the live chart. setup runs on the live chart only, so what it changes shows once that draws.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
    scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
    or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
+import { drawnInside, placeOf } from "./parts/drawn.ts";
 
 export interface ChartProps {
 	option: ChartOption;
@@ -47,8 +52,8 @@ function copy(value: unknown): unknown {
 }
 
 /**
- * Renders `<div class="chart" role="img">` and makes the chart on it in the browser; a changed `option` is applied with set(),
- * and unmounting disposes the chart.
+ * Renders `<div class="chart" role="img">` holding the chart as pack drew it, and makes the live chart on it in the browser,
+ * which takes the drawn one's place; a changed `option` is applied with set(), and unmounting disposes the chart.
  */
 export function Chart({ option, label, class: extra, id, setup }: ChartProps) {
 	const element = useRef<HTMLDivElement>(null);
@@ -73,13 +78,15 @@ export function Chart({ option, label, class: extra, id, setup }: ChartProps) {
 		},
 		[],
 	);
+	const classes = extra ? `chart ${extra}` : "chart";
 	return (
 		<div
 			ref={element}
-			class={extra ? `chart ${extra}` : "chart"}
+			class={classes}
 			id={id}
 			role="img"
 			aria-label={label}
+			{...drawnInside((drawer) => drawer.chart(copy(option), placeOf(classes, id)))}
 		/>
 	);
 }

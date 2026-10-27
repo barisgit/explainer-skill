@@ -7,6 +7,7 @@ import { dataUri, EMBEDDED, MIME } from "../data-uri.ts";
 import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT, shownPath } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
+import { pageDrawer } from "./draw.ts";
 import { QUESTION_IMPORT, QUESTION_MODULE } from "./kit-scripts.ts";
 
 /** The bare imports a page and the kit make, resolved to the skill's own files, so an installed skill needs no node_modules. */
@@ -198,14 +199,17 @@ interface Prerender {
 	render: (labels: Record<string, string> | undefined) => ReturnType<typeof renderPage>;
 	/** kit/components/parts/format.ts's, which this file does not import: its types need the kit's globals. */
 	setPageLang: (lang: string) => void;
+	/** kit/components/parts/drawn.ts's, for the same reason: what Chart and Plot draw themselves with while the page renders. */
+	setDrawer: (drawer: ReturnType<typeof pageDrawer>) => void;
 }
 
 /**
  * Renders the page to static HTML in this process: the page, its imports and Preact are bundled into one module (so they share
  * one Preact), which is imported from a temporary file and run once. Returns the HTML (islands between comment markers) and
  * the islands, and adds the stylesheets the page's modules import to `css`. While it renders, the page's frontmatter `labels` are
- * the global kitLabels, as in the browser, so the components that add text (Question) read the page's. An error the author can
- * fix (kit/islands/server.ts's IslandError) or any error the page throws is a PackError.
+ * the global kitLabels, as in the browser, so the components that add text (Question) read the page's, and Chart and Plot draw
+ * themselves (draw.ts). An error the author can fix (kit/islands/server.ts's IslandError) or any error the page throws is a
+ * PackError.
  */
 export async function prerender(
 	page: CompiledPage,
@@ -214,6 +218,7 @@ export async function prerender(
 ): Promise<{ html: string; islands: Island[] }> {
 	const code = `import Content from ${JSON.stringify(page.path)};
 export { setPageLang } from ${JSON.stringify(join(KIT_DIR, "components/parts/format.ts"))};
+export { setDrawer } from ${JSON.stringify(join(KIT_DIR, "components/parts/drawn.ts"))};
 import { renderPage } from ${JSON.stringify(join(ISLANDS, "server.ts"))};
 export function render(labels) {
 	globalThis.kitLabels = labels;
@@ -236,6 +241,7 @@ export function render(labels) {
 		writeFileSync(file, js);
 		const module: Prerender = await import(file);
 		module.setPageLang(page.lang);
+		module.setDrawer(pageDrawer(page.lang, css));
 		return module.render(labels);
 	} catch (e) {
 		if (e instanceof PackError) {

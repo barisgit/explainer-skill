@@ -1,6 +1,7 @@
 /* charts: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light/dark. Load after kit:echarts.js.
    Charts.make(el, option, setup?)  -> { chart, set(patch), dispose() }
-     el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width
+     el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width. The chart pack drew
+             in it (.chart-drawn) stays until then, and the first draw over it does not animate
      option  any ECharts option; colours default to --c1..--c6, text to the page font
      setup   (chart) => void, run after every (re)mount: attach chart.on("click", ...), chart.group, echarts.connect(...)
      chart   the live instance (null until mounted)
@@ -35,8 +36,6 @@
 
 	// ECharts' canvas only parses rgb/hex, while computed color-mix() is color(srgb ...): such values are read back through a pixel.
 	const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-	const COLOR_KEY = /(olor|^fill|^stroke)$/;
-	const COLOR_EXPR = /^(var|color-mix|light-dark)\(/;
 
 	/** Concrete rgb(a) for a CSS colour expression in the current scheme. */
 	function resolve(expr: string) {
@@ -52,187 +51,18 @@
 		return `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`;
 	}
 
-	/** The Intl options of a JSON number format (NumberFormat in kit-types/globals.d.ts); plot.js writes formats the same way. */
-	const intlOptions = ({
-		digits,
-		percent,
-		currency,
-		compact,
-	}: NumberFormat): Intl.NumberFormatOptions => ({
-		style: percent ? "percent" : currency ? "currency" : "decimal",
-		useGrouping: "min2", // 12 345, but a year stays 2024
-		...(currency ? { currency } : {}),
-		...(compact ? { notation: "compact" } : {}),
-		...(digits === undefined
-			? {}
-			: { minimumFractionDigits: digits, maximumFractionDigits: digits }),
+	const { resolveOption, theme: tokenTheme } = window.ChartsOption({
+		color: resolve,
+		lang: () => document.documentElement.lang || "en",
 	});
-	/** Writes a number in a JSON format as the page's lang does. A word unit stands apart (18 min), a symbol joins it (90%). */
-	function numberText(format: NumberFormat) {
-		const intl = new Intl.NumberFormat(document.documentElement.lang || "en", intlOptions(format));
-		const { unit = "" } = format;
-		const after = /^\p{L}/u.test(unit) ? `\u00a0${unit}` : unit;
-		return (v: number) => intl.format(v) + after;
-	}
 
-	const FORMAT_KEY = /^(formatter|valueFormatter|labelFormatter)$/;
-	const FORMAT_NAMES = new Set(["digits", "unit", "percent", "currency", "compact"]);
-
-	/** The number in what ECharts hands a formatter: a tick's value, the last of an [x, y] value, or a mark's params.value. */
-	function numberIn(arg: unknown): unknown {
-		if (Array.isArray(arg)) {
-			return numberIn(arg.at(-1));
-		}
-		return isObject(arg) && "value" in arg ? numberIn(arg.value) : arg;
-	}
-
-	/** The texts as a formatter: a series label takes the one of its dataIndex, an axis label the one of its index. */
-	const textsFormatter = (texts: string[]) => (arg: unknown, index: unknown) =>
-		texts[isObject(arg) && typeof arg.dataIndex === "number" ? arg.dataIndex : Number(index)] ?? "";
-
-	/** A NumberFormat as a formatter; text that is not a number, such as a category name, stays as it is. */
-	function numberFormatter(format: NumberFormat) {
-		const text = numberText(format);
-		return (arg: unknown) => {
-			const value = numberIn(arg);
-			return typeof value === "number" ? text(value) : String(value ?? "");
-		};
-	}
-
-	/** The function ECharts calls for a formatter written as JSON under a formatter key (texts, or a NumberFormat), else undefined. */
-	function jsonFormatter(key: string, value: unknown) {
-		if (!FORMAT_KEY.test(key)) {
-			return undefined;
-		}
-		if (Array.isArray(value)) {
-			const texts = value.filter((item): item is string => typeof item === "string");
-			return texts.length === value.length ? textsFormatter(texts) : undefined;
-		}
-		return isObject(value) && Object.keys(value).every((name) => FORMAT_NAMES.has(name))
-			? numberFormatter(value)
-			: undefined;
-	}
-
-	/** Items of an array resolved, or the array itself when it holds numbers only. */
-	const resolveItems = (items: unknown[], key: string) =>
-		items.every((item) => typeof item === "number")
-			? items
-			: items.map((item) => resolveOption(item, key));
-
-	/**
-	 * Copy of an option with every colour expression under a colour key resolved for the current scheme, and every JSON formatter
-	 * made a function. Plain objects and arrays are copied, everything else (functions, class instances, arrays of numbers only) is
-	 * shared, so an item in a data array that also holds numbers is resolved. Run at every mount so saved options stay token-based.
-	 */
-	function resolveOption<T>(value: T, key?: string): T;
-	function resolveOption(value: unknown, key = ""): unknown {
-		if (typeof value === "string") {
-			return COLOR_KEY.test(key) && COLOR_EXPR.test(value) ? resolve(value) : value;
-		}
-		const formatter = jsonFormatter(key, value);
-		if (formatter) {
-			return formatter;
-		}
-		if (Array.isArray(value)) {
-			return resolveItems(value, key);
-		}
-		if (!isObject(value) || Object.getPrototypeOf(value) !== Object.prototype) {
-			return value;
-		}
-		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveOption(v, k)]));
-	}
-
-	/** ECharts theme object built from the tokens, so every component starts in the page's look; `el` is the chart's element. */
-	function theme(el: HTMLElement) {
-		// Resolved to rgb: --accent-soft and other derived tokens are color-mix(), which ECharts cannot parse.
-		const token = (name: string) => resolve(`var(--${name})`);
-		const ink = token("ink");
-		const muted = token("muted");
-		const rule = token("rule");
-		const ruleStrong = token("rule-strong");
-		const surface = token("surface");
-		// --under changes by block (page, panel, band), so it is read where the chart sits; the probe sees only the root's value.
-		const under = resolve(getComputedStyle(el).getPropertyValue("--under"));
-		const accent = token("accent");
-		const accentSoft = token("accent-soft");
-		const axis = {
-			axisLine: { lineStyle: { color: ruleStrong } },
-			axisTick: { lineStyle: { color: ruleStrong } },
-			axisLabel: { color: muted },
-			nameTextStyle: { color: muted },
-			splitLine: { lineStyle: { color: rule } },
-		};
-		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a halo in the tone under the chart.
-		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
-		const labelled = Object.fromEntries(
-			[
-				"line",
-				"bar",
-				"scatter",
-				"pie",
-				"heatmap",
-				"treemap",
-				"sankey",
-				"sunburst",
-				"radar",
-				"boxplot",
-			].map((type) => [type, label]),
-		);
-		return {
-			...labelled,
-			grid: { outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
-			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
-			backgroundColor: "transparent",
+	/** The ECharts theme for a chart on `el`, whose --under (the tone under it) changes by block: page, panel, band. */
+	const theme = (el: HTMLElement) =>
+		tokenTheme({
+			under: resolve(getComputedStyle(el).getPropertyValue("--under")),
+			font: getComputedStyle(document.body).fontFamily,
 			animation: !matchMedia("(prefers-reduced-motion: reduce)").matches,
-			animationDuration: 700,
-			animationDurationUpdate: 500,
-			animationEasing: "cubicOut",
-			textStyle: { fontFamily: getComputedStyle(document.body).fontFamily, color: ink },
-			title: { textStyle: { color: ink }, subtextStyle: { color: muted } },
-			categoryAxis: axis,
-			valueAxis: axis,
-			timeAxis: axis,
-			logAxis: axis,
-			legend: {
-				textStyle: { color: ink },
-				inactiveColor: ruleStrong,
-				pageTextStyle: { color: muted },
-				pageIconColor: accent,
-			},
-			tooltip: {
-				backgroundColor: surface,
-				borderColor: ruleStrong,
-				textStyle: { color: ink },
-				axisPointer: {
-					lineStyle: { color: muted },
-					crossStyle: { color: muted },
-					label: { backgroundColor: ink, color: surface },
-				},
-			},
-			dataZoom: {
-				// Quiet until touched: neutral track and handles, the accent only on hover and drag.
-				borderColor: rule,
-				backgroundColor: "transparent",
-				fillerColor: accentSoft,
-				textStyle: { color: muted },
-				handleStyle: { color: surface, borderColor: ruleStrong },
-				moveHandleStyle: { color: rule },
-				emphasis: { handleStyle: { borderColor: accent }, moveHandleStyle: { color: accent } },
-				dataBackground: { lineStyle: { color: ruleStrong }, areaStyle: { color: rule } },
-				selectedDataBackground: {
-					lineStyle: { color: muted },
-					areaStyle: { color: ruleStrong, opacity: 0.35 },
-				},
-			},
-			brush: { brushStyle: { color: accentSoft, borderColor: accent } },
-			toolbox: {
-				iconStyle: { borderColor: muted },
-				emphasis: { iconStyle: { borderColor: accent } },
-			},
-			visualMap: { textStyle: { color: muted } },
-			markLine: { lineStyle: { color: muted }, label: { color: muted } },
-		};
-	}
+		});
 
 	/**
 	 * Merges a patch into the saved option the way ECharts' setOption merges: objects recursively;
@@ -315,9 +145,19 @@
 		// False once disposed: a font load still pending must not mount it again.
 		let live = true;
 		const mount = () => {
+			// A chart on show (pack's drawing, or this one before the scheme changed) is replaced as it stands, not drawn in again.
+			const drawn = el.querySelector(":scope > .chart-drawn");
+			const shown = Boolean(chart || drawn);
 			chart?.dispose();
-			chart = echarts.init(el, theme(el));
-			chart.setOption(resolveOption(option));
+			const look = theme(el);
+			chart = echarts.init(el, look);
+			chart.setOption(resolveOption(shown ? { ...option, animation: false } : option));
+			if (shown) {
+				chart.setOption({
+					animation: Boolean("animation" in option ? option.animation : look.animation),
+				});
+			}
+			drawn?.remove();
 			setup?.(chart);
 		};
 		// Canvas text needs the web font loaded before the first draw.

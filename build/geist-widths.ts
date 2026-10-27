@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Measures the kit's Geist in Chrome and writes the advance-width table that the beautiful-mermaid patch sizes diagram
- * boxes with into node_modules/beautiful-mermaid/src/text-metrics.ts, between its geist-widths markers: printable ASCII at the weights the
- * renderer uses, in thousandths of an em, kerning left out. Geist Mono needs no table: its 0.6 em advance is the
+ * Measures the kit's Geist in Chrome and writes the advance-width table, between the geist-widths markers, into the two places
+ * that size text without a browser: node_modules/beautiful-mermaid/src/text-metrics.ts, which the beautiful-mermaid patch sizes
+ * diagram boxes with, and skills/explainer/src/geist.ts, which pack measures chart and plot labels with. Printable ASCII at the
+ * weights they use, in thousandths of an em, kerning left out. Geist Mono needs no table: its 0.6 em advance is the
  * renderer's own monospace estimate.
  *
  * Rerun when kit/fonts changes: `bun patch beautiful-mermaid`, `bun build/geist-widths.ts`,
- * `bun patch --commit node_modules/beautiful-mermaid` (then drop the .bun-tag hunk it adds), `bun run vendor`.
+ * `bun patch --commit node_modules/beautiful-mermaid` (then drop the .bun-tag hunk it adds), `bun run vendor`, `bun run format`.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,7 +19,10 @@ import { withPage } from "../skills/explainer/src/chrome.ts";
 const WEIGHTS = [400, 500, 600];
 const root = join(import.meta.dir, "..");
 const fonts = join(root, "skills", "explainer", "kit", "fonts");
-const target = join(root, "node_modules", "beautiful-mermaid", "src", "text-metrics.ts");
+const targets = [
+	join(root, "node_modules", "beautiful-mermaid", "src", "text-metrics.ts"),
+	join(root, "skills", "explainer", "src", "geist.ts"),
+];
 const START = "// geist-widths:start";
 const END = "// geist-widths:end";
 const face = (family: string, file: string) =>
@@ -60,16 +64,18 @@ const GEIST_WIDTHS: Record<number, readonly number[]> = {
 ${rows.join("\n")}
 }
 ${END}`;
-	const source = readFileSync(target, "utf8");
-	const [before, rest] = source.split(START);
-	const after = rest?.split(END)[1];
-	if (before === undefined || after === undefined) {
-		throw new Error(
-			`${target} has no ${START} ... ${END} block; is the beautiful-mermaid patch applied?`,
-		);
+	for (const target of targets) {
+		const source = readFileSync(target, "utf8");
+		const [before, rest] = source.split(START);
+		const after = rest?.split(END)[1];
+		if (before === undefined || after === undefined) {
+			throw new Error(
+				`${target} has no ${START} ... ${END} block; is the beautiful-mermaid patch applied?`,
+			);
+		}
+		writeFileSync(target, before + block + after);
+		process.stdout.write(`wrote ${rows.length} weights to ${target}\n`);
 	}
-	writeFileSync(target, before + block + after);
-	process.stdout.write(`wrote ${rows.length} weights to ${target}\n`);
 } finally {
 	rmSync(dir, { recursive: true, force: true });
 }

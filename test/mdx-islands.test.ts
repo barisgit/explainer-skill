@@ -230,8 +230,9 @@ describe("Plot", () => {
 	test("a page with only a Plot gets plot.js and no ECharts, and the plot draws", async () => {
 		const output = await pack("plot", PLOT_PAGE);
 		const html = readFileSync(output, "utf8");
+		// pack drew it: the legend (empty for one series) and the drawn copies, for plot.js to draw over.
 		expect(html).toContain(
-			'<div class="chart plot" id="calls" role="img" aria-label="Calls per day"></div>',
+			'<div class="chart plot" id="calls" role="img" aria-label="Calls per day"><ul class="plot-legend"></ul><div class="plot-area"><div class="chart-drawn" aria-hidden="true"><svg viewBox=',
 		);
 		expect(html).toContain("plot: small line, stem and bar plots");
 		expect(html).not.toContain("Apache ECharts");

@@ -16,7 +16,8 @@
    Where frame runs: exported from a module whose first line is "use client", it ships and runs in the browser on each change
    (base is then JSON); use that for sliders over model curves. Otherwise pack calls it for every combination and the page
    carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
-   Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page. */
+   Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page, and the
+   starting frame is in the page as SVG, as a Plot's or Chart's is. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";

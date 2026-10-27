@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+Every `Chart` and `Plot` is in the packed page as SVG: it shows before the scripts run, with scripts off, and in print.
+
+### What an author does differently
+
+- Nothing: pages keep writing `<Chart option={...} />` and `<Plot option={...} />`, from the page, in an `Explore` or in a client component. `pack` draws each figure three times (a desktop column, half of one, a phone) and the page shows the copy nearest the element's width until the kit script draws it at its own size, without animating over it. Hover values, legends, zoom, `setup` and Explore's frames work as before, on the live chart.
+- Token colours, `color-mix()` and the tone under the chart stay CSS in the drawing, so it follows light and dark and a page's token overrides with no flash of other colours. Colours ECharts mixes from two of them, as a `visualMap` does, are drawn as those two mixed.
+- A chart's option functions (formatters) now also run in `pack`. A chart whose functions throw there, because they read the page, is not drawn by `pack` and appears when the script draws it, as before.
+- The drawings take the height a page's CSS gives the chart when a top-level rule names it by class or id (`.chart.mix { block-size: clamp(22rem, 40vw, 24rem) }`). A height set any other way (in `@media`, through a parent) is not known to `pack`, so the drawing scales to fit the element until the script redraws it.
+- For a layout that changes with the chart's width, write ECharts' `media` queries in the option rather than reading the element's width in a client component: the phone copy follows them, while code that measures the element runs only in the browser.
+- A packed page grows by the drawings: about 10 to 20 KB per figure.
 - A written `Question` with a model answer inside is a self-check: what the reader writes is kept on the page, stays out of the reply and brings no Reply bar. One with nothing inside still joins the reply. A page that keeps answers without a Reply bar gets a Clear answers button at its end once something is saved, which asks before it clears (new label keys `clearAnswers`, `clearAnswersPrompt`). On a page with a Reply bar, a self-check's answer now brings the bar's Clear too.
 
 ## v0.10.0

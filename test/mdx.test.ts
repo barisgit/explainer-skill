@@ -73,7 +73,7 @@ describe("an .mdx page packs to one prerendered file", () => {
 			/<div data-overview(="")?><header class="masthead"><h1>Waits grow <em>fast<\/em><\/h1><p class="lede">The lede says what the page shows.<\/p><p class="meta">Simulated sample data<\/p><\/header><section><h2>The counter<\/h2>/,
 		);
 		expect(html).toMatch(
-			/<!--island:0--><figure class="fig">.*<output id="count">3<\/output><div class="chart" role="img" aria-label="Bars"><\/div><\/figure><!--\/island-->/,
+			/<!--island:0--><figure class="fig">.*<output id="count">3<\/output><div class="chart" role="img" aria-label="Bars"><div class="chart-drawn" aria-hidden="true"><svg viewBox="0 0 1054 416">.*<\/svg><\/div><\/div><\/figure><!--\/island-->/,
 		);
 		expect(html).toContain('<div class="mermaid"><svg');
 		expect(html).toContain(".marker-page-css");

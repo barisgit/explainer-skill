@@ -17,7 +17,7 @@
      label   the accessible name (role="img")
      class   more classes after "chart plot", e.g. "tall"
    The plot fills the element at its pixel size and redraws on resize, so text stays 13 px from phone to desktop; light and dark switch
-   with no redraw. A new option redraws at once: series is replaced whole, other keys merge into the plot (x and y one level deeper).
+   with no redraw. pack draws it into the page first, so it shows with scripts off and in print. A new option redraws at once: series is replaced whole, other keys merge into the plot (x and y one level deeper).
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
    Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series.
@@ -25,6 +25,7 @@
    component or exported by a "use client" module: format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
 import { useEffect, useRef } from "preact/hooks";
+import { drawnInside, placeOf } from "./parts/drawn.ts";
 
 export interface PlotProps {
 	option: PlotOption;
@@ -34,8 +35,9 @@ export interface PlotProps {
 }
 
 /**
- * Renders `<div class="chart plot" role="img">` and draws the plot into it in the browser; a changed `option` is applied with
- * set(), and unmounting stops its resize observer. plot.js replaces the element's children, so the element renders none.
+ * Renders `<div class="chart plot" role="img">` holding the plot as pack drew it, and draws the plot into it in the browser at
+ * its size; a changed `option` is applied with set(), and unmounting stops its resize observer. plot.js replaces the element's
+ * children, so in the browser the element renders none of its own.
  */
 export function Plot({ option, label, class: extra, id }: PlotProps) {
 	const element = useRef<HTMLDivElement>(null);
@@ -55,14 +57,16 @@ export function Plot({ option, label, class: extra, id }: PlotProps) {
 		},
 		[],
 	);
+	// "plot" is what plot.js adds; rendering it keeps a re-render from taking it away.
+	const classes = extra ? `chart plot ${extra}` : "chart plot";
 	return (
 		<div
 			ref={element}
-			// "plot" is what plot.js adds; rendering it keeps a re-render from taking it away.
-			class={extra ? `chart plot ${extra}` : "chart plot"}
+			class={classes}
 			id={id}
 			role="img"
 			aria-label={label}
+			{...drawnInside((drawer) => drawer.plot(option, placeOf(classes, id)))}
 		/>
 	);
 }
