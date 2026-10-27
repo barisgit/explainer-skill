@@ -175,6 +175,62 @@ import "./sized.css";
 	}, 60_000);
 });
 
+describe("what pack draws is exact, or nothing", () => {
+	test("a colour pack cannot read back exactly leaves its figure to the live chart", async () => {
+		const figures = drawnFigures(
+			await packedMdx(
+				dir,
+				"unreadable",
+				`import { Chart } from "kit";
+
+# Unreadable
+
+<Chart id="to-literal" label="Token to literal" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: { type: "category", data: ["x"] }, visualMap: { min: 0, max: 10, inRange: { color: ["var(--c2)", "#ff0000"] } }, series: [{ type: "heatmap", data: [[0, 0, 0], [1, 0, 3]] }] }} />
+
+<Chart id="lightness" label="Lightness" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, visualMap: { show: false, min: 0, max: 10, inRange: { colorLightness: [0.2, 0.8] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "var(--c2)" } }] }} />
+
+<Chart id="replaced-alpha" label="Replaced alpha" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, visualMap: { show: false, min: 0, max: 10, inRange: { colorAlpha: [0.4, 0.4] } }, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)" } }] }} />
+
+<Chart id="multiplied-alpha" label="Multiplied alpha" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "line", data: [1, 3], areaStyle: { color: "color-mix(in srgb, var(--c2) 50%, transparent)", opacity: 0.4 } }] }} />
+
+<Chart id="literal" label="Literal" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "bar", data: [1, 3], itemStyle: { color: "#ed5c93" } }] }} />
+`,
+			),
+		);
+		// A token mixed with a literal, a lightness change and a replaced alpha are colours no CSS expression gives exactly.
+		expect(figures.get("to-literal")).toBeUndefined();
+		expect(figures.get("lightness")).toBeUndefined();
+		expect(figures.get("replaced-alpha")).toBeUndefined();
+		// An opacity multiplies the expression's own alpha, in the drawing as on the canvas.
+		expect(figures.get("multiplied-alpha")).toMatch(
+			/fill-opacity="0.4" style="fill:color-mix\(in srgb, var\(--c2\) 50%, transparent\)"/,
+		);
+		// A colour the option writes as it is stays that colour, never a stand-in's expression.
+		expect(figures.get("literal")).toContain('fill="#ed5c93"');
+		expect(figures.get("literal")).not.toContain("var(--under)");
+	}, 30_000);
+});
+
+/**
+ * The markup pack drew inside each figure of a packed page, by the figure's id ("figure-N", counted from 1, for one without),
+ * and undefined for a figure it left undrawn.
+ */
+function drawnFigures(path: string): Map<string, string | undefined> {
+	const parts = readFileSync(path, "utf8")
+		.split(/(?=<div class="chart[ "])/)
+		.slice(1);
+	return new Map(
+		parts.map((part, i): [string, string | undefined] => {
+			const id = /^<div [^>]*\bid="([^"]+)"/.exec(part)?.[1] ?? `figure-${i + 1}`;
+			const drawn =
+				/^<div [^>]*>(?:<ul class="plot-legend">.*?<\/ul><div class="plot-area">)?(<div class="chart-drawn".*)/s.exec(
+					part,
+				);
+			return [id, drawn?.[1]];
+		}),
+	);
+}
+
 /**
  * Page expression: how many drawn copies are left, whether ECharts mounted the chart, the plot's live lines, and whether the
  * chart's middle reaches the live chart rather than a copy over it.

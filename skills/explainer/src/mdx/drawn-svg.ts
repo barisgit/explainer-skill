@@ -1,28 +1,52 @@
 /**
  * The SVG ECharts' SSR writes for a chart (draw.ts), made the kit's: colours back to the CSS expressions they stood in for, and
- * no more than the page needs to show it, since every chart is in the page twice.
+ * no more than the page needs to show it, since every chart is in the page three times.
  */
 
-/** Turns an SVG colour value back into the CSS expression it stood in for, or undefined when it stood in for none. */
-export type ExpressionOf = (value: string) => string | undefined;
+import type { PaintOf } from "./stand-ins.ts";
 
-/** The SVG attributes that hold a colour. */
-const PAINT = /^(fill|stroke|stop-color|flood-color|lighting-color)$/;
+/** The SVG attributes that hold a colour, each with the attribute that gives it an opacity. */
+const PAINT: Record<string, string> = {
+	fill: "fill-opacity",
+	stroke: "stroke-opacity",
+	"stop-color": "stop-opacity",
+	"flood-color": "flood-opacity",
+};
+
+/** Whether an opacity attribute value, when there is one, lets what is under it through. */
+const seeThrough = (value: string | undefined) => value !== undefined && Number(value) < 1;
 
 /**
  * An element's opening tag with each stand-in colour among its paint attributes moved into its style as the expression, which
- * CSS resolves in place: var(--under) is the tone of the block the chart sits in.
+ * CSS resolves in place: var(--under) is the tone of the block the chart sits in. Undefined when a paint is a colour no
+ * expression gives exactly.
  */
-function cssPaint(tag: string, expressionOf: ExpressionOf): string {
+function cssPaint(tag: string, paintOf: PaintOf): string | undefined {
+	const attributes = new Map(
+		[...tag.matchAll(/\s([\w-]+)="([^"]*)"/g)].map((m) => [m[1] as string, m[2] as string]),
+	);
 	const styles: string[] = [];
+	let exact = true;
 	const rest = tag.replace(/\s([\w-]+)="([^"]*)"/g, (whole, name: string, value: string) => {
-		const expression = PAINT.test(name) ? expressionOf(value) : undefined;
-		if (expression === undefined) {
+		const opacity = PAINT[name];
+		if (opacity === undefined) {
 			return whole;
 		}
-		styles.push(`${name}:${expression}`);
+		const translucent =
+			seeThrough(attributes.get(opacity)) || seeThrough(attributes.get("opacity"));
+		const css = paintOf(value, translucent);
+		if (css === undefined) {
+			exact = false;
+		}
+		if (!css) {
+			return whole;
+		}
+		styles.push(`${name}:${css}`);
 		return "";
 	});
+	if (!exact) {
+		return undefined;
+	}
 	if (!styles.length) {
 		return tag;
 	}
@@ -144,17 +168,23 @@ const LONG_DECIMAL = /(\d+\.\d\d)\d+/g;
  * The SVG ECharts wrote, made the kit's: stand-ins back to their expressions; without the hover styles (whose colours ECharts
  * mixed from the stand-ins, and which the live chart replaces), the event metadata, the full-size background and the page's own
  * font family (theme.css sets it); lines without points that change nothing; `svgTag` for its own, so it scales by its viewBox
- * to the size CSS gives it.
+ * to the size CSS gives it. Undefined when a colour in it is not one the drawing can write exactly (stand-ins.ts).
  */
-export function kitSvg(svg: string, svgTag: string, expressionOf: ExpressionOf): string {
-	return shorterPaths(svg)
+export function kitSvg(svg: string, svgTag: string, paintOf: PaintOf): string | undefined {
+	let exact = true;
+	const kit = shorterPaths(svg)
 		.replace(/<style[\s\S]*?<\/style>/g, "")
 		.replace(/ (?:ecmeta_\w+|pointer-events)="[^"]*"| class="zr\d+-cls-\d+"/g, "")
 		.replace(/<rect width="\d+" height="\d+" x="0" y="0" fill="none"><\/rect>\n?/, "")
 		.replace(/font-family:var\(--font\);/g, "")
 		.replace(/^<svg [^>]*>/, svgTag)
 		.replace(/="([^"]*)"/g, (_, value: string) => `="${value.replace(LONG_DECIMAL, "$1")}"`)
-		.replace(/<[a-zA-Z][\w-]*(?:\s[\w:-]+="[^"]*")*\s*\/?>/g, (tag) => cssPaint(tag, expressionOf))
+		.replace(/<[a-zA-Z][\w-]*(?:\s[\w:-]+="[^"]*")*\s*\/?>/g, (tag) => {
+			const painted = cssPaint(tag, paintOf);
+			exact &&= painted !== undefined;
+			return painted ?? tag;
+		})
 		.replace(/<(linear|radial)Gradient[\s\S]*?<\/\1Gradient>/g, fadedStops)
 		.replace(/>\s+</g, "><");
+	return exact ? kit : undefined;
 }

@@ -7,7 +7,7 @@
  * A Chart is drawn by ECharts with its SVG renderer (vendor/echarts-ssr.js), from the option and theme charts.js makes
  * (kit/parts/charts/option.ts). Every colour expression, the kit's tokens included, goes in as a stand-in colour and comes out
  * as the expression again (stand-ins.ts), so the SVG follows light and dark, a page's token overrides and the tone under it, as
- * a Plot does.
+ * a Plot does. What pack draws is exact or absent: a figure with a colour pack cannot write exactly is not drawn here.
  * A Plot is drawn by plot.js's own code (kit/parts/plot/draw.ts). Text is measured in Geist (geist.ts).
  */
 import { join } from "node:path";
@@ -17,7 +17,7 @@ import { runKitPart } from "../kit.ts";
 import { SKILL_ROOT } from "../paths.ts";
 import { type Place, pageHeights, type Viewport } from "./chart-heights.ts";
 import { kitSvg, shorterPaths } from "./drawn-svg.ts";
-import { standIns } from "./stand-ins.ts";
+import { type ChartColours, standIns } from "./stand-ins.ts";
 
 /** A Chart or Plot option, as the page wrote it; a Plot's series is the one key the drawer reads. */
 type Option = Record<string, unknown> & { series?: unknown[] };
@@ -144,31 +144,71 @@ function orNothing<T extends unknown[]>(draw: (...args: T) => string): (...args:
 	};
 }
 
+/** The keys under which ECharts may replace a colour's alpha rather than multiply it. */
+const REPLACES_ALPHA = new Set(["colorAlpha", "markArea"]);
+
+/** The keys under which an option writes a colour or a list of them, as kit/parts/charts/option.ts reads them. */
+const COLOR_KEY = /(olor|^fill|^stroke)$/;
+/** The colour expressions pack stands in for, as kit/parts/charts/option.ts finds them. */
+const COLOR_EXPR = /^(var|color-mix|light-dark)\(/;
+
+/** The colour expressions an array lists, as strings or under its items' colour keys: the ones ECharts may mix. */
+const listed = (items: unknown[]) =>
+	items.flatMap((item) => {
+		const values =
+			item !== null && typeof item === "object"
+				? Object.entries(item).flatMap(([key, value]) => (COLOR_KEY.test(key) ? [value] : []))
+				: [item];
+		return values.filter((v): v is string => typeof v === "string" && COLOR_EXPR.test(v));
+	});
+
+/**
+ * What an option says about its colours (stand-ins.ts): the colours it writes as they are, with ECharts' own; the expressions it
+ * lists together; whether it may replace alphas.
+ */
+function chartColours(option: unknown): ChartColours {
+	const literals = [...loadEcharts().ownColors];
+	const mixes: string[][] = [];
+	let replacesAlpha = false;
+	const visit = (value: unknown): void => {
+		if (typeof value === "string") {
+			if (Bun.color(value, "css") !== null) {
+				literals.push(value);
+			}
+		} else if (Array.isArray(value)) {
+			mixes.push(listed(value));
+			value.forEach(visit);
+		} else if (value !== null && typeof value === "object") {
+			for (const [key, item] of Object.entries(value)) {
+				replacesAlpha ||= REPLACES_ALPHA.has(key);
+				visit(item);
+			}
+		}
+	};
+	visit(option);
+	return { literals, mixes: mixes.filter((group) => group.length > 1), replacesAlpha };
+}
+
 /** The drawer pack renders a page in `lang` with (kit/components/parts/drawn.ts's Drawer). */
 export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	const pageHeight = pageHeights(stylesheets);
 	/** The height of a copy of the figure on `place`: the page's own for it, else the theme's. */
 	const heightOf = (copy: Copy, place: Place) =>
 		pageHeight(place, copy.viewport) ?? (place.classes.includes("tall") ? copy.tall : copy.height);
-	const { color, expressionOf } = standIns();
-	const charts = (runKitPart("charts/option.ts", "ChartsOption") as ChartsOptionPart)({
-		color,
-		lang: () => lang,
-	});
+	const chartsOption = runKitPart("charts/option.ts", "ChartsOption") as ChartsOptionPart;
 	const plots = (runKitPart("plot/draw.ts", "PlotDraw") as PlotDrawPart)({ lang: () => lang });
-	const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
 	return {
 		chart: orNothing((option: Option, place: Place) => {
+			// Each chart has stand-ins of its own, clear of the colours its option writes as they are.
+			const { color, paintOf } = standIns(chartColours(option));
+			const charts = chartsOption({ color, lang: () => lang });
+			const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
 			const resolved = charts.resolveOption(option);
 			const copies = COPIES.map((copy) => {
 				const height = heightOf(copy, place);
-				return kitSvg(
-					chartSvg(resolved, theme, copy.width, height),
-					svgTag(copy, height),
-					expressionOf,
-				);
+				return kitSvg(chartSvg(resolved, theme, copy.width, height), svgTag(copy, height), paintOf);
 			});
-			return drawnCopies(copies);
+			return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 		}),
 		plot: orNothing((option: Option, place: Place) => {
 			// Every series starts switched on; plot.js marks its buttons so as it draws.
