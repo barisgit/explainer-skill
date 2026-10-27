@@ -3,6 +3,7 @@
  * Regenerates the vendored libraries from the pinned devDependencies:
  * (paths inside skills/explainer)
  *   kit/echarts.js                custom ECharts bundle (build/echarts-entry.ts), minified, one script tag
+ *   vendor/echarts-ssr.js         the same charts with the SVG renderer, one ES module; used by `pack` to draw charts, never inlined
  *   vendor/beautiful-mermaid.js   beautiful-mermaid with ELK and entities, one ES module; used by `pack` to render diagrams, never inlined
  *   vendor/mdx.js                 the MDX compiler with remark-gfm and remark-frontmatter, one ES module; used by `pack` for .mdx pages, never inlined
  *   vendor/preact/*.js            Preact, its hooks and JSX runtime, and preact-render-to-string, as ES modules that import "preact";
@@ -57,6 +58,14 @@ writeFileSync(
 	join(skill, "kit/echarts.js"),
 	echartsHeader + (await bundle(join(import.meta.dir, "echarts-entry.ts"), "browser", "iife")),
 );
+mkdirSync(join(skill, "vendor"), { recursive: true });
+writeFileSync(
+	join(skill, "vendor/echarts-ssr.js"),
+	echartsHeader
+		.replace("global echarts", "ES module exporting init and setPlatformAPI")
+		.replace("Canvas renderer", "SVG renderer, for pack") +
+		(await bundle(join(import.meta.dir, "echarts-ssr-entry.ts"), "bun", "esm")),
+);
 
 // The minifier drops ELK's own notice comments, so the header restates them (EPL-2.0 section 3.3) and points at the licence files.
 const [bm, elk, entities] = await Promise.all(
@@ -67,7 +76,6 @@ const mermaidHeader = `/*! beautiful-mermaid ${bm} (MIT, Copyright (c) 2026 Craf
    which builds on https://github.com/eclipse/elk) and entities ${entities} (BSD-2-Clause, Copyright (c) Felix Böhm).
    Each component keeps its own licence; this file as a whole is not MIT. Texts: kit/licenses/beautiful-mermaid.txt, elkjs.txt, entities.txt.
    Exports renderMermaidSVG and parseMermaid. Rebuild with: bun run vendor */\n`;
-mkdirSync(join(skill, "vendor"), { recursive: true });
 writeFileSync(
 	join(skill, "vendor/beautiful-mermaid.js"),
 	mermaidHeader + (await bundle(join(import.meta.dir, "beautiful-mermaid-entry.ts"), "bun", "esm")),
@@ -209,6 +217,7 @@ for (const [file, parts] of Object.entries(licences)) {
 
 for (const f of [
 	"kit/echarts.js",
+	"vendor/echarts-ssr.js",
 	"vendor/beautiful-mermaid.js",
 	"vendor/table-core.js",
 	"vendor/mdx.js",
