@@ -4,7 +4,7 @@
    coal.tsx ranks the countries, place.tsx draws the drill-down view. */
 import { Chart } from "kit";
 import type { ComponentChildren } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import {
 	cell,
 	dP,
@@ -79,7 +79,7 @@ const MODES: [Unit, string][] = [
 
 /* ---- 1. Stacked mix: one option draws the world, and any place in the drill-down view. ---- */
 
-function mixOption(place: Place, mode: Unit, narrow: boolean): ChartOption {
+function mixOption(place: Place, mode: Unit): ChartOption {
 	const pct = mode === "share";
 	const bands = [
 		...SOURCES.map((s) => ({ part: s, at: (y: number) => twh(place, s, y) })),
@@ -91,8 +91,10 @@ function mixOption(place: Place, mode: Unit, narrow: boolean): ChartOption {
 		return `${p.marker} ${p.seriesName}: <b>${pct ? pc(v, v >= 10 ? 0 : 1) : `${fmtT(v)} TWh`}</b>`;
 	};
 	return {
-		grid: { top: narrow ? 112 : 64, left: 8, right: 24, bottom: 8 },
+		grid: { top: 64, left: 8, right: 24, bottom: 8 },
 		legend: { top: 8, left: 8, right: 8 },
+		// Below 640 px the legend wraps, so the plot starts lower. As a media query, pack's drawings follow it too.
+		media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }],
 		tooltip: {
 			trigger: "axis",
 			formatter: (params: AxisParam[]) => {
@@ -122,22 +124,6 @@ function mixOption(place: Place, mode: Unit, narrow: boolean): ChartOption {
 	};
 }
 
-/** A ref for a figure and whether its chart is narrower than 640 px, where the legend wraps and the plot starts lower. */
-function useNarrow() {
-	const figure = useRef<HTMLElement>(null);
-	const [narrow, setNarrow] = useState(false);
-	useEffect(() => {
-		const chart = figure.current?.querySelector(".chart");
-		if (!chart) {
-			return;
-		}
-		const observer = new ResizeObserver(() => setNarrow(chart.clientWidth < 640));
-		observer.observe(chart);
-		return () => observer.disconnect();
-	}, []);
-	return [figure, narrow] as const;
-}
-
 /** The stacked mix of one place, with its Amount/Share switch. `name` names the switch's radio group. */
 export function MixFigure(props: {
 	place: Place;
@@ -147,10 +133,9 @@ export function MixFigure(props: {
 	caption: ComponentChildren;
 }) {
 	const [mode, setMode] = useState<Unit>("twh");
-	const [figure, narrow] = useNarrow();
-	const option = useMemo(() => mixOption(props.place, mode, narrow), [props.place, mode, narrow]);
+	const option = useMemo(() => mixOption(props.place, mode), [props.place, mode]);
 	return (
-		<figure class="fig" ref={figure}>
+		<figure class="fig">
 			<div class="controls">
 				<Seg
 					name={props.name}
