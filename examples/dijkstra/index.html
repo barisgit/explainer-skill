@@ -2919,8 +2919,8 @@ li a {
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept. Once anything is saved, a Clear answers button at the end of the page puts every control back to its
    default, again with events, and drops the saved copy; a first press only asks, a second within 4 s clears. With reply (kit
-   reply) the reader's notes are kept too, and the same button sits in the reply bar instead, where a self-check's answer (a kit
-   Question's choice, or a written answer beside a model one) alone does not bring it.
+   reply) the reader's notes are kept too, and on a page that asks for replies (reply: true, a data-reply control, or a note) the
+   same button sits in the reply bar instead.
    Labels: clearAnswers "Clear answers", clearAnswersPrompt "Press again to clear all answers." (announced), and for both
    buttons clearConfirm "Clear everything?" and clearCancelled "Clear cancelled." (announced). */
 (() => {
@@ -2948,8 +2948,7 @@ li a {
       storedNotes = saved;
     }
   };
-  let onChange = () => updateAlone();
-  const SELF_CHECK = "fieldset.self-check";
+  let onChange = () => void update(false);
   const isRadio = (c) => c.type === "radio";
   const isToggle = (c) => isRadio(c) || c.type === "checkbox";
   const isMultiSelect = (c) => c instanceof HTMLSelectElement && c.multiple;
@@ -3080,8 +3079,7 @@ li a {
     }
     const controls = { ...pending };
     for (const u of present.filter(answered)) {
-      const check = u.el.closest(SELF_CHECK) ? { check: true } : {};
-      controls[u.key] = { value: readControl(u.el), sig: u.sig, ...check };
+      controls[u.key] = { value: readControl(u.el), sig: u.sig };
     }
     keptById = Object.fromEntries(Object.entries(controls).filter(([key]) => key.startsWith("#")));
     return { controls, notes: notes.list() };
@@ -3130,12 +3128,17 @@ li a {
     persist(state);
     return state;
   }
-  function update() {
+  function update(inBar) {
     const state = save();
     if (!state) {
       return notes.list().length > 0;
     }
-    return state.notes.length > 0 || Object.values(state.controls).some((entry) => entry.check !== true);
+    const kept = !empty(state);
+    if (kept && !inBar) {
+      own ??= ownClear();
+    }
+    own?.show(kept && !inBar);
+    return kept;
   }
   const CONFIRM_MS = 4000;
   function clearButton(texts, onClear) {
@@ -3209,16 +3212,6 @@ li a {
         made.show(visible);
       }
     };
-  }
-  function updateAlone() {
-    const state = save();
-    if (!state) {
-      return;
-    }
-    if (!empty(state)) {
-      own ??= ownClear();
-    }
-    own?.show(!empty(state));
   }
   const later = () => setTimeout(() => onChange());
   for (const type of ["input", "change", "click"]) {
