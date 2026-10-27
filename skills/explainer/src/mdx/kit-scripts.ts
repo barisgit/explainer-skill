@@ -187,8 +187,9 @@ export function scriptsInCode(code: string): Set<KitScript> {
 
 /**
  * The kit scripts the Questions in a client scan need. A self-check, called with no spread and either options and an answer
- * written as a string, or no options and children that are surely there (a string, a list, an element), needs keep.js alone; any
- * other use of Question (other props, or the component passed on) needs what Question's own code does.
+ * written as a string, or no options and children written as one string, list or element, needs keep.js alone; any other use
+ * of Question (other props, or the component passed on) needs what Question's own code does. A guess on the safe side brings
+ * reply.js, whose bar and Clear wait until the page has a reply question or a note (keep.js clears answers until then).
  */
 function questionScripts(code: string): KitScript[] {
 	const imported = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*"${QUESTION_IMPORT}";?`).exec(
@@ -214,19 +215,47 @@ function questionScripts(code: string): KitScript[] {
 /** Where a call's first argument ends and an object literal second one opens: `jsx(Question, {`. */
 const OBJECT_ARGUMENT = /\s*,\s*\{/y;
 
-/**
- * A value that is never undefined, as the bundler writes it: a string, a list, or a JSX element (which it marks pure). A
- * variable or an expression such as `open && "x"` may be undefined.
- */
-const DEFINED_VALUE = /["'`[]|\/\* @__PURE__ \*\//y;
+/** A JSX element as the bundler writes one: a call it marks pure, up to the call's opening parenthesis. */
+const ELEMENT_CALL = /\/\* @__PURE__ \*\/\s*[\w$.]+\(/y;
+/** What follows a property's value: the next property or the end of the object. */
+const VALUE_END = /\s*[,}]/y;
 
-/** Whether compiled code has a value that is never undefined at `index`. */
-function definedAt(code: string, index: number | undefined): boolean {
-	if (index === undefined) {
+/** The index of the bracket that closes the one opening at `code[start]`, strings and template literals inside skipped. */
+function closingBracket(code: string, start: number): number {
+	const open: string[] = [];
+	for (let i = start; i < code.length; i++) {
+		i = open.at(-1) === "`" ? templateStep(code, i, open) : codeStep(code, i, open);
+		if (open.length === 0) {
+			return i;
+		}
+	}
+	return code.length;
+}
+
+/** Where the literal that starts at `code[index]` ends (past its last character), or -1 when no literal starts there. */
+function literalEnd(code: string, index: number): number {
+	const c = code[index];
+	if (c === '"' || c === "'") {
+		return stringEnd(code, index) + 1;
+	}
+	if (c === "`" || c === "[") {
+		return closingBracket(code, index) + 1;
+	}
+	ELEMENT_CALL.lastIndex = index;
+	return ELEMENT_CALL.test(code) ? closingBracket(code, ELEMENT_CALL.lastIndex - 1) + 1 : -1;
+}
+
+/**
+ * Whether the property value at `code[index]` is never undefined: the whole value is one string, list or JSX element. Anything
+ * else may be, even when it starts as one (`["a"][i]`, `"ab"[i]`, `open && "x"`), and then Question's own scripts come too.
+ */
+function literalAt(code: string, index: number | undefined): boolean {
+	const end = index === undefined ? -1 : literalEnd(code, index);
+	if (end < 0) {
 		return false;
 	}
-	DEFINED_VALUE.lastIndex = index;
-	return DEFINED_VALUE.test(code);
+	VALUE_END.lastIndex = end;
+	return VALUE_END.test(code);
 }
 
 /**
@@ -244,8 +273,8 @@ function selfCheckCall(code: string, start: number, end: number): boolean {
 	}
 	const answer = props.get("answer");
 	return props.has("options")
-		? answer !== undefined && /["'`]/.test(code[answer] ?? "")
-		: definedAt(code, props.get("children"));
+		? answer !== undefined && /["'`]/.test(code[answer] ?? "") && literalAt(code, answer)
+		: literalAt(code, props.get("children"));
 }
 
 let questionNeeds: Set<KitScript> | undefined;

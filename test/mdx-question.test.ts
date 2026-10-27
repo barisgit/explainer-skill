@@ -290,3 +290,37 @@ export function Late() {
 		expect(seen.second).toBe(0);
 	}, 30_000);
 });
+
+describe("Question a client component renders later", () => {
+	test("children that may be undefined bring reply.js, and the Question joins the reply when they are", async () => {
+		const output = await packedMdx(
+			dir,
+			"maybe",
+			'import { Maybe } from "./maybe.tsx";\n\n# Maybe\n\n<Maybe index={1} />\n',
+			{
+				"maybe.tsx": `"use client";
+import { useState } from "preact/hooks";
+import { Question } from "kit";
+
+export function Maybe({ index }: { index: number }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div>
+			<button type="button" class="btn" id="reveal" onClick={() => setOpen(true)}>Show</button>
+			{open && <Question name="why" legend="Why?">{["Because."][index]}</Question>}
+		</div>
+	);
+}
+`,
+			},
+		);
+		const shown = await inPage(output, (cdp) =>
+			act<[boolean, boolean]>(
+				cdp,
+				`document.getElementById("reveal").click()`,
+				`[Boolean(document.querySelector("fieldset.written[data-reply]")), Boolean(document.querySelector(".reply-bar .primary")?.checkVisibility())]`,
+			),
+		);
+		expect(shown).toEqual([true, true]);
+	}, 30_000);
+});
