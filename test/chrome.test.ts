@@ -79,13 +79,21 @@ async function runCheck(file: string, tmp: string, args: string[] = [], env: obj
 
 test("a page that crashes fails the call waiting on it at once, naming the crash", async () => {
 	const failure = await withPage(async (cdp) => {
-		// Chrome refuses Page.crash while a navigation is pending ("Page has pending navigations, not killing"), and the new
-		// page's first one can still be on a slow host: the crash comes after a finished load, and a refusal fails the test.
-		await cdp.send("Page.enable");
-		await cdp.load("about:blank");
 		const waiting = cdp.evaluate("new Promise(() => {})", true).catch((error: unknown) => error);
-		const crash = await cdp.send("Page.crash").catch((error: unknown) => error);
-		expect(String(crash)).toContain("the page crashed in Chrome");
+		// The page's process ends as the OOM killer ends it. Page.crash and chrome://crash go through Chrome's crash handler
+		// instead, and on GitHub's runner the crash they caused was never reported.
+		const pids = (args: string[]) =>
+			Bun.spawnSync(["pgrep", ...args])
+				.stdout.toString()
+				.split("\n")
+				.filter(Boolean);
+		const renderers = pids(["-P", String(process.pid)]).flatMap((chrome) =>
+			pids(["-g", chrome, "-f", "type=renderer"]),
+		);
+		expect(renderers.length).toBeGreaterThan(0);
+		for (const renderer of renderers) {
+			process.kill(Number(renderer), "SIGKILL");
+		}
 		return await waiting;
 	});
 	expect(failure).toBeInstanceOf(ChromeError);
