@@ -43,7 +43,6 @@ spawn(
 	],
 	{ stdio: "ignore" },
 ).unref();
-writeFileSync(join(profile, "started"), "");
 
 const commands = createReadStream("", { fd: 3 });
 const replies = createWriteStream("", { fd: 4 });
@@ -63,6 +62,9 @@ function stop() {
 }
 process.on("SIGTERM", stop);
 commands.on("end", stop).on("close", stop);
+// Written only once SIGTERM is handled: a test that signals the stand-in as soon as it sees `started` must find it shutting down
+// as Chrome does, not killed by the default action.
+writeFileSync(join(profile, "started"), "");
 
 const silent = FAKE_CHROME === "silent";
 const RESULTS: Record<string, object> = {
