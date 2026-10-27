@@ -252,6 +252,8 @@ import "./unsized.css";
 
 <Chart id="reset" class="reset" label="Reset" option={${OPTION}} />
 
+<Chart id="animated" class="animated" label="Animated" option={${OPTION}} />
+
 <Plot id="relative" class="relative" label="Relative" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
 
 <Chart id="free" label="Free" option={${OPTION}} />
@@ -264,6 +266,8 @@ import "./unsized.css";
 .padded { padding: 2rem; }
 .bordered { border: 1px solid; }
 .reset { all: revert-layer; }
+.animated { animation: grow 1s forwards; }
+@keyframes grow { to { block-size: 30rem; } }
 .relative { block-size: 50%; }
 .key svg { block-size: 1rem; padding: 1rem; }
 [data-step] { inline-size: max-content; }
@@ -271,7 +275,16 @@ import "./unsized.css";
 				},
 			),
 		);
-		for (const id of ["sized", "nested", "queried", "padded", "bordered", "reset", "relative"]) {
+		for (const id of [
+			"sized",
+			"nested",
+			"queried",
+			"padded",
+			"bordered",
+			"reset",
+			"animated",
+			"relative",
+		]) {
 			expect(figures.get(id), id).toBeUndefined();
 		}
 		// No rule that sets a size or a border reaches this one (an svg or a [data-step] is not a chart; a colour changes no box): the theme's height stands.

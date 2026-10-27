@@ -1,7 +1,7 @@
 /**
  * The size a figure's element has, so what pack draws (draw.ts) has its shape: the height comes from the kit (the theme's, its
  * `tall` class, or the `height` prop), and a page's own CSS may not change the element's box. A rule that may reach the element
- * and sets its size, padding, border, `all` or `box-sizing` makes draw.ts draw nothing, as does a page rule that may set the
+ * and sets its size, padding, border, `all`, `box-sizing` or an animation makes draw.ts draw nothing, as does a page rule that may set the
  * root font size the rem lengths are read against.
  */
 import { readFileSync } from "node:fs";
@@ -36,9 +36,9 @@ interface Rule {
 	properties: string[];
 }
 
-/** The properties that size or reshape an element's box. */
+/** The properties that size or reshape an element's box, or animate it (a @keyframes rule may change any of them). */
 const BOX =
-	/^(?:(?:min-|max-)?(?:height|width|block-size|inline-size)|aspect-ratio|box-sizing|all|padding|border)(?:-[\w-]+)?$/;
+	/^(?:(?:min-|max-)?(?:height|width|block-size|inline-size)|aspect-ratio|box-sizing|all|padding|border|animation)(?:-[\w-]+)?$/;
 /** The properties that set the font size rem is read against, on the root. */
 const FONT = /^font(?:-size)?$/;
 /** At-rules whose rules hold in some windows, layers or documents; the others' contents style no element. */
