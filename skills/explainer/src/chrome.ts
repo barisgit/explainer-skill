@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { constants, homedir, tmpdir, userInfo } from "node:os";
+import { homedir, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { Cdp, ChromeError, seconds, within } from "./cdp.ts";
+import { cleanUpOnSignal } from "./on-signal.ts";
 
 const { CHROME } = process.env;
 const CHROME_PATHS = [
@@ -180,31 +181,6 @@ async function start(
 }
 
 /**
- * The cleanups of the Chromes withPage owns now, so a signal that ends the process removes them and their profiles too. A cleanup
- * stays here until it has finished, so a signal during withPage's own cleanup still waits for it.
- */
-const running = new Set<() => Promise<void>>();
-
-/** Stops every running Chrome and deletes its profile, then exits as the signal would have. */
-function exitOnSignal(signal: NodeJS.Signals) {
-	void Promise.allSettled([...running].map((cleanup) => cleanup())).finally(() =>
-		process.exit(128 + (constants.signals[signal] ?? 0)),
-	);
-}
-
-let signalsHooked = false;
-/** Installs exitOnSignal for SIGINT, SIGTERM and SIGHUP, once per process. */
-function hookSignals() {
-	if (signalsHooked) {
-		return;
-	}
-	signalsHooked = true;
-	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-		process.once(signal, exitOnSignal);
-	}
-}
-
-/**
  * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its profile deleted once Chrome has exited
  * (a profile deleted while Chrome shuts down is written again), also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's
  * start-up included. withPage and a signal share one cleanup, which runs once. Once `limit` aborts, Chrome's start-up or the
@@ -219,11 +195,10 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSig
 			owner.closing = true;
 			await owner.stop?.();
 			rmSync(profile, { recursive: true, force: true });
-		})().finally(() => running.delete(cleanup));
+		})().finally(() => release());
 		return cleaning;
 	};
-	running.add(cleanup);
-	hookSignals();
+	const release = cleanUpOnSignal(cleanup);
 	try {
 		const cdp = await launch(profile, owner, limit);
 		try {
