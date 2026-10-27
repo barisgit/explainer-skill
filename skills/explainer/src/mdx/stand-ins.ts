@@ -10,6 +10,10 @@
 
 type Rgb = [number, number, number];
 
+const fromHex = (hex: string) =>
+	[1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as Rgb;
+const toHex = (rgb: Rgb) => `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+
 /** How far apart, per channel, two stand-ins are at least, while the colour cube has room for that. */
 const SPACING = 24;
 /** How far, per channel, a mixed colour may be from its exact mix: ECharts rounds each channel. */
@@ -42,9 +46,7 @@ const LITERALS: Rgb[] = [
 	"#fc8452",
 	"#9a60b4",
 	"#ea7ccc",
-].map((hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as Rgb);
-
-const hex = (rgb: Rgb) => `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+].map(fromHex);
 
 /** The largest per-channel difference between two colours. */
 const apart = (a: Rgb, b: Rgb) => Math.max(...a.map((c, i) => Math.abs(c - (b[i] as number))));
@@ -102,7 +104,7 @@ export function standIns() {
 		let found = byExpression.get(expression);
 		if (!found) {
 			const rgb = fresh();
-			found = hex(rgb);
+			found = toHex(rgb);
 			byExpression.set(expression, found);
 			expressions.push(expression);
 			rgbs.push(rgb);
@@ -146,7 +148,7 @@ const percent = (share: number) => `${+(share * 100).toFixed(1)}%`;
 /** The channels and alpha of an SVG colour value written #rrggbb, rgb(...) or rgba(...); undefined for anything else. */
 function parsed(value: string): [Rgb, number | undefined] | undefined {
 	if (/^#[0-9a-f]{6}$/i.test(value)) {
-		return [[1, 3, 5].map((i) => Number.parseInt(value.slice(i, i + 2), 16)) as Rgb, undefined];
+		return [fromHex(value), undefined];
 	}
 	const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(value);
 	return rgb

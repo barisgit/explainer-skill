@@ -77,7 +77,7 @@ const short = (n: number) => String(Math.round(n * 10) / 10);
  * A path of straight lines (M, L and Z commands only, as ECharts writes a line or an area with many points) with the points
  * that do not change its shape left out, the rest written relative to the one before; any other path as it is.
  */
-export function shorterPath(d: string): string {
+function shorterPath(d: string): string {
 	if (!/^[MLZ\d\s.,-]+$/.test(d)) {
 		return d;
 	}

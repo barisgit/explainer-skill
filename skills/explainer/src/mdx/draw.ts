@@ -75,6 +75,9 @@ const COPIES: Copy[] = [
 /** The opening tag of a copy's svg, sized by its viewBox. */
 const svgTag = (copy: Copy, height: number) =>
 	`<svg viewBox="0 0 ${copy.width} ${height}"${copy.fit ? ` data-fit="${copy.fit}"` : ""}>`;
+/** The copies of one figure, in the element theme.css picks one of them in and the kit script removes. */
+const drawnCopies = (svgs: string[]) =>
+	`<div class="chart-drawn" aria-hidden="true">${svgs.join("")}</div>`;
 /** Above a plot's area: the legend's padding, and one row of legend buttons when it shows. */
 const PLOT_LEGEND = { padding: 8, row: 30 };
 /** The size of the text plot.js measures its labels at. */
@@ -165,9 +168,10 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 					expressionOf,
 				);
 			});
-			return `<div class="chart-drawn" aria-hidden="true">${copies.join("")}</div>`;
+			return drawnCopies(copies);
 		}),
 		plot: orNothing((option: Option, place: Place) => {
+			// Every series starts switched on; plot.js marks its buttons so as it draws.
 			const legend = plots
 				.legendMarkup(option)
 				.replace(/<button /g, '<button aria-pressed="true" ');
@@ -177,7 +181,7 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 				const H = heightOf(copy, place) - PLOT_LEGEND.padding - (legend ? PLOT_LEGEND.row : 0);
 				return `${svgTag(copy, H)}${shorterPaths(plots.render(option, copy.width, H, width, shown))}</svg>`;
 			});
-			return `<ul class="plot-legend">${legend}</ul><div class="plot-area"><div class="chart-drawn" aria-hidden="true">${copies.join("")}</div></div>`;
+			return `<ul class="plot-legend">${legend}</ul><div class="plot-area">${drawnCopies(copies)}</div>`;
 		}),
 	};
 }

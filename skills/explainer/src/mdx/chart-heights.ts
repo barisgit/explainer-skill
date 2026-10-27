@@ -7,7 +7,10 @@
  */
 import { readFileSync } from "node:fs";
 
-/** The element a chart is drawn for: its classes and id, as the component renders them. */
+/**
+ * The element a chart is drawn for: its classes and id, as the component renders them. The same shape as
+ * kit/components/parts/drawn.ts's Place, which pack's side cannot import: that module's types need the kit's globals.
+ */
 export interface Place {
 	classes: readonly string[];
 	id: string | undefined;
@@ -19,9 +22,15 @@ export interface Viewport {
 	height: number;
 }
 
+/** A compound selector of classes and at most one id, as its parts. */
+interface Compound {
+	classes: string[];
+	id: string | undefined;
+}
+
 /** One rule that sets a chart's height: the compound selectors it applies through, and the value it sets. */
 interface HeightRule {
-	selectors: { classes: string[]; id: string | undefined }[];
+	selectors: Compound[];
 	value: string;
 }
 
@@ -61,7 +70,7 @@ function topLevelRules(css: string): { selector: string; body: string }[] {
 }
 
 /** A compound selector of an optional div and classes and ids only, as its parts; undefined for any other selector. */
-function compound(selector: string): { classes: string[]; id: string | undefined } | undefined {
+function compound(selector: string): Compound | undefined {
 	if (!/^(div)?([.#][\w-]+)+$/.test(selector)) {
 		return undefined;
 	}
@@ -85,7 +94,7 @@ function heightRules(css: string): HeightRule[] {
 }
 
 /** The arguments of a CSS function, split at its top-level commas. */
-function args(inside: string): string[] {
+function functionArguments(inside: string): string[] {
 	const parts: string[] = [];
 	let depth = 0;
 	let start = 0;
@@ -101,30 +110,32 @@ function args(inside: string): string[] {
 }
 
 /** A CSS length in pixels at `viewport`, or undefined when it is not one pack can work out. */
-export function lengthAt(value: string, viewport: Viewport): number | undefined {
+function lengthAt(value: string, viewport: Viewport): number | undefined {
 	const plain = /^(-?\d*\.?\d+)(px|rem|em|vw|vh)$/.exec(value.replace(/\s*!important$/, ""));
 	if (plain) {
-		const n = Number(plain[1]);
-		const unit = plain[2];
-		const per = {
+		const pixelsPer = {
 			px: 1,
 			rem: ROOT_FONT,
 			em: ROOT_FONT,
 			vw: viewport.width / 100,
 			vh: viewport.height / 100,
 		};
-		return n * per[unit as keyof typeof per];
+		return Number(plain[1]) * pixelsPer[plain[2] as keyof typeof pixelsPer];
 	}
 	const call = /^(clamp|min|max)\((.*)\)$/.exec(value);
-	const values = call ? args(call[2] as string).map((arg) => lengthAt(arg, viewport)) : [];
-	if (!call || !values.length || values.some((v) => v === undefined)) {
+	if (!call) {
 		return undefined;
 	}
-	const [a = 0, b = 0, c = 0] = values as number[];
-	if (call[1] === "clamp") {
-		return values.length === 3 ? Math.max(a, Math.min(b, c)) : undefined;
+	const values = functionArguments(call[2] ?? "").map((arg) => lengthAt(arg, viewport));
+	const lengths = values.filter((v) => v !== undefined);
+	if (!lengths.length || lengths.length < values.length) {
+		return undefined;
 	}
-	return call[1] === "min" ? Math.min(...(values as number[])) : Math.max(...(values as number[]));
+	if (call[1] === "clamp") {
+		const [least = 0, preferred = 0, most = 0] = lengths;
+		return lengths.length === 3 ? Math.max(least, Math.min(preferred, most)) : undefined;
+	}
+	return call[1] === "min" ? Math.min(...lengths) : Math.max(...lengths);
 }
 
 /**
