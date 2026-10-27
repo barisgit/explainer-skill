@@ -39,7 +39,8 @@ if (
 	join(temp, "org.chromium.Chromium.XXXXXX", "SingletonSocket").length > 107
 ) {
 	process.stderr.write(`FATAL:process_singleton_posix.cc(313)] Socket path too long: ${temp}\n`);
-	process.kill(process.pid, "SIGABRT");
+	// Chrome aborts here; an exit does as well for check, which reads only the log (a SIGABRT to itself left Bun 1.4.3 hanging).
+	process.exit(134);
 }
 writeFileSync(join(mkdtempSync(join(temp, "org.chromium.Chromium.")), "SingletonSocket"), "");
 spawn(
