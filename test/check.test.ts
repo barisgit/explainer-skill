@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { packAndRun, packHtml, pageContract, runCli, scratch } from "./support.ts";
@@ -506,3 +506,21 @@ test("check waits for a chart drawn late and names a visible one still not drawn
 	expect(result.stdout).not.toContain("#late");
 	expect(result.code).toBe(1);
 }, 40_000);
+
+test("check refuses a --tag that is not a file name before it starts Chrome, so no PNG lands outside --out", async () => {
+	const file = dir.write("tagged.html", page(""));
+	const out = dir.path("tag-out");
+	mkdirSync(out);
+	// --quick names the desktop PNG <tag>-desktop.png in --out, which this tag would put beside --out, over this file.
+	const beside = dir.path("escape-desktop.png");
+	writeFileSync(beside, "before");
+
+	const result = await runCli(["check", file, "--quick", "--tag", "../escape", "--out", out]);
+
+	expect(result.code).toBe(2);
+	expect(result.stderr).toBe(
+		'error: --tag takes a name to add to file names, without a path separator, not "../escape"\n',
+	);
+	expect(readFileSync(beside, "utf8")).toBe("before");
+	expect(readdirSync(out)).toEqual([]);
+});
