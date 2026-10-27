@@ -101,7 +101,7 @@ interface KeepClearButton {
 	show(visible: boolean): void;
 }
 
-/** keep.js's keeper, which reply.js drives: the controls it keeps, and its save, clear and touch calls. */
+/** keep.js's keeper, which reply.js drives: the controls it keeps, its save, clear and touch calls, and its Clear button. */
 interface KeepApi {
 	/** CSS selector of the controls that can be kept. */
 	selector: string;

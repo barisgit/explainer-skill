@@ -2918,10 +2918,9 @@ li a {
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept. Once anything is saved, a Clear answers button at the end of the page puts every control back to its
-   default, again with events, and drops the saved copy. It asks first: one click turns it red ("Clear everything?"), a second
-   within 4 s clears; Escape, leaving the button or the wait cancels. With reply (kit reply) the reader's notes are kept too, and
-   the same button sits in the reply bar instead, where a self-check's answer (a kit Question's choice, or its written answer
-   beside a model one) alone does not bring it.
+   default, again with events, and drops the saved copy; a first press only asks, a second within 4 s clears. With reply (kit
+   reply) the reader's notes are kept too, and the same button sits in the reply bar instead, where a self-check's answer (a kit
+   Question's choice, or a written answer beside a model one) alone does not bring it.
    Labels: clearAnswers "Clear answers", clearAnswersPrompt "Press again to clear all answers." (announced), and for both
    buttons clearConfirm "Clear everything?" and clearCancelled "Clear cancelled." (announced). */
 (() => {
@@ -3213,11 +3212,13 @@ li a {
   }
   function updateAlone() {
     const state = save();
-    if (!state || empty(state) && !own) {
+    if (!state) {
       return;
     }
-    own ??= ownClear();
-    own.show(!empty(state));
+    if (!empty(state)) {
+      own ??= ownClear();
+    }
+    own?.show(!empty(state));
   }
   const later = () => setTimeout(() => onChange());
   for (const type of ["input", "change", "click"]) {
