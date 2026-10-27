@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import type { Cdp } from "../skills/explainer/src/chrome.ts";
+import type { Cdp } from "../skills/explainer/src/cdp.ts";
 import {
 	act,
 	FRAMES,

@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import type { Cdp, ExceptionDetails } from "./chrome.ts";
-import { ChromeError, withPage } from "./chrome.ts";
+import type { Cdp, ExceptionDetails } from "./cdp.ts";
+import { ChromeError } from "./cdp.ts";
+import { withPage } from "./chrome.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import {
 	DISCOVER_JS,

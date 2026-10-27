@@ -1,4 +1,4 @@
-import { ChromeError } from "./chrome.ts";
+import { ChromeError } from "./cdp.ts";
 import { CLI, COMMANDS, type Command, usage } from "./commands.ts";
 
 function help(name?: string): string {

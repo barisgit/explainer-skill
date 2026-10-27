@@ -1,7 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { ChromeError, withPage } from "../skills/explainer/src/chrome.ts";
+import { ChromeError } from "../skills/explainer/src/cdp.ts";
+import { withPage } from "../skills/explainer/src/chrome.ts";
 import { SKILL_DIR, scratch } from "./support.ts";
 
 const dir = scratch();

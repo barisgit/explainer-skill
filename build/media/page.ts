@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
-import { type Cdp, settle } from "../../skills/explainer/src/chrome.ts";
+import type { Cdp } from "../../skills/explainer/src/cdp.ts";
+import { settle } from "../../skills/explainer/src/chrome.ts";
 import type { Rect, Region, Size, Theme } from "./types.ts";
 
 /** Device pixels per CSS pixel in every capture: text stays sharp when the image is shown at its CSS size on a dense screen. */

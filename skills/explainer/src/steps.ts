@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import type { Cdp } from "./chrome.ts";
+import type { Cdp } from "./cdp.ts";
 import { ELEMENT_NAME_JS, REGION_VISIBLE_JS, SETTLE_JS } from "./page-js.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
