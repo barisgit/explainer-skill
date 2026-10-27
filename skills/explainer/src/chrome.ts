@@ -254,9 +254,9 @@ async function start(
 }
 
 /**
- * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its directory deleted once Chrome has exited (a profile deleted while Chrome shuts down is written again; files that a process
- * outlives are kept, with a warning), also when
- * SIGINT, SIGTERM or SIGHUP ends the process, Chrome's start-up included. withPage and a signal share one cleanup, which runs once.
+ * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its directory deleted once Chrome has
+ * exited (a profile deleted while Chrome shuts down is written again; files that a process outlives are kept, with a warning),
+ * also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's start-up included. withPage and a signal share one cleanup, which runs once.
  * Once `limit` aborts, Chrome's start-up or the page's next or pending call fails with its reason (a ChromeError), and the
  * cleanup runs within Chrome's exit grace and the group's.
  */
