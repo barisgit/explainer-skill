@@ -1,6 +1,6 @@
 /* reply: reader notes and answers sent as one Markdown reply: data-reply on form controls, select text or click a data-ref part to add a note. pack includes it, with keep, for data-reply or reply: true in the frontmatter.
-   Nothing shows until the reader selects text, clicks a data-ref part (a Note button appears), or changes an input (a Clear button
-   appears), or the page has data-reply controls (a Reply button).
+   Nothing shows until the reader selects text, clicks a data-ref part (a Note button appears), or changes an input on a page
+   that asks for replies (a Clear button appears), or the page has data-reply controls (a Reply button).
    Questions and state are plain form controls inside any element marked data-reply:
      <fieldset data-reply>                        a question: the legend is its label, the checked option its answer
        <legend>Where should sessions live?</legend>
@@ -19,9 +19,9 @@
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, touched }] }.
-   Keeping (kit keep): the reader's answers and notes are kept across reloads. The bar holds keep's Clear button as "Clear answers
-   and notes", shown while anything is answered, a note exists, or answers wait for a control not yet shown (a self-check's answer
-   does not count); confirmed, it also drops the notes.
+   Keeping (kit keep): the reader's answers and notes are kept across reloads. On a page with reply: true (pack marks its <main>
+   data-asks-reply), a data-reply control or a note, the bar holds keep's Clear button as "Clear answers and notes" while anything
+   is kept; confirmed, it also drops the notes. Otherwise keep's own Clear at the end of the page clears the answers.
    Labels: the texts the reply UI adds are English. A page in another language sets them, with those of the other kit scripts, in the
    page's frontmatter labels, one key: text per line (reply: Odgovor). Keys here:
    reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearPrompt "Press again to clear all
@@ -292,8 +292,6 @@
 			document.documentElement.style.setProperty("--reply-bar-height", height);
 		}
 	}).observe(bar);
-	const asked = Boolean(document.querySelector("[data-reply]"));
-
 	function clearAll() {
 		notes.length = 0;
 		keep.clear();
@@ -304,11 +302,17 @@
 	 * runs once the page has loaded (the restore), so the buttons take kitLabels the page set after this script.
 	 */
 	function sync() {
-		const kept = keep.update();
+		// The bar is reply's while the page has something to reply: it asks for replies (reply: true), has a reply question now
+		// (one may render later) or a note. Otherwise keep.js's own Clear clears the answers, so a page that carries reply.js on
+		// pack's safe-side guess looks as it would without it.
+		const asked = document.querySelector("[data-reply]") !== null;
+		const inBar =
+			asked || filledNotes().length > 0 || document.querySelector("[data-asks-reply]") !== null;
+		const kept = keep.update(inBar);
 		const count = filledNotes().length + answers().filter((a) => a.touched).length;
 		button.hidden = !count && !asked;
-		clear.show(kept);
-		bar.hidden = button.hidden && !kept;
+		clear.show(inBar && kept);
+		bar.hidden = button.hidden && !(inBar && kept);
 		button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
 	}
 

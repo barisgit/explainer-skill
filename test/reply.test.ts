@@ -21,17 +21,17 @@ const replyButton = () => document.querySelector(".reply-bar .primary");
 const armed = () => clearButton().classList.contains("is-armed");
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;`;
 
-/** A small page: \`body\` inside <main>, then keep.js and reply.js, then the helpers and \`script\`. */
+/** A small page as pack writes one with reply: true: \`body\` inside <main>, then keep.js and reply.js, then the helpers and \`script\`. */
 const SMALL = (body: string, script: string) =>
-	`<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Small</h1>${body}</main>
+	`<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main data-asks-reply><h1>Small</h1>${body}</main>
 <script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${COMMON}
 ${script}</script></body></html>`;
 
-/** The page's own listeners are the only thing that updates #out, and it starts as "authored", so a restore that skips them shows. */
+/** A page with reply: true. The page's own listeners are the only thing that updates #out, and it starts as "authored", so a restore that skips them shows. */
 const PAGE = (
 	script: string,
 ) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Keep</h1>
+<link rel="stylesheet" href="kit:theme.css"></head><body><main data-asks-reply><h1>Keep</h1>
 <p>Intro with <span data-ref="part">a part</span>.</p>
 <fieldset><legend>Pick</legend><label><input type="radio" name="pick" value="a" checked> A</label> <label><input type="radio" name="pick" value="b" id="pick-b"> B</label></fieldset>
 <label>Range <input type="range" id="r" min="0" max="10" value="3"></label>
@@ -479,7 +479,7 @@ const end = () => document.documentElement.scrollHeight - innerHeight;`;
 /** A tall page whose first box is a full-width table; `question` adds a data-reply question, so the Reply button shows from the start. */
 const BAR_PAGE = (question: boolean, script: string) =>
 	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="kit:theme.css"></head><body><main><table class="compare">${ROWS}</table><h1>Bar</h1>${PROSE}
+<link rel="stylesheet" href="kit:theme.css"></head><body><main data-asks-reply><table class="compare">${ROWS}</table><h1>Bar</h1>${PROSE}
 ${question ? `<fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" checked> A</label> <label><input type="radio" name="p" value="b" id="b"> B</label></fieldset>` : ""}
 <input id="late" aria-label="Late">${PROSE}<table class="compare">${ROWS}</table></main>
 <script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_GEOMETRY}

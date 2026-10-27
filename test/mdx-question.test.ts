@@ -113,18 +113,23 @@ export function Quiz({ answer }: { answer: string }) {
 			'import { Quiz } from "./quiz.tsx";\n\n# Quiz\n\n<Quiz answer="kWh" />\n',
 		);
 		const reveal = `document.getElementById("reveal").click()`;
-		const seen = `[document.getElementById("q-kWh")?.checked ?? null, Boolean(document.querySelector(".reply-bar")?.checkVisibility())]`;
+		const clear = `document.querySelector(".keep-clear .btn").click()`;
+		const seen = `[document.getElementById("q-kWh")?.checked ?? null, Boolean(document.querySelector(".reply-bar")?.checkVisibility()), Boolean(document.querySelector(".keep-clear .btn")?.checkVisibility())]`;
 		const state = await inPage(output, async (cdp) => {
 			await act(cdp, reveal, "0");
 			const chosen = await act(cdp, `document.getElementById("q-kWh").click()`, seen);
 			await load(cdp);
 			const reloaded = await cdp.evaluate(seen);
-			return { chosen, reloaded, shown: await act(cdp, reveal, seen) };
+			const shown = await act(cdp, reveal, seen);
+			await act(cdp, clear, "0");
+			return { chosen, reloaded, shown, cleared: await act(cdp, clear, seen) };
 		});
+		// reply.js is on the page, but with no reply question and no note, keep's own Clear clears the choice.
 		expect(state).toEqual({
-			chosen: [true, false],
-			reloaded: [null, false],
-			shown: [true, false],
+			chosen: [true, false, true],
+			reloaded: [null, false, true],
+			shown: [true, false, true],
+			cleared: [false, false, false],
 		});
 	}, 30_000);
 

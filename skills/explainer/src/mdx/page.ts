@@ -217,7 +217,8 @@ async function kitScripts(html: string, scan: string, front: Frontmatter): Promi
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
  * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client
- * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one. Every error the author can fix is a PackError;
+ * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one and `<main
+ * data-asks-reply>` for reply: true, which keeps reply.js's bar on a page with no reply question. Every error the author can fix is a PackError;
  * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
  */
 export async function mdxPage(
@@ -264,6 +265,7 @@ export async function mdxPage(
 		(file) => `<link rel="stylesheet" href="${escapeHtml(relative(dir, file))}">`,
 	);
 	const scheme = page.front.scheme ? ` data-scheme="${page.front.scheme}"` : "";
+	const asks = page.front.reply ? " data-asks-reply" : "";
 	const shell = [
 		"<!doctype html>",
 		`<html lang="${escapeHtml(page.front.lang)}"${scheme}>`,
@@ -276,7 +278,7 @@ export async function mdxPage(
 		...links,
 		"</head>",
 		"<body>",
-		`<main class="page">${hoistViews(html, shownPath(path))}</main>`,
+		`<main class="page"${asks}>${hoistViews(html, shownPath(path))}</main>`,
 		...(islands.length
 			? [
 					`<script type="application/json" id="explainer-islands">${scriptJson(islandData(islands, modules))}</script>`,

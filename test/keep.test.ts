@@ -83,3 +83,41 @@ test("a page that keeps answers without a reply offers one Clear at its end once
 	expect(seen.cleared.heard).toContain("why");
 	expect(seen.after).toMatchObject({ clear: null, answers: ["", ""], stored: 0 });
 }, 30_000);
+
+test("a reply question that appears after keep's Clear moves Clear into the reply bar, so one Clear shows at a time", async () => {
+	const output = await packedMdx(
+		dir,
+		"ask-later",
+		`import { Question } from "kit";\nimport { Ask } from "./ask.tsx";\n\n# Later\n\n<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>\n\n<Ask />\n`,
+		{
+			"ask.tsx": `"use client";
+import { useState } from "preact/hooks";
+import { Question } from "kit";
+
+export function Ask() {
+	const [open, setOpen] = useState(false);
+	return (
+		<div>
+			<button type="button" class="btn" id="reveal" onClick={() => setOpen(true)}>Ask</button>
+			{open && <Question name="next" legend="What next?" options={["More", "Less"]} />}
+		</div>
+	);
+}
+`,
+		},
+	);
+	const shown = `[".keep-clear .btn", ".reply-bar .btn:not(.primary)", ".reply-bar .primary"].map((s) => Boolean(document.querySelector(s)?.checkVisibility())).concat(document.getElementById("unit-kWh").checked)`;
+	const barClear = `document.querySelector(".reply-bar .btn:not(.primary)").click()`;
+	const seen = await inPage(output, async (cdp) => {
+		const chosen = await act(cdp, `document.getElementById("unit-kWh").click()`, shown);
+		const asked = await act(cdp, `document.getElementById("reveal").click()`, shown);
+		await act(cdp, barClear, "0");
+		return { chosen, asked, cleared: await act(cdp, barClear, shown) };
+	});
+	// [keep's Clear, the bar's Clear, Reply, the self-check's choice]
+	expect(seen).toEqual({
+		chosen: [true, false, false, true],
+		asked: [false, true, true, true],
+		cleared: [false, false, true, false],
+	});
+}, 30_000);

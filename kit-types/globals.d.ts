@@ -107,8 +107,11 @@ interface KeepApi {
 	selector: string;
 	/** A label's text without the controls inside it. */
 	ownText(label: HTMLLabelElement): string;
-	/** After any change: adopts new controls, saves, returns whether anything for the reply is kept (a self-check's answer is not). */
-	update(): boolean;
+	/**
+	 * After any change: adopts new controls, saves, returns whether anything is kept. Unless `inBar` (the caller shows Clear in
+	 * its reply bar), keep.js shows its own Clear while anything is.
+	 */
+	update(inBar: boolean): boolean;
 	/** Every control back to its default (with input and change events), saved state dropped; notes are the owner's to empty. */
 	clear(): void;
 	/** The Clear button keep.js shows alone, for an owner's own place and texts: a press arms it, a second calls `onClear`. */

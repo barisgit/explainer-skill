@@ -9,8 +9,8 @@
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
    <details> are not kept. Once anything is saved, a Clear answers button at the end of the page puts every control back to its
    default, again with events, and drops the saved copy; a first press only asks, a second within 4 s clears. With reply (kit
-   reply) the reader's notes are kept too, and the same button sits in the reply bar instead, where a self-check's answer (a kit
-   Question's choice, or a written answer beside a model one) alone does not bring it.
+   reply) the reader's notes are kept too, and on a page that asks for replies (reply: true, a data-reply control, or a note) the
+   same button sits in the reply bar instead.
    Labels: clearAnswers "Clear answers", clearAnswersPrompt "Press again to clear all answers." (announced), and for both
    buttons clearConfirm "Clear everything?" and clearCancelled "Clear cancelled." (announced). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
@@ -44,8 +44,8 @@
 			storedNotes = saved;
 		},
 	};
-	/** Called when something changed outside reply.js's own calls; alone, keep.js saves then and shows its own Clear. */
-	let onChange: () => void = () => updateAlone();
+	/** Called when something changed outside reply.js's own calls; alone, keep.js saves then, with its own Clear. */
+	let onChange: () => void = () => void update(false);
 	/** What a control is, by its own label and kind alone (never its group's): a saved value is put only into a control with the same one. */
 	type Control = ReplyControl;
 	/** What a control holds: checked, selected values (multiple select), or its text. */
@@ -65,11 +65,7 @@
 	interface Saved {
 		value: unknown;
 		sig: string;
-		/** A self-check's answer: kept, but not an answer for the reply, so it alone brings no reply bar. Saved, since the control may not be shown yet. */
-		check?: true;
 	}
-	/** Where a kit Question that is a self-check keeps its options or its text box. */
-	const SELF_CHECK = "fieldset.self-check";
 	const isRadio = (c: Control): c is HTMLInputElement => c.type === "radio";
 	const isToggle = (c: Control): c is HTMLInputElement => isRadio(c) || c.type === "checkbox";
 	const isMultiSelect = (c: Control): c is HTMLSelectElement =>
@@ -266,8 +262,7 @@
 		}
 		const controls = { ...pending };
 		for (const u of present.filter(answered)) {
-			const check = u.el.closest(SELF_CHECK) ? { check: true as const } : {};
-			controls[u.key] = { value: readControl(u.el), sig: u.sig, ...check };
+			controls[u.key] = { value: readControl(u.el), sig: u.sig };
 		}
 		keptById = Object.fromEntries(Object.entries(controls).filter(([key]) => key.startsWith("#")));
 		return { controls, notes: notes.list() };
@@ -338,17 +333,21 @@
 	}
 
 	/**
-	 * Saves and says whether anything for the reply is kept: answers, answers waiting for a control that is not shown yet, or
-	 * notes. A self-check's answer is saved but does not count. Before the restore only the notes are known.
+	 * Saves and says whether anything is kept: answers, answers waiting for a control that is not shown yet, or notes. Unless
+	 * `inBar` (reply.js shows the reply bar, with its own Clear), keep.js's own Clear shows while anything is, so the page has
+	 * exactly one Clear. Before the restore only the notes are known, and nothing is saved or shown.
 	 */
-	function update() {
+	function update(inBar: boolean) {
 		const state = save();
 		if (!state) {
 			return notes.list().length > 0;
 		}
-		return (
-			state.notes.length > 0 || Object.values(state.controls).some((entry) => entry.check !== true)
-		);
+		const kept = !empty(state);
+		if (kept && !inBar) {
+			own ??= ownClear();
+		}
+		own?.show(kept && !inBar);
+		return kept;
 	}
 
 	/** How long an armed Clear waits for its second press. */
@@ -415,7 +414,7 @@
 		};
 	}
 
-	/** keep.js's own Clear on a page without reply.js, made the first time something is saved. */
+	/** keep.js's own Clear for a page without a reply bar, made the first time something is saved there. */
 	let own: KeepClearButton | undefined;
 
 	/**
@@ -442,18 +441,6 @@
 				made.show(visible);
 			},
 		};
-	}
-
-	/** Alone: saves, and offers Clear while anything is saved, a self-check's answer included, since nothing else clears it. */
-	function updateAlone() {
-		const state = save();
-		if (!state) {
-			return;
-		}
-		if (!empty(state)) {
-			own ??= ownClear();
-		}
-		own?.show(!empty(state));
 	}
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
