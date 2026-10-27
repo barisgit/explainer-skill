@@ -63,8 +63,9 @@ export const TIMERS_JS = `(() => {
 		if (!(Number(ms) > ${SHORT_TIMER_MS})) pending.add(id);
 		return id;
 	};
-	window.clearTimeout = (id) => { pending.delete(id); clearTimeout(id); };
-	window.clearInterval = (id) => { pending.delete(id); clearInterval(id); };
+	// The native functions convert the id to a 32-bit integer ("7" cancels timer 7), and so does the tracking.
+	window.clearTimeout = (id) => { pending.delete(Number(id) | 0); clearTimeout(id); };
+	window.clearInterval = (id) => { pending.delete(Number(id) | 0); clearInterval(id); };
 	window[${TIMERS_KEY}] = {
 		set,
 		/**

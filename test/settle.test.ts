@@ -45,11 +45,14 @@ tick();`,
 	expect(state).toBe("yes");
 }, 30_000);
 
-test("a timeout cancelled by clearInterval counts as cancelled, as it does natively", async () => {
+test("a timeout cancelled by clearInterval, or by its id as a string, counts as cancelled, as it does natively", async () => {
 	const { missing, state } = await settled<boolean>(
 		"cross-cancel.html",
 		`window.fired = false;
-clearInterval(setTimeout(() => { window.fired = true; }, 500));`,
+const fire = () => { window.fired = true; };
+clearInterval(setTimeout(fire, 500));
+clearTimeout(String(setTimeout(fire, 500)));
+clearInterval(String(setTimeout(fire, 500)));`,
 		`new Promise((done) => setTimeout(() => done(window.fired), 700))`,
 	);
 	expect(missing).toBe("");
