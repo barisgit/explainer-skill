@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readlinkSync, realpathSync, rmSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
@@ -37,6 +37,8 @@ export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const START_DEADLINE_MS = 20_000;
 /** How long Chrome may take to exit after SIGTERM before it is killed, so its profile can be deleted. */
 const EXIT_GRACE_MS = 5_000;
+/** How long Chrome's helpers may take to exit after its main process (they take milliseconds), and how long a killed group may. */
+const GROUP_GRACE_MS = 1_000;
 /** How often stop looks whether Chrome's helpers have exited. */
 const GROUP_POLL_MS = 10;
 /** How long a failed start waits to see whether Chrome is exiting on its own, whose log then explains the failure. */
@@ -62,12 +64,14 @@ const FLAGS = [
 class SandboxUnavailable extends ChromeError {}
 
 /**
- * What withPage owns of its Chrome: `stop` of the process spawned last, set as soon as it exists and resolving once it has exited,
- * and `closing`, set when cleanup begins, after which no Chrome may be spawned for the profile.
+ * What withPage owns of its Chrome: `stop` of the process spawned last, set as soon as it exists and resolving once it is stopped;
+ * `closing`, set when cleanup begins, after which no Chrome may be spawned for the profile; and `stuck`, set when a stopped Chrome
+ * left a process behind, which may still write into the profile.
  */
 interface Owner {
 	stop?: () => Promise<void>;
 	closing: boolean;
+	stuck: boolean;
 }
 
 /**
@@ -93,7 +97,7 @@ async function launch(profile: string, owner: Owner, limit?: AbortSignal): Promi
 	}
 }
 
-/** Whether any process of the process group `pgid` still exists. */
+/** Whether any process of the process group `pgid` still exists (a zombie counts). */
 function groupAlive(pgid: number): boolean {
 	try {
 		process.kill(-pgid, 0);
@@ -103,23 +107,44 @@ function groupAlive(pgid: number): boolean {
 	}
 }
 
-/**
- * Resolves once every process of Chrome's group (`pgid`, Chrome's own pid) has exited. Chrome's helpers can outlive its main
- * process by a few milliseconds and write into the profile meanwhile (on Linux a profile deleted right after the main process
- * exited came back in about one run in five), so the profile is deleted only after this. Helpers still there after EXIT_GRACE_MS
- * are killed.
- */
-async function groupGone(pgid: number | undefined) {
-	if (pgid === undefined) {
-		return;
-	}
-	const end = performance.now() + EXIT_GRACE_MS;
+/** Resolves whether the process group `pgid` has emptied within `ms`. */
+async function groupGone(pgid: number, ms: number): Promise<boolean> {
+	const end = performance.now() + ms;
 	while (groupAlive(pgid)) {
 		if (performance.now() > end) {
-			process.kill(-pgid, "SIGKILL");
+			return false;
 		}
 		await settle(GROUP_POLL_MS);
 	}
+	return true;
+}
+
+/**
+ * Stops Chrome (`proc`, which `exited` follows) and resolves whether every process of its group (`pgid`, Chrome's own pid) has
+ * exited. Chrome's helpers can outlive its main process by a few milliseconds and write into the profile meanwhile (on Linux a
+ * profile deleted right after the main process exited came back in about one run in five), so the profile may be deleted only
+ * once this resolves true. What is left after the graces gets one SIGKILL; a process even that leaves (a zombie whose parent
+ * never reaps it) makes this resolve false GROUP_GRACE_MS later, so stopping is bounded whatever Chrome does.
+ */
+async function stopGroup(
+	proc: ChildProcess,
+	pgid: number,
+	exited: Promise<void>,
+): Promise<boolean> {
+	proc.kill();
+	const ended = await within(exited, EXIT_GRACE_MS, "").then(
+		() => true,
+		() => false,
+	);
+	if (ended && (await groupGone(pgid, GROUP_GRACE_MS))) {
+		return true;
+	}
+	try {
+		process.kill(-pgid, "SIGKILL");
+	} catch {
+		// The group emptied since it was last looked at.
+	}
+	return await groupGone(pgid, GROUP_GRACE_MS);
 }
 
 /** The last line of Chrome's log that says something, for a one-line error. */
@@ -168,14 +193,17 @@ async function start(
 	// Registered at once, so an exit before `stop` (a crash, or a failed start) is not missed.
 	let stopping = false;
 	const exited = new Promise<void>((done) => proc.once("exit", () => done()));
-	const stop = async () => {
+	let stopped: Promise<void> | undefined;
+	const stop = () => {
 		stopping = true;
-		proc.kill();
-		await within(exited, EXIT_GRACE_MS, "Chrome did not exit").catch(() => {
-			proc.kill("SIGKILL");
-			return exited;
-		});
-		await groupGone(proc.pid);
+		const { pid } = proc;
+		// No pid: the spawn failed, so no process exists.
+		stopped ??= (pid === undefined ? Promise.resolve(true) : stopGroup(proc, pid, exited)).then(
+			(gone) => {
+				owner.stuck ||= !gone;
+			},
+		);
+		return stopped;
 	};
 	owner.stop = stop;
 	// Why Chrome exited on its own while starting. The full log is searched: Chrome's stack trace pushes the sandbox line out of
@@ -234,19 +262,26 @@ function removeProfile(profile: string) {
 
 /**
  * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its profile deleted once Chrome has exited
- * (a profile deleted while Chrome shuts down is written again), also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's
- * start-up included. withPage and a signal share one cleanup, which runs once. Once `limit` aborts, Chrome's start-up or the
- * page's next or pending call fails with its reason (a ChromeError), and the cleanup runs within Chrome's exit grace.
+ * (a profile deleted while Chrome shuts down is written again; one that a process outlives is kept, with a warning), also when
+ * SIGINT, SIGTERM or SIGHUP ends the process, Chrome's start-up included. withPage and a signal share one cleanup, which runs once.
+ * Once `limit` aborts, Chrome's start-up or the page's next or pending call fails with its reason (a ChromeError), and the
+ * cleanup runs within Chrome's exit grace and the group's.
  */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSignal): Promise<T> {
 	const profile = mkdtempSync(join(tmpdir(), "artifact-chrome-"));
-	const owner: Owner = { closing: false };
+	const owner: Owner = { closing: false, stuck: false };
 	let cleaning: Promise<void> | undefined;
 	const cleanup = () => {
 		cleaning ??= (async () => {
 			owner.closing = true;
 			await owner.stop?.();
-			removeProfile(profile);
+			if (owner.stuck) {
+				console.error(
+					`warning: Chrome's processes did not all exit, so its profile is kept: ${profile}`,
+				);
+			} else {
+				removeProfile(profile);
+			}
 		})().finally(() => release());
 		return cleaning;
 	};

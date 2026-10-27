@@ -191,6 +191,40 @@ test("withPage deletes Chrome's profile only once Chrome has exited, so nothing 
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 
+test("withPage whose Chrome leaves a process that never exits kills its group once, keeps the profile and says where, within a bound", async () => {
+	const tmp = tempDir("tmp-stuck");
+	const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");
+	// A zombie helper (adopted by a PID 1 that does not reap) stays in Chrome's group after SIGKILL: here the group probe says
+	// so, while every real signal still goes through.
+	const script = `
+		const kill = process.kill.bind(process);
+		let groupKills = 0;
+		process.kill = (pid, signal) => {
+			if (pid < 0 && signal === 0) return true;
+			if (pid < 0 && signal === "SIGKILL") groupKills++;
+			return kill(pid, signal);
+		};
+		await (await import(${JSON.stringify(chrome)})).withPage(async () => {});
+		console.log(groupKills);
+	`;
+	const started = performance.now();
+	const proc = Bun.spawn([process.execPath, "-e", script], {
+		env: { ...process.env, CHROME: fakeChrome, TMPDIR: tmp },
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	expect(await proc.exited).toBe(0);
+	// Chrome's 5 s exit grace is not needed here (the stand-in exits on SIGTERM), so this is the helpers' grace and the kill's.
+	expect(performance.now() - started).toBeLessThan(5_000);
+	expect(await new Response(proc.stdout).text()).toBe("1\n");
+	const profile = readdirSync(tmp).find((name) => name.startsWith("artifact-chrome-"));
+	expect(await new Response(proc.stderr).text()).toBe(
+		`warning: Chrome's processes did not all exit, so its profile is kept: ${join(tmp, profile ?? "")}\n`,
+	);
+	expect(existsSync(join(tmp, profile ?? "", "started"))).toBe(true);
+	await chromesGone(tmp);
+}, 30_000);
+
 test("check ended by SIGTERM while Chrome starts stops that Chrome and deletes its profile after it exits", async () => {
 	const tmp = tempDir("tmp-term-start");
 	const proc = startCheck(stalled, tmp, [], { CHROME: fakeChrome, FAKE_CHROME: "silent" });
