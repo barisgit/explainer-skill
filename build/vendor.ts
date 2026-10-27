@@ -18,6 +18,7 @@
  */
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { BunPlugin } from "bun";
 
 const root = join(import.meta.dir, "..");
 const skill = join(root, "skills", "explainer");
@@ -25,6 +26,19 @@ const nm = (...p: string[]) => join(root, "node_modules", ...p);
 const text = (...p: string[]) => Bun.file(nm(...p)).text();
 const versionOf = async (pkg: string): Promise<string> =>
 	(await Bun.file(nm(pkg, "package.json")).json()).version;
+
+/**
+ * Resolves `explainer-geist`, which the beautiful-mermaid patch imports, to src/geist.ts: diagrams and the charts pack draws
+ * measure text with one table of Geist's advances, which build/geist-widths.ts writes.
+ */
+const explainerGeist: BunPlugin = {
+	name: "explainer-geist",
+	setup(builder) {
+		builder.onResolve({ filter: /^explainer-geist$/ }, () => ({
+			path: join(skill, "src", "geist.ts"),
+		}));
+	},
+};
 
 /** Bundles one entry and returns its single output file's text and the files it was built from (relative to the repository). */
 async function build(
@@ -39,6 +53,7 @@ async function build(
 		target,
 		format,
 		external,
+		plugins: [explainerGeist],
 		metafile: true,
 	});
 	const [output] = built.outputs;
