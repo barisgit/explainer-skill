@@ -158,6 +158,32 @@
 .mermaid > svg .mono {
 	font-family: var(--mono);
 }
+/* Schematic blocks (spike, issue #71): pack draws each in currentColor, sized like a Mermaid diagram: at most 1.2 times its drawn
+   size, at least the width that keeps its text at 10 px, below which the block scrolls sideways. Values recede in --muted. */
+.schematic {
+	display: block;
+	margin: 1.5rem 0;
+	padding: 1.25rem 1rem;
+	text-align: center;
+	overflow-x: auto;
+}
+.fig > .schematic {
+	margin: 0;
+}
+.schematic > svg {
+	color: var(--ink);
+	font-family: var(--font);
+	overflow: visible;
+	max-width: var(--schematic-max);
+	min-width: var(--schematic-min);
+}
+.schematic > svg .value {
+	fill: var(--muted);
+}
+.schematic > svg .wires {
+	color: color-mix(in srgb, var(--ink) 85%, var(--under));
+}
+
 /* A flowchart or state diagram too wide for a phone comes with a copy laid out across it (svg[data-phone]), shown on phones in
    its place. */
 @media screen and (width >= 40rem) {

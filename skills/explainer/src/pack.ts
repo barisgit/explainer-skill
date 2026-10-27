@@ -9,6 +9,7 @@ import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
 import { PackError } from "./pack-error.ts";
+import { renderSchematic } from "./schematic/index.ts";
 import { themeSvgImages } from "./svg-theme.ts";
 
 const IMPORT_FIX = 'import that stylesheet from the page instead (import "./other.css")';
@@ -70,8 +71,33 @@ function renderMermaidBlocks(
 	diagramRefs: Set<string>,
 ): Promise<string> {
 	let blocks = 0;
+	let schematics = 0;
 	let source: string[] = [];
 	return new HTMLRewriter()
+		.on("pre.schematic", {
+			element(el) {
+				const n = ++schematics;
+				const parts: string[] = [];
+				source = parts;
+				el.tagName = "div";
+				el.onEndTag((end) => {
+					try {
+						const drawn = renderSchematic(unescapeHtml(parts.join("")));
+						problems.push(...drawn.problems.map((p) => `schematic block ${n}: ${p}`));
+						for (const id of drawn.refs) {
+							diagramRefs.add(id);
+						}
+						end.before(drawn.svg, { html: true });
+					} catch (e) {
+						problems.push(`schematic block ${n}: ${e instanceof Error ? e.message : String(e)}`);
+					}
+				});
+			},
+			text(chunk) {
+				source.push(chunk.text);
+				chunk.remove();
+			},
+		})
 		.on("pre.mermaid, div.mermaid", {
 			element(el) {
 				const n = ++blocks;
@@ -274,7 +300,7 @@ export async function packPage(
 	// The inliner names the loads it sees as written; findLoads also finds the escaped ones, so the same load can come twice.
 	const all = [...new Set([...problems, ...(await findLoads(html)).map(loadMessage)])];
 	if (all.length) {
-		const remote = all.some((p) => !p.startsWith("mermaid block"));
+		const remote = all.some((p) => !/^(mermaid|schematic) block/.test(p));
 		throw new PackError(
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and import or reference them relatively." : ""}`,
 		);

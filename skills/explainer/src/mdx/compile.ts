@@ -131,9 +131,12 @@ function* elementsOf(node: HastNodes): Generator<Element> {
 	}
 }
 
+/** The fences pack draws in the HTML pass, by their language. */
+const DRAWN_FENCES = ["mermaid", "schematic"];
+
 /**
- * ```mermaid fences (`<pre><code class="language-mermaid">`) become `<pre class="mermaid">` with the source as their text, which
- * pack draws as one SVG in the HTML pass.
+ * ```mermaid and ```schematic fences (`<pre><code class="language-mermaid">`) become `<pre class="mermaid">` (or schematic)
+ * with the source as their text, which pack draws as one SVG in the HTML pass.
  */
 function mermaidFences(tree: HastRoot) {
 	for (const pre of elementsOf(tree)) {
@@ -142,8 +145,11 @@ function mermaidFences(tree: HastRoot) {
 			continue;
 		}
 		const { className } = code.properties;
-		if (Array.isArray(className) && className.includes("language-mermaid")) {
-			pre.properties = { className: ["mermaid"] };
+		const drawn = DRAWN_FENCES.find(
+			(lang) => Array.isArray(className) && className.includes(`language-${lang}`),
+		);
+		if (drawn) {
+			pre.properties = { className: [drawn] };
 			pre.children = code.children;
 		}
 	}
