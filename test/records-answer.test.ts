@@ -105,6 +105,45 @@ const THREE_VIEWS = (source: string) =>
 		'<Records {...decisions} views={["tree", "table", "board"]} />',
 	);
 
+/** A client component that shows `jsx`, a Records block, only after a click: its markup is not in the prerendered page. */
+const revealing = (jsx: string) => `"use client";
+import { useState } from "preact/hooks";
+import { Records } from "kit";
+
+export function Reveal() {
+	const [open, setOpen] = useState(false);
+	return (
+		<div>
+			<button type="button" class="btn" id="reveal" onClick={() => setOpen(true)}>Show</button>
+			{open && ${jsx}}
+		</div>
+	);
+}
+`;
+
+const LATER = `id: "r", idField: "id", data: [{ id: "a", t: "A" }], fields: { id: { label: "Item", kind: "text" }, t: { label: "Title", kind: "text" } }, columns: ["id", "t"]`;
+
+test("a Records block with a reply that a client component renders later brings keep.js and reply.js; one written out without a reply brings neither", async () => {
+	const scripts = async (name: string, jsx: string) => {
+		dir.write(`${name}.tsx`, revealing(jsx));
+		const page = `import { Reveal } from "./${name}.tsx";\n\n# Review\n\n<Reveal />\n`;
+		return kitScriptsIn(await packedMdx(dir, name, page));
+	};
+	const needed = expect.arrayContaining(["keep", "reply"]);
+	expect(
+		await scripts("later-spread", `<Records {...{ ${LATER}, reply: { options: ["Agree"] } }} />`),
+	).toEqual(needed);
+	expect(
+		await scripts("later-prop", `<Records {...{ ${LATER} }} reply={{ options: ["Agree"] }} />`),
+	).toEqual(needed);
+	const plain = await scripts(
+		"later-plain",
+		`<Records id="r" idField="id" data={[{ id: "a", t: "A" }]} fields={{ id: { label: "Item", kind: "text" }, t: { label: "Title", kind: "text" } }} columns={["id", "t"]} />`,
+	);
+	expect(plain).not.toContain("reply");
+	expect(plain).not.toContain("keep");
+}, 60_000);
+
 test("without a sum no row says Total", async () => {
 	const html = readFileSync(await packedMdx(dir, "totals", THREE_VIEWS(reviewPage())), "utf8");
 	expect(html).not.toContain('<div class="tree-row total"');

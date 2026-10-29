@@ -3,12 +3,13 @@
  * prerendered HTML holds that markup, or when its client code can write it later: the code is searched for the same markup as
  * it appears in compiled JSX and DOM calls (`"data-reply"`, `dataset.reply`, `Charts.make`). The kit components are markup
  * generators, so their code holds the markers too and needs no list of its own; a new attribute a kit script reads needs a row.
- * Question is the exception: which markup it writes depends on its props (a self-check, chosen or written, writes no
- * data-reply), so the client code is scanned with Question left as an import, and its calls decide. Markup a client component
+ * Question and Records are the exceptions: which markup they write depends on their props (a self-check, chosen or written,
+ * writes no data-reply; a Records block writes answers only with a `reply`), so the client code is scanned with them left as
+ * imports, and their calls decide. Markup a client component
  * builds from computed names (`"data-" + kind`) is not found.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { KIT_DIR } from "../paths.ts";
 
 /** A kit script's file name as pages reference it. */
@@ -173,16 +174,42 @@ export const AFTER_ISLANDS: KitScript[] = [
 	"reply.js",
 ];
 
-/** The kit module whose markup depends on its props, and the import bundle.ts's clientScan leaves in its place. */
+/** The kit modules whose markup depends on their props, and the imports bundle.ts's clientScan leaves in their place. */
 export const QUESTION_MODULE = join(KIT_DIR, "components", "question.tsx");
 export const QUESTION_IMPORT = "kit-question";
+export const RECORDS_MODULE = join(KIT_DIR, "components", "records.tsx");
+export const RECORDS_IMPORT = "kit-records";
 
 /** The kit scripts compiled JavaScript (a client scan, a transpiled component) can need for the markup it writes. */
 export function scriptsInCode(code: string): Set<KitScript> {
 	return new Set([
 		...MARKERS.filter((marker) => marker.code(code)).flatMap((m) => m.scripts),
 		...questionScripts(code),
+		...recordsScripts(code),
 	]);
+}
+
+/**
+ * The calls of the kit component the scan left as `import { exported } from "module"`: the code without the import, the name the
+ * bundler gave the import (renamed when the client code has one of its own), and where each use of the name starts. Null when
+ * the code does not import it or never uses it.
+ */
+function usesOf(
+	code: string,
+	module: string,
+	exported: string,
+): { rest: string; name: string; uses: number[] } | null {
+	const imported = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*"${module}";?`).exec(code);
+	if (!imported) {
+		return null;
+	}
+	const name =
+		new RegExp(`\\b${exported}\\s+as\\s+([\\w$]+)`).exec(imported[1] ?? "")?.[1] ?? exported;
+	const rest = code.slice(0, imported.index) + code.slice(imported.index + imported[0].length);
+	const uses = [
+		...rest.matchAll(new RegExp(`(?<![\\w$.])${name.replaceAll("$", "\\$")}(?![\\w$])`, "g")),
+	].map((use) => use.index);
+	return uses.length ? { rest, name, uses } : null;
 }
 
 /**
@@ -192,22 +219,12 @@ export function scriptsInCode(code: string): Set<KitScript> {
  * reply.js, whose bar and Clear wait until the page has a reply question or a note (keep.js clears answers until then).
  */
 function questionScripts(code: string): KitScript[] {
-	const imported = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*"${QUESTION_IMPORT}";?`).exec(
-		code,
-	);
-	if (!imported) {
+	const found = usesOf(code, QUESTION_IMPORT, "Question");
+	if (!found) {
 		return [];
 	}
-	// The bundler renames the import when the client code has a Question of its own.
-	const name = /\bQuestion\s+as\s+([\w$]+)/.exec(imported[1] ?? "")?.[1] ?? "Question";
-	const rest = code.slice(0, imported.index) + code.slice(imported.index + imported[0].length);
-	const uses = [
-		...rest.matchAll(new RegExp(`(?<![\\w$.])${name.replaceAll("$", "\\$")}(?![\\w$])`, "g")),
-	];
-	if (uses.length === 0) {
-		return [];
-	}
-	return uses.every((use) => selfCheckCall(rest, use.index, use.index + name.length))
+	const { rest, name, uses } = found;
+	return uses.every((use) => selfCheckCall(rest, use, use + name.length))
 		? ["keep.js"]
 		: [...questionCodeScripts()];
 }
@@ -259,16 +276,24 @@ function literalAt(code: string, index: number | undefined): boolean {
 }
 
 /**
+ * The props of the call at `code[start, end)`, a jsx(Component, { ... }) with the object written out; null for any other use of
+ * the name (passed on, called with props held in a variable).
+ */
+function callProps(code: string, start: number, end: number): Map<string, number> | null {
+	OBJECT_ARGUMENT.lastIndex = end;
+	if (!(/\(\s*$/.test(code.slice(Math.max(0, start - 20), start)) && OBJECT_ARGUMENT.test(code))) {
+		return null;
+	}
+	return objectProps(code, OBJECT_ARGUMENT.lastIndex - 1);
+}
+
+/**
  * Whether the use of Question at `code[start, end)` is a call that writes a self-check: jsx(Question, { options, answer: "b" }),
  * or a written answer with its model answer inside, jsx(Question, { name, legend, children: jsx("p", ...) }).
  */
 function selfCheckCall(code: string, start: number, end: number): boolean {
-	OBJECT_ARGUMENT.lastIndex = end;
-	if (!(/\(\s*$/.test(code.slice(Math.max(0, start - 20), start)) && OBJECT_ARGUMENT.test(code))) {
-		return false;
-	}
-	const props = objectProps(code, OBJECT_ARGUMENT.lastIndex - 1);
-	if (props.has("...")) {
+	const props = callProps(code, start, end);
+	if (!props || props.has("...")) {
 		return false;
 	}
 	const answer = props.get("answer");
@@ -278,11 +303,63 @@ function selfCheckCall(code: string, start: number, end: number): boolean {
 }
 
 /**
- * The module that writes a Records row's answer (`data-reply`, controls with ids). Records code is in every page that has a
- * Records island, so the scan of client code leaves this module out: a page needs keep.js and reply.js for it only when its
- * prerendered markup holds the answers (`config.reply`), as `scriptsInHtml` finds them.
+ * The module that writes a Records row's answer (`data-reply`, controls with ids). A Records block brings its scripts (keep.js
+ * and reply.js) only when its config has a reply, so the scripts of Records' own code leave this module out.
  */
 export const RECORDS_ANSWER_MODULE = join(KIT_DIR, "components", "parts", "records-answer.tsx");
+
+/** A kit module and every kit module it imports, directly or not, by absolute path. */
+export function moduleTree(path: string, found = new Set<string>()): Set<string> {
+	found.add(path);
+	const source = readFileSync(path, "utf8");
+	for (const { path: imported } of new Bun.Transpiler({ loader: "tsx" }).scan(source).imports) {
+		const next = resolve(dirname(path), imported);
+		if (imported.startsWith(".") && !found.has(next)) {
+			moduleTree(next, found);
+		}
+	}
+	return found;
+}
+
+/** The kit scripts of the compiled code of `modules`, as pack reads a page's own. */
+const modulesScripts = (modules: Iterable<string>) =>
+	new Set(
+		[...modules].flatMap((path) => [
+			...scriptsInCode(
+				new Bun.Transpiler({ loader: "tsx" }).transformSync(readFileSync(path, "utf8")),
+			),
+		]),
+	);
+
+let recordsNeeds: { block: Set<KitScript>; answer: Set<KitScript> } | undefined;
+
+/** What Records' own code needs for the markup it can write (folds, refs), and what the answer on its rows needs besides. */
+function recordsCodeScripts() {
+	if (!recordsNeeds) {
+		const own = [...moduleTree(RECORDS_MODULE)].filter((path) => path !== RECORDS_ANSWER_MODULE);
+		recordsNeeds = { block: modulesScripts(own), answer: modulesScripts([RECORDS_ANSWER_MODULE]) };
+	}
+	return recordsNeeds;
+}
+
+/**
+ * The kit scripts the Records blocks in a client scan need: those of Records' code, and keep.js and reply.js too unless every
+ * block is a call whose props are written out with no reply and no spread (a config spread in may hold one). A guess on the
+ * safe side brings reply.js, whose bar and Clear wait until the page has a reply question or a note.
+ */
+function recordsScripts(code: string): KitScript[] {
+	const found = usesOf(code, RECORDS_IMPORT, "Records");
+	if (!found) {
+		return [];
+	}
+	const { rest, name, uses } = found;
+	const { block, answer } = recordsCodeScripts();
+	const plain = uses.every((use) => {
+		const props = callProps(rest, use, use + name.length);
+		return props && !props.has("...") && !props.has("reply");
+	});
+	return [...block, ...(plain ? [] : answer)];
+}
 
 let questionNeeds: Set<KitScript> | undefined;
 

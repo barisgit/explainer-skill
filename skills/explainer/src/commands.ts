@@ -11,7 +11,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
 import { authorTsconfig, kitLabels, kitPath, leadingComment, pageFile } from "./kit.ts";
 import { clientBundle, isClientModule } from "./mdx/bundle.ts";
-import { RECORDS_ANSWER_MODULE, scriptsInCode } from "./mdx/kit-scripts.ts";
+import { moduleTree, RECORDS_ANSWER_MODULE, scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
@@ -71,19 +71,6 @@ function components(): { name: string; file: string; summary: string }[] {
 			const [, component, summary = ""] = /^([A-Z]\w*): (.*)/.exec(kitHeader(file)) ?? [];
 			return component ? [{ name: component, file, summary }] : [];
 		});
-}
-
-/** A kit module and every kit module it imports, directly or not, by absolute path. */
-function moduleTree(path: string, found = new Set<string>()): Set<string> {
-	found.add(path);
-	const source = readFileSync(path, "utf8");
-	for (const { path: imported } of new Bun.Transpiler({ loader: "tsx" }).scan(source).imports) {
-		const next = resolve(dirname(path), imported);
-		if (imported.startsWith(".") && !found.has(next)) {
-			moduleTree(next, found);
-		}
-	}
-	return found;
 }
 
 /**

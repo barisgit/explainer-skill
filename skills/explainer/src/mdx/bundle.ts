@@ -8,7 +8,23 @@ import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT, shownPath } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
 import { pageDrawer } from "./draw.ts";
-import { QUESTION_IMPORT, QUESTION_MODULE, RECORDS_ANSWER_MODULE } from "./kit-scripts.ts";
+import {
+	QUESTION_IMPORT,
+	QUESTION_MODULE,
+	RECORDS_ANSWER_MODULE,
+	RECORDS_IMPORT,
+	RECORDS_MODULE,
+} from "./kit-scripts.ts";
+
+/**
+ * What the scan of client code reads in place of kit modules: Question and Records as imports its calls are read from, and a
+ * Records row's answer as nothing, since the scripts it needs come with a Records that has a reply (kit-scripts.ts).
+ */
+const SCAN_STUBS = new Map([
+	[QUESTION_MODULE, `export { Question } from "${QUESTION_IMPORT}";`],
+	[RECORDS_MODULE, `export { Records } from "${RECORDS_IMPORT}";`],
+	[RECORDS_ANSWER_MODULE, "export const Answer = () => null;"],
+]);
 
 /** The bare imports a page and the kit make, resolved to the skill's own files, so an installed skill needs no node_modules. */
 const BARE: Record<string, string> = {
@@ -75,8 +91,8 @@ export interface CompiledPage {
 
 /**
  * What a page build is for: the prerender (client modules swapped for their island wrappers), the browser's client bundle, or
- * the scan of the client code for the kit scripts it needs (kit Question left as an import from QUESTION_IMPORT, a Records row's
- * answer left out).
+ * the scan of the client code for the kit scripts it needs (kit Question and Records left as imports from QUESTION_IMPORT and
+ * RECORDS_IMPORT, and a Records row's answer left out).
  */
 type BuildFor = "prerender" | "browser" | "scan";
 
@@ -116,11 +132,9 @@ function pagePlugin(
 				if (path === entry.path) {
 					return { contents: entry.code, loader: "js" };
 				}
-				if (purpose === "scan" && path === QUESTION_MODULE) {
-					return { contents: `export { Question } from "${QUESTION_IMPORT}";`, loader: "js" };
-				}
-				if (purpose === "scan" && path === RECORDS_ANSWER_MODULE) {
-					return { contents: "export const Answer = () => null;", loader: "js" };
+				const stub = purpose === "scan" ? SCAN_STUBS.get(path) : undefined;
+				if (stub) {
+					return { contents: stub, loader: "js" };
 				}
 				const source = readFileSync(path, "utf8");
 				return purpose === "prerender" && isClientModule(source)
@@ -292,7 +306,7 @@ export function clientBundle(
 
 /**
  * The client bundle's code as kit-scripts.ts's scriptsInCode reads it: not minified, so names and props stay as written, and
- * with kit Question left as an import, so its calls rather than its code tell whether it writes a reply question. Tree shaking
+ * with kit Question and Records left as imports, so their calls rather than their code tell whether they write a reply. Tree shaking
  * leaves out the kit components the client modules do not use, so the code holds only markup they can write.
  */
 export function clientScan(
@@ -304,7 +318,7 @@ export function clientScan(
 		page,
 		islandsEntry(page, modules),
 		css,
-		{ target: "browser", format: "esm", external: [QUESTION_IMPORT] },
+		{ target: "browser", format: "esm", external: [QUESTION_IMPORT, RECORDS_IMPORT] },
 		"scan",
 	);
 }
