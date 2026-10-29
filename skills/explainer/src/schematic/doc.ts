@@ -27,4 +27,4 @@ pack fails on a part with no place, an unknown part or pin, parts on top of each
 
 Linking: each part carries data-ref=NAME, each wire and junction the data-ref of its net and of the parts it joins, every ground "gnd":
   <span data-ref="R_C">the collector resistor</span>   lights the part and the wires touching it; <span data-ref="vcc">the supply rail</span> lights the net (kit link).
-Phones: the drawing shrinks no further than 10 px text and then scrolls sideways; print fits it to the paper. To resize one, set --schematic-max (widest) or --schematic-min (narrowest before it scrolls) on its svg.`;
+Size: the drawing fills the column up to part names at body size (16 px), never larger. Phones: it shrinks no further than 10 px text and then scrolls sideways; print fits it to the paper. To resize one, set --schematic-max (widest) or --schematic-min (narrowest before it scrolls) on its svg.`;

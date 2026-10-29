@@ -217,8 +217,8 @@
 	}
 }
 /* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's tokens;
-   a part's value and its sub-labels are secondary. Sized like a diagram: 1.2 times the drawn size at most, at least the width that
-   keeps its smallest text at 10 px, below which the block scrolls sideways, and on paper fitted to the column. */
+   a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at body size (16 px); at
+   least the width that keeps its smallest text at 10 px, below which the block scrolls sideways; on paper fitted to the column. */
 .schematic {
 	display: block;
 	margin: 1.5rem 0;

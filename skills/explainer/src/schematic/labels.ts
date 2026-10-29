@@ -113,6 +113,22 @@ export function obstaclesOf(scene: Scene, dots: Point[]): Box[] {
 	];
 }
 
+/** The distance between two boxes, 0 when they touch or overlap. */
+export const gapBetween = (a: Box, b: Box) =>
+	Math.hypot(Math.max(0, a.x0 - b.x1, b.x0 - a.x1), Math.max(0, a.y0 - b.y1, b.y0 - a.y1));
+
+/**
+ * The labelled part whose body a label is as near as, or nearer than, its own part's body: the reader cannot tell whose label it
+ * is. A label belongs to its part only when it is strictly nearer that part than any other.
+ */
+export function rivalOf(box: Box, own: Part, scene: Scene): Part | undefined {
+	const gap = gapBetween(box, bodyOf(own));
+	return scene.parts.find((p) => p !== own && p.label.length && gapBetween(box, bodyOf(p)) <= gap);
+}
+
+/** What a label that is not clearly its part's costs: more than any overlap, so every clear spot is tried first. */
+const AMBIGUOUS = 10_000;
+
 const clash = (box: Box, obstacles: Box[]) =>
 	obstacles.reduce((sum, o) => sum + overlapArea(grow(box, 1), o), 0);
 
@@ -154,7 +170,7 @@ function placeOne(part: Part, scene: Scene, obstacles: Box[]): PlacedLabel {
 	)) {
 		// A label inside its own IC may cover the box, not the pin names.
 		const against = side === "inside" ? obstacles.filter((o) => !sameBox(o, own)) : obstacles;
-		const cost = clash(box, against);
+		const cost = clash(box, against) + (rivalOf(box, part, scene) ? AMBIGUOUS : 0);
 		if (cost === 0) {
 			return { part: part.id, lines: part.label, box, anchor: anchorOf(side) };
 		}

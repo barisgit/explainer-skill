@@ -10,8 +10,10 @@ import type { PlacedLabel } from "./labels.ts";
 import { extentOf, type Part, pinsOf, type Scene } from "./scene.ts";
 import { FONT, LINE, runsOf, SUB, VALUE_FONT } from "./text.ts";
 
-/** The most a drawing grows past its drawn size: its 12-unit text then reads about as large as a Mermaid diagram's (1.2 times 13 px). */
-const SCALE = 1.3;
+/** The size, in px, a part's name reads at when the drawing is as large as it gets: body text, never larger. */
+const BODY_PX = 16;
+/** The most a drawing grows past its drawn size; a column narrower than that scales it down instead. */
+const SCALE = BODY_PX / FONT;
 const MARGIN = 6;
 const STROKE = 1.5;
 
@@ -136,7 +138,7 @@ export function refsOf(scene: Scene): string[] {
 }
 
 /**
- * The SVG, sized like a Mermaid diagram: at most SCALE times its drawn width, and at least the width that keeps its smallest
+ * The SVG, as wide as its column up to SCALE times its drawn width (names at body size), and at least the width that keeps its smallest
  * text at READABLE_PX, below which its block scrolls sideways (theme.css reads both from --schematic-max and --schematic-min).
  */
 export function renderSvg(
@@ -148,7 +150,7 @@ export function renderSvg(
 	const box = sheetBox(scene, labels);
 	const w = box.x1 - box.x0;
 	const h = box.y1 - box.y0;
-	const most = Math.ceil(w * SCALE);
+	const most = Math.floor(w * SCALE);
 	const least = Math.min(most, Math.ceil((w * READABLE_PX) / smallestText(labels)));
 	const byPart = new Map(labels.map((l) => [l.part, l]));
 	return [

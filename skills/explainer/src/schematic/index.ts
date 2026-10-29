@@ -25,11 +25,11 @@ export interface Schematic {
 export function renderSchematic(source: string): Schematic {
 	const { title, parts, errors } = parseNetlist(source);
 	errors.push(...placeParts(parts));
+	const grounds = groundsFor(parts);
 	if (!errors.length) {
 		// Parts on top of each other leave the router no way through; say so instead of listing its failures.
-		errors.push(...overlappingParts(parts));
+		errors.push(...overlappingParts(parts), ...grounds.errors);
 	}
-	const grounds = groundsFor(parts);
 	const all = [...parts, ...grounds.grounds];
 	const wired = errors.length ? [] : routeNets(all, netsOf(parts), grounds.wires, errors);
 	const scene = { parts: all, wires: [...wired, ...grounds.wires] };

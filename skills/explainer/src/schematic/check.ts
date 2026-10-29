@@ -12,7 +12,7 @@ import {
 	type Segment,
 	same,
 } from "./geometry.ts";
-import { GAPS, obstaclesOf, type PlacedLabel } from "./labels.ts";
+import { GAPS, gapBetween, obstaclesOf, type PlacedLabel, rivalOf } from "./labels.ts";
 import { GROUND_NETS, GROUND_REF, netsOf, OPEN_NET } from "./nets.ts";
 import { bodyOf, extentOf, type Part, pinAt, type Scene, wireSegments } from "./scene.ts";
 import { drawnNets } from "./topology.ts";
@@ -60,9 +60,6 @@ export function overlappingParts(parts: Part[]): string[] {
 	return out;
 }
 
-const gapBetween = (a: Box, b: Box) =>
-	Math.hypot(Math.max(0, a.x0 - b.x1, b.x0 - a.x1), Math.max(0, a.y0 - b.y1, b.y0 - a.y1));
-
 /** The gap at which a label counts as far from its part. */
 const FAR = GAPS[GAPS.length - 2] ?? 16;
 
@@ -88,16 +85,14 @@ function labelProblems(scene: Scene, dots: Point[], labels: PlacedLabel[]): stri
 			return;
 		}
 		const gap = gapBetween(label.box, extentOf(own));
-		const nearer = scene.parts.find(
-			(p) => p !== own && p.label.length && gapBetween(label.box, bodyOf(p)) < gap,
-		);
+		const rival = rivalOf(label.box, own, scene);
 		if (!inside && gap > FAR) {
 			out.push(
 				`${at(own)}: its label sits ${Math.round(gap)} units from it; leave room right beside ${own.id} for it`,
 			);
-		} else if (!inside && nearer) {
+		} else if (!inside && rival) {
 			out.push(
-				`${at(own)}: its label sits closer to ${nearer.id} than to ${own.id}; leave room right beside ${own.id} for it`,
+				`${at(own)}: its label is as near ${rival.id} as ${own.id}, so it could belong to either; leave room right beside ${own.id} for it (a larger offset from ${rival.id})`,
 			);
 		}
 	});

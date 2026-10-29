@@ -1,5 +1,5 @@
 /** The nets of a netlist as the drawing needs them: which pins each joins, where ground symbols go, what is left open on purpose. */
-import { add, type Orientation, type Point, UPRIGHT } from "./geometry.ts";
+import { add, type Point, UPRIGHT } from "./geometry.ts";
 import { exitOf, type Part, pinAt, type Wire } from "./scene.ts";
 import { G, GROUND } from "./symbols.ts";
 
@@ -25,43 +25,42 @@ export function netsOf(parts: Part[]): Map<string, Array<{ part: Part; pin: stri
 	return nets;
 }
 
-/** The orientation of a ground symbol whose wire arrives from the direction a pin leaves in: it hangs away from its pin. */
-function facing(exit: Point): Orientation {
-	if (exit.y > 0) {
-		return UPRIGHT;
+/** The ground symbol for one pin and the stub wire to it (none when it sits right under the pin), or what is wrong. */
+function groundFor(part: Part, pin: string, p: Point): { ground: Part; wire?: Wire } | string {
+	const exit = exitOf(part, pin);
+	if (exit.y < 0) {
+		return `line ${part.line} (${part.id}): pin ${pin} is on ground but faces up, where a ground symbol would hang upside down; turn ${part.id} so that pin faces down (a two-terminal: v has a on top and b below, r270 has a below) or put it on the bottom side of an IC`;
 	}
-	return { rot: exit.y < 0 ? 180 : exit.x < 0 ? 90 : 270, flip: false };
+	const at = exit.y > 0 ? p : add(p, { x: exit.x * G, y: 0 });
+	const ground: Part = {
+		id: GROUND_REF,
+		kind: "ground",
+		def: GROUND,
+		at,
+		o: UPRIGHT,
+		label: [],
+		nets: { a: GROUND_REF },
+		line: part.line,
+	};
+	return at === p ? { ground } : { ground, wire: { net: GROUND_REF, points: [p, at] } };
 }
 
 /**
- * A ground symbol at every pin on net 0: right under a pin that leaves downwards, else at the end of a 10-unit stub, turned to hang away from the pin (a wire of
- * net 0, which the check keeps clear of the other nets like any other wire).
+ * A ground symbol at every pin on net 0, always hanging down: right under a pin that leaves downwards, else at the end of a
+ * 10-unit stub sideways (a wire of net `gnd`, which the check keeps clear of the other nets like any other wire). A pin that
+ * leaves upwards cannot reach a ground that hangs down without running back past its own part, so it is an error that says
+ * to turn the part.
  */
-export function groundsFor(parts: Part[]): { grounds: Part[]; wires: Wire[] } {
-	const grounds: Part[] = [];
-	const wires: Wire[] = [];
-	for (const part of parts) {
-		for (const [pin, net] of Object.entries(part.nets)) {
+export function groundsFor(parts: Part[]): { grounds: Part[]; wires: Wire[]; errors: string[] } {
+	const made = parts.flatMap((part) =>
+		Object.entries(part.nets).flatMap(([pin, net]) => {
 			const p = pinAt(part, pin);
-			if (!p || !GROUND_NETS.has(net)) {
-				continue;
-			}
-			const exit = exitOf(part, pin);
-			const at = exit.y > 0 ? p : add(p, { x: exit.x * G, y: exit.y * G });
-			if (at !== p) {
-				wires.push({ net: GROUND_REF, points: [p, at] });
-			}
-			grounds.push({
-				id: GROUND_REF,
-				kind: "ground",
-				def: GROUND,
-				at,
-				o: facing(exit),
-				label: [],
-				nets: { a: GROUND_REF },
-				line: part.line,
-			});
-		}
-	}
-	return { grounds, wires };
+			return p && GROUND_NETS.has(net) ? [groundFor(part, pin, p)] : [];
+		}),
+	);
+	return {
+		grounds: made.flatMap((m) => (typeof m === "string" ? [] : [m.ground])),
+		wires: made.flatMap((m) => (typeof m === "string" || !m.wire ? [] : [m.wire])),
+		errors: made.filter((m) => typeof m === "string"),
+	};
 }

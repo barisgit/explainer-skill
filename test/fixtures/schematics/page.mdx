@@ -10,10 +10,10 @@ The sense resistor <span data-ref="R_SC">R_SC</span> and the divider <span data-
 title µA723 regulator with fold-back current limiting
 U1 ic µA723 @0,0 top V_{CC+}=vi V_C=vi left REF=ref IN+=inp right OUTPUT=drv V_Z "CURR LIM"=cl "CURR SENS"=vo IN−=vo bottom V_{CC−}=0 "FREQ COMP"=comp
 VI port vi V_I @U1.VCC+ -6,-5
-Q1 vi drv e 2N3055 b@U1.OUTPUT 4,-3
-R3 cl e b@Q1.e 0,5 h
-R_SC e vo a@R3.b h
-R4 0 cl b@R3.a v
+Q1 vi drv e 2N3055 b@U1.OUTPUT 10,0
+R3 e cl a@Q1.e -3,2 r180
+R4 cl 0 a@R3.b v
+R_SC e vo a@Q1.e 2,2
 R1 ref inp a@U1.REF -4,2 v
 R2 inp 0 a@R1.b v
 C1 comp 0 1000 pF a@U1.FREQCOMP 0,3 v

@@ -2,6 +2,10 @@ import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderSchematic } from "../skills/explainer/src/schematic/index.ts";
+import { rivalOf } from "../skills/explainer/src/schematic/labels.ts";
+import { parseNetlist } from "../skills/explainer/src/schematic/netlist.ts";
+import { placeParts } from "../skills/explainer/src/schematic/place.ts";
+import type { Part } from "../skills/explainer/src/schematic/scene.ts";
 import { packAndRun, packMdx, pageContract, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -74,6 +78,51 @@ test("parts on top of each other are reported before any routing failure", () =>
 	]);
 });
 
+test("every ground hangs down, and a ground pin that faces up is an error that says to turn the part", () => {
+	const grounds = (svg: string) => [
+		...svg.matchAll(/<g data-ref="gnd" data-kind="ground">.*?<g transform="([^"]*)"/g),
+	];
+	for (const source of [regulator, commonEmitter, twoStage]) {
+		const found = grounds(renderSchematic(source).svg);
+		expect(found.length).toBeGreaterThan(0);
+		expect(found.every((m) => !(m[1] ?? "").includes("rotate"))).toBe(true);
+	}
+	// A vertical resistor's pin a is on top; the sideways one reaches its ground by a stub and the ground still hangs down.
+	expect(problemsOf("R1 0 a 1k @0,0 v", "R2 a 0 1k a@R1.b v")).toEqual([
+		expect.stringMatching(/^line 1 \(R1\): pin a is on ground but faces up.*turn R1/),
+	]);
+	const sideways = renderSchematic("R1 a 0 1k @0,0\nR2 a 0 1k a@R1.a 0,4");
+	expect(sideways.problems).toEqual([]);
+	expect(grounds(sideways.svg).every((m) => !(m[1] ?? "").includes("rotate"))).toBe(true);
+});
+
+test("a label belongs to its part only when it is strictly nearer that part than any other", () => {
+	const { parts } = parseNetlist("R1 a b 1k @0,0 v\nR2 b 0 220 @4,0 v");
+	placeParts(parts);
+	const [r1, r2] = parts;
+	const scene = { parts, wires: [] };
+	const at = (x: number) => ({ x0: x, y0: 10, x1: x + 12, y1: 24 });
+	// R1's body is at x = 0, R2's at x = 40: a box at 20..32 is nearer R2, one at 8..20 nearer R1, one midway ties.
+	expect(rivalOf(at(20), r1 as Part, scene)?.id).toBe("R2");
+	expect(rivalOf(at(8), r1 as Part, scene)).toBeUndefined();
+	expect(rivalOf(at(14), r1 as Part, scene)?.id).toBe("R2");
+	expect(rivalOf(at(8), r2 as Part, scene)?.id).toBe("R1");
+});
+
+test("labels with no clear owner are never drawn: crowded parts are reported, not given ambiguous labels", () => {
+	const crowded = problemsOf(
+		"R1 a b 1k @0,0 v",
+		"R2 b 0 220 a@R1.a 3,0 v",
+		"R3 a 0 4.7k a@R1.a 6,0 v",
+	);
+	expect(crowded).toEqual([
+		expect.stringMatching(/^line 2 \(R2\): its label sits \d+ units from it/),
+	]);
+	expect(
+		problemsOf("R1 a b 1k @0,0 v", "R2 b 0 220 a@R1.b 0,0 v", "R3 a 0 4.7k a@R1.a 12,0 v"),
+	).toEqual([]);
+});
+
 test("pack fails a block with its number and the problem's line, and names what to write", async () => {
 	const { result } = await packMdx(
 		dir,
@@ -111,6 +160,19 @@ test("a part's name and a net's name in the prose light the part and the wires t
 		})()`,
 	});
 	expect(await packAndRun(dir, "linked", page)).toEqual([]);
+}, 30_000);
+
+test("on a wide screen the drawing fills the column up to part names at body size, and no text is larger", async () => {
+	const page = circuitPage({
+		"names read at 16 px, the largest text anywhere, in a drawing narrower than the column": `(() => {
+			const svg = document.querySelector(".schematic svg");
+			const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+			const sizes = [...svg.querySelectorAll("text")].map((t) => parseFloat(getComputedStyle(t).fontSize) * scale);
+			const narrow = svg.getBoundingClientRect().width < document.querySelector(".schematic").clientWidth;
+			return Math.max(...sizes) <= 16.01 && (innerWidth < 640 || (narrow && Math.max(...sizes) >= 15.9));
+		})()`,
+	});
+	expect(await packAndRun(dir, "wide", page)).toEqual([]);
 }, 30_000);
 
 test("on a phone the drawing keeps 10 px text and scrolls sideways; on paper it fits the column", async () => {
