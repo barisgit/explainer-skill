@@ -252,6 +252,33 @@ ${pageContract({
 	}, 30_000);
 }
 
+/** A page of one full-width block (width: "full"), with views for a rail or without. */
+const fullPage = (views: boolean) => `${HEAD}<main class="page"><div data-overview><h1>Records</h1>
+<section><h2>People</h2><p id="prose">${"Words in the reading column. ".repeat(20)}</p>${views ? '<a href="#p/a">A</a>' : ""}</section>
+<section id="records"><h2>Items</h2><div class="wide" data-width="full" id="wide"><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div>${views ? '<a href="#i/1">One</a>' : ""}</section></div>
+${views ? '<section class="view" data-view="p"><a class="back" href="#">Home</a><h1>Person</h1></section><section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section>' : ""}</main>
+<script src="kit:views.js"></script>
+<script>
+const box = (id) => document.getElementById(id).getBoundingClientRect();
+const column = () => document.getElementById("records").getBoundingClientRect();
+const rail = () => document.querySelector(".toc")?.getBoundingClientRect();
+const growth = () => [column().left - box("wide").left, box("wide").right - column().right];
+${pageContract({
+	"a full block ends at the window's 2rem gutter on both sides, or the rail's gap on the left": `innerWidth < 1100 || (Math.abs(box("wide").right - (innerWidth - 32)) < 1 && (!rail() || Math.abs(box("wide").left - rail().right - 40) < 1) && (rail() || Math.abs(box("wide").left - 32) < 1))`,
+	"it grows as far to one side of the column as to the other": `!rail() || Math.abs(growth()[0] - growth()[1]) < 1`,
+	"on a phone it is the column": `innerWidth >= 600 || Math.abs(growth()[0]) + Math.abs(growth()[1]) < 1`,
+	"prose keeps its column": `box("prose").left >= column().left - 1 && box("prose").right <= column().right + 1`,
+	"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+})}</script></body></html>`;
+
+for (const views of [true, false]) {
+	test(`width "full" reaches the window's gutters ${views ? "beside the rail, centred on the column" : "without a rail"}`, async () => {
+		expect(
+			await packAndRun(dir, `full-${views}`, fullPage(views), { widths: RAIL_WIDTHS }),
+		).toEqual([]);
+	}, 30_000);
+}
+
 test("a section with two folds gets Expand all, which follows the folds the reader toggles", async () => {
 	const page = `${HEAD}<main class="page"><div data-overview><h1>Folds</h1>
 <section id="two"><h2>Two</h2><div><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div></section>

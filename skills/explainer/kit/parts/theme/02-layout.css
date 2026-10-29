@@ -93,6 +93,11 @@ h3,
 .fold-all:has(+ .wide) {
 	margin-inline: calc(50% - min(44rem, 50vw - var(--gutter)));
 }
+/* data-width="full" (Records width: "full"): a .wide block from gutter to gutter, centred on the column. */
+.wide[data-width="full"],
+.fold-all:has(+ .wide[data-width="full"]) {
+	margin-inline: calc(50% - (50vw - var(--gutter)));
+}
 /* Band: the one stretch where the reader acts or decides, in the sunken tone from window edge to edge. The content keeps the column;
    the shadow carries the tone sideways and the clip keeps it to the band's height, so nothing scrolls sideways. */
 .band {

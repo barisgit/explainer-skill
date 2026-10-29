@@ -107,7 +107,7 @@
 }
 
 /* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
-   its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach); below that it is a closed
+   its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach), or as a full block does (--full-reach); below that it is a closed
    disclosure at the top of the page. Transparent, so a .band's tone runs under it. */
 .toc ol {
 	margin: 0;
@@ -185,13 +185,20 @@
 	}
 }
 @media (min-width: 64rem) {
-	/* How far .wide grows to each side of the column beside the rail: the page box's margin less the window's gutter, at most
-	   11rem, so a 66rem column grows to 88rem as without the rail. The rail moves out into its margin by as much, so its gap to a
-	   .wide block stays the 2.5rem it keeps from the column, and the growth is the same on both sides: the page box is centred. The
-	   margin is that of the page box below, with 50vw for half its 100%; a classic scrollbar's width, which vw also counts, stays
-	   within the gutter. */
+	/* How far a block grows to each side of the column beside the rail, with the same growth on both sides: the page box is
+	   centred. A full block grows by the page box's margin less the window's gutter, so its edges are the gutter on the right and
+	   the rail's gap on the left (the rail's width and gap are the page box's padding). A .wide block grows by the same up to
+	   11rem, so a 66rem column grows to 88rem as without the rail. The rail moves out into its margin by as much, so its gap to
+	   the block stays the 2.5rem it keeps from the column. The margin is that of the page box below, with 50vw for half its 100%;
+	   a classic scrollbar's width, which vw also counts, stays within the gutter. */
 	.has-toc {
-		--wide-reach: clamp(0px, 50vw - min(50vw - var(--gutter), 40.5rem) - var(--gutter), 11rem);
+		--full-reach: max(0px, 50vw - min(50vw - var(--gutter), 40.5rem) - var(--gutter));
+		--wide-reach: min(var(--full-reach), 11rem);
+		--rail-reach: var(--wide-reach);
+	}
+	/* A page with a data-width="full" block moves the rail out as far as that block reaches: to the window's gutter. */
+	.has-toc:has([data-width="full"]) {
+		--rail-reach: var(--full-reach);
 	}
 	.has-toc .page {
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
@@ -201,7 +208,7 @@
 		position: fixed;
 		z-index: 1;
 		inset-block: 0;
-		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--wide-reach));
+		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--rail-reach));
 		inline-size: 12.5rem;
 		padding-block: clamp(1.75rem, 5vw, 3.5rem) 2rem;
 		overflow-y: auto;
@@ -217,6 +224,12 @@
 	}
 	.has-toc .fold-all:has(+ .wide) {
 		margin-inline-end: calc(-1 * var(--wide-reach));
+	}
+	.has-toc .wide[data-width="full"] {
+		margin-inline: calc(-1 * var(--full-reach));
+	}
+	.has-toc .fold-all:has(+ .wide[data-width="full"]) {
+		margin-inline-end: calc(-1 * var(--full-reach));
 	}
 }
 
