@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndRun, scratch } from "./support.ts";
+import { readFileSync, statSync } from "node:fs";
+import { inPage, packAndRun, packedMdx, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -24,4 +25,30 @@ var contract = new Promise((found) => Charts.make(document.getElementById("c"), 
 
 test("colour tokens resolve in any element of a series' data, not only when it starts with an object", async () => {
 	expect(await packAndRun(dir, "mixed", PAGE)).toEqual([]);
+}, 30_000);
+
+test("a page with a Chart carries ECharts compressed, and the live chart takes the drawn one's place once it has unpacked", async () => {
+	const output = await packedMdx(
+		dir,
+		"packed",
+		`import { Chart } from "kit";
+
+# Bars
+
+<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "bar", data: [1, 2] }] }} />
+`,
+	);
+	const html = readFileSync(output, "utf8");
+	// The plain runtime ends with the line that defines the global; the page has the packed copy and the licence comment instead.
+	expect(html).not.toContain("globalThis,{echarts");
+	expect(html).toContain("/* echarts: Apache ECharts");
+	expect(html).toMatch(/<script data-deflate="[A-Za-z0-9+/=]+">/);
+	expect(statSync(output).size).toBeLessThan(600_000);
+	const state = await inPage(output, (cdp) =>
+		cdp.evaluate(`({
+			live: Boolean(echarts.getInstanceByDom(document.querySelector(".chart"))),
+			drawn: document.querySelectorAll(".chart-drawn").length,
+		})`),
+	);
+	expect(state).toEqual({ live: true, drawn: 0 });
 }, 30_000);

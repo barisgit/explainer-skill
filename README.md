@@ -17,7 +17,7 @@ In order of priority:
 
 1. **The reader understands and takes in the subject.** This comes before everything else; looks and interactivity serve it. [`guide.md`](skills/explainer/guide.md) records what made generated pages better or worse for their readers, and the kit's house style keeps the eye on the content.
 2. **Agents write pages easily, and the source stays readable for the agent who edits it later.** A page is MDX: prose in Markdown, and charts, sliders, steppers, drill-down views and questions as one tag each over data the page imports, so the agent writes the content and its data rather than the machinery.
-3. **The page is one portable file that works offline and stays small enough.** Necessary, but the least important of the three. `pack` renders the page to static HTML, inlines only the kit scripts it uses (ECharts, about 0.9 MB, only for pages that use it), and draws Mermaid diagrams as SVG and formulas as MathML, so no diagram or math library ships.
+3. **The page is one portable file that works offline and stays small enough.** Necessary, but the least important of the three. `pack` renders the page to static HTML, inlines only the kit scripts it uses (ECharts, about 0.4 MB compressed and unpacked as the page loads, only for pages that use it), and draws Mermaid diagrams as SVG and formulas as MathML, so no diagram or math library ships.
 
 ## Install
 

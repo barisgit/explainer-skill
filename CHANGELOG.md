@@ -4,8 +4,12 @@
 
 A circuit is a ```schematic fence: a netlist that `pack` places, wires and draws as one SVG.
 
+A page with a `Chart` is about 500 KB smaller: `pack` carries ECharts compressed and the page unpacks it as it loads.
+
 ### What an author does differently
 
+- Nothing in the page changes. The examples with charts go from 1.3 to 1.5 MB to 0.8 to 1.0 MB. ECharts is ready about 100 ms after the page loads (headless Chrome); until then the charts `pack` drew stay in place and the live charts replace them as before. It needs `DecompressionStream` (Chrome 103, Firefox 113, Safari 16.4); an older browser keeps the drawn charts, and a chart `pack` could not draw stays empty.
+- Client code that calls `Charts.make` needs no change. Code that reads the `echarts` global directly (not through a chart's `setup`) runs before ECharts exists: wait for `window.echartsReady`.
 - Write each part on a line, nets by name, and where it goes: `Q1 c b e BC547 @0,0`, `R_C vcc c 4.7k b@Q1.c 0,-1 v` (this resistor's `b` pin one unit above Q1's collector). `pack` routes the nets on a grid, adds ground symbols, junction dots and labels, and fails with the line and what to change on a part with no place, an unknown pin, parts on top of each other, a net it cannot route, a label with no room, an IC pin written twice, an `nc` pin that touches anything, or a net that joins one pin or touches another (a part's lead counts as part of its pin). Symbols: resistor, capacitor, electrolytic, inductor, diode, zener, LED, switch, battery, voltage and current source, potentiometer, NPN and PNP, N and P MOSFET, op-amp, IC with named pins, terminals, supply rails and ground. `kit schematic` has the reference.
 - Parts link to the prose with `data-ref="R_C"`; a net's name (`vcc`, `gnd`) lights its wires and junctions. Grounds always hang down: a pin on ground that faces up fails `pack` and tells you to turn the part. A label must be nearer its own part than any other. The drawing follows light, dark and a page's tokens, fills the column up to part names at 16 px, shrinks to 10 px text and then scrolls sideways on a phone, and fits the paper in print.
 

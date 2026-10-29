@@ -1,7 +1,8 @@
 /* charts: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light/dark. Load after kit:echarts.js.
    Charts.make(el, option, setup?)  -> { chart, set(patch), dispose() }
-     el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width. The chart pack drew
-             in it (.chart-drawn) stays until then, and the first draw over it does not animate
+     el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width and ECharts has
+             unpacked (a packed page carries it compressed). The chart pack drew in it (.chart-drawn) stays until then, and the first
+             draw over it does not animate
      option  any ECharts option; colours default to --c1..--c6, text to the page font
      setup   (chart) => void, run after every (re)mount: attach chart.on("click", ...), chart.group, echarts.connect(...)
      chart   the live instance (null until mounted)
@@ -21,7 +22,8 @@
    state reset. Reduced motion turns animation off. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
-	if (!window.echarts) {
+	// pack sends ECharts compressed: echarts is defined once window.echartsReady resolves, and a chart mounts only then.
+	if (!(window.echarts || window.echartsReady)) {
 		throw new Error('kit:charts.js needs <script src="kit:echarts.js"></script> before it');
 	}
 	const probe = document.createElement("i");
@@ -160,10 +162,11 @@
 			drawn?.remove();
 			setup?.(chart);
 		};
-		// Canvas text needs the web font loaded before the first draw.
-		const fontReady = document.fonts
-			.load(`500 12px ${getComputedStyle(document.body).fontFamily}`)
-			.catch(() => []);
+		// Canvas text needs the web font loaded before the first draw, and ECharts to exist.
+		const fontReady = Promise.all([
+			document.fonts.load(`500 12px ${getComputedStyle(document.body).fontFamily}`).catch(() => []),
+			window.echartsReady,
+		]);
 		const resizer = new ResizeObserver(() => {
 			if (!el.clientWidth) {
 				return;

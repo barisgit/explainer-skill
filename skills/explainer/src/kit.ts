@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, sep } from "node:path";
+import { deflateRawSync } from "node:zlib";
 import { KIT_DIR, SKILL_ROOT } from "./paths.ts";
 
 /**
@@ -169,4 +170,30 @@ export function readKitText(path: string): string {
 		})
 		.join("\n");
 	return inKit && path.endsWith(".css") ? `@layer kit {\n${text.trimEnd()}\n}` : text;
+}
+
+/** A kit file as a page carries it: its text, and the base64 of its deflate-raw bytes when pack sends it compressed. */
+export interface PageFile {
+	text: string;
+	deflate?: string;
+}
+
+/** The kit scripts pack sends compressed: ECharts, 900 KB of minified code that deflates to a third. */
+const COMPRESSED = new Set(["echarts.js"]);
+
+/**
+ * What a page carries for the kit file `path`. The ECharts runtime is carried deflated (deflate-raw, base64 as the smallest
+ * encoding every browser's DecompressionStream reads) and kit/unpack.ts is the text: the script's leading comment, which stays
+ * readable for its licence and `kit echarts.js`, then the loader. Any other file is its readKitText.
+ */
+export function pageFile(path: string): PageFile {
+	const text = readKitText(path);
+	if (!(isKitFile(path) && COMPRESSED.has(basename(path)))) {
+		return { text };
+	}
+	const header = leadingComment(text);
+	return {
+		text: `${header}\n${readKitText(kitPath("unpack.js"))}`,
+		deflate: deflateRawSync(text.slice(header.length), { level: 9 }).toString("base64"),
+	};
 }
