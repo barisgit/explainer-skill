@@ -9,6 +9,7 @@ import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
 import { PackError } from "./pack-error.ts";
+import { renderSchematic } from "./schematic/index.ts";
 import { themeSvgImages } from "./svg-theme.ts";
 
 const IMPORT_FIX = 'import that stylesheet from the page instead (import "./other.css")';
@@ -90,6 +91,43 @@ function renderMermaidBlocks(
 						diagramRefs.add(id);
 					}
 					end.before(diagram.svg + (diagram.phone ?? ""), { html: true });
+				});
+			},
+			text(chunk) {
+				source.push(chunk.text);
+				chunk.remove();
+			},
+		})
+		.transform(new Response(html))
+		.text();
+}
+
+/**
+ * Replaces the source of every `pre.schematic` block with its drawing in a `div`: one SVG in `currentColor`, so the page's
+ * tokens colour it. A block with any problem (a parse error, a wire through a part, a label far from its part) fails the pack
+ * with the problems naming their netlist lines. `diagramRefs` collects every part and net name.
+ */
+function renderSchematicBlocks(
+	html: string,
+	problems: string[],
+	diagramRefs: Set<string>,
+): Promise<string> {
+	let blocks = 0;
+	let source: string[] = [];
+	return new HTMLRewriter()
+		.on("pre.schematic", {
+			element(el) {
+				const n = ++blocks;
+				const parts: string[] = [];
+				source = parts;
+				el.tagName = "div";
+				el.onEndTag((end) => {
+					const drawing = renderSchematic(unescapeHtml(parts.join("")));
+					problems.push(...drawing.problems.map((p) => `schematic block ${n}: ${p}`));
+					for (const id of drawing.refs) {
+						diagramRefs.add(id);
+					}
+					end.before(drawing.svg, { html: true });
 				});
 			},
 			text(chunk) {
@@ -268,13 +306,19 @@ export async function packPage(
 ): Promise<{ html: string; warnings: string[] }> {
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
-	const source = await render((html) => renderMermaidBlocks(html, problems, diagramRefs));
+	const source = await render(async (html) =>
+		renderSchematicBlocks(
+			await renderMermaidBlocks(html, problems, diagramRefs),
+			problems,
+			diagramRefs,
+		),
+	);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const html = await themeSvgImages(inlined);
 	// The inliner names the loads it sees as written; findLoads also finds the escaped ones, so the same load can come twice.
 	const all = [...new Set([...problems, ...(await findLoads(html)).map(loadMessage)])];
 	if (all.length) {
-		const remote = all.some((p) => !p.startsWith("mermaid block"));
+		const remote = all.some((p) => !/^(mermaid|schematic) block/.test(p));
 		throw new PackError(
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and import or reference them relatively." : ""}`,
 		);

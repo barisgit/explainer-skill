@@ -16,6 +16,7 @@ import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
 import { report } from "./report.ts";
+import { SCHEMATIC_DOC } from "./schematic/doc.ts";
 import { stepError } from "./steps.ts";
 
 /** The command line that starts this CLI, as shown in help and hints. */
@@ -126,7 +127,8 @@ const kitSize = (files: string[]) => sizeText(kitBytes(files));
 interface Feature {
 	name: string;
 	files: string[];
-	line: string;
+	/** The listing line; none when another feature's line names this one (the listing has no room for its own). */
+	line?: string;
 	doc: () => string;
 }
 
@@ -138,9 +140,10 @@ const FEATURES: Feature[] = [
 	{
 		name: "mermaid",
 		files: [],
-		line: "```mermaid fences: flowchart, state, sequence, class, ER and xychart, drawn as SVG; each part gets a data-ref of its id.",
+		line: "```mermaid fences: flowchart, state, sequence, class, ER, xychart; ```schematic: circuits as netlists (kit schematic). Drawn as SVG, each part with a data-ref.",
 		doc: () => MERMAID_DOC,
 	},
+	{ name: "schematic", files: [], doc: () => SCHEMATIC_DOC },
 	{
 		name: "math.css",
 		files: ["math.css"],
@@ -221,7 +224,9 @@ async function kitListing(): Promise<string> {
 		...(await Promise.all(
 			components().map(async (c) => line(c.name, await componentSize(c.file), c.summary)),
 		)),
-		...FEATURES.map((f) => line(f.name, f.files.length ? kitSize(f.files) : "", f.line)),
+		...FEATURES.filter((f) => f.line).map((f) =>
+			line(f.name, f.files.length ? kitSize(f.files) : "", f.line ?? ""),
+		),
 		`Read one: ${CLI} kit <name>. The kit's texts are English: kit labels prints them to translate.`,
 	].join("\n");
 }

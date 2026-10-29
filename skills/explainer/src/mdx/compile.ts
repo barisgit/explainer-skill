@@ -131,19 +131,25 @@ function* elementsOf(node: HastNodes): Generator<Element> {
 	}
 }
 
+/** The fence languages pack draws as a figure of their own. */
+const DRAWN_FENCES = ["mermaid", "schematic"];
+
 /**
- * ```mermaid fences (`<pre><code class="language-mermaid">`) become `<pre class="mermaid">` with the source as their text, which
- * pack draws as one SVG in the HTML pass.
+ * ```mermaid and ```schematic fences (`<pre><code class="language-mermaid">`) become `<pre class="mermaid">` (or `schematic`) with
+ * the source as their text, which pack draws as one SVG in the HTML pass.
  */
-function mermaidFences(tree: HastRoot) {
+function drawnFences(tree: HastRoot) {
 	for (const pre of elementsOf(tree)) {
 		const [code] = pre.children;
 		if (pre.tagName !== "pre" || code?.type !== "element") {
 			continue;
 		}
 		const { className } = code.properties;
-		if (Array.isArray(className) && className.includes("language-mermaid")) {
-			pre.properties = { className: ["mermaid"] };
+		const language = DRAWN_FENCES.find(
+			(name) => Array.isArray(className) && className.includes(`language-${name}`),
+		);
+		if (language) {
+			pre.properties = { className: [language] };
 			pre.children = code.children;
 		}
 	}
@@ -248,7 +254,7 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 						}
 					},
 				],
-				rehypePlugins: [() => mermaidFences, () => compareTables, mathToMathml(file)],
+				rehypePlugins: [() => drawnFences, () => compareTables, mathToMathml(file)],
 			},
 		);
 		return { js: String(compiled.value), front, title: front.title ?? h1 };

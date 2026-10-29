@@ -7,7 +7,7 @@
    Colour what the reader compares, each compared thing (a phase, an option, a series) in the same --c1..--c6 on every chart and
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
-   Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid scroll dg |
+   Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input
@@ -17,7 +17,7 @@
    before its word. A <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word
    or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
    Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
-   are inset; .bleed .stage .chart .scroll .compare .mermaid .dg run edge to edge, .split is an edge-to-edge row of columns divided by
+   are inset; .bleed .stage .chart .scroll .compare .mermaid .schematic .dg run edge to edge, .split is an edge-to-edge row of columns divided by
    hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens, centred on the
    column, beside the contents rail too.
    The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child

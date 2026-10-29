@@ -216,6 +216,34 @@
 		display: none;
 	}
 }
+/* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's tokens;
+   a part's value and its sub-labels are secondary. Sized like a diagram: 1.2 times the drawn size at most, at least the width that
+   keeps its smallest text at 10 px, below which the block scrolls sideways, and on paper fitted to the column. */
+.schematic {
+	display: block;
+	margin: 1.5rem 0;
+	padding: 1.25rem 1rem;
+	text-align: center;
+	overflow-x: auto;
+}
+.fig > .schematic {
+	margin: 0;
+}
+.schematic > svg {
+	color: var(--ink);
+	font-family: var(--font);
+	overflow: visible;
+	max-width: var(--schematic-max);
+	min-width: var(--schematic-min);
+}
+.schematic > svg .value {
+	fill: var(--muted);
+}
+@media print {
+	.schematic > svg {
+		min-width: 0;
+	}
+}
 /* pack inlines an svg file in <img> once per scheme; the copy shown follows the system scheme unless <html data-scheme> forces one
    (light-dark() cannot switch display). Only the other copy is hidden, so the page's own display rule for the <img> stays. */
 :root[data-scheme="dark"] img.light,

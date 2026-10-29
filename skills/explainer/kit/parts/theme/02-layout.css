@@ -153,7 +153,7 @@ h3,
 	overflow: hidden;
 
 	/* In a panel the diagram runs edge to edge on the blueprint surface; on a plain figure it sits on the page like a chart. */
-	& > .mermaid {
+	& > :is(.mermaid, .schematic) {
 		--under: var(--bg);
 		background: var(--blueprint);
 	}
@@ -163,7 +163,7 @@ h3,
 	margin: 0;
 	max-inline-size: none;
 }
-.fig > :is(.bleed, .stage, .chart, .scroll, .compare, .mermaid, .dg, .split) {
+.fig > :is(.bleed, .stage, .chart, .scroll, .compare, .mermaid, .schematic, .dg, .split) {
 	padding-inline: 0;
 }
 .fig > :is(h2, h3) {
