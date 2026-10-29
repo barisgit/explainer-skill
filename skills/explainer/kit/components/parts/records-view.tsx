@@ -16,6 +16,7 @@ import type {
 	TableView,
 	TreeView,
 } from "../../records/index.ts";
+import type { AnswerMemory } from "./answer-memory.ts";
 import { Answer } from "./records-answer.tsx";
 
 /** What the island does when the reader uses a control; each takes the state the view model computed for it. */
@@ -33,6 +34,8 @@ interface Context {
 	block: string;
 	/** The answer every record takes, or null. */
 	reply: ReplyView | null;
+	/** The answers entered so far, which the answers drawn now start from; the island's. */
+	answers: AnswerMemory | undefined;
 	actions: RecordsActions | undefined;
 	texts: RecordsTexts;
 	filtering: boolean;
@@ -124,6 +127,7 @@ function RowAnswer({ row, ctx }: { row: ItemRow; ctx: Context }) {
 			label={labelOf(row.cells, ctx.lead)}
 			reply={ctx.reply}
 			noteText={ctx.texts.note}
+			kept={ctx.answers}
 		/>
 	) : null;
 }
@@ -540,16 +544,19 @@ export function RecordsBlock({
 	actions,
 	live = false,
 	root,
+	answers,
 }: {
 	vm: RecordsView;
 	actions?: RecordsActions;
 	live?: boolean;
 	root?: Ref<HTMLDivElement>;
+	answers?: AnswerMemory;
 }) {
 	const { body } = vm;
 	const ctx: Context = {
 		block: vm.id,
 		reply: vm.reply,
+		answers,
 		actions,
 		texts: vm.texts,
 		filtering: vm.filtering,

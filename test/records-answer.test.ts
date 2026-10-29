@@ -105,6 +105,41 @@ const THREE_VIEWS = (source: string) =>
 		'<Records {...decisions} views={["tree", "table", "board"]} />',
 	);
 
+/** What the reader has entered for decision 1, as the page shows it now. */
+const D1 = `[answer(1, "Agree").checked, note(1).value].join()`;
+
+test("an answer survives a change of view and a filter that hides its row and brings it back", async () => {
+	const output = await packedMdx(dir, "remount", THREE_VIEWS(reviewPage()));
+	await inPage(output, async (cdp) => {
+		await cdp.evaluate(PAGE_JS, true);
+		const view = (n: number) =>
+			act(cdp, `$("#decisions .toolbar .seg label:nth-child(${n}) input").click()`, D1);
+		const search = (text: string) =>
+			act(
+				cdp,
+				`const s = $("#decisions input[type=search]"); s.value = ${JSON.stringify(text)}; s.dispatchEvent(new Event("input", { bubbles: true }));`,
+				D1,
+			);
+		await act(cdp, `answer(1, "Agree").click(); typeNote(1, "use the vault");`, "0");
+		const kept = "true,use the vault";
+		expect(await view(2)).toBe(kept);
+		expect(await view(3)).toBe(kept);
+		expect(await view(1)).toBe(kept);
+		// Filtered out (its fieldset moves to the hidden list) and back.
+		expect(await view(2)).toBe(kept);
+		expect(await search("windows")).toBe(kept);
+		expect(await search("")).toBe(kept);
+		// Clear still resets what the reader entered, in the block as it is now.
+		await cdp.evaluate(
+			`document.querySelector(".reply-bar .btn:not(.primary)").click(), document.querySelector(".reply-bar .btn:not(.primary)").click()`,
+			true,
+		);
+		expect(await view(1)).toBe("false,");
+		const reply = await cdp.evaluate<string>(`replyText()`, true);
+		expect(reply).not.toContain("use the vault");
+	});
+}, 60_000);
+
 /** A client component that shows `jsx`, a Records block, only after a click: its markup is not in the prerendered page. */
 const revealing = (jsx: string) => `"use client";
 import { useState } from "preact/hooks";

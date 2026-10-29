@@ -14,6 +14,7 @@ import {
 	type RecordsState,
 	type RecordsView,
 } from "../../records/index.ts";
+import { type AnswerMemory, rememberAnswers } from "./answer-memory.ts";
 import { pageLabels, pageLang } from "./format.ts";
 import { onFocusIn, onKeyDown, rove } from "./records-keys.ts";
 import { type RecordsActions, RecordsBlock } from "./records-view.tsx";
@@ -172,6 +173,8 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 	const ready = useHash(records, root, setState);
 	usePrint(setPrinting);
 	useRowKeys(root);
+	const answers = useMemo((): AnswerMemory => new Map(), []);
+	useEffect(() => (root.current ? rememberAnswers(root.current, answers) : undefined), [answers]);
 	useEffect(() => setLive(true), []);
 	const written = useRef(state);
 	useEffect(() => {
@@ -208,5 +211,5 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 		}),
 		[],
 	);
-	return <RecordsBlock vm={vm} actions={actions} live={live} root={root} />;
+	return <RecordsBlock vm={vm} actions={actions} live={live} root={root} answers={answers} />;
 }
