@@ -43,7 +43,7 @@ export interface Scene {
 }
 
 /** A pin name as authors may write it: without subscript marks, quotes or spaces, any case, − as -. */
-const plain = (name: string) =>
+export const plain = (name: string) =>
 	name
 		.replace(/[_{}\s"]/g, "")
 		.replace(/−/g, "-")
@@ -86,11 +86,19 @@ export const exitOf = (part: Part, pin: string): Point =>
 
 export const bodyOf = (part: Part): Box => placeBox(part.def.body, part.o, part.at);
 
-/** Everything a part draws: its body and the leads out to its pins. */
-export const extentOf = (part: Part): Box =>
-	union([bodyOf(part), boxOf(pinsOf(part).map((p) => p.at))]);
+/** What wires and other parts must stay out of: the body and the marks drawn beside it. */
+export const obstacleOf = (part: Part): Box =>
+	placeBox(
+		part.def.marks ? union([part.def.body, part.def.marks]) : part.def.body,
+		part.o,
+		part.at,
+	);
 
-/** A part's leads: from each pin in to its body, which wires of other nets must not touch either. */
+/** Everything a part draws: its body, marks and the leads out to its pins. */
+export const extentOf = (part: Part): Box =>
+	union([obstacleOf(part), boxOf(pinsOf(part).map((p) => p.at))]);
+
+/** A part's leads: from each pin in to its body, which wires of other nets must not touch either; each starts at its pin. */
 export function leadsOf(part: Part): Segment[] {
 	const body = grow(bodyOf(part), -0.5);
 	return pinsOf(part).flatMap(({ pin, at }) => {

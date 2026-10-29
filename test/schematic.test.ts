@@ -123,6 +123,89 @@ test("labels with no clear owner are never drawn: crowded parts are reported, no
 	).toEqual([]);
 });
 
+test("a wire that touches a part's lead joins its pin, so two nets meeting on a lead are reported", () => {
+	// R2's pin m lands on the lead of C1's pin n, with no wire between them to show it.
+	expect(
+		problemsOf("C1 n nc @0,0", "R2 m nc v @1,0", "P1 port n @-4,0", "P2 port m @1,-4"),
+	).toEqual([
+		expect.stringMatching(/^lines 1, 2, 3, 4: nets (n and m|m and n) touch \(.*C1\.a.*R2\.a/),
+	]);
+});
+
+test("an nc pin that touches anything is reported, whatever it touches", () => {
+	const meets = [
+		// An open pin on a live pin, with the junction dot the three meeting would draw.
+		["R1 nc n @0,0", "R2 nc nc v a@R1.b", "R3 n nc @10,0"],
+		// Two open pins meeting: nothing says they are one net, and nothing says they are not.
+		["R1 nc nc @0,0", "R2 nc nc a@R1.b"],
+		// An open pin on the lead of a live one.
+		["C1 n 0 @0,0", "R2 nc 0 v @1,0", "P1 port n @-4,0"],
+	];
+	for (const lines of meets) {
+		expect(problemsOf(...lines)).toEqual([
+			expect.stringMatching(/^lines [\d, ]+: pins .* meet, and .*R[12]\.[ab] (is|are) nc \(open\)/),
+		]);
+	}
+});
+
+test("an IC that names a pin twice is rejected, also when the names differ only in their marks", () => {
+	expect(problemsOf("U1 ic Test @0,0 left IN=0 right IN=nc")).toEqual([
+		expect.stringMatching(/^line 1: U1: pin IN is listed twice/),
+	]);
+	expect(problemsOf('U1 ic Test @0,0 left V_{CC}=a right "VCC"=b')).toEqual([
+		expect.stringMatching(/^line 1: U1: pin VCC is listed twice, as V_\{CC\}/),
+	]);
+});
+
+/** The wires of a drawing as [x0, y0, x1, y1] runs. */
+const wireRuns = (svg: string) =>
+	[...svg.matchAll(/class="wire" d="([^"]*)"/g)].flatMap((m) => {
+		const points = [...(m[1] ?? "").matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((p) => [
+			Number(p[1]),
+			Number(p[2]),
+		]);
+		return points.slice(1).map((p, i) => [...(points[i] ?? []), ...p] as number[]);
+	});
+
+test("no wire runs across the polarity marks of an electrolytic capacitor or a battery", () => {
+	// Each mark lies above its part's lead, outside the body, which the wires of P1 and P2 used to run straight over.
+	for (const [kind, mark] of [
+		["electrolytic", { x0: 7, x1: 12, y0: -10.5, y1: -5.5 }],
+		["battery", { x0: 3.5, x1: 8.5, y0: -10.5, y1: -5.5 }],
+	] as const) {
+		const drawn = renderSchematic(`C1 ${kind} nc nc @0,0\nP1 port n @-4,-1\nP2 port n @8,-1`);
+		expect(drawn.problems).toEqual([]);
+		const through = wireRuns(drawn.svg).filter(([x0 = 0, y0 = 0, x1 = 0, y1 = 0]) => {
+			const [xa, xb, ya, yb] = [
+				Math.min(x0, x1),
+				Math.max(x0, x1),
+				Math.min(y0, y1),
+				Math.max(y0, y1),
+			];
+			return xa < mark.x1 && xb > mark.x0 && ya < mark.y1 && yb > mark.y0;
+		});
+		expect(through).toEqual([]);
+	}
+});
+
+test("a drawing's smallest text, subscripts and IC pin names included, still reads at 10 px where it is narrowest", () => {
+	const { svg } = renderSchematic(
+		"U1 ic Chip @0,0 top V_{CC}=nc V_{DD}=nc left IN_{1}=nc right OUT_{2}=nc",
+	);
+	const sizes = [...svg.matchAll(/<(?:text|tspan)[^>]* font-size="([\d.]+)"/g)].map((m) =>
+		Number(m[1]),
+	);
+	const [width = 0] = (/viewBox="\S+ \S+ (\S+)/.exec(svg) ?? []).slice(1).map(Number);
+	const least = Number(/--schematic-min: (\d+)px/.exec(svg)?.[1]);
+	expect(Math.min(...sizes)).toBeLessThan(10);
+	expect((Math.min(...sizes) * least) / width).toBeGreaterThanOrEqual(9.99);
+});
+
+test("a routed wire blocks the straight runs of its path too, not only its corners", () => {
+	// Found by fuzzing: the later wires ran along or ended on the straight part of an earlier one, which joined two nets.
+	expect(problemsOf("R1 c 0 @6,0 v", "R2 b b @18,15 r270", "R3 c b @2,10 r270")).toEqual([]);
+});
+
 test("pack fails a block with its number and the problem's line, and names what to write", async () => {
 	const { result } = await packMdx(
 		dir,
@@ -177,7 +260,7 @@ test("on a wide screen the drawing fills the column up to part names at body siz
 
 test("on a phone the drawing keeps 10 px text and scrolls sideways; on paper it fits the column", async () => {
 	const page = circuitPage({
-		"no text is under 10 px": `[...document.querySelectorAll(".schematic svg text")].every((t) => parseFloat(getComputedStyle(t).fontSize) * (t.ownerSVGElement.getBoundingClientRect().width / t.ownerSVGElement.viewBox.baseVal.width) >= 9.99)`,
+		"no text is under 10 px": `[...document.querySelectorAll(".schematic svg text, .schematic svg tspan[font-size]")].every((t) => parseFloat(getComputedStyle(t).fontSize) * (t.ownerSVGElement.getBoundingClientRect().width / t.ownerSVGElement.viewBox.baseVal.width) >= 9.99)`,
 		"the block scrolls instead of shrinking": `(() => {
 			const block = document.querySelector(".schematic");
 			const svg = block.querySelector("svg");

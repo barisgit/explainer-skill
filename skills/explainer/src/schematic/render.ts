@@ -121,15 +121,19 @@ function sheetBox(scene: Scene, labels: PlacedLabel[]): Box {
 	);
 }
 
-/** The smallest text size the drawing uses: a value's subscript if it has one. */
-function smallestText(labels: PlacedLabel[]): number {
-	const sizes = labels.flatMap((l) =>
-		l.lines.flatMap((line, i) => {
-			const size = i ? VALUE_FONT : FONT;
-			return runsOf(line).map((run) => (run.sub ? size * SUB : size));
-		}),
+/** The sizes of a line's text runs when it is set at `size`: a subscript is smaller. */
+const runSizes = (line: string, size: number) =>
+	runsOf(line).map((run) => (run.sub ? size * SUB : size));
+
+/** The smallest text size the drawing emits: any label line's or IC pin name's subscript, if it has one. */
+function smallestText(scene: Scene, labels: PlacedLabel[]): number {
+	const pins = scene.parts.flatMap((p) =>
+		(p.def.texts ?? []).flatMap((t) => runSizes(t.text, FONT)),
 	);
-	return Math.min(FONT, ...sizes);
+	const names = labels.flatMap((l) =>
+		l.lines.flatMap((line, i) => runSizes(line, i ? VALUE_FONT : FONT)),
+	);
+	return Math.min(FONT, ...pins, ...names);
 }
 
 /** The ids and nets a drawing's elements carry as data-ref. */
@@ -151,7 +155,7 @@ export function renderSvg(
 	const w = box.x1 - box.x0;
 	const h = box.y1 - box.y0;
 	const most = Math.floor(w * SCALE);
-	const least = Math.min(most, Math.ceil((w * READABLE_PX) / smallestText(labels)));
+	const least = Math.min(most, Math.ceil((w * READABLE_PX) / smallestText(scene, labels)));
 	const byPart = new Map(labels.map((l) => [l.part, l]));
 	return [
 		`<svg viewBox="${num(box.x0)} ${num(box.y0)} ${num(w)} ${num(h)}" width="100%"`,

@@ -127,8 +127,9 @@ class Board {
 		return (this.uses.get(k(x, y)) ?? []).some((u) => u.net === net);
 	}
 
-	/** Records a routed polyline of grid points for `net`. */
-	occupy(points: Point[], net: string) {
+	/** Records a routed polyline's every grid point for `net`, so a later wire cannot run through the straight parts. */
+	occupy(corners: Point[], net: string) {
+		const points = expand(corners);
 		points.forEach((p, i) => {
 			const prev = points[i - 1];
 			const next = points[i + 1];

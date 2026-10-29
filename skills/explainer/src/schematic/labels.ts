@@ -9,6 +9,7 @@ import {
 	exitOf,
 	extentOf,
 	leadsOf,
+	obstacleOf,
 	type Part,
 	pinAt,
 	type Scene,
@@ -107,7 +108,7 @@ export function obstaclesOf(scene: Scene, dots: Point[]): Box[] {
 	return [
 		...wireSegments(scene).map((s) => segmentBox(s, 1.5)),
 		...scene.parts.flatMap((p) => leadsOf(p).map((s) => segmentBox(s, 1.5))),
-		...scene.parts.map((p) => grow(bodyOf(p), 1)),
+		...scene.parts.map((p) => grow(obstacleOf(p), 1)),
 		...scene.parts.flatMap(pinTextBoxes),
 		...dots.map((d) => grow({ x0: d.x, y0: d.y, x1: d.x, y1: d.y }, 3)),
 	];

@@ -23,6 +23,11 @@ export interface SymbolDef {
 	/** Solid parts of the symbol (arrow heads), filled in the ink colour. */
 	fill?: string;
 	body: Box;
+	/**
+	 * What the symbol draws beside its body (a polarity sign over a lead): not conductive, but wires and parts stay out of it
+	 * like the body.
+	 */
+	marks?: Box;
 	texts?: SymbolText[];
 }
 
@@ -39,9 +44,14 @@ interface Body {
 	y1: number;
 	stroke: string;
 	fill?: string;
+	/** The box of the marks, relative to the path's start like the stroke. */
+	marks?: Box;
 }
 
 const CIRCLE = (r: number) => `M0,0 a${r},${r} 0 1 1 ${2 * r},0 a${r},${r} 0 1 1 ${-2 * r},0`;
+
+/** The plus sign that marks pin a of a polarised part, over its lead, as a box clear of the strokes. */
+const PLUS: Box = { x0: -10, y0: -11.5, x1: -3, y1: -4.5 };
 
 /** The two-terminal bodies, pin a on the left and pin b on the right (the first and second node of a netlist line). */
 const BODIES = {
@@ -58,6 +68,7 @@ const BODIES = {
 		y0: -9,
 		y1: 9,
 		stroke: "M0,-9 V9 M8,-9 Q4,0 8,9 M-9,-8 h5 M-6.5,-10.5 v5",
+		marks: PLUS,
 	},
 	inductor: {
 		len: 30,
@@ -88,6 +99,7 @@ const BODIES = {
 		y0: -9,
 		y1: 9,
 		stroke: "M0,-9 V9 M5,-5 V5 M10,-9 V9 M15,-5 V5 M-9,-8 h5 M-6.5,-10.5 v5",
+		marks: PLUS,
 	},
 	// A voltage source: plus at a, minus at b.
 	vsource: { len: 24, y0: -12, y1: 12, stroke: `${CIRCLE(12)} M5,0 h5 M7.5,-2.5 v5 M15,0 h5` },
@@ -129,6 +141,9 @@ function twoTerminal(body: Body, extra: Partial<SymbolDef> = {}): SymbolDef {
 		stroke: `${leads} ${translatePath(body.stroke, start)}`,
 		...(body.fill ? { fill: translatePath(body.fill, start) } : {}),
 		body: { x0: start, y0: body.y0, x1: start + body.len, y1: body.y1 },
+		...(body.marks
+			? { marks: { ...body.marks, x0: body.marks.x0 + start, x1: body.marks.x1 + start } }
+			: {}),
 		...extra,
 	};
 }

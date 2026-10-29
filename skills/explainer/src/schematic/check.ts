@@ -14,7 +14,15 @@ import {
 } from "./geometry.ts";
 import { GAPS, gapBetween, obstaclesOf, type PlacedLabel, rivalOf } from "./labels.ts";
 import { GROUND_NETS, GROUND_REF, netsOf, OPEN_NET } from "./nets.ts";
-import { bodyOf, extentOf, type Part, pinAt, type Scene, wireSegments } from "./scene.ts";
+import {
+	bodyOf,
+	extentOf,
+	obstacleOf,
+	type Part,
+	pinAt,
+	type Scene,
+	wireSegments,
+} from "./scene.ts";
 import { drawnNets } from "./topology.ts";
 
 const at = (part: Part) => `line ${part.line} (${part.id})`;
@@ -35,7 +43,7 @@ function wiresThroughParts(scene: Scene): string[] {
 			// A terminal's pin is the centre of its circle: its own wire ends inside it.
 			const ownEnd =
 				part.kind === "port" && [s.a, s.b].some((p) => same(p, pinAt(part, "a") ?? part.at));
-			if (!ownEnd && crossesBox(s, grow(bodyOf(part), -0.5))) {
+			if (!ownEnd && crossesBox(s, grow(obstacleOf(part), -0.5))) {
 				out.push(
 					`${at(part)}: the wire of net ${s.net} runs through ${part.id} at ${where(s)}; move ${part.id} (change its offset, or turn it with h or v) so no wire crosses it`,
 				);
@@ -50,7 +58,7 @@ export function overlappingParts(parts: Part[]): string[] {
 	const out: string[] = [];
 	parts.forEach((p, i) => {
 		for (const q of parts.slice(i + 1)) {
-			if (overlapArea(bodyOf(p), bodyOf(q)) > 0) {
+			if (overlapArea(obstacleOf(p), obstacleOf(q)) > 0) {
 				out.push(
 					`${at(q)}: overlaps ${p.id} (line ${p.line}); place ${q.id} further from it (a larger dx,dy)`,
 				);
@@ -99,11 +107,25 @@ function labelProblems(scene: Scene, dots: Point[], labels: PlacedLabel[]): stri
 	return out;
 }
 
+/** Pins written nc that the drawing joins to another pin, an open one included: an open pin touches nothing. */
+function openPinProblems(pins: Array<{ part: Part; pin: string }>): string[] {
+	const open = pins.filter((p) => p.part.nets[p.pin] === OPEN_NET);
+	if (!open.length || pins.length < 2) {
+		return [];
+	}
+	const name = (p: { part: Part; pin: string }) => `${p.part.id}.${p.pin}`;
+	const lines = [...new Set(pins.map((p) => p.part.line))].join(", ");
+	return [
+		`lines ${lines}: pins ${pins.map(name).join(", ")} meet, and ${open.map(name).join(", ")} ${open.length > 1 ? "are" : "is"} nc (open); move one of the parts so an open pin touches nothing, or give it a net`,
+	];
+}
+
 /** The nets the geometry joins against the nets the netlist declares: no two joined, none in pieces, none ending nowhere. */
 function netProblems(scene: Scene): string[] {
 	const out: string[] = [];
 	const seen = new Set<string>();
 	for (const net of drawnNets(scene)) {
+		out.push(...openPinProblems(net.pins));
 		const names = [
 			...new Set(net.pins.map((p) => netOf(p.part, p.pin)).filter((n) => n && n !== OPEN_NET)),
 		];

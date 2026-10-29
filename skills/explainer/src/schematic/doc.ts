@@ -19,7 +19,7 @@ Line:  NAME [kind] NODES... [VALUE...] [PLACE] [h|v|r90|r180|r270|flip]
             With no pin before @, the part's origin goes there: a two-terminal's pin a, a transistor's base or gate, an IC's top-left corner.
             Pins that land on the same point are joined without a wire.
   turn      h (a left, b right; the default) or v (a on top); two-terminals and transistors also take r90 r180 r270 and flip. An IC does not turn.
-Nets: names are yours; 0, gnd or GND is ground, drawn as a ground symbol at each pin (data-ref "gnd"); nc leaves a pin open on purpose. A net that joins one pin is an error.
+Nets: names are yours; 0, gnd or GND is ground, drawn as a ground symbol at each pin (data-ref "gnd"); nc leaves a pin open on purpose: it touches nothing. A net that joins one pin is an error.
 Comments start with #.
 
 Place a chain of parts with each one's pin on the last one's (a@R1.b), a stage by offsets from its transistor, and let the router run the rest. Leave two units or more between parts that need a wire.

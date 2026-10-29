@@ -5,7 +5,7 @@
 import { type Orientation, type Point, UPRIGHT } from "./geometry.ts";
 import { type IcSides, ic } from "./ic.ts";
 import { OPEN_NET } from "./nets.ts";
-import type { Part } from "./scene.ts";
+import { type Part, plain } from "./scene.ts";
 import { G, KINDS, LETTERS, type SymbolDef } from "./symbols.ts";
 
 /** Where a part goes: at a sheet position, or its pin on a pin of another part, `offset` away. */
@@ -87,11 +87,30 @@ function splitPlacement(tokens: string[], turns: boolean) {
 	return { placement, o, rest };
 }
 
-/** The pins of an IC line: side keywords, each followed by name=net words (a bare name is a pin left open); the rest is its type. */
-function icPins(rest: string[]): { sides: IcSides; nets: Record<string, string>; type: string } {
+/** What is wrong with writing the pin `name` again after `written` (pin keys to the names first written), if anything; records it. */
+function repeated(written: Map<string, string>, name: string): string | undefined {
+	const first = written.get(plain(name));
+	written.set(plain(name), first ?? name);
+	return first === undefined
+		? undefined
+		: `pin ${name} is listed twice${first === name ? "" : `, as ${first} and ${name}`}; each pin of an IC has one name and one net`;
+}
+
+/**
+ * The pins of an IC line: side keywords, each followed by name=net words (a bare name is a pin left open); the rest is its type.
+ * A pin written twice, or under names that mean one pin (V_{CC} and VCC), is an error: the second would drop the first's net.
+ */
+function icPins(rest: string[]): {
+	sides: IcSides;
+	nets: Record<string, string>;
+	type: string;
+	errors: string[];
+} {
 	const sides: IcSides = { left: [], right: [], top: [], bottom: [] };
 	const nets: Record<string, string> = {};
 	const type: string[] = [];
+	const errors: string[] = [];
+	const written = new Map<string, string>();
 	let side: keyof IcSides | undefined;
 	for (const word of rest) {
 		if (SIDES.has(word)) {
@@ -99,13 +118,17 @@ function icPins(rest: string[]): { sides: IcSides; nets: Record<string, string>;
 		} else if (side) {
 			const eq = word.lastIndexOf("=");
 			const name = eq > 0 ? word.slice(0, eq) : word;
+			const again = repeated(written, name);
+			if (again) {
+				errors.push(again);
+			}
 			sides[side].push(name);
 			nets[name] = eq > 0 ? word.slice(eq + 1) : OPEN_NET;
 		} else {
 			type.push(word);
 		}
 	}
-	return { sides, nets, type: type.join(" ") };
+	return { sides, nets, type: type.join(" "), errors };
 }
 
 /** A part's symbol, nets and value from the words after its placement; an IC names its pins, other parts list nodes in order. */
@@ -116,6 +139,9 @@ function wiringOf(
 ): { def: SymbolDef; nets: Record<string, string>; value: string } | string {
 	if (kind === "ic") {
 		const pins = icPins(rest);
+		if (pins.errors.length) {
+			return `${id}: ${pins.errors.join("; ")}`;
+		}
 		return { def: ic(pins.sides, [id, pins.type]), nets: pins.nets, value: pins.type };
 	}
 	const known = KINDS[kind];

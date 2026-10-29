@@ -8,7 +8,7 @@ import {
 	type Segment,
 	same,
 } from "./geometry.ts";
-import { type Part, pinsOf, type Scene, wireSegments } from "./scene.ts";
+import { leadsOf, type Part, pinsOf, type Scene, wireSegments } from "./scene.ts";
 
 /** A union-find over point keys. */
 class Joins {
@@ -60,6 +60,17 @@ function contacts(scene: Scene): Contact[] {
 	return [...out.values()];
 }
 
+/** Joins every point on a pin's lead (a wire's end, another part's pin) to that pin: the lead is conductor, a part's own terminals stay apart. */
+function joinLeads(joins: Joins, scene: Scene, points: Point[]) {
+	for (const part of scene.parts) {
+		for (const lead of leadsOf(part)) {
+			for (const p of points.filter((q) => onSegment(q, lead))) {
+				joins.join(key(p), key(lead.a));
+			}
+		}
+	}
+}
+
 /** Every pin on the sheet that a wire or another pin reaches, grouped by what joins them: the netlist the geometry says. */
 export function drawnNets(scene: Scene): Array<{ pins: Array<{ part: Part; pin: string }> }> {
 	const joins = new Joins();
@@ -71,6 +82,7 @@ export function drawnNets(scene: Scene): Array<{ pins: Array<{ part: Part; pin: 
 			joins.join(key(p), key(s.a));
 		}
 	}
+	joinLeads(joins, scene, points);
 	const nets = new Map<string, Array<{ part: Part; pin: string }>>();
 	for (const part of scene.parts) {
 		for (const { pin, at } of pinsOf(part)) {
