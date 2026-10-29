@@ -123,6 +123,13 @@ pre code {
 	background: none;
 	padding: 0;
 }
+/* On a phone a command wraps, with its indentation, instead of scrolling: the end of a long line is what a reader came for. */
+@media (max-width: 40rem) {
+	pre {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+}
 a {
 	color: var(--accent);
 	text-decoration-thickness: 1px;

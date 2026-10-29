@@ -38,3 +38,20 @@ ${pageContract({
 
 	expect(await packAndRun(dir, "textarea", page)).toEqual([]);
 }, 30_000);
+
+test("a code block wraps on a phone, with its indentation, and scrolls on a wide screen", async () => {
+	const line =
+		"kit pack page.mdx --out out.html --flag --another-flag --and-one-more-flag --last-flag-of-the-command".repeat(
+			2,
+		);
+	const page = `${HEAD}<pre id="cmd"><code>if ready:\n    ${line}</code></pre></main>
+<script>
+const pre = document.getElementById("cmd");
+${pageContract({
+	"the page does not scroll sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+	"the block wraps on a phone only": `(innerWidth < 640) === (pre.scrollWidth <= pre.clientWidth)`,
+	"the indentation stays": `getComputedStyle(pre).whiteSpace !== "normal"`,
+})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "pre", page)).toEqual([]);
+}, 30_000);
