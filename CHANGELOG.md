@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+A circuit is a ```schematic fence: a netlist that `pack` places, wires and draws as one SVG.
+
+### What an author does differently
+
+- Write each part on a line, nets by name, and where it goes: `Q1 c b e BC547 @0,0`, `R_C vcc c 4.7k b@Q1.c 0,-1 v` (this resistor's `b` pin one unit above Q1's collector). `pack` routes the nets on a grid, adds ground symbols, junction dots and labels, and fails with the line and what to change on a part with no place, an unknown pin, parts on top of each other, a net it cannot route, a label with no room, or a net that joins one pin. Symbols: resistor, capacitor, electrolytic, inductor, diode, zener, LED, switch, battery, voltage and current source, potentiometer, NPN and PNP, N and P MOSFET, op-amp, IC with named pins, terminals, supply rails and ground. `kit schematic` has the reference.
+- Parts link to the prose with `data-ref="R_C"`; a net's name (`vcc`, `gnd`) lights its wires and junctions. The drawing follows light, dark and a page's tokens, shrinks to 10 px text and then scrolls sideways on a phone, and fits the paper in print.
+
 ## v0.11.0
 
 A `Chart` or `Plot` is in the packed page as SVG whenever `pack` can draw it exactly: it shows before the scripts run, with scripts off, and in print. One it cannot (below) appears when the script draws it, as before. One set of `Controls` can drive figures in several sections, and a written `Question` with a model answer inside is a self-check that stays on the page.
