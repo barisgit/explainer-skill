@@ -7,6 +7,8 @@ import {
 	runCli,
 	SETTLED,
 	scratch,
+	type Viewport,
+	WIDTHS,
 } from "./support.ts";
 
 const dir = scratch();
@@ -550,4 +552,35 @@ ${onLoad(2, "the postal code field starts empty and no city answer waits for it"
 
 	expect(checked.stdout).not.toContain("keep contract");
 	expect(checked.code).toBe(0);
+}, 60_000);
+
+test("the reply lists answers with their notes under them, marks defaults, and folds the unanswered into one line", async () => {
+	const body = `<fieldset data-reply><legend>Pick one?</legend><label><input type="radio" name="p" value="a"> A</label> <label><input type="radio" name="p" value="b" id="pick-b"> B</label></fieldset>
+<fieldset data-reply><legend>Starts on</legend><label><input type="radio" name="s" value="a" checked> A</label> <label><input type="radio" name="s" value="b"> B</label></fieldset>
+<fieldset data-reply><legend>Also pick</legend><label><input type="radio" name="q" value="a"> A</label></fieldset>
+<fieldset data-reply="Decision 12"><label><input type="radio" name="d12" value="change" id="d12-change"> Change</label> <input type="text" id="n12" data-note aria-label="Note"></fieldset>
+<fieldset data-reply="Decision 13"><label><input type="radio" name="d13" value="agree"> Agree</label> <input type="text" id="n13" data-note aria-label="Note"></fieldset>
+<fieldset data-reply="Decision 14"><label><input type="radio" name="d14" value="agree"> Agree</label> <textarea id="n14" data-note aria-label="Note"></textarea></fieldset>`;
+	const answers = `Answers
+- Pick one? B
+- Starts on: A (default)
+- Decision 12: Change
+  Note: use the vault
+- Decision 14: no answer
+  Note: only a note
+  on two lines
+Not answered: Also pick; Decision 13`;
+	const contract = pageContract({
+		"the reply holds the answers, notes under their items, and one line for the rest": `(replyButton().click(), document.querySelector(".reply-md").textContent.split("\\n\\n").find((part) => part.startsWith("Answers")) === ${JSON.stringify(answers)})`,
+	});
+	const failures = await packAndRun(dir, "reply-format", SMALL(`${body}`, contract), {
+		widths: [WIDTHS[0] as Viewport],
+		steps: [
+			"click:#pick-b",
+			"click:#d12-change",
+			"type:#n12=use the vault",
+			"type:#n14=only a note\non two lines",
+		],
+	});
+	expect(failures).toEqual([]);
 }, 60_000);

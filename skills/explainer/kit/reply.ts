@@ -10,15 +10,18 @@
        <label class="field"><span>Max latency</span><input type="range" min="1" max="50" value="10" /><output>10 ms</output></label>
      </div>
    A control works alone too: <select data-reply="Region">…</select>. Radios and checkboxes group by name; a checkbox group answers with the
-   checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A control the reader never touched
-   is sent as "(default)", one with nothing chosen as "no answer". Notes come from selected text and clicks on [data-ref] parts
+   checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A text field or textarea with
+   data-note inside a data-reply element is the note on that element's other control and goes with it, under it in the reply.
+   The reply lists the answers, each with its note under it; a control the reader never touched keeps its default, marked
+   "(default)", and every one with nothing chosen and no note is left out of the list and named in one line, "Not answered: a; b".
+   Notes come from selected text and clicks on [data-ref] parts
    (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
    is-annotatable (a faint underline), also those rendered later.
    The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
-   quote | part, text }], answers: [{ label, value, touched }] }.
+   quote | part, text }], answers: [{ label, value, note, touched }] }.
    Keeping (kit keep): the reader's answers and notes are kept across reloads. On a page with reply: true (pack marks its <main>
    data-asks-reply), a data-reply control or a note, the bar holds keep's Clear button as "Clear answers and notes" while anything
    is kept; confirmed, it also drops the notes. Otherwise keep's own Clear at the end of the page clears the answers.
@@ -95,6 +98,13 @@
 	const { ownText } = keep;
 	/** Controls answering together; never empty. */
 	type Group = [ReplyControl, ...ReplyControl[]];
+	/** One answer as the reply lists it: `value` is null when nothing is chosen, `note` the text of the host's data-note field. */
+	interface Answer {
+		label: string;
+		value: string | null;
+		note: string;
+		touched: boolean;
+	}
 	const optionText = (c: ReplyControl) => (c.labels?.[0] ? ownText(c.labels[0]) : c.value);
 
 	function unitLabel(c: ReplyControl) {
@@ -158,10 +168,19 @@
 		return [...groups.values()];
 	}
 
-	function answers() {
+	/** A host's controls without its note field, and the field: a host with nothing but a note field answers with it as any other. */
+	function splitNote(controls: ReplyControl[]): [ReplyControl[], ReplyControl | undefined] {
+		const field = controls.find((c) => c.matches("[data-note]"));
+		const rest = controls.filter((c) => c !== field);
+		return rest.length ? [rest, field] : [controls, undefined];
+	}
+
+	function answers(): Answer[] {
 		return [...document.querySelectorAll<HTMLElement>("[data-reply]")].flatMap((host) => {
 			const own = controlOf(host);
-			const controls = own ? [own] : [...host.querySelectorAll<ReplyControl>(CONTROL)];
+			const [controls, noteField] = splitNote(
+				own ? [own] : [...host.querySelectorAll<ReplyControl>(CONTROL)],
+			);
 			const groups = groupControls(controls);
 			const name = clean(
 				host.dataset.reply ||
@@ -169,14 +188,19 @@
 					host.querySelector("legend")?.textContent ||
 					"",
 			);
-			return groups.map((cs) => ({
-				label:
-					groups.length === 1
-						? name || unitLabel(cs[0])
-						: [name, unitLabel(cs[0])].filter(Boolean).join(" › "),
-				value: groupValue(cs),
-				touched: cs.some(keep.touched),
-			}));
+			return groups.map((cs, i) => {
+				// The note belongs to the first group, the one a host with a note field has.
+				const note = i === 0 && noteField ? noteField : undefined;
+				return {
+					label:
+						groups.length === 1
+							? name || unitLabel(cs[0])
+							: [name, unitLabel(cs[0])].filter(Boolean).join(" › "),
+					value: groupValue(cs),
+					note: note?.value.trim() ?? "",
+					touched: cs.some(keep.touched) || (note !== undefined && keep.touched(note)),
+				};
+			});
 		});
 	}
 
@@ -211,15 +235,29 @@
 	const noteLine = (n: ReplyNote) =>
 		`- On ${n.quote ? `"${n.quote}"` : `part "${n.part}"`} (${n.where}): ${n.text.trim().split("\n").join("\n  ")}`;
 	// A legend that is already a question reads badly with a colon after it: "Which fix?: Second barista".
-	const answerLine = (a: { label: string; value: string | null; touched: boolean }) =>
-		`- ${a.label}${/[?:]$/.test(a.label) ? "" : ":"} ${a.value ?? "no answer"}${a.value != null && !a.touched ? " (default)" : ""}`;
+	const answerLine = (a: Answer) =>
+		[
+			`- ${a.label}${/[?:]$/.test(a.label) ? "" : ":"} ${a.value ?? "no answer"}${a.value != null && !a.touched ? " (default)" : ""}`,
+			...(a.note ? [`  Note: ${a.note.split("\n").join("\n  ")}`] : []),
+		].join("\n");
+	/** The answers section's lines: what the reader answered or noted, then one line naming every item left without either. */
+	function answerLines(given: Answer[]) {
+		const [done, left] = [
+			given.filter((a) => a.value !== null || a.note),
+			given.filter((a) => a.value === null && !a.note),
+		];
+		return [
+			...done.map(answerLine),
+			...(left.length ? [`Not answered: ${left.map((a) => a.label).join("; ")}`] : []),
+		];
+	}
 
 	function markdown() {
-		const given = answers();
+		const given = answerLines(answers());
 		const sections = [
 			[`Reply on "${title()}" (${file})`],
 			filledNotes().length ? ["Notes", ...filledNotes().map(noteLine)] : [],
-			given.length ? ["Answers", ...given.map(answerLine)] : [],
+			given.length ? ["Answers", ...given] : [],
 		];
 		return `${sections
 			.filter((s) => s.length)
