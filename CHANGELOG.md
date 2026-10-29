@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+A page with a `Chart` is about 500 KB smaller: `pack` carries ECharts compressed and the page unpacks it as it loads.
+
+### What an author does differently
+
+- Nothing in the page changes. The examples with charts go from 1.3 to 1.5 MB to 0.8 to 1.0 MB. ECharts is ready about 100 ms after the page loads (headless Chrome); until then the charts `pack` drew stay in place and the live charts replace them as before. It needs `DecompressionStream` (Chrome 103, Firefox 113, Safari 16.4); an older browser keeps the drawn charts, and a chart `pack` could not draw stays empty.
+- Client code that calls `Charts.make` needs no change. Code that reads the `echarts` global directly (not through a chart's `setup`) runs before ECharts exists: wait for `window.echartsReady`.
+
 ## v0.11.0
 
 A `Chart` or `Plot` is in the packed page as SVG whenever `pack` can draw it exactly: it shows before the scripts run, with scripts off, and in print. One it cannot (below) appears when the script draws it, as before. One set of `Controls` can drive figures in several sections, and a written `Question` with a model answer inside is a self-check that stays on the page.

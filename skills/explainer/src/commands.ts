@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
-import { authorTsconfig, kitLabels, kitPath, leadingComment, readKitText } from "./kit.ts";
+import { authorTsconfig, kitLabels, kitPath, leadingComment, pageFile } from "./kit.ts";
 import { clientBundle, isClientModule } from "./mdx/bundle.ts";
 import { scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pageSources } from "./mdx/sources.ts";
@@ -114,7 +114,10 @@ async function componentSize(file: string): Promise<string> {
 
 /** The bytes of kit files as a page carries them. */
 const kitBytes = (files: string[]) =>
-	files.reduce((sum, f) => sum + Buffer.byteLength(readKitText(kitPath(f))), 0);
+	files.reduce((sum, f) => {
+		const { text, deflate = "" } = pageFile(kitPath(f));
+		return sum + Buffer.byteLength(text) + deflate.length;
+	}, 0);
 
 /** A size as `kit` lists it, e.g. "16 KB". */
 const sizeText = (bytes: number) => `${(bytes / 1024).toFixed(0)} KB`;

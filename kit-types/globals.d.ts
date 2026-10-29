@@ -158,6 +158,8 @@ interface ReplyNotesOptions {
 declare var kitLabels: Readonly<Record<string, string>> | undefined;
 
 declare var echarts: typeof import("echarts");
+/** Set by the loader of a compressed ECharts (kit/unpack.ts): resolves once `echarts` exists. Undefined when the page carries ECharts plain. */
+declare var echartsReady: Promise<void> | undefined;
 declare var Charts: {
 	make(el: HTMLElement, option: ChartOption, setup?: (chart: ECharts) => void): ChartHandle;
 	color(token: string): string;

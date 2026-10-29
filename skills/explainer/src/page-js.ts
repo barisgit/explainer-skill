@@ -84,8 +84,9 @@ export const TIMERS_JS = `(() => {
 /**
  * Page expression: a promise of "" once the page has drawn what its load or the last step started, or of what is still missing
  * after SETTLE_DEADLINE_MS. In order: a frame, a task and a frame (Preact runs an island's effects in between, which make its
- * charts and start their fonts); the fonts; every chart the reader can see drawn, that is each `.chart` with a width (plots aside,
- * which plot.js draws as it makes them) has its ECharts instance, since Charts.make mounts a chart once its font has loaded; the
+ * charts and start their fonts); ECharts unpacked; the fonts; every chart the reader can see drawn, that is each `.chart` with a
+ * width (plots aside, which plot.js draws as it makes them) has its ECharts instance, since Charts.make mounts a chart once its
+ * font has loaded; the
  * same frames again for the redraws those start; then the short timers pending by then (TIMERS_JS, where check installed it) and,
  * when there were any, the frames, fonts and charts again for what they started (a timer that adds a chart). That one batch of
  * timers bounds the wait: timers they set are not waited for. The deadline runs on a timer, so a page that stops producing frames
@@ -100,6 +101,9 @@ export const SETTLE_JS = `(() => {
 	const undrawn = () => window.echarts ? [...document.querySelectorAll(".chart:not(.plot)")].filter((el) => el.clientWidth && !echarts.getInstanceByDom(el)) : [];
 	let waiting = "an animation frame";
 	const drawn = async () => {
+		// A packed page unpacks ECharts as it loads; its rejection is the page's error, which check reports itself.
+		waiting = "ECharts to unpack";
+		await window.echartsReady?.catch(() => {});
 		waiting = "the page's fonts";
 		await document.fonts.ready;
 		// "": the deadline names the charts still undrawn.

@@ -4,7 +4,7 @@ import { classCollisions } from "./collisions.ts";
 import { dataUri } from "./data-uri.ts";
 import { safeScript, unescapeHtml } from "./escape.ts";
 import { repeatedIdProblems } from "./ids.ts";
-import { kitFiles, kitPath, readKitText } from "./kit.ts";
+import { kitFiles, kitPath, pageFile, readKitText } from "./kit.ts";
 import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
@@ -156,8 +156,9 @@ function inliningRewriter(baseDir: string, problems: string[]): HTMLRewriter {
 					return;
 				}
 				const type = el.getAttribute("type");
+				const { text, deflate } = pageFile(path);
 				el.replace(
-					`<script${type ? ` type="${type}"` : ""}>${safeScript(readKitText(path))}</script>`,
+					`<script${type ? ` type="${type}"` : ""}${deflate ? ` data-deflate="${deflate}"` : ""}>${safeScript(text)}</script>`,
 					{ html: true },
 				);
 			},
