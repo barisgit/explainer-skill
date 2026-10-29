@@ -78,6 +78,16 @@ function summaryCells(
 	);
 }
 
+/** The total row: its label, then the sums; null when no column is summed, since a row that adds nothing says nothing. */
+function totalCells(
+	model: Model,
+	columns: readonly Column[],
+	sums: Readonly<Record<string, Sum>>,
+	texts: ViewTexts,
+): Cell[] | null {
+	return columns.some((c) => c.sum) ? summaryCells(model, columns, texts.total, sums, texts) : null;
+}
+
 /** A field's value as text, for `detail` and `refField`: empty when the config names no field or the record holds none. */
 const textOf = (item: Item, field: string | undefined) =>
 	field === undefined ? "" : valueText(item.record, field);
@@ -169,7 +179,7 @@ function treeView(
 		kind: "tree",
 		columns,
 		groups,
-		total: summaryCells(model, columns, texts.total, model.totals, texts),
+		total: totalCells(model, columns, model.totals, texts),
 		expanded: allOpen(groups),
 		expandAll: { ...state, open: model.rules.groups, details: model.rules.details },
 		collapseAll: { ...state, open: [], details: [] },
@@ -204,7 +214,7 @@ function tableView(
 		kind: "table",
 		columns: headers,
 		rows: items.map((item) => itemRow(model, state, item, columns, true)),
-		total: summaryCells(model, columns, texts.total, sums, texts),
+		total: totalCells(model, columns, sums, texts),
 	};
 }
 

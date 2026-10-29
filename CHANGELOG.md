@@ -19,6 +19,7 @@ A page where the reader must judge every item now has what it needs: each `Recor
 - `width: "full"` spans the window from gutter to gutter, beside the contents rail from the rail to the gutter, centred on the column and with the breadcrumbs where they were; it has no maximum width. Phones are unchanged.
 - Records is keyboard-navigable: one Tab stop on the rows, Up, Down, Home and End between rows, Right and Left to open, close and leave a group in the tree, Enter to follow a row's link or fold, `/` to search. A block with a `reply` is always an island, so the keys work there.
 - Every reply, from `Question`s and row answers alike, lists the answered items with their choice and note together, and folds the unanswered into one line, `Not answered: ...`. An untouched default is still marked `(default)`. A `data-note` field inside a `data-reply` element is that element's note.
+- A `Records` block with no field that has `sum: true` draws no Total row.
 - Code blocks wrap on phones, keeping their indentation; wide screens still scroll them.
 - `guide.md` and `SKILL.md` say to show every item whole when the reader must judge each one, and to ask the person who asked for the page when the source cannot say what a reader needs.
 

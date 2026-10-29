@@ -94,8 +94,8 @@ export interface TreeView {
 	kind: "tree";
 	columns: readonly Column[];
 	groups: readonly GroupRow[];
-	/** The label, then the sums over every record. */
-	total: readonly Cell[];
+	/** The label, then the sums over every record; null when no column is summed, so there is nothing to total. */
+	total: readonly Cell[] | null;
 	/** Every group and every detail is shown open: Expand all then reads Collapse all. */
 	expanded: boolean;
 	/** The states with every group and detail open, and with all of them closed. */
@@ -108,8 +108,8 @@ export interface TableView {
 	kind: "table";
 	columns: readonly Header[];
 	rows: readonly ItemRow[];
-	/** The label, then the sums over the rows shown. */
-	total: readonly Cell[];
+	/** The label, then the sums over the rows shown; null when no column is summed. */
+	total: readonly Cell[] | null;
 }
 
 /** One board column: a value of the first groupBy field, with the matching records as cards. */

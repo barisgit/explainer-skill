@@ -240,7 +240,7 @@ function Tree({ body, ctx }: { body: TreeView; ctx: Context }) {
 	// Two sets of widths: every column, and on phones only the number columns (09-records.css picks one). A column whose
 	// total is incomplete is the one whose sums may read "+ ?": every incomplete subtotal leaves the total incomplete too.
 	const incomplete = new Set(
-		body.total.filter((cell) => cell.incomplete).map((cell) => cell.field),
+		(body.total ?? []).filter((cell) => cell.incomplete).map((cell) => cell.field),
 	);
 	const style = rest.length
 		? `--records-cols: ${widths(rest, incomplete)}; --records-cols-narrow: ${
@@ -263,7 +263,7 @@ function Tree({ body, ctx }: { body: TreeView; ctx: Context }) {
 			{body.groups.map((group) => (
 				<TreeGroup key={group.id} group={group} ctx={ctx} />
 			))}
-			<div class="tree-row total">{rowCells(body.total, ctx)}</div>
+			{body.total && <div class="tree-row total">{rowCells(body.total, ctx)}</div>}
 		</div>
 	);
 }
@@ -319,22 +319,37 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 						</tr>
 					))}
 				</tbody>
-				<tfoot>
-					<tr>
-						<th scope="row">{body.total[0]?.text}</th>
-						{body.total.slice(1).map((cell, i) => {
-							const column = rest[i];
-							return (
-								<td key={cell.field} class={column && num(column)} data-label={column?.label}>
-									{cellText(cell)}
-								</td>
-							);
-						})}
-						{ctx.reply && <td />}
-					</tr>
-				</tfoot>
+				{body.total && <TableTotal total={body.total} columns={rest} ctx={ctx} />}
 			</table>
 		</div>
+	);
+}
+
+/** The table's total row: the label, the sums under the columns that have one, and an empty cell under the answers. */
+function TableTotal({
+	total,
+	columns,
+	ctx,
+}: {
+	total: readonly Cell[];
+	columns: readonly Column[];
+	ctx: Context;
+}) {
+	return (
+		<tfoot>
+			<tr>
+				<th scope="row">{total[0]?.text}</th>
+				{total.slice(1).map((cell, i) => {
+					const column = columns[i];
+					return (
+						<td key={cell.field} class={column && num(column)} data-label={column?.label}>
+							{cellText(cell)}
+						</td>
+					);
+				})}
+				{ctx.reply && <td />}
+			</tr>
+		</tfoot>
 	);
 }
 

@@ -62,7 +62,7 @@ test("the tree groups every item by phase and package, in source order, with sub
 			expect(pkg.kind === "group" && pkg.cells[likely]?.value).toBe(sumOf(expected));
 		}
 	}
-	expect(total[likely]).toMatchObject({ value: sumOf(data), text: "3,116\u00a0h" });
+	expect(total?.[likely]).toMatchObject({ value: sumOf(data), text: "3,116\u00a0h" });
 });
 
 test("source order is the default; a sort reorders only the table", () => {
@@ -206,13 +206,13 @@ test("a sum over records with unknown values shows the known part and how many i
 		// Unknown is not zero: the sum of nothing known is unknown.
 		{ text: "?", value: null, incomplete: "unknown, 2 without a value" },
 	]);
-	expect(treeBody.kind === "tree" && hours(treeBody.total)).toEqual({
+	expect(treeBody.kind === "tree" && hours(treeBody.total ?? [])).toEqual({
 		text: "1,372 h + ?",
 		value: 1372,
 		incomplete: "1,372 h known, 3 without a value",
 	});
 	const { body: table } = partial.view({ ...partial.initial, view: "table" });
-	expect(table.kind === "table" && hours(table.total).text).toBe("1,372 h + ?");
+	expect(table.kind === "table" && hours(table.total ?? []).text).toBe("1,372 h + ?");
 	const { body: board } = partial.view({ ...partial.initial, view: "board" });
 	expect(board.kind === "board" && board.lanes.map((l) => hours(l.cells).text)).toEqual([
 		"1,364 h",
@@ -238,7 +238,7 @@ test("a signed sum with an unknown value is not read as a bound: a known 100 and
 		],
 	});
 	const { body } = ledger.view();
-	const total = body.kind === "table" ? body.total[1] : undefined;
+	const total = body.kind === "table" ? body.total?.[1] : undefined;
 	expect({
 		text: total?.text.replace(/\u00a0/g, " "),
 		incomplete: total?.incomplete?.replace(/\u00a0/g, " "),
@@ -379,4 +379,25 @@ test("a reply puts the same choices on every record, and the records a view leav
 	).toThrow(
 		/reply.options: expected a list of labels[\s\S]*width: expected "wide" or "full"; got "huge"/,
 	);
+});
+
+test("a total row exists only where some column is summed", () => {
+	const { fields } = plan as { fields: Record<string, { sum?: boolean }> };
+	const unsummed = Object.fromEntries(
+		Object.entries(fields).map(([name, field]) => [
+			name,
+			"sum" in field ? { ...field, sum: false } : field,
+		]),
+	);
+	const noSums = createRecords({
+		...(plan as Record<string, unknown>),
+		fields: unsummed,
+		views: ["tree", "table"],
+	});
+	for (const view of ["tree", "table"] as const) {
+		const body = noSums.view({ ...noSums.initial, view }).body;
+		expect(body.kind === view && body.total).toBeNull();
+	}
+	const body = records.view().body;
+	expect(body.kind === "tree" && body.total?.length).toBeGreaterThan(1);
 });

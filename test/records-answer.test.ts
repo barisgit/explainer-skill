@@ -98,3 +98,24 @@ test("only a Records block with a reply brings the scripts that keep and send an
 	expect(kitScriptsIn(plain)).not.toContain("reply");
 	expect(kitScriptsIn(plain)).not.toContain("keep");
 });
+
+const THREE_VIEWS = (source: string) =>
+	source.replace(
+		"<Records {...decisions} />",
+		'<Records {...decisions} views={["tree", "table", "board"]} />',
+	);
+
+test("without a sum no row says Total", async () => {
+	const html = readFileSync(await packedMdx(dir, "totals", THREE_VIEWS(reviewPage())), "utf8");
+	expect(html).not.toContain('<div class="tree-row total"');
+	await inPage(await packedMdx(dir, "totals-table", THREE_VIEWS(reviewPage())), async (cdp) => {
+		await act(
+			cdp,
+			`document.querySelector("#decisions .toolbar .seg label:nth-child(2) input").click()`,
+			"0",
+		);
+		expect(await cdp.evaluate(`document.querySelectorAll("#decisions tfoot").length`, true)).toBe(
+			0,
+		);
+	});
+}, 60_000);
