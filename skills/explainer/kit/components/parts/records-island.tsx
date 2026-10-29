@@ -15,6 +15,7 @@ import {
 	type RecordsView,
 } from "../../records/index.ts";
 import { pageLabels, pageLang } from "./format.ts";
+import { onFocusIn, onKeyDown, rove } from "./records-keys.ts";
 import { type RecordsActions, RecordsBlock } from "./records-view.tsx";
 
 const groupsOf = (rows: readonly GroupRow[]): GroupRow[] =>
@@ -131,6 +132,29 @@ function usePrint(set: (printing: boolean) => void) {
 	}, [set]);
 }
 
+/** Row focus that roves: one row in the Tab order, the arrow keys between rows (records-keys.ts), kept in step with each render. */
+function useRowKeys(root: { current: HTMLElement | null }) {
+	useEffect(() => {
+		const block = root.current;
+		if (!block) {
+			return undefined;
+		}
+		const down = (event: KeyboardEvent) => onKeyDown(event, block);
+		const focus = (event: FocusEvent) => onFocusIn(event, block);
+		block.addEventListener("keydown", down);
+		block.addEventListener("focusin", focus);
+		return () => {
+			block.removeEventListener("keydown", down);
+			block.removeEventListener("focusin", focus);
+		};
+	}, [root]);
+	useLayoutEffect(() => {
+		if (root.current) {
+			rove(root.current);
+		}
+	});
+}
+
 /** Records with controls; `config` is the props the page gave Records, as JSON. */
 export function RecordsIsland({ config }: { config: RecordsConfig }) {
 	const records = useMemo(
@@ -147,6 +171,7 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 
 	const ready = useHash(records, root, setState);
 	usePrint(setPrinting);
+	useRowKeys(root);
 	useEffect(() => setLive(true), []);
 	const written = useRef(state);
 	useEffect(() => {

@@ -260,6 +260,12 @@
 .records .lane li > .answer {
 	margin-block-start: 0.5rem;
 }
+/* A row reached by the arrow keys without a link or fold of its own is the row itself. */
+.records :is(.tree-row, tbody tr, .lane li):focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
 /* Phones: the tree keeps the label and the numbers, a line under it; owners, categories and dates are left to the table, the
    board and the item's view. The first number starts in its own column, as in a tree with no hidden cells. */
 @media (max-width: 40rem) {
