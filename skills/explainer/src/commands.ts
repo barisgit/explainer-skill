@@ -11,7 +11,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
 import { authorTsconfig, kitLabels, kitPath, leadingComment, pageFile } from "./kit.ts";
 import { clientBundle, isClientModule } from "./mdx/bundle.ts";
-import { scriptsInCode } from "./mdx/kit-scripts.ts";
+import { RECORDS_ANSWER_MODULE, scriptsInCode } from "./mdx/kit-scripts.ts";
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
@@ -96,8 +96,11 @@ async function componentSize(file: string): Promise<string> {
 	const transpiler = new Bun.Transpiler({ loader: "tsx" });
 	const modules = [...moduleTree(kitPath(file))];
 	const sources = modules.map((path) => readFileSync(path, "utf8"));
+	// A page carries the scripts of a Records row's answer only when its config asks for one, so they are not the component's.
 	const scripts = new Set(
-		sources.flatMap((code) => [...scriptsInCode(transpiler.transformSync(code))]),
+		sources
+			.filter((_, i) => modules[i] !== RECORDS_ANSWER_MODULE)
+			.flatMap((code) => [...scriptsInCode(transpiler.transformSync(code))]),
 	);
 	const either = scripts.has("plot.js") && scripts.has("charts.js");
 	const files = [...scripts].filter(

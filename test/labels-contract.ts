@@ -43,6 +43,8 @@ export const ENGLISH = {
 	recordsBoard: "Board",
 	recordsView: "View",
 	recordsSearch: "Search",
+	recordsAnswer: "Answer",
+	recordsNote: "Note",
 	recordsTotal: "Total",
 	recordsShown: "{shown} of {total}",
 	recordsCount: "Records",
@@ -94,6 +96,8 @@ export const SLOVENIAN: typeof ENGLISH = {
 	recordsBoard: "Tabla",
 	recordsView: "Pogled",
 	recordsSearch: "Iskanje",
+	recordsAnswer: "Odgovor",
+	recordsNote: "Opomba",
 	recordsTotal: "Skupaj",
 	recordsShown: "{shown} od {total}",
 	recordsCount: "Zapisi",
@@ -144,12 +148,21 @@ async function records() {
 	if (!block) {
 		return;
 	}
-	const views = [...block.querySelectorAll(".seg span")].map((s) => s.textContent).join("|");
-	expect("records views", views === [L.recordsTree, L.recordsTable, L.recordsBoard].join("|") && aria(".seg", block) === L.recordsView);
+	const views = [...block.querySelectorAll(".toolbar .seg span")].map((s) => s.textContent).join("|");
+	expect("records views", views === [L.recordsTree, L.recordsTable, L.recordsBoard].join("|") && aria(".toolbar .seg", block) === L.recordsView);
 	const search = $("input[type=search]", block);
 	expect("records search", search.getAttribute("aria-label") === L.recordsSearch && search.placeholder === L.recordsSearch);
 	expect("records count", $("output", block).textContent === L.recordsShown.replace("{shown}", "2").replace("{total}", "2"));
 	expect("records total and expand all", $(".total", block).firstElementChild.textContent === L.recordsTotal && $(".fold-all", block).textContent === L.expandAll);
+	const note = $("input[data-note]", block);
+	expect("records note", note.placeholder === L.recordsNote && note.getAttribute("aria-label").startsWith(L.recordsNote));
+	const tabled = changed(block);
+	$(".toolbar .seg label:nth-child(2) input", block).click();
+	await tabled;
+	expect("records answer column", $("thead th:last-child", block).textContent === L.recordsAnswer);
+	const treed = changed(block);
+	$(".toolbar .seg label:nth-child(1) input", block).click();
+	await treed;
 	const drawn = changed(block);
 	search.value = "zzz";
 	search.dispatchEvent(new Event("input", { bubbles: true }));

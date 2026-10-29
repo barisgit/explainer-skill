@@ -118,8 +118,9 @@ function toNodes(
 	});
 }
 
-const idsOf = (nodes: readonly TreeNode[]): string[] =>
-	nodes.flatMap((n) => [n.id, ...idsOf(n.groups)]);
+/** The ids of the groups below `nodes`, in tree order, down to `levels` levels (all of them when left out). */
+const idsOf = (nodes: readonly TreeNode[], levels = Number.POSITIVE_INFINITY): string[] =>
+	levels < 1 ? [] : nodes.flatMap((n) => [n.id, ...idsOf(n.groups, levels - 1)]);
 
 function itemsOf(
 	config: CheckedConfig,
@@ -164,6 +165,8 @@ export function buildModel(config: CheckedConfig, locale: string): Model {
 	if (problems.length) {
 		throw new RecordsConfigError(`records ${JSON.stringify(config.id)}`, problems);
 	}
+	const details = detailIds(config, items);
+	const { open } = config;
 	const rules: StateRules = {
 		id: config.id,
 		views: config.views,
@@ -172,7 +175,12 @@ export function buildModel(config: CheckedConfig, locale: string): Model {
 		searchable: config.search.length > 0,
 		facets: facetValues(config),
 		groups: idsOf(tree),
-		details: detailIds(config, items),
+		details,
+		opened: {
+			groups:
+				open === undefined || open === false ? [] : idsOf(tree, open === true ? undefined : open),
+			details: open === true ? details : [],
+		},
 	};
 	const cell = (item: Item, field: string): Cell => {
 		const value = readValue(item.record, field);

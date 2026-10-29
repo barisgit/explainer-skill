@@ -12,6 +12,8 @@ export const LABELS = {
 	recordsTotal: "Total",
 	recordsShown: "{shown} of {total}",
 	recordsCount: "Records",
+	recordsAnswer: "Answer",
+	recordsNote: "Note",
 	recordsNoMatches: "No matches",
 	recordsClear: "Clear filters",
 	recordsKnown: "{value} known, {missing} without a value",

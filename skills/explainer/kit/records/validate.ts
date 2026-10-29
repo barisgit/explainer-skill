@@ -27,6 +27,7 @@ import {
 	show,
 } from "./read.ts";
 import { checkGroupPaths, readData } from "./validate-data.ts";
+import { readOpen, readReply, readWidth } from "./validate-display.ts";
 import { readFields } from "./validate-fields.ts";
 
 /** A config as parseConfig returns it: the lists left out hold their defaults, so the model never guesses them again. */
@@ -70,6 +71,9 @@ const TOP_KEYS = [
 	"link",
 	"detail",
 	"refField",
+	"open",
+	"reply",
+	"width",
 ] as const satisfies readonly (keyof RecordsConfig)[];
 
 const isView = (v: unknown): v is ViewKind => VIEW_KINDS.some((kind) => kind === v);
@@ -311,6 +315,10 @@ export function parseConfig(input: unknown): CheckedConfig {
 		hint: `a view name: ${NAME_HINT}`,
 	});
 	const { detail, refField } = readRowKeys(input, fields, link, report);
+	const { reply: rawReply, open: rawOpen, width: rawWidth } = input;
+	const reply = readReply(rawReply, report);
+	const open = readOpen(rawOpen, groupBy.length, report);
+	const width = readWidth(rawWidth, report);
 	const data = idField ? readData(rawData, { idField, fields, groupBy }, report) : [];
 	checkGroupPaths(groups, data, groupBy, report);
 	if (problems.length || id === undefined || idField === undefined) {
@@ -331,5 +339,8 @@ export function parseConfig(input: unknown): CheckedConfig {
 		...(link ? { link } : {}),
 		...(detail ? { detail } : {}),
 		...(refField ? { refField } : {}),
+		...(reply ? { reply } : {}),
+		...(open === undefined ? {} : { open }),
+		...(width ? { width } : {}),
 	};
 }

@@ -1,0 +1,112 @@
+{
+	"id": "decisions",
+	"idField": "id",
+	"fields": {
+		"id": { "label": "Decision", "kind": "text" },
+		"title": { "label": "Question", "kind": "text" },
+		"area": {
+			"label": "Area",
+			"kind": "category",
+			"values": [
+				{ "value": "packaging", "label": "Packaging", "color": "var(--c1)" },
+				{ "value": "security", "label": "Security", "color": "var(--c2)" },
+				{ "value": "compat", "label": "Compatibility", "color": "var(--c3)" }
+			]
+		},
+		"risk": {
+			"label": "Risk if wrong",
+			"kind": "category",
+			"values": [
+				{ "value": "low", "label": "Low" },
+				{ "value": "medium", "label": "Medium" },
+				{ "value": "high", "label": "High", "color": "var(--bad)" }
+			]
+		},
+		"case": { "label": "The case", "kind": "text" }
+	},
+	"columns": ["id", "title", "risk"],
+	"groupBy": ["area"],
+	"groups": [
+		{ "path": ["packaging"], "description": "How a release reaches the people who install it." },
+		{ "path": ["security"], "description": "What a release proves about where it came from." },
+		{ "path": ["compat"], "description": "Which setups a release promises to keep working." }
+	],
+	"search": ["id", "title", "case"],
+	"facets": ["risk"],
+	"open": true,
+	"width": "full",
+	"reply": { "options": ["Agree", "Change", "Need context"], "note": true },
+	"detail": "case",
+	"data": [
+		{
+			"id": "D1",
+			"title": "Publish release candidates to the main channel?",
+			"area": "packaging",
+			"risk": "medium",
+			"case": "Situation: users run tidy upgrade and pick up whatever the latest tag is. Now: a release candidate goes to the next channel only, with npm publish --access public --provenance --tag next && gh release create v2.4.0-rc.1 --prerelease --generate-notes --verify-tag. Alternative: publish it as latest, as pip does for pre-releases when asked with --pre, so more people test it. Recommendation: keep the separate channel; a broken candidate would reach everyone."
+		},
+		{
+			"id": "D2",
+			"title": "Ship a single static binary next to the package?",
+			"area": "packaging",
+			"risk": "low",
+			"case": "Situation: the package needs Node 20 on the machine. Now: nobody gets a binary. Alternative: build one per platform with bun build --compile --target=bun-linux-x64 --outfile dist/tidy-linux-x64 src/cli.ts, as ripgrep and fd do. Recommendation: yes, for Linux and macOS first; it removes the Node requirement for CI users."
+		},
+		{
+			"id": "D3",
+			"title": "Keep a changelog file in the repository?",
+			"area": "packaging",
+			"risk": "low",
+			"case": "Situation: release notes are written by the release tool from merged pull requests. Now: there is no CHANGELOG.md; notes live on the release page. Alternative: also commit them, as most libraries do, so they travel with a clone. Recommendation: generate the file at release time; no extra writing."
+		},
+		{
+			"id": "D4",
+			"title": "Sign release archives with a project key?",
+			"area": "security",
+			"risk": "high",
+			"case": "Situation: anyone can download the archive from the release page. Now: archives are unsigned and checked only by a checksum file next to them. Alternative: sign with cosign sign-blob --yes --output-signature tidy.tar.gz.sig --output-certificate tidy.tar.gz.pem tidy.tar.gz, which Go and Kubernetes releases do. Recommendation: yes; a checksum on the same page proves nothing if the page is altered."
+		},
+		{
+			"id": "D5",
+			"title": "Require two reviewers for changes to the release workflow?",
+			"area": "security",
+			"risk": "high",
+			"case": "Situation: the workflow holds the publishing token. Now: one reviewer can approve a change to it. Alternative: a code-owners rule that asks two, as most registries recommend for publishing code. Recommendation: yes; it slows a change to this one file only."
+		},
+		{
+			"id": "D6",
+			"title": "Pin third-party actions to commit hashes?",
+			"area": "security",
+			"risk": "medium",
+			"case": "Situation: the workflow uses six actions from other authors. Now: they are pinned to tags, which their authors can move. Alternative: pin to hashes and let a bot propose updates. Recommendation: yes, with the bot, so pinning does not freeze fixes."
+		},
+		{
+			"id": "D7",
+			"title": "Drop Node 18 in this release?",
+			"area": "compat",
+			"risk": "medium",
+			"case": "Situation: Node 18 reached end of life in April. Now: the package still runs on it, and CI tests it. Alternative: require Node 20 and say so in the release notes, as the other tools in this space already did. Recommendation: drop it; the tests on 18 take a third of the CI time."
+		},
+		{
+			"id": "D8",
+			"title": "Keep the old --legacy-paths flag for another release?",
+			"area": "compat",
+			"risk": "low",
+			"case": "Situation: the flag was deprecated in 2.2 and prints a warning. Now: it still works. Alternative: remove it, which the 2.2 notes promised for 2.4. Recommendation: remove it as promised; point to tidy migrate-paths in the error."
+		},
+		{
+			"id": "D9",
+			"title": "Support Windows paths with spaces in the config file?",
+			"area": "compat",
+			"risk": "medium",
+			"case": "Situation: three users reported C:\\Program Files\\Tidy\\tidy.toml failing to load. Now: such paths fail with an unreadable error. Alternative: quote-aware parsing, which costs one day and a new test matrix entry. Recommendation: fix it; it is the most reported problem this quarter."
+		},
+		{
+			"id": "D10",
+			"title": "Publish the type definitions as a separate package?",
+			"area": "compat",
+			"risk": "low",
+			"case": "Situation: the types ship inside the main package. Now: they follow its version. Alternative: split them out, as DefinitelyTyped does, so they can be fixed without a release. Recommendation: no; one version is simpler for everyone."
+		}
+	]
+}

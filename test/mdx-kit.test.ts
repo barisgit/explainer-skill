@@ -244,7 +244,7 @@ import { Question, Records, View } from "kit";
 
 <a href="#i/1">One</a>, and the <span data-ref="cache">cache</span>.
 
-<Records id="tasks" data={[{ id: "A", phase: "One", hours: 2 }, { id: "B", phase: "Two", hours: 3 }]} idField="id" fields={{ id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }} columns={["id", "hours"]} groupBy={["phase"]} views={["tree", "table", "board"]} search={["id"]} />
+<Records id="tasks" data={[{ id: "A", phase: "One", hours: 2 }, { id: "B", phase: "Two", hours: 3 }]} idField="id" fields={{ id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }} columns={["id", "hours"]} groupBy={["phase"]} views={["tree", "table", "board"]} search={["id"]} reply={{ options: ["Agree"], note: true }} />
 
 <figure aria-label="Scheme"><p>The <span data-ref="db">db</span>.</p></figure>
 

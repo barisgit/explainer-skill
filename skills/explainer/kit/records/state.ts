@@ -2,8 +2,8 @@
  * What the reader has chosen in one records block, and its form in the URL hash.
  *
  * The hash form is `<block id>?<params>`, such as `plan?view=table&sort=-labour&q=power&f.owner=JV,PS&open=1,1.wp1&detail=WP1-02`
- * (`open=*` and `detail=*` for all), and only the params that differ from the defaults are written; the defaults alone are
- * just `plan`. It lives beside the kit's views
+ * (`open=*` and `detail=*` for all, `open=` for none), and only the params that differ from the defaults are written; the
+ * defaults alone are just `plan`. It lives beside the kit's views
  * router (kit/views.ts) without clashing: a block id has no `/`, so no `#name/param` route claims it, and no element has the id
  * `plan?...`, so the router shows the overview, where the block is. An item's own view (`#item/WP1-02`) replaces the block's
  * hash, and Back returns to it. One block's state at a time lives in the hash: a hash that names another block, or none,
@@ -48,6 +48,8 @@ export interface StateRules {
 	groups: readonly string[];
 	/** The ids of the records that have a detail, in source order. */
 	details: readonly string[];
+	/** The groups and details shown open at load (config `open`): what the state holds before the reader folds anything. */
+	opened: { readonly groups: readonly string[]; readonly details: readonly string[] };
 }
 
 /** The state a block opens with. */
@@ -57,8 +59,8 @@ export function initialState(rules: StateRules): RecordsState {
 		sort: rules.sort,
 		filters: {},
 		search: "",
-		open: [],
-		details: [],
+		open: rules.opened.groups,
+		details: rules.opened.details,
 	};
 }
 
@@ -113,14 +115,15 @@ const FOLDS = [
 	{ param: "detail", key: "details", all: "details" },
 ] as const;
 
-/** The `open` and `detail` params of a normalized state. */
+/** The `open` and `detail` params of a normalized state: those that differ from the folds the block opens with. */
 function foldParams(rules: StateRules, s: RecordsState): string[] {
+	const start = initialState(rules);
 	return FOLDS.flatMap(({ param, key, all }) => {
 		const ids = s[key];
-		if (!ids.length) {
+		if (ids.join() === start[key].join()) {
 			return [];
 		}
-		return [`${param}=${ids.length === rules[all].length ? "*" : encode(ids)}`];
+		return [`${param}=${ids.length > 0 && ids.length === rules[all].length ? "*" : encode(ids)}`];
 	});
 }
 

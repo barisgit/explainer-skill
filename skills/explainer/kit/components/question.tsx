@@ -13,10 +13,12 @@
    Without options the reader writes the answer in a text box (its id is the name, written as above). What is written inside the Question
    is the model answer, behind a fold the reader opens when ready (kitLabels.showAnswer), which Expand all leaves shut; such a Question
    is a self-check too: kept, but not in the reply. With nothing inside, the written answer joins the reply.
-   A reply question the reader never touched is sent as "(default)", one with nothing chosen as "no answer".
+   The reply lists each answered question with its choice, and a note under it when the reader wrote one; questions left alone
+   are folded into one "Not answered: ..." line. A choice the reader never touched is sent as "(default)".
    For a panel whose controls' current values join the reply, put data-reply on any element around plain controls with ids:
    <div class="controls" data-reply="Requirements"><label class="field"><span>Max latency</span><input id="lat" type="range" /></label></div> */
 import type { ComponentChildren } from "preact";
+import { idOf, idPart } from "./parts/answer-ids.ts";
 
 export interface QuestionProps {
 	name: string;
@@ -42,19 +44,6 @@ const LABELS = {
  */
 const kitText = (key: keyof typeof LABELS) =>
 	(typeof kitLabels === "undefined" ? undefined : kitLabels?.[key]) || LABELS[key];
-
-/**
- * Text as part of an id, case kept: letters, digits and `-` stay, every other character (`_` included) becomes `_<hex code
- * point>_`, so distinct texts give distinct parts and the id holds no space or punctuation ("Ship now" is "Ship_20_now").
- */
-const idPart = (text: string) =>
-	text.replace(/[^\p{L}\p{N}-]/gu, (c) => `_${(c.codePointAt(0) ?? 0).toString(16)}_`);
-
-/**
- * An option's id, `name-value`: the same on every pack and distinct for distinct values of one Question, so keep.js keeps the
- * answer by it. Two Questions can still meet ("a-b" with "c", "a" with "b-c"); pack fails on a page where they do.
- */
-const idOf = (name: string, value: string) => `${idPart(name)}-${idPart(value)}`;
 
 /** The problem with a written answer's props, if any: the props that pick among options have nothing to pick from. */
 function writtenProblem({ multiple, checked, answer }: QuestionProps): string | undefined {

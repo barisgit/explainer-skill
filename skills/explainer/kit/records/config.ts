@@ -107,6 +107,20 @@ export interface SortSpec {
 	desc?: boolean;
 }
 
+/**
+ * An answer the reader gives in every record's row: one of a few choices, and optionally a note. The choices are Question's
+ * `options`: a list of labels that are their own values, or `{ value: label }` pairs. Each record's answer joins the reply as one
+ * entry named by the record's label, with its note under it.
+ */
+export interface ReplyConfig {
+	options: readonly string[] | Readonly<Record<string, string>>;
+	/** Offer a one-line note beside the choices. */
+	note?: boolean;
+}
+
+/** How wide the block is: `"wide"` as `.wide` (up to 88rem), `"full"` nearly the window's width, beside the contents rail too. */
+export type BlockWidth = "wide" | "full";
+
 /** The config of one records block. */
 export interface RecordsConfig {
 	/**
@@ -134,6 +148,11 @@ export interface RecordsConfig {
 	groupBy?: readonly string[];
 	/** Titles and descriptions of particular groups. */
 	groups?: readonly GroupNote[];
+	/**
+	 * Groups shown open at load: `true` opens every group and every record's detail, a number the first that many levels of
+	 * groups (`1` the outermost). Left out: closed. The reader's folds still go in the URL hash, and a hash that names them wins.
+	 */
+	open?: boolean | number;
 	/** The views offered, the first shown by default. Left out: the tree when there is a `groupBy`, else the table. */
 	views?: readonly ViewKind[];
 	/**
@@ -157,4 +176,8 @@ export interface RecordsConfig {
 	 * share it (kit link). Not `ref`, which Preact keeps for itself.
 	 */
 	refField?: string;
+	/** An answer the reader gives on every record, in its row of the tree and table and on its card. */
+	reply?: ReplyConfig;
+	/** The block's width; `"wide"` when left out. */
+	width?: BlockWidth;
 }

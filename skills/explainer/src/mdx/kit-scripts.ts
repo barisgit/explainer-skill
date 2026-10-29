@@ -277,6 +277,13 @@ function selfCheckCall(code: string, start: number, end: number): boolean {
 		: literalAt(code, props.get("children"));
 }
 
+/**
+ * The module that writes a Records row's answer (`data-reply`, controls with ids). Records code is in every page that has a
+ * Records island, so the scan of client code leaves this module out: a page needs keep.js and reply.js for it only when its
+ * prerendered markup holds the answers (`config.reply`), as `scriptsInHtml` finds them.
+ */
+export const RECORDS_ANSWER_MODULE = join(KIT_DIR, "components", "parts", "records-answer.tsx");
+
 let questionNeeds: Set<KitScript> | undefined;
 
 /** The kit scripts Question's own code needs for the markup it can write: every form's. */

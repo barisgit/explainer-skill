@@ -4,7 +4,7 @@
  * it leads to (`next`, `toggle`, `clear`), so a renderer only hands that back. Ids are stable across edits of other records: a
  * group's id comes from its values, an item's from its id field.
  */
-import type { FieldKind, Value, ViewKind } from "./config.ts";
+import type { BlockWidth, FieldKind, Value, ViewKind } from "./config.ts";
 import type { RecordsState } from "./state.ts";
 
 /** One cell of a row, a group or a total. An empty cell has text "" and keeps its column. */
@@ -172,6 +172,21 @@ export interface RecordsTexts {
 	collapseAll: string;
 	/** What a board lane's count counts. */
 	count: string;
+	/** The table column that holds each record's answer, and the name of its note field. */
+	answer: string;
+	note: string;
+}
+
+/** One choice of the answer a record takes. */
+export interface ReplyChoice {
+	value: string;
+	label: string;
+}
+
+/** The answer on every record (config `reply`): the choices, and whether a note goes with them. */
+export interface ReplyView {
+	choices: readonly ReplyChoice[];
+	note: boolean;
 }
 
 /** One records block in one state. */
@@ -196,4 +211,12 @@ export interface RecordsView {
 	/** The state without search and filters, when there are any. */
 	clear: RecordsState | null;
 	body: TreeView | TableView | BoardView;
+	/** The answer every record takes, or null. */
+	reply: ReplyView | null;
+	/**
+	 * With a reply: the records the body does not show (the table and board leave out those a search or filter excludes). They keep
+	 * their answer in the page, out of sight, so the reply covers every record whatever the reader is looking at.
+	 */
+	unlisted: readonly ItemRow[];
+	width: BlockWidth;
 }

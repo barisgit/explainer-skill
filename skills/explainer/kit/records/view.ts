@@ -4,6 +4,7 @@ import { type Item, type Narrowing, type Sum, valueText } from "./engine.ts";
 import { slug } from "./ids.ts";
 import type { Model, TreeNode } from "./model.ts";
 import { normalize, type RecordsState, writeHash } from "./state.ts";
+import { choicePairs } from "./validate-display.ts";
 import type {
 	BoardView,
 	Cell,
@@ -15,6 +16,7 @@ import type {
 	Lane,
 	RecordsTexts,
 	RecordsView,
+	ReplyView,
 	TableView,
 	TreeView,
 	ViewOption,
@@ -277,6 +279,25 @@ function viewOptions(model: Model, state: RecordsState, texts: ViewTexts): ViewO
 	}));
 }
 
+const replyOf = (model: Model): ReplyView | null => {
+	const { reply } = model.config;
+	return reply
+		? {
+				choices: choicePairs(reply.options).map(([value, label]) => ({ value, label })),
+				note: reply.note === true,
+			}
+		: null;
+};
+
+/** The ids of the records a body shows; the tree shows all of them, dimming those a search leaves out. */
+function shownIds(body: RecordsView["body"], all: readonly Item[]): ReadonlySet<string> {
+	if (body.kind === "tree") {
+		return new Set(all.map((item) => item.id));
+	}
+	const rows = body.kind === "table" ? body.rows : body.lanes.flatMap((lane) => lane.items);
+	return new Set(rows.map((row) => row.id));
+}
+
 /** The view model of `state`, which is normalized first, so any state a renderer hands back is safe. */
 export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): RecordsView {
 	const state = normalize(model.rules, raw);
@@ -292,6 +313,8 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 			: state.view === "board"
 				? boardView(model, state, narrowing, texts)
 				: tableView(model, state, result.items, result.sums, texts);
+	const reply = replyOf(model);
+	const shown = shownIds(body, model.items);
 	return {
 		id: model.config.id,
 		state,
@@ -308,5 +331,12 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 			.replace("{total}", model.count(model.items.length)),
 		clear: filtering ? { ...state, filters: {}, search: "" } : null,
 		body,
+		reply,
+		unlisted: reply
+			? model.items
+					.filter((item) => !shown.has(item.id))
+					.map((item) => itemRow(model, state, item, body.columns, false))
+			: [],
+		width: model.config.width ?? "wide",
 	};
 }

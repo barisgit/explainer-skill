@@ -15,11 +15,19 @@
      link      a filled View's name: each row links to #<link>/<id>, and the view's previous/next go through the rows shown
      detail    a text field a row opens to in place in every view (instead of link); Expand all opens these too
      refField  a field whose value is the row's data-ref (kit link)
+     reply     { options: ["Agree", "Change", "Need context"], note: true }: every record gets these choices (a list of labels, or
+               value: label pairs, as Question's options) and a note box beside its row, in the tree, table and board. Each answer is
+               kept like any control and joins the reply under the record's label (its leading text columns, "D4 Sign the archives?");
+               a record the reader leaves alone is listed under "Not answered". No choice starts chosen, so a skipped row shows
+     open      true opens every group and every record's detail at load; a number opens that many group levels (1 is the outermost).
+               The hash writes only what the reader changed from there. Use it when the reader must see every item, as with reply
+     width     "wide" (default) or "full": the block spans the window from gutter to gutter (beside a contents rail, from the
+               rail to the gutter), a phone's column as ever
    A field with sum: true adds subtotals to groups and lanes, and a total. Records without a value are not zero: the sum shows
    what is known plus ? (8 h + ?), or ? when none has one. The view, sort, search, filters and open folds go in the URL hash,
    so a link opens what the reader saw, and a link of your own applies a state: <a href="#plan?f.owner=JV">JV's work</a>.
    Inside a View the state follows its route: #team?crew?view=table.
-   A tree or board alone, with no search or facets, is static markup. Otherwise it is an island that carries the data as JSON, a
+   A tree or board alone, with no search, facets or reply is static markup. Otherwise it is an island that carries the data as JSON, a
    second copy beside a filled View of the same records; its controls show once the script runs, and before that the default
    view reads as it is. pack checks the config and names the path of each problem (fields.hours.kind); it also fails on a link
    that names no View and on a block id that is a View's name. It prints as the whole tree. */
@@ -39,6 +47,10 @@ export function Records(props: RecordsProps) {
 	const records = createRecords(props, { locale: pageLang(), labels: pageLabels() });
 	const vm = records.view();
 	const controls =
-		vm.views.length > 1 || vm.searchable || vm.facets.length > 0 || vm.body.kind === "table";
+		vm.views.length > 1 ||
+		vm.searchable ||
+		vm.facets.length > 0 ||
+		vm.reply !== null ||
+		vm.body.kind === "table";
 	return controls ? <RecordsIsland config={props} /> : <RecordsBlock vm={vm} />;
 }

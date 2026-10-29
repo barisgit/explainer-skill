@@ -316,3 +316,67 @@ test("a row opens in place to its detail or links to its view, and carries its r
 		'detail: a row links to its view (link "item") or opens in place to its detail, not both',
 	);
 });
+
+test("groups open at load by levels or all, and the hash writes only what differs from that", () => {
+	const unlinked = { ...(plan as Record<string, unknown>), link: undefined, detail: "rationale" };
+	const topLevel = createRecords({ ...unlinked, open: 1 });
+	const openGroups = (r: typeof records) => {
+		const body = r.view().body;
+		return body.kind === "tree" ? body.groups.map((g) => g.open) : [];
+	};
+	expect(openGroups(records)).toEqual([false, false, false]);
+	expect(openGroups(topLevel)).toEqual([true, true, true]);
+	const nested = topLevel.view().body;
+	expect(
+		nested.kind === "tree" && nested.groups[0]?.children.some((c) => c.kind === "group" && c.open),
+	).toBe(false);
+	const all = createRecords({ ...unlinked, open: true });
+	const everything = all.view().body;
+	expect(everything.kind === "tree" && everything.expanded).toBe(true);
+	// The defaults write no hash; closing a group the block opened, or all of them, is a difference and is written.
+	expect(topLevel.writeHash(topLevel.initial)).toBe("plan");
+	expect(topLevel.writeHash({ ...topLevel.initial, open: ["2", "3"] })).toBe("plan?open=2,3");
+	expect(topLevel.writeHash({ ...topLevel.initial, open: [] })).toBe("plan?open=");
+	expect(topLevel.readHash("#plan?open=")?.open).toEqual([]);
+	expect(topLevel.readHash("#plan?view=table")?.open).toEqual(["1", "2", "3"]);
+	expect(all.writeHash(all.initial)).toBe("plan");
+	expect(all.writeHash({ ...all.initial, details: [] })).toBe("plan?detail=");
+	expect(() => createRecords({ ...unlinked, open: 3 })).toThrow(
+		"open: expected true, false or a number of levels from 1 to 2; got 3",
+	);
+});
+
+test("a reply puts the same choices on every record, and the records a view leaves out keep theirs", () => {
+	const answering = createRecords({
+		...(plan as Record<string, unknown>),
+		search: ["id", "title"],
+		reply: { options: { agree: "Agree", change: "Change" }, note: true },
+		width: "full",
+	});
+	const view = answering.view();
+	expect(view.reply).toEqual({
+		choices: [
+			{ value: "agree", label: "Agree" },
+			{ value: "change", label: "Change" },
+		],
+		note: true,
+	});
+	expect(view.width).toBe("full");
+	// The tree shows every record; the table drops those a search excludes, and hands them back as unlisted.
+	expect(view.unlisted).toEqual([]);
+	const table = answering.view({ ...answering.initial, view: "table", search: "board" });
+	expect(table.shown).toBeLessThan(96);
+	expect(table.unlisted).toHaveLength(96 - table.shown);
+	expect(table.body.kind === "table" && table.body.rows).toHaveLength(table.shown);
+	expect(records.view().reply).toBeNull();
+	expect(() =>
+		createRecords({ ...(plan as object), reply: { options: ["Yes", "Yes"], note: 1 } }),
+	).toThrow(
+		/reply.options: the label "Yes" is used twice[\s\S]*reply.note: expected true or false; got 1/,
+	);
+	expect(() =>
+		createRecords({ ...(plan as object), reply: { options: [] }, width: "huge" }),
+	).toThrow(
+		/reply.options: expected a list of labels[\s\S]*width: expected "wide" or "full"; got "huge"/,
+	);
+});

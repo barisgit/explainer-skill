@@ -8,7 +8,7 @@ import { PackError } from "../pack-error.ts";
 import { KIT_DIR, SKILL_ROOT, shownPath } from "../paths.ts";
 import { compileMdx } from "./compile.ts";
 import { pageDrawer } from "./draw.ts";
-import { QUESTION_IMPORT, QUESTION_MODULE } from "./kit-scripts.ts";
+import { QUESTION_IMPORT, QUESTION_MODULE, RECORDS_ANSWER_MODULE } from "./kit-scripts.ts";
 
 /** The bare imports a page and the kit make, resolved to the skill's own files, so an installed skill needs no node_modules. */
 const BARE: Record<string, string> = {
@@ -75,7 +75,8 @@ export interface CompiledPage {
 
 /**
  * What a page build is for: the prerender (client modules swapped for their island wrappers), the browser's client bundle, or
- * the scan of the client code for the kit scripts it needs (kit Question left as an import from QUESTION_IMPORT).
+ * the scan of the client code for the kit scripts it needs (kit Question left as an import from QUESTION_IMPORT, a Records row's
+ * answer left out).
  */
 type BuildFor = "prerender" | "browser" | "scan";
 
@@ -117,6 +118,9 @@ function pagePlugin(
 				}
 				if (purpose === "scan" && path === QUESTION_MODULE) {
 					return { contents: `export { Question } from "${QUESTION_IMPORT}";`, loader: "js" };
+				}
+				if (purpose === "scan" && path === RECORDS_ANSWER_MODULE) {
+					return { contents: "export const Answer = () => null;", loader: "js" };
 				}
 				const source = readFileSync(path, "utf8");
 				return purpose === "prerender" && isClientModule(source)

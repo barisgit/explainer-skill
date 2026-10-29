@@ -229,6 +229,37 @@
 	font-weight: 400;
 }
 
+/* A record's answer (config reply): its choices as a .seg and its note, on one line where they fit. Under a tree row it starts
+   where the row's label does (two levels of the tree's indent), in a table it is the last cell, on a card it ends the card. */
+.records .answer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	min-inline-size: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+.records .answer .seg span {
+	padding-block: 0.1875rem;
+	min-block-size: 0;
+	font-size: 0.875rem;
+}
+.records .answer .note {
+	flex: 1 1 12rem;
+	min-inline-size: 0;
+	max-inline-size: 28rem;
+	min-block-size: 2rem;
+}
+.records .tree .answer {
+	margin-block: 0;
+	margin-inline-start: 2.625rem;
+	padding-block: 0.125rem 0.75rem;
+}
+.records .lane li > .answer {
+	margin-block-start: 0.5rem;
+}
 /* Phones: the tree keeps the label and the numbers, a line under it; owners, categories and dates are left to the table, the
    board and the item's view. The first number starts in its own column, as in a tree with no hidden cells. */
 @media (max-width: 40rem) {

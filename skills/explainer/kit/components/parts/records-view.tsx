@@ -12,9 +12,11 @@ import type {
 	RecordsState,
 	RecordsTexts,
 	RecordsView,
+	ReplyView,
 	TableView,
 	TreeView,
 } from "../../records/index.ts";
+import { Answer } from "./records-answer.tsx";
 
 /** What the island does when the reader uses a control; each takes the state the view model computed for it. */
 export interface RecordsActions {
@@ -27,6 +29,10 @@ export interface RecordsActions {
 }
 
 interface Context {
+	/** The block's id, which the controls of its answers carry in their ids. */
+	block: string;
+	/** The answer every record takes, or null. */
+	reply: ReplyView | null;
 	actions: RecordsActions | undefined;
 	texts: RecordsTexts;
 	filtering: boolean;
@@ -109,8 +115,30 @@ function rowCells(cells: readonly Cell[], ctx: Context, label?: JSX.Element): JS
 
 const missed = (ctx: Context, matches: boolean) => (ctx.filtering && !matches ? "miss" : undefined);
 
-/** An item of the tree: a link to its view, a fold that opens to its detail, or a plain row. */
+/** A record's answer under its row, in the view it is shown in; nothing without a reply. */
+function RowAnswer({ row, ctx }: { row: ItemRow; ctx: Context }) {
+	return ctx.reply ? (
+		<Answer
+			block={ctx.block}
+			recordId={row.id}
+			label={labelOf(row.cells, ctx.lead)}
+			reply={ctx.reply}
+			noteText={ctx.texts.note}
+		/>
+	) : null;
+}
+
+/** An item of the tree: its row, a link to its view, a fold that opens to its detail or a plain one, and its answer under it. */
 function TreeItem({ row, ctx }: { row: ItemRow; ctx: Context }) {
+	return (
+		<>
+			<TreeRow row={row} ctx={ctx} />
+			<RowAnswer row={row} ctx={ctx} />
+		</>
+	);
+}
+
+function TreeRow({ row, ctx }: { row: ItemRow; ctx: Context }) {
 	const cells = rowCells(row.cells, ctx);
 	const miss = missed(ctx, row.match);
 	if (row.href) {
@@ -262,6 +290,7 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 								)}
 							</th>
 						))}
+						{ctx.reply && <th>{ctx.texts.answer}</th>}
 					</tr>
 				</thead>
 				<tbody>
@@ -282,6 +311,11 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 									</td>
 								);
 							})}
+							{ctx.reply && (
+								<td data-label={ctx.texts.answer}>
+									<RowAnswer row={row} ctx={ctx} />
+								</td>
+							)}
 						</tr>
 					))}
 				</tbody>
@@ -296,6 +330,7 @@ function Table({ body, ctx }: { body: TableView; ctx: Context }) {
 								</td>
 							);
 						})}
+						{ctx.reply && <td />}
 					</tr>
 				</tfoot>
 			</table>
@@ -361,6 +396,7 @@ function Card({ row, columns, ctx }: { row: ItemRow; columns: readonly Column[];
 		<li data-ref={row.ref}>
 			{row.detail && !row.href ? label : <p>{label}</p>}
 			<Values cells={row.cells.slice(lead)} columns={columns.slice(lead)} />
+			<RowAnswer row={row} ctx={ctx} />
 		</li>
 	);
 }
@@ -497,6 +533,8 @@ export function RecordsBlock({
 }) {
 	const { body } = vm;
 	const ctx: Context = {
+		block: vm.id,
+		reply: vm.reply,
 		actions,
 		texts: vm.texts,
 		filtering: vm.filtering,
@@ -504,7 +542,13 @@ export function RecordsBlock({
 		tags: new Set(body.kind === "tree" ? body.columns.filter(isTag).map((c) => c.field) : []),
 	};
 	return (
-		<div ref={root ?? null} class="records wide" id={vm.id} data-records={actions ? "" : undefined}>
+		<div
+			ref={root ?? null}
+			class="records wide"
+			id={vm.id}
+			data-records={actions ? "" : undefined}
+			data-width={vm.width === "full" ? "full" : undefined}
+		>
 			{actions && <Toolbar vm={vm} actions={actions} live={live} />}
 			{actions && vm.facets.length > 0 && (
 				<div class="facets" hidden={!live}>
@@ -519,6 +563,13 @@ export function RecordsBlock({
 				<Table body={body} ctx={ctx} />
 			) : (
 				<Board body={body} ctx={ctx} />
+			)}
+			{vm.unlisted.length > 0 && (
+				<div hidden>
+					{vm.unlisted.map((row) => (
+						<RowAnswer key={row.id} row={row} ctx={ctx} />
+					))}
+				</div>
 			)}
 		</div>
 	);

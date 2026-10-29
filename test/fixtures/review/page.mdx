@@ -1,0 +1,50 @@
+---
+title: Release 2.4 review
+---
+import { Records, View } from "kit";
+import decisions from "./decisions.json";
+
+# Ten decisions need your call before *Tidy 2.4* ships.
+
+Tidy is a fictional command-line tool for cleaning project folders. Each decision below says what happens today, the alternative, and a recommendation; answer on its row, add a note where you disagree, and choose Need context when the case is not enough.
+
+## The decisions
+
+<Records {...decisions} />
+
+## How an approved set is applied
+
+The release tool reads the reply. [See the command it runs](#apply), or [what the terms mean](#terms).
+
+## What is not here
+
+<details>
+<summary>41 smaller changes need nobody's call</summary>
+
+Dependency bumps (23), documentation fixes (11) and test-only changes (7). They are in the release notes.
+
+</details>
+
+<View name="apply" back="All decisions">
+
+# The command the release tool runs
+
+It is one long line on purpose, so it can be pasted as it is:
+
+```sh
+TIDY_CHANNEL=next TIDY_SIGN_KEY=file:///etc/tidy/keys/release-2024.key tidy release --from v2.3.1 --to v2.4.0-rc.1 --notes-from-merged-prs --provenance --tag next --dry-run --verbose
+```
+
+</View>
+
+<View name="terms" back="All decisions">
+
+# Terms the decisions use
+
+<dl>
+<dt>Release candidate</dt><dd>A build offered for testing before the release itself.</dd>
+<dt>Provenance</dt><dd>A signed statement of which commit and workflow built a package.</dd>
+<dt>Channel</dt><dd>A named stream of releases, such as next, that users opt into.</dd>
+</dl>
+
+</View>
