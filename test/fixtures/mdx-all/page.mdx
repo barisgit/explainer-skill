@@ -61,6 +61,17 @@ flowchart TD
 - The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.
 - The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.
 
+The status lamp on the inverter is wired like this:
+
+```schematic
+title Status lamp: a 12 V supply, a series resistor and an LED
+VB battery vcc 0 12 V @0,0 v
+R_lim resistor vcc lamp 680 a@VB.a 6,0 v
+D1 led lamp 0 green b@R_lim.b 0,4 v
+```
+
+The <span data-ref="R_lim">series resistor</span> sets the lamp's current, about 16 mA.
+
 <h2 data-nav="Cost">The 5 kWh quote is 4,200 €, two thirds of it the battery</h2>
 
 <Records {...quote("Item", "Price")} refField="ref" />

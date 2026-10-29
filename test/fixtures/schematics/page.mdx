@@ -1,0 +1,63 @@
+# Three circuits as netlists
+
+Each circuit below is a ```` ```schematic ```` block: one part per line, parts placed from a pin of another, wires routed by pack. Hover a <span data-ref="R_SC">sense resistor</span>, the <span data-ref="vo">output net</span> or <span data-ref="gnd">ground</span> to see what touches it.
+
+## µA723 with fold-back current limiting
+
+The sense resistor <span data-ref="R_SC">R_SC</span> and the divider <span data-ref="R3">R3</span>, <span data-ref="R4">R4</span> set the knee of the current limit; the external pass transistor <span data-ref="Q1">Q1</span> carries the load.
+
+```schematic
+title µA723 regulator with fold-back current limiting
+U1 ic µA723 @0,0 top V_{CC+}=vi V_C=vi left REF=ref IN+=inp right OUTPUT=drv V_Z "CURR LIM"=cl "CURR SENS"=vo IN−=vo bottom V_{CC−}=0 "FREQ COMP"=comp
+VI port vi V_I @U1.VCC+ -6,-5
+Q1 vi drv e 2N3055 b@U1.OUTPUT 4,-3
+R3 cl e b@Q1.e 0,5 h
+R_SC e vo a@R3.b h
+R4 0 cl b@R3.a v
+R1 ref inp a@U1.REF -4,2 v
+R2 inp 0 a@R1.b v
+C1 comp 0 1000 pF a@U1.FREQCOMP 0,3 v
+VO port vo V_O @R_SC.b 6,0
+```
+
+## Common-emitter amplifier
+
+```schematic
+title Common-emitter amplifier
+Q1 c b e BC547 @0,0
+R_C vcc c 4.7k b@Q1.c 0,-1 v
+R1 vcc b 47k a@R_C.a -8,0 v
+R2 b 0 10k a@R1.b 0,6 v
+C1 in b 10 µF b@Q1.b -8,0
+VIN port in v_in @C1.a -4,0
+VCC port vcc V_CC @R1.a -12,-2
+R_E e 0 1k a@Q1.e 0,3 v
+C_E e 0 100 µF a@R_E.a 6,0 v
+C2 c out 10 µF a@Q1.c 4,0
+VOUT port out v_out @C2.b 4,0
+```
+
+## Two-stage RC-coupled amplifier
+
+```schematic
+title Two-stage RC-coupled amplifier
+Q1 c1 b1 e1 BC547 @0,0
+RC1 vcc c1 4.7k b@Q1.c 0,-3 v
+RE1 e1 0 1k a@Q1.e 0,3 v
+CE1 e1 0 100 µF a@RE1.a 6,0 v
+R1 vcc b1 47k a@RC1.a -8,0 v
+R2 b1 0 10k a@R1.b 0,6 v
+Cin in b1 1 µF b@Q1.b -8,0
+RS src in 600 b@Cin.a -2,0
+VS vsource src 0 v_s a@RS.a v
+CC c1 b2 1 µF a@Q1.c 4,0
+Q2 c2 b2 e2 BC547 b@CC.b 12,0
+RC2 vcc c2 4.7k b@Q2.c 0,-1 v
+RE2 e2 0 1k a@Q2.e 0,3 v
+CE2 e2 0 100 µF a@RE2.a 6,0 v
+R3 vcc b2 47k a@RC2.a -8,0 v
+R4 b2 0 10k a@R3.b 0,6 v
+COUT c2 out 1 µF a@Q2.c 4,0
+RL out 0 10k a@COUT.b 2,2 v
+VCC port vcc V_CC @R1.a -4,-2
+```
