@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { withPage } from "../skills/explainer/src/chrome.ts";
+import { withTestPage } from "./browser.ts";
 import { packAndRun, packHtml, pageContract, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -330,7 +330,7 @@ function pngSize(file: string): [number, number] {
 
 /** The colour ("r,g,b") of a PNG at each of `points`, read back through a canvas in Chrome. */
 const pngColours = (file: string, points: Array<[number, number]>) =>
-	withPage(async (cdp) => {
+	withTestPage(async (cdp) => {
 		const png = readFileSync(file).toString("base64");
 		return cdp.evaluate<string[]>(
 			`(async () => {

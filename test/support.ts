@@ -3,12 +3,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Cdp } from "../skills/explainer/src/cdp.ts";
-import { withPage } from "../skills/explainer/src/chrome.ts";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
 import { packPage } from "../skills/explainer/src/pack.ts";
 import { PackError } from "../skills/explainer/src/pack-error.ts";
 import { SETTLE_JS } from "../skills/explainer/src/page-js.ts";
 import { runStep, type ShotPath } from "../skills/explainer/src/steps.ts";
+import { withTestPage } from "./browser.ts";
 
 /** The skill directory as an installer would copy it. */
 export const SKILL_DIR = join(import.meta.dir, "..", "skills", "explainer");
@@ -227,7 +227,7 @@ export function runPacked(
 	output: string,
 	{ slowdown = 1, media = "screen", widths = WIDTHS, steps = [] }: RunOptions = {},
 ): Promise<string[]> {
-	return withPage(async (cdp) => {
+	return withTestPage(async (cdp) => {
 		const failures: string[] = [];
 		let width = 0;
 		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
@@ -311,7 +311,7 @@ export function inPage<T>(
 	fn: (cdp: Cdp) => Promise<T>,
 	viewport: Viewport = DESKTOP,
 ): Promise<T> {
-	return withPage(async (cdp) => {
+	return withTestPage(async (cdp) => {
 		const errors: string[] = [];
 		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
 			errors.push(d.exception?.description ?? d.text),

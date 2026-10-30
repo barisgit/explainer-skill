@@ -1,7 +1,7 @@
 /**
  * A stand-in for Chrome that the tests start through CHROME (see fakeChrome in chrome.test.ts), for the orderings a real Chrome
  * shows only by chance. It speaks just enough of the debugging pipe for withPage: it answers every call with an empty result
- * (`Target.createTarget` and `Target.attachToTarget` with ids), or none at all when FAKE_CHROME is "silent", as a Chrome that hangs
+ * (`Target.createBrowserContext`, `Target.createTarget` and `Target.attachToTarget` with ids), or none at all when FAKE_CHROME is "silent", as a Chrome that hangs
  * while it starts. It writes `started` into its profile once running, and when told to stop (SIGTERM, or the pipe closing) it waits
  * EXIT_WRITE_MS and then writes `written-at-exit` into the profile, as a real Chrome flushes its profile while it shuts down. As
  * Chrome does, it leaves a directory behind in its temp directory (a singleton socket's, a URL fetcher's), which it takes from
@@ -90,6 +90,7 @@ writeFileSync(join(profile, "started"), "");
 
 const silent = FAKE_CHROME === "silent";
 const RESULTS: Record<string, object> = {
+	"Target.createBrowserContext": { browserContextId: "context" },
 	"Target.createTarget": { targetId: "page" },
 	"Target.attachToTarget": { sessionId: "session" },
 };

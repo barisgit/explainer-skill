@@ -8,6 +8,9 @@ const CALL_DEADLINE_MS = 20_000;
 /** How long a page may take from navigation to its load event: a packed page loads nothing, so only a stalled Chrome comes close. */
 const LOAD_DEADLINE_MS = 10_000;
 
+/** How long a page's browser context may take to be disposed of. */
+const DISPOSE_DEADLINE_MS = 2_000;
+
 /** A duration for an error message: `20 s`. */
 export const seconds = (ms: number) => `${ms / 1000} s`;
 
@@ -70,27 +73,91 @@ export function within<T>(work: Promise<T>, ms: number, message: string): Promis
 }
 
 /**
+ * What the clients of one debugging pipe share: the pipe Chrome reads commands from, the call numbers, the replies being awaited
+ * and the clients that events are routed to by session.
+ */
+class Wire {
+	private id = 0;
+	readonly pending = new Map<number, (r: Reply) => void>();
+	readonly clients = new Set<Cdp>();
+	/** Why the connection is lost, once it is. */
+	lost: ChromeError | undefined;
+	readonly output: Writable;
+	constructor(output: Writable) {
+		this.output = output;
+	}
+	/** Sends a call for `sessionId` and returns its number. */
+	write(method: string, params: object, sessionId: string | undefined): number {
+		const id = ++this.id;
+		this.output.write(`${JSON.stringify({ id, method, params, sessionId })}\0`);
+		return id;
+	}
+	/** Hands a reply to its call, and an event to the clients of its session (the browser's have none). */
+	receive(msg: Message) {
+		if (msg.id) {
+			this.pending.get(msg.id)?.(msg);
+		} else if (msg.method === "Target.detachedFromTarget") {
+			const { sessionId } = msg.params as CdpEvents["Target.detachedFromTarget"];
+			for (const client of this.clients) {
+				if (client.sessionId === sessionId) {
+					client.abort(new ChromeError(CONNECTION_CLOSED));
+				}
+			}
+		} else if (msg.method) {
+			for (const client of this.clients) {
+				if (client.sessionId === msg.sessionId) {
+					client.emit(msg.method, msg.params as never);
+				}
+			}
+		}
+	}
+	/** Fails every client: Chrome exited, the pipe broke or the caller's limit passed. The first reason wins. */
+	abort(error: ChromeError) {
+		this.lost ??= error;
+		for (const client of this.clients) {
+			client.abort(error);
+		}
+	}
+}
+
+/**
  * Minimal Chrome DevTools Protocol client over Chrome's debugging pipe (`--remote-debugging-pipe`: JSON messages ended by a NUL
- * byte, written to Chrome's fd 3 and read from its fd 4): request/response plus event subscription. It starts on the browser
- * target, and `attachPage` then points every call and event at one page. Every call and awaited event has a deadline, and once
- * the connection is lost (Chrome exited, the page crashed or closed, `abort` was called or the caller's limit passed) every
- * pending and later call fails with that reason instead of waiting forever.
+ * byte, written to Chrome's fd 3 and read from its fd 4): request/response plus event subscription. `open` returns the client of
+ * the browser target; its `page` and `isolatedPage` run a function against a new page with a client of that page (its calls and
+ * events are the page's). Every call and awaited event has a deadline,
+ * and once the connection is lost (Chrome exited, a page crashed or closed, `abort` was called or the caller's limit passed)
+ * every pending and later call of the clients it concerns fails with that reason instead of waiting forever.
  */
 export class Cdp {
-	private id = 0;
-	private readonly pending = new Map<number, (r: Reply) => void>();
 	private readonly listeners = new Map<string, Array<(params: never) => void>>();
 	/** Rejecters of the calls and events being awaited, called with the reason the connection is lost. */
 	private readonly waiters = new Set<(error: ChromeError) => void>();
 	private lost: ChromeError | undefined;
-	/** The page's session once attachPage has run; until then calls go to the browser. */
-	private sessionId: string | undefined;
-	private readonly output: Writable;
-	/** `limit`, when given, aborts the client (see `abort`) with its reason, which must then be a ChromeError. */
-	constructor(input: Readable, output: Writable, limit?: AbortSignal) {
-		this.output = output;
-		const stop = () =>
+	private readonly wire: Wire;
+	/** The page's session; undefined for the browser's client. */
+	readonly sessionId: string | undefined;
+	private constructor(wire: Wire, sessionId: string | undefined) {
+		this.wire = wire;
+		this.sessionId = sessionId;
+		wire.clients.add(this);
+		if (wire.lost) {
+			this.abort(wire.lost);
+		}
+		this.on("Inspector.targetCrashed", () =>
 			this.abort(
+				new ChromeError("the page crashed in Chrome (out of memory, or its process was killed)"),
+			),
+		);
+	}
+	/**
+	 * The client of the browser behind `input` and `output` (Chrome's fd 4 and fd 3). `limit`, when given, aborts every client
+	 * with its reason, which must then be a ChromeError.
+	 */
+	static open(input: Readable, output: Writable, limit?: AbortSignal): Cdp {
+		const wire = new Wire(output);
+		const browser = new Cdp(wire, undefined);
+		const stop = () =>
+			wire.abort(
 				limit?.reason instanceof ChromeError
 					? limit.reason
 					: new ChromeError(String(limit?.reason)),
@@ -99,7 +166,7 @@ export class Cdp {
 			stop();
 		}
 		limit?.addEventListener("abort", stop, { once: true });
-		const closed = () => this.abort(new ChromeError(CONNECTION_CLOSED));
+		const closed = () => wire.abort(new ChromeError(CONNECTION_CLOSED));
 		output.on("error", closed);
 		input.on("error", closed).on("close", closed);
 		input.setEncoding("utf8");
@@ -109,40 +176,62 @@ export class Cdp {
 			const messages = chunk.split("\0");
 			const last = messages.pop() ?? "";
 			for (const text of messages) {
-				this.receive(JSON.parse(parts.join("") + text) as Message);
+				wire.receive(JSON.parse(parts.join("") + text) as Message);
 				parts = [];
 			}
 			parts.push(last);
 		});
-		this.on("Inspector.targetCrashed", () =>
-			this.abort(
-				new ChromeError("the page crashed in Chrome (out of memory, or its process was killed)"),
-			),
-		);
+		return browser;
 	}
-	private receive(msg: Message) {
-		if (msg.id) {
-			this.pending.get(msg.id)?.(msg);
-		} else if (msg.method === "Target.detachedFromTarget") {
-			if ((msg.params as CdpEvents["Target.detachedFromTarget"]).sessionId === this.sessionId) {
-				this.abort(new ChromeError(CONNECTION_CLOSED));
-			}
-		} else if (msg.method && msg.sessionId === this.sessionId) {
-			for (const listener of this.listeners.get(msg.method) ?? []) {
-				listener(msg.params as never);
-			}
+	/** Calls the listeners of `event`; the connection's, which routes events here by session. */
+	emit<E extends keyof CdpEvents>(event: E, params: CdpEvents[E]) {
+		for (const listener of this.listeners.get(event) ?? []) {
+			listener(params as never);
 		}
 	}
-	/** Opens a new page and directs every later call and event to it. */
-	async attachPage() {
+	/**
+	 * Runs `fn` against a new page, with a client of it, in the browser's default context. Called on the browser's client. The page
+	 * lives until the browser does: a Chrome ended while a page in a context of its own has a request in flight spins on instead
+	 * of exiting when its pipe closes, which a killed `check` must not leave behind.
+	 */
+	async page<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
+		return await this.attach(fn, undefined);
+	}
+	/**
+	 * Runs `fn` against a new page in a browser context of its own, which is disposed afterwards with the page, so pages that
+	 * share a browser share no cookies, storage or tabs. Called on the browser's client.
+	 */
+	async isolatedPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T> {
+		const { browserContextId } = await this.send<{ browserContextId: string }>(
+			"Target.createBrowserContext",
+		);
+		try {
+			return await this.attach(fn, browserContextId);
+		} finally {
+			// Best effort and short: a Chrome that no longer answers is being stopped anyway.
+			await this.send(
+				"Target.disposeBrowserContext",
+				{ browserContextId },
+				DISPOSE_DEADLINE_MS,
+			).catch(() => undefined);
+		}
+	}
+	private async attach<T>(fn: (cdp: Cdp) => Promise<T>, browserContextId: string | undefined) {
 		const { targetId } = await this.send<{ targetId: string }>("Target.createTarget", {
 			url: "about:blank",
+			browserContextId,
 		});
 		const { sessionId } = await this.send<{ sessionId: string }>("Target.attachToTarget", {
 			targetId,
 			flatten: true,
 		});
-		this.sessionId = sessionId;
+		const page = new Cdp(this.wire, sessionId);
+		try {
+			await page.send("Inspector.enable");
+			return await fn(page);
+		} finally {
+			this.wire.clients.delete(page);
+		}
 	}
 	/**
 	 * Fails every pending and later call and awaited event with `error`: for a caller whose own deadline has passed. The first
@@ -184,17 +273,15 @@ export class Cdp {
 	 * does not let us check. A protocol error is a ChromeError naming the method.
 	 */
 	send<T = unknown>(method: string, params: object = {}, deadline = CALL_DEADLINE_MS): Promise<T> {
-		const id = ++this.id;
 		return this.wait<T>(
 			`Chrome did not answer ${method} in ${seconds(deadline)}`,
 			deadline,
 			(ok, fail) => {
-				this.pending.set(id, (r) =>
+				const id = this.wire.write(method, params, this.sessionId);
+				this.wire.pending.set(id, (r) =>
 					r.error ? fail(new ChromeError(`${method}: ${r.error.message}`)) : ok(r.result as T),
 				);
-				const { sessionId } = this;
-				this.output.write(`${JSON.stringify({ id, method, params, sessionId })}\0`);
-				return () => this.pending.delete(id);
+				return () => this.wire.pending.delete(id);
 			},
 		);
 	}
@@ -248,6 +335,6 @@ export class Cdp {
 	}
 	/** Ends the pipe Chrome reads commands from; Chrome exits once it sees the pipe closed. */
 	close() {
-		this.output.end();
+		this.wire.output.end();
 	}
 }

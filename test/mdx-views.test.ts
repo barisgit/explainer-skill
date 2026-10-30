@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { Cdp } from "../skills/explainer/src/cdp.ts";
-import { withPage } from "../skills/explainer/src/chrome.ts";
+import { withTestPage } from "./browser.ts";
 import { FRAMES, load, packedMdx, packMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -118,7 +118,7 @@ const packed = (name: string, source: string) => packedMdx(dir, name, source, be
 
 /** Runs `fn` in headless Chrome with `media` emulated; fails on any uncaught page error. */
 function inChrome<T>(fn: (cdp: Cdp) => Promise<T>, media = "screen"): Promise<T> {
-	return withPage(async (cdp) => {
+	return withTestPage(async (cdp) => {
 		const errors: string[] = [];
 		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) =>
 			errors.push(d.exception?.description ?? d.text),

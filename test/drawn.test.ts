@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { withPage } from "../skills/explainer/src/chrome.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
+import { withTestPage } from "./browser.ts";
 import { inPage, packedMdx, scratch, WIDTHS } from "./support.ts";
 
 const dir = scratch();
@@ -51,7 +51,7 @@ interface DrawnState {
 
 /** DRAWN_STATE at each width in light and dark, and as the page prints, with the page's scripts off. */
 function drawnStates(): Promise<Record<string, DrawnState>> {
-	return withPage(async (cdp) => {
+	return withTestPage(async (cdp) => {
 		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
 		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
 		const states: Record<string, DrawnState> = {};
@@ -342,7 +342,7 @@ import "./rootfont.css";
 /** Opens the page with scripts off at each width, and expects its `count` drawn copies showing to fit their elements at the drawn size. */
 async function expectFitted(path: string, count: number): Promise<void> {
 	// With scripts off, the copy showing fills its element at its drawn size, so its text is as large as the live chart's.
-	const scales = await withPage(async (cdp) => {
+	const scales = await withTestPage(async (cdp) => {
 		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
 		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
 		const found: number[] = [];

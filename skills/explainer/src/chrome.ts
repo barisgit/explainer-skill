@@ -213,7 +213,7 @@ async function start(
 	// Registered at once, so an exit before `stop` (a crash, or a failed start) is not missed.
 	let stopping = false;
 	const exited = new Promise<void>((done) => proc.once("exit", () => done()));
-	const cdp = new Cdp(proc.stdio[4] as Readable, proc.stdio[3] as Writable, limit);
+	const cdp = Cdp.open(proc.stdio[4] as Readable, proc.stdio[3] as Writable, limit);
 	let stopped: Promise<void> | undefined;
 	const stop = () => {
 		stopping = true;
@@ -249,7 +249,7 @@ async function start(
 	});
 	try {
 		await within(
-			Promise.race([cdp.attachPage(), exitedEarly]),
+			Promise.race([cdp.send("Browser.getVersion"), exitedEarly]),
 			START_DEADLINE_MS,
 			`Chrome did not start in ${seconds(START_DEADLINE_MS)}`,
 		);
@@ -270,14 +270,24 @@ async function start(
 	}
 }
 
+/** A headless Chrome that runs pages. */
+export interface Browser {
+	/** Runs `fn` against a new page in Chrome's default context, which lasts until Chrome is stopped. */
+	page<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T>;
+	/** Runs `fn` against a new page in a browser context of its own: the page and what it stored are gone afterwards. */
+	isolatedPage<T>(fn: (cdp: Cdp) => Promise<T>): Promise<T>;
+	/** Stops Chrome and deletes its directory once Chrome has exited (see openBrowser). */
+	close(): Promise<void>;
+}
+
 /**
- * Runs `fn` against the page of a fresh headless Chrome. Chrome is always stopped and its directory deleted once Chrome has
- * exited (a profile deleted while Chrome shuts down is written again; files that a process outlives are kept, with a warning),
- * also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's start-up included. withPage and a signal share one cleanup, which runs once.
- * Once `limit` aborts, Chrome's start-up or the page's next or pending call fails with its reason (a ChromeError), and the
- * cleanup runs within Chrome's clean-exit and SIGTERM graces and the group's.
+ * Starts a headless Chrome. `close` stops it and deletes its directory once Chrome has exited (a profile deleted while Chrome
+ * shuts down is written again; files that a process outlives are kept, with a warning), and a signal that ends the process
+ * (SIGINT, SIGTERM or SIGHUP) does the same until then, Chrome's start-up included. Close and a signal share one cleanup, which
+ * runs once. Once `limit` aborts, Chrome's start-up or a page's next or pending call fails with its reason (a ChromeError), and
+ * the cleanup runs within Chrome's graces and the group's.
  */
-export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSignal): Promise<T> {
+export async function openBrowser(limit?: AbortSignal): Promise<Browser> {
 	// Chrome's directory: its profile, and its temp directory in place of the system's. Chrome leaves directories there whenever
 	// it exits (on Linux its singleton socket's, and Google Chrome a `com.google.Chrome.chrome_chrome_url_fetcher_.*` one per
 	// launch, thousands in a day of checks), so they go with the profile. The name is short because on Linux Chrome aborts
@@ -303,13 +313,23 @@ export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSig
 	const release = cleanUpOnSignal(cleanup);
 	try {
 		const cdp = await launch(dir, owner, limit);
-		try {
-			await cdp.send("Inspector.enable");
-			return await fn(cdp);
-		} finally {
-			cdp.close();
-		}
-	} finally {
+		return {
+			page: (fn) => cdp.page(fn),
+			isolatedPage: (fn) => cdp.isolatedPage(fn),
+			close: cleanup,
+		};
+	} catch (error) {
 		await cleanup();
+		throw error;
+	}
+}
+
+/** Runs `fn` against the page of a fresh headless Chrome, which is stopped afterwards (see openBrowser). */
+export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSignal): Promise<T> {
+	const browser = await openBrowser(limit);
+	try {
+		return await browser.page(fn);
+	} finally {
+		await browser.close();
 	}
 }
