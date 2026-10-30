@@ -46,7 +46,7 @@ Showcase assets stay in `examples/`, never in `skills/explainer/`, because insta
 | `bun run typecheck` | `bun check --all` for the CLI, build and tests, then for the kit (`tsconfig.kit.json`) and the records core (`tsconfig.records.json`): Bun's built-in checker, same errors as `tsc`, strictest settings |
 | `bun run lint` | `biome check` (format check, lint, import order), warnings are errors; no writes |
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
-| `bun run test` | Contract tests (Chrome needed, about two minutes) |
+| `bun run test` | Contract tests (Chrome needed, about six minutes) |
 | `bun run ci` | typecheck, lint, test: the gate; the same command runs in GitHub Actions |
 | `bun run verify:install` | Release check, not in `ci` (needs network and Chrome): installs from a clone of HEAD with `npx skills` and Caplet into a temp HOME, then runs `kit`, `pack`, `check` from each copy |
 | `bun run media [--keep] [example ...]` | Regenerates `examples/media/` (gallery thumbnails, hero collage, animated WebP clips) in light and dark from the packed `examples/<name>/index.html` pages; a full run replaces the directory. Scenes are data at the top of `build/media.ts`. Needs Chrome and ffmpeg with libwebp_anim; about two minutes |
