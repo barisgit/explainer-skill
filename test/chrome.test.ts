@@ -209,6 +209,40 @@ test("withPage deletes Chrome's profile only once Chrome has exited, so nothing 
 	expect(readdirSync(tmp)).toEqual([]);
 }, 30_000);
 
+/**
+ * Runs withPage with the stand-in Chrome in a fresh temp directory and returns what first told the stand-in to stop and how long
+ * withPage took.
+ */
+async function stoppedBy(name: string, env: object = {}) {
+	const tmp = tempDir(name);
+	const stops = dir.path(`${name}.stops`);
+	const chrome = join(import.meta.dir, "..", "skills", "explainer", "src", "chrome.ts");
+	const started = performance.now();
+	const proc = Bun.spawn(
+		[
+			process.execPath,
+			"-e",
+			`await (await import(${JSON.stringify(chrome)})).withPage(async () => {});`,
+		],
+		{ env: { ...process.env, CHROME: fakeChrome, TMPDIR: tmp, FAKE_CHROME_STOPS: stops, ...env } },
+	);
+	expect(await proc.exited).toBe(0);
+	const elapsed = performance.now() - started;
+	await chromesGone(tmp);
+	expect(readdirSync(tmp)).toEqual([]);
+	return { cause: readFileSync(stops, "utf8"), elapsed };
+}
+
+test("withPage stops Chrome by closing its pipe, not by a signal: on macOS only a clean exit removes Chrome's code-signing clone", async () => {
+	expect((await stoppedBy("tmp-clean-exit")).cause).toBe("pipe");
+}, 30_000);
+
+test("withPage sends SIGTERM to a Chrome that ignores its closed pipe, within a bound", async () => {
+	const { cause, elapsed } = await stoppedBy("tmp-deaf", { FAKE_CHROME: "deaf" });
+	expect(cause).toBe("SIGTERM");
+	expect(elapsed).toBeLessThan(8_000);
+}, 30_000);
+
 // Chrome on macOS copes with a socket path past the limit.
 test.skipIf(process.platform !== "linux")(
 	"withPage in a temp directory too deep for Chrome's socket fails with one line saying what to change, and leaves nothing",
@@ -253,7 +287,7 @@ test("withPage whose Chrome leaves a process that never exits kills its group on
 		stderr: "pipe",
 	});
 	expect(await proc.exited).toBe(0);
-	// Chrome's 5 s exit grace is not needed here (the stand-in exits on SIGTERM), so this is the helpers' grace and the kill's.
+	// Chrome's graces are not needed here (the stand-in exits when its pipe closes), so this is the helpers' grace and the kill's.
 	expect(performance.now() - started).toBeLessThan(5_000);
 	expect(await new Response(proc.stdout).text()).toBe("1\n");
 	const [kept] = readdirSync(tmp);

@@ -9,9 +9,12 @@
  * the stand-in refuses to start there without it, since the tests could not see what it left. As Chrome on Linux does, it aborts
  * when its singleton socket's path in that directory would pass the 107 characters a Unix socket may have. And as Chrome's helper processes
  * can, a helper it starts outlives it: it writes `written-by-helper` into the profile EXIT_WRITE_MS after the stand-in has exited.
+ * When FAKE_CHROME_STOPS names a file, it appends what first told it to stop there (`pipe` or `SIGTERM`), which the profile's
+ * deletion would otherwise take with it; and FAKE_CHROME "deaf" makes it ignore the pipe closing, as a Chrome that hangs.
  */
 import { spawn } from "node:child_process";
 import {
+	appendFileSync,
 	createReadStream,
 	createWriteStream,
 	mkdirSync,
@@ -27,7 +30,7 @@ const profile = process.argv.find((arg) => arg.startsWith("--user-data-dir="))?.
 if (!profile) {
 	throw new Error("fake Chrome needs --user-data-dir");
 }
-const { FAKE_CHROME, TMPDIR, MAC_CHROMIUM_TMPDIR } = process.env;
+const { FAKE_CHROME, FAKE_CHROME_STOPS, TMPDIR, MAC_CHROMIUM_TMPDIR } = process.env;
 const temp = process.platform === "darwin" ? MAC_CHROMIUM_TMPDIR : TMPDIR;
 if (!temp) {
 	throw new Error(
@@ -59,11 +62,14 @@ const commands = createReadStream("", { fd: 3 });
 const replies = createWriteStream("", { fd: 4 });
 
 let stopping = false;
-function stop() {
+function stop(cause: string) {
 	if (stopping) {
 		return;
 	}
 	stopping = true;
+	if (FAKE_CHROME_STOPS) {
+		appendFileSync(FAKE_CHROME_STOPS, cause);
+	}
 	setTimeout(() => {
 		// As Chrome does, it recreates the profile when it is gone.
 		mkdirSync(profile as string, { recursive: true });
@@ -71,8 +77,13 @@ function stop() {
 		process.exit(0);
 	}, EXIT_WRITE_MS);
 }
-process.on("SIGTERM", stop);
-commands.on("end", stop).on("close", stop);
+process.on("SIGTERM", () => stop("SIGTERM"));
+if (FAKE_CHROME !== "deaf") {
+	commands.on("end", () => stop("pipe")).on("close", () => stop("pipe"));
+} else {
+	// Nothing else holds the process once the pipe is closed.
+	setInterval(() => undefined, 60_000);
+}
 // Written only once SIGTERM is handled: a test that signals the stand-in as soon as it sees `started` must find it shutting down
 // as Chrome does, not killed by the default action.
 writeFileSync(join(profile, "started"), "");

@@ -35,6 +35,12 @@ export const settle = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 /** How long Chrome may take from launch to a page ready to drive. */
 const START_DEADLINE_MS = 20_000;
+/**
+ * How long Chrome may take to exit once its debugging pipe is closed before it is sent SIGTERM. A Chrome that exits this way
+ * removes its code-signing clone on macOS (a copy of the whole app, about 1,340 files, which a Chrome ended by a signal leaves
+ * in the user's temp area); it takes about 100 ms, so this only bounds a Chrome that hangs.
+ */
+const CLEAN_EXIT_MS = 3_000;
 /** How long Chrome may take to exit after SIGTERM before it is killed, so its profile can be deleted. */
 const EXIT_GRACE_MS = 5_000;
 /** How long Chrome's helpers may take to exit after its main process (they take milliseconds), and how long a killed group may. */
@@ -119,9 +125,18 @@ async function groupGone(pgid: number, ms: number): Promise<boolean> {
 	return true;
 }
 
+/** Resolves whether `exited` settles within `ms`. */
+const exitsWithin = (exited: Promise<void>, ms: number) =>
+	within(exited, ms, "").then(
+		() => true,
+		() => false,
+	);
+
 /**
  * Stops Chrome (`proc`, which `exited` follows) and resolves whether every process of its group (`pgid`, Chrome's own pid) has
- * exited. Chrome's helpers can outlive its main process by a few milliseconds and write into the profile meanwhile (on Linux a
+ * exited. Chrome is asked to leave first, by closing its debugging pipe (`closePipe`): that exit is a clean one, which removes
+ * what a signalled Chrome leaves behind (see CLEAN_EXIT_MS). Only a Chrome that does not leave in time gets SIGTERM, and one
+ * that still stays SIGKILL. Chrome's helpers can outlive its main process by a few milliseconds and write into the profile meanwhile (on Linux a
  * profile deleted right after the main process exited came back in about one run in five), so the profile may be deleted only
  * once this resolves true. What is left after the graces gets one SIGKILL; a process even that leaves (a zombie whose parent
  * never reaps it) makes this resolve false GROUP_GRACE_MS later, so stopping is bounded whatever Chrome does.
@@ -130,12 +145,14 @@ async function stopGroup(
 	proc: ChildProcess,
 	pgid: number,
 	exited: Promise<void>,
+	closePipe: () => void,
 ): Promise<boolean> {
-	proc.kill();
-	const ended = await within(exited, EXIT_GRACE_MS, "").then(
-		() => true,
-		() => false,
-	);
+	closePipe();
+	let ended = await exitsWithin(exited, CLEAN_EXIT_MS);
+	if (!ended) {
+		proc.kill();
+		ended = await exitsWithin(exited, EXIT_GRACE_MS);
+	}
 	if (ended && (await groupGone(pgid, GROUP_GRACE_MS))) {
 		return true;
 	}
@@ -196,16 +213,17 @@ async function start(
 	// Registered at once, so an exit before `stop` (a crash, or a failed start) is not missed.
 	let stopping = false;
 	const exited = new Promise<void>((done) => proc.once("exit", () => done()));
+	const cdp = new Cdp(proc.stdio[4] as Readable, proc.stdio[3] as Writable, limit);
 	let stopped: Promise<void> | undefined;
 	const stop = () => {
 		stopping = true;
 		const { pid } = proc;
 		// No pid: the spawn failed, so no process exists.
-		stopped ??= (pid === undefined ? Promise.resolve(true) : stopGroup(proc, pid, exited)).then(
-			(gone) => {
-				owner.stuck ||= !gone;
-			},
-		);
+		stopped ??= (
+			pid === undefined ? Promise.resolve(true) : stopGroup(proc, pid, exited, () => cdp.close())
+		).then((gone) => {
+			owner.stuck ||= !gone;
+		});
 		return stopped;
 	};
 	owner.stop = stop;
@@ -229,7 +247,6 @@ async function start(
 			throw exitError();
 		}
 	});
-	const cdp = new Cdp(proc.stdio[4] as Readable, proc.stdio[3] as Writable, limit);
 	try {
 		await within(
 			Promise.race([cdp.attachPage(), exitedEarly]),
@@ -258,7 +275,7 @@ async function start(
  * exited (a profile deleted while Chrome shuts down is written again; files that a process outlives are kept, with a warning),
  * also when SIGINT, SIGTERM or SIGHUP ends the process, Chrome's start-up included. withPage and a signal share one cleanup, which runs once.
  * Once `limit` aborts, Chrome's start-up or the page's next or pending call fails with its reason (a ChromeError), and the
- * cleanup runs within Chrome's exit grace and the group's.
+ * cleanup runs within Chrome's clean-exit and SIGTERM graces and the group's.
  */
 export async function withPage<T>(fn: (cdp: Cdp) => Promise<T>, limit?: AbortSignal): Promise<T> {
 	// Chrome's directory: its profile, and its temp directory in place of the system's. Chrome leaves directories there whenever
