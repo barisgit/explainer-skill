@@ -37,7 +37,7 @@ Several agents share one copy in `~/.agents/skills/explainer` and the others get
 caplet add github:barisgit/explainer-skill --pin main --scope user
 ```
 
-Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.12.0` instead to hold a version.
+Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.12.1` instead to hold a version.
 
 Caplet copies the skill into `~/.agents/skills/explainer`, gives it to Claude Code as a plugin, and records the source in `~/.agents/capabilities.yml`. For one project, run `caplet init` in it, then `caplet add <source> --scope project`. A local checkout works too: `caplet add <path> --scope user`.
 
