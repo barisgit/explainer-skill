@@ -129,7 +129,8 @@ export const SWEEP_WARNING = `scroll sweep incomplete after ${SWEEP_BUDGET_MS / 
  * Runs in the page: sweeps the document, then laid-out auto/scroll containers on both axes, following growing content and waiting
  * for scroll events and observers. The 3 s budget is shared by all targets per page load, never multiplied by inner scrollers.
  * Returns at most one incomplete-sweep warning per load; report.ts groups it per overview/view, even when coverage differs across screens.
- * Restores inner positions and returns the document to the top, with one bounded event-delivery tick after restoration.
+ * Restores inner and ancestor positions (including non-target overflow:hidden boxes) and returns the document to the top,
+ * with one bounded event-delivery tick after restoration.
  */
 export const SWEEP_JS = `(async () => {
 	const end = performance.now() + ${SWEEP_BUDGET_MS};
@@ -148,7 +149,16 @@ export const SWEEP_JS = `(async () => {
 			y: (el === root || allows(style.overflowY)) && el.scrollHeight > el.clientHeight,
 		};
 	};
-	const target = (el) => ({ el, left: el === root ? 0 : el.scrollLeft, top: el === root ? 0 : el.scrollTop, done: false });
+	const positions = new Map();
+	const target = (el) => {
+		const ancestors = [];
+		for (let p = el; p; p = p.parentElement) ancestors.push(p);
+		// Save parents before children, once: reverse restoration then runs inside-out, with the document last.
+		for (const p of ancestors.reverse()) if (!positions.has(p)) {
+			positions.set(p, { left: p === root ? 0 : p.scrollLeft, top: p === root ? 0 : p.scrollTop });
+		}
+		return { el, done: false };
+	};
 	const targets = root ? [target(root)] : [];
 	const discovered = new Set([root]);
 	const discover = () => {
@@ -199,7 +209,7 @@ export const SWEEP_JS = `(async () => {
 		discover();
 		for (const target of targets) if (target.el !== root) await walk(target);
 	} finally {
-		for (const { el, left, top } of [...targets].reverse()) el.scrollTo({ left, top, behavior: "instant" });
+		for (const [el, { left, top }] of [...positions].reverse()) el.scrollTo({ left, top, behavior: "instant" });
 		if (moved) await tick();
 	}
 	const missed = targets.filter((t) => !t.done);

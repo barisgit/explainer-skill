@@ -111,6 +111,41 @@ test("a nonzero scroller exposes its reset position before advancing and is rest
 	});
 }, 30_000);
 
+test("the sweep restores non-target hidden ancestors moved by scrollIntoView", async () => {
+	await withPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		await cdp.load(
+			`file://${dir.write(
+				"ancestors.html",
+				page(
+					`<div id="outer" style="overflow:hidden;width:120px;height:120px"><div style="position:relative;width:360px;height:360px">
+			<div id="hidden" style="position:absolute;left:120px;top:120px;overflow:hidden;width:120px;height:120px"><div style="position:relative;width:360px;height:360px">
+			<div id="panel" style="position:absolute;left:140px;top:140px;overflow:auto;width:100px;height:100px"><div style="height:300px">Panel</div></div>
+			</div></div></div></div>`,
+				),
+			)}`,
+		);
+		await cdp.evaluate(
+			`document.getElementById('outer').scrollTo(40, 40);
+			document.getElementById('hidden').scrollTo(30, 30);
+			document.getElementById('panel').scrollTop = 50;
+			new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))`,
+			true,
+		);
+		expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+		expect(
+			await cdp.evaluate(`['outer','hidden','panel'].map(id => {
+			const el = document.getElementById(id); return [el.scrollLeft, el.scrollTop];
+		})`),
+		).toEqual([
+			[40, 40],
+			[30, 30],
+			[0, 50],
+		]);
+		expect(await cdp.evaluate("[scrollX, scrollY]")).toEqual([0, 0]);
+	});
+}, 30_000);
+
 test("check reports budget exhaustion once across screens, naming the unreached document", async () => {
 	const file = dir.write(
 		"budget.html",
