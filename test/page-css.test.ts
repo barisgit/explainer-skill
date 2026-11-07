@@ -42,6 +42,31 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 		expect(warnings[0]).toContain("parts/theme/08-tree.css");
 	});
 
+	test.each([
+		[".chip", true],
+		[".verdict-label .chip", true],
+		[".chip.verdict", false],
+		[".plot.tall", true],
+		[".plot.tall.verdict", false],
+	])("an intended restyle needs a page-owned class on the subject: %s", async (selector, warns) => {
+		const input = dir.write(
+			"restyle.html",
+			`<!doctype html><html><head>${KIT}<style>${selector} { color: red; }</style></head>
+<body><div class="verdict-label"><span class="chip verdict">Verdict</span></div><div class="plot tall verdict"></div></body></html>`,
+		);
+
+		const { error, warnings } = await packHtml(input, dir.path("restyle.out.html"));
+
+		expect(error).toBe("");
+		expect(warnings).toHaveLength(warns ? 1 : 0);
+		if (warns) {
+			expect(warnings[0]).toContain(`"${selector}"`);
+			expect(warnings[0]).toContain(
+				"add a class the kit does not use to the element and selector's last compound (e.g. .chip.verdict)",
+			);
+		}
+	});
+
 	test("in the CSS an .mdx page imports, and not for the markup of the kit's components", async () => {
 		dir.write("own-mdx.css", `${OWN_TREE} .mine { color: red; }`);
 		const input = dir.write(
