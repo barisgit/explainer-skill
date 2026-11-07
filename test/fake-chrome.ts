@@ -2,7 +2,7 @@
  * A stand-in for Chrome that the tests start through CHROME (see fakeChrome in chrome.test.ts), for the orderings a real Chrome
  * shows only by chance. It speaks just enough of the debugging pipe for withPage: it answers every call with an empty result
  * (`Target.createBrowserContext`, `Target.createTarget` and `Target.attachToTarget` with ids), or none at all when FAKE_CHROME is "silent", as a Chrome that hangs
- * while it starts. It writes `started` into its profile once running, and when told to stop (SIGTERM, or the pipe closing) it waits
+ * while it starts. It writes its pid in `started` in its profile once running, and when told to stop (SIGTERM, or the pipe closing) it waits
  * EXIT_WRITE_MS and then writes `written-at-exit` into the profile, as a real Chrome flushes its profile while it shuts down. As
  * Chrome does, it leaves a directory behind in its temp directory (a singleton socket's, a URL fetcher's), which it takes from
  * TMPDIR on Linux and from MAC_CHROMIUM_TMPDIR on macOS, where Chrome otherwise ignores TMPDIR for the system's temp directory;
@@ -10,7 +10,8 @@
  * when its singleton socket's path in that directory would pass the 107 characters a Unix socket may have. And as Chrome's helper processes
  * can, a helper it starts outlives it: it writes `written-by-helper` into the profile EXIT_WRITE_MS after the stand-in has exited.
  * When FAKE_CHROME_STOPS names a file, it appends what first told it to stop there (`pipe` or `SIGTERM`), which the profile's
- * deletion would otherwise take with it; and FAKE_CHROME "deaf" makes it ignore the pipe closing, as a Chrome that hangs.
+ * deletion would otherwise take with it; FAKE_CHROME "deaf" ignores the pipe closing, and "slow-deaf" also takes 2.5 s to exit
+ * after SIGTERM, reproducing the shared browser's fallback shutdown past Bun's default 5 s hook timeout.
  */
 import { spawn } from "node:child_process";
 import {
@@ -70,15 +71,18 @@ function stop(cause: string) {
 	if (FAKE_CHROME_STOPS) {
 		appendFileSync(FAKE_CHROME_STOPS, cause);
 	}
-	setTimeout(() => {
-		// As Chrome does, it recreates the profile when it is gone.
-		mkdirSync(profile as string, { recursive: true });
-		writeFileSync(join(profile as string, "written-at-exit"), "");
-		process.exit(0);
-	}, EXIT_WRITE_MS);
+	setTimeout(
+		() => {
+			// As Chrome does, it recreates the profile when it is gone.
+			mkdirSync(profile as string, { recursive: true });
+			writeFileSync(join(profile as string, "written-at-exit"), "");
+			process.exit(0);
+		},
+		FAKE_CHROME === "slow-deaf" ? 2_500 : EXIT_WRITE_MS,
+	);
 }
 process.on("SIGTERM", () => stop("SIGTERM"));
-if (FAKE_CHROME !== "deaf") {
+if (FAKE_CHROME !== "deaf" && FAKE_CHROME !== "slow-deaf") {
 	commands.on("end", () => stop("pipe")).on("close", () => stop("pipe"));
 } else {
 	// Nothing else holds the process once the pipe is closed.
@@ -86,7 +90,7 @@ if (FAKE_CHROME !== "deaf") {
 }
 // Written only once SIGTERM is handled: a test that signals the stand-in as soon as it sees `started` must find it shutting down
 // as Chrome does, not killed by the default action.
-writeFileSync(join(profile, "started"), "");
+writeFileSync(join(profile, "started"), String(process.pid));
 
 const silent = FAKE_CHROME === "silent";
 const RESULTS: Record<string, object> = {
