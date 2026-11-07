@@ -47,6 +47,38 @@ new IntersectionObserver(entries => {
 	expect(result.stdout).toContain("console.error: off-diagonal observer");
 }, 30_000);
 
+test("check discovers scrollers revealed and inserted by document scrolling", async () => {
+	const file = dir.write(
+		"late.html",
+		page(
+			`<div style="height:1600px">Long</div><div id="revealed" style="display:none;overflow:auto;height:100px"><div style="height:300px">Hidden panel</div></div>`,
+			`let created = false;
+		addEventListener('scroll', () => {
+			if (!scrollY || created) return;
+			created = true;
+			document.getElementById('revealed').style.display = 'block';
+			document.body.insertAdjacentHTML('beforeend', '<div id="inserted" style="overflow:auto;height:100px"><div style="height:300px">New panel</div></div>');
+			for (const id of ['revealed', 'inserted']) {
+				const el = document.getElementById(id);
+				el.addEventListener('scroll', () => { if (el.scrollTop) console.error('late ' + id); });
+			}
+		});`,
+		),
+	);
+	const result = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--view",
+		"none",
+		"--out",
+		dir.path("late-shots"),
+	]);
+	expect(result.code).toBe(1);
+	expect(result.stdout).toContain("console.error: late revealed");
+	expect(result.stdout).toContain("console.error: late inserted");
+}, 30_000);
+
 test("check reports budget exhaustion once across screens, naming the unreached document", async () => {
 	const file = dir.write(
 		"budget.html",

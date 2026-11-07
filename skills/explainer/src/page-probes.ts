@@ -148,13 +148,19 @@ export const SWEEP_JS = `(async () => {
 			y: (el === root || allows(style.overflowY)) && el.scrollHeight > el.clientHeight,
 		};
 	};
-	const inner = [document.body, ...document.body.querySelectorAll("*")].filter((el) => {
-		const { x, y } = axes(el);
-		return el !== root && (x || y) && el.clientWidth > 0 && el.clientHeight > 0 && shown(el);
-	});
-	const targets = [root, ...inner].filter(Boolean).map((el) => ({
-		el, left: el === root ? 0 : el.scrollLeft, top: el === root ? 0 : el.scrollTop, done: false,
-	}));
+	const target = (el) => ({ el, left: el === root ? 0 : el.scrollLeft, top: el === root ? 0 : el.scrollTop, done: false });
+	const targets = root ? [target(root)] : [];
+	const discovered = new Set([root]);
+	const discover = () => {
+		for (const el of [document.body, ...document.body.querySelectorAll("*")]) {
+			if (discovered.has(el)) continue;
+			const { x, y } = axes(el);
+			if (!(x || y) || !el.clientWidth || !el.clientHeight || !shown(el)) continue;
+			discovered.add(el);
+			targets.push(target(el));
+		}
+	};
+	discover();
 	const limits = (el) => {
 		const { x, y } = axes(el);
 		return { x: x ? el.scrollWidth - el.clientWidth : 0, y: y ? el.scrollHeight - el.clientHeight : 0 };
@@ -181,7 +187,10 @@ export const SWEEP_JS = `(async () => {
 		}
 	};
 	try {
-		for (const target of targets) await walk(target);
+		if (root) await walk(targets[0]);
+		// Document scroll handlers can reveal or insert panels. They join the same queue and deadline, once each.
+		discover();
+		for (const target of targets) if (target.el !== root) await walk(target);
 	} finally {
 		for (const { el, left, top } of [...targets].reverse()) el.scrollTo({ left, top, behavior: "instant" });
 		if (moved) await tick();
