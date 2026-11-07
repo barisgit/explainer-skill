@@ -309,11 +309,12 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	}
 
 	/**
-	 * A section's entry, named by its data-nav (a short label for a heading that states an answer) or else its heading; it owns the
+	 * A section's entry, named by its data-nav, then its heading's data-nav, then the heading text; it owns the
 	 * view names the section is the first to link to.
 	 */
 	function entry(section: HTMLElement, heading: HTMLElement, n: number, claimed: Set<string>) {
-		const text = clean(section.dataset.nav) || clean(heading.textContent);
+		const text =
+			clean(section.dataset.nav) || clean(heading.dataset.nav) || clean(heading.textContent);
 		const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
 		const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
 		for (const name of owns) {

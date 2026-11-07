@@ -311,8 +311,9 @@ test("data-nav names a section in the rail; rail entries and crumbs wrap; crumbs
 	const long =
 		"The second option costs less in the first year but more by the third, once the licence renews at the list price and the support contract that came free with the first year starts to be billed";
 	const page = `${HEAD}<main class="page"><div data-overview><h1>Rail</h1>
-<section data-nav="Price"><h2>${long}</h2><a href="#i/1">One</a> <a href="#i/2">Two, a view whose link text is long enough to need a second line</a></section>
-<section><h2>${long}</h2><a href="#p/a">Ana</a></section></div>
+<section data-nav="Price"><h2 data-nav="Ignored">${long}</h2><a href="#i/1">One</a> <a href="#i/2">Two, a view whose link text is long enough to need a second line</a></section>
+<section><h2>${long}</h2><a href="#p/a">Ana</a></section>
+<section class="band"><h2 data-nav="Timeline">The work finishes in June</h2><p>Schedule</p></section></div>
 <section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section>
 <section class="view" data-view="p"><a class="back" href="#">Home</a><h1>Person</h1></section></main>
 <script src="kit:views.js"></script>
@@ -328,7 +329,7 @@ ${SETTLED}
 var contract = settled.then(async () => {
 	const failures = [];
 	const expect = (ok, name) => { if (!ok) failures.push(name); };
-	expect(texts("#toc-list > li > a") === "Home|Price|${long}", "the rail names a section by its data-nav, else by its heading");
+	expect(texts("#toc-list > li > a") === "Home|Price|${long}|Timeline", "the rail uses section data-nav, then heading data-nav, then heading text");
 	// The phone's Contents disclosure opens; on a wide screen the rail is already shown.
 	document.querySelector(".toc-toggle").click();
 	expect(lines(document.querySelectorAll("#toc-list > li > a")[2]) > 2, "a long heading wraps in the rail instead of being cut to two lines");
