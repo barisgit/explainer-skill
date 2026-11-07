@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Full-page capture</title>
+<style>
+body { margin: 0; background: white; overflow-x: hidden; }
+header { position: sticky; top: 0; height: 40px; background: rgb(0, 128, 0); z-index: 2; }
+footer { position: sticky; bottom: 0; height: 40px; background: rgb(255, 128, 0); z-index: 2; }
+#fixed { position: fixed; right: 0; bottom: 60px; width: 30px; height: 30px; background: rgb(255, 0, 0); z-index: 3; }
+#before { height: 1200px; }
+#after { height: 1200px; }
+#change { height: 40px; }
+#state { height: 60px; background: rgb(0, 0, 255); }
+#panel { overflow: auto; height: 80px; width: 200px; }
+#panel > div { height: 160px; background: rgb(128, 0, 128); }
+#panel > div:last-child { background: rgb(0, 255, 255); }
+canvas { display: block; }
+select { appearance: none; display: block; width: 100px; height: 20px; border: 0; padding: 0; color: transparent; background: yellow; }
+select:has(option[value="second"]:checked) { background: rgb(0, 255, 0); }
+</style>
+</head>
+<body>
+<header>Sticky header</header>
+<div id="before"></div>
+<button id="change">Set interaction state</button>
+<details id="details"><summary>More</summary><div id="state">Open state</div></details>
+<select id="tab"><option value="first">First tab</option><option value="second">Second tab</option></select>
+<canvas id="chart" width="100" height="60"></canvas>
+<div id="panel"><div>First</div><div>Second</div></div>
+<div id="after"></div>
+<footer>Sticky footer</footer>
+<div id="fixed"></div>
+<script>
+document.getElementById("change").onclick = () => {
+ document.getElementById("details").open = true;
+ document.getElementById("tab").selectedIndex = 1;
+ document.getElementById("panel").scrollTop = 160;
+ const ctx = document.getElementById("chart").getContext("2d");
+ ctx.fillStyle = "rgb(255, 0, 255)";
+ ctx.fillRect(0, 0, 100, 60);
+};
+</script>
+</body>
+</html>

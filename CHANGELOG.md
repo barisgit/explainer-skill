@@ -12,6 +12,8 @@
 
 - `data-nav` on an `h2` inside an author-written section now names its contents-rail entry; the section's own `data-nav` takes precedence.
 
+- Full-page `check` PNGs now show document-sticky headers and footers only at their flow positions, not over content at the last scroll offset. Viewport-fixed overlays are omitted from full-page images and remain in first-screen and explicit `--do shot:` PNGs. Capture does not reload or scroll the document; page callbacks are suspended while Chrome draws, preserving the interaction state, layout viewport and inner scroll positions (#45).
+
 - `pack`'s kit-class warning and `kit theme` explain how to mark an intended restyle: add a class the kit does not use to the element and selector, such as `.chip.verdict`.
 - Sections inside figures no longer get the page's section gaps and hairlines. Panels still clip contents to their rounded corners, without preventing sticky rows from following the page scroll.
 

@@ -3,6 +3,7 @@ import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./cdp.ts";
 import { ChromeError } from "./cdp.ts";
 import { withPage } from "./chrome.ts";
+import { fullPageScreenshot } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import {
@@ -254,14 +255,7 @@ async function capture(run: Run, png: string, screen: Screen): Promise<string[]>
 			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
 		);
 	}
-	const { contentSize } = await cdp.send<{ contentSize: { height: number } }>(
-		"Page.getLayoutMetrics",
-	);
-	const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
-		format: "png",
-		captureBeyondViewport: true,
-		clip: { x: 0, y: 0, width: screen.vp.width, height: Math.ceil(contentSize.height), scale: 1 },
-	});
+	const data = await fullPageScreenshot(cdp, screen.vp.width);
 	writeFileSync(png, Buffer.from(data, "base64"));
 	return [
 		...page.warnings,
