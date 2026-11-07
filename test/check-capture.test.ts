@@ -192,6 +192,25 @@ test.each([false, true])(
 	30_000,
 );
 
+test("restoring an omitted overlay does not restart its important opacity transition", async () => {
+	await withPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		await cdp.load(
+			`file://${dir.write(
+				"transition.html",
+				`<!doctype html><meta name="viewport" content="width=device-width"><style>
+			body { height:1800px } #overlay { position:fixed;top:0;opacity:0.7;transition:opacity 1s!important }
+			</style><div id="overlay" style="color:red">Overlay</div>`,
+			)}`,
+		);
+		const state = `({ opacity: getComputedStyle(document.getElementById('overlay')).opacity,
+			style: document.getElementById('overlay').getAttribute('style') })`;
+		const before = await cdp.evaluate(state);
+		await fullPageScreenshot(cdp, 390);
+		expect(await cdp.evaluate(state)).toEqual(before);
+	});
+}, 30_000);
+
 test("a failed full-page capture restores styles and page callbacks", async () => {
 	await withPage(async (cdp) => {
 		await cdp.send("Page.enable");

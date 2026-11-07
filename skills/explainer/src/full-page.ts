@@ -11,6 +11,9 @@ const RESTORE_KEY = `Symbol.for("explainer.check.fullPage")`;
 const PREPARE_JS = `(() => {
 	const saved = [];
 	window[${RESTORE_KEY}] = () => {
+		// Commit restored values while transitions are still off, then restore the exact original attributes.
+		for (const [el, style] of saved) el.setAttribute("style", (style ?? "") + ";transition:none!important");
+		for (const [el] of saved) getComputedStyle(el).opacity;
 		for (const [el, style] of saved) {
 			if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
 		}
