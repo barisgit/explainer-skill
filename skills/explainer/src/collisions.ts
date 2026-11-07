@@ -235,7 +235,7 @@ export async function classCollisions(
 			if (key && name && !found.has(name)) {
 				found.set(
 					name,
-					`${name} is a kit class too (kit ${key.file}), so the kit's rules also reach the page's "${written}" (${where}): rename the page's class unless the rule restyles the kit's`,
+					`${name} is a kit class too (kit ${key.file}), so the kit's rules also reach the page's "${written}" (${where}): rename the page's class; for an intended restyle, add a class the kit does not use to the element and selector's last compound (e.g. .chip.verdict)`,
 				);
 			}
 		}
