@@ -100,6 +100,88 @@ const SLIDER_STATE = `[document.getElementById("m").value, document.querySelecto
 	document.querySelector("#env > p").textContent, document.querySelector("#env svg path.line")?.getAttribute("d").length > 100,
 	document.querySelector("#env svg path.line")?.getAttribute("d") === window.firstLine, document.querySelector("#env figcaption").textContent]`;
 
+describe("Explore client validation", () => {
+	test("large client-frame products validate at most 256 combinations without enumerating the product", async () => {
+		dir.write(
+			"bounded.ts",
+			`"use client";
+let calls = 0;
+export function bounded(...values: number[]) {
+	// Validation gets 256 calls, then the island renders the starting frame once.
+	if (typeof document === "undefined" && ++calls > 257) throw new Error("validation exceeded 256 frames");
+	return { readout: values.join(",") };
+}
+`,
+		);
+		// Large enough to expose exhaustive traversal, small enough for a regression to fail without exhausting memory.
+		const controls = Array.from(
+			{ length: 3 },
+			(_, i) => `{ id: "bounded-${i}", label: "Value ${i}", range: [0, 20, 1], value: 7 }`,
+		).join(",");
+		const { result, output } = await packMdx(
+			dir,
+			"bounded",
+			`import { Explore } from "kit";
+import { bounded } from "./bounded.ts";
+
+# Bounded
+
+<Explore id="bounded" controls={[${controls}]} frame={bounded} />
+`,
+		);
+		expect([result.code, result.stderr.trim()]).toEqual([0, ""]);
+		const readout = await inPage(output, (cdp) =>
+			act(
+				cdp,
+				`const v = document.getElementById("bounded-2"); v.value = "8"; v.dispatchEvent(new Event("input", { bubbles: true }))`,
+				`document.querySelector("#bounded > p").textContent`,
+			),
+		);
+		expect(readout).toBe("7,7,8");
+	});
+
+	test("client validation includes defaults, endpoints and a deterministic stride, and checks small products exhaustively", async () => {
+		for (const [max, target] of [
+			[20, [7, 7, 7]],
+			[20, [0, 0, 0]],
+			[20, [20, 20, 20]],
+			[20, [0, 1, 15]], // First interior stride point in the 21^3 product.
+			[2, [1, 1, 1]], // Neither an endpoint nor a default, in a small product.
+		] as const) {
+			dir.write(
+				"sampled.ts",
+				`"use client";
+export function sampled(...values: number[]) {
+	if (values.join(",") === "${target.join(",")}") throw new Error("checked sample");
+	return { readout: values.join(",") };
+}
+`,
+			);
+			const controls = ["a", "b", "c"]
+				.map(
+					(id) =>
+						`{ id: "${id}", label: "${id}", range: [0, ${max}, 1], value: ${max === 20 ? 7 : 0} }`,
+				)
+				.join(",");
+			const { result } = await packMdx(
+				dir,
+				"sampled",
+				`import { Explore } from "kit";
+import { sampled } from "./sampled.ts";
+
+# Sampled
+
+<Explore controls={[${controls}]} frame={sampled} />
+`,
+			);
+			expect([result.code, result.stderr]).toEqual([
+				1,
+				expect.stringContaining(`frame(${target.join(", ")}) threw: checked sample`),
+			]);
+		}
+	});
+});
+
 describe("Explore", () => {
 	test("a slider whose frame a client module exports computes it in the browser: keyboard, input events, a phone, kept across a reload", async () => {
 		const { output, html } = await pack("slider", slider("client.tsx"));

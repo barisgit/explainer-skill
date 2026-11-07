@@ -17,15 +17,16 @@
    Where frame runs: exported from a module whose first line is "use client", it ships and runs in the browser on each change
    (base is then JSON); use that for sliders over model curves. Otherwise pack calls it for every combination and the page
    carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
-   Either way pack calls it for every combination, so a value it cannot draw fails the pack, not the reader's page, and the
-   starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart).
+   For a client frame, pack checks all combinations up to 256; above that it checks the defaults and 255 evenly spaced
+   combinations in control order, including all-minimum and all-maximum values. Untested combinations can fail for readers.
+   The starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart).
    Controls: one set of controls for figures in different sections. Write <Controls id="usage" controls={[...]} /> once, where the
    reader should find it, then <Explore use="usage" label="..." frame={daily} /> after it, in any section, in place of controls.
    Every such Explore follows the same choices, takes the other props as usual (a "use client" frame, base, height, a readout or
    stats alone) and shows a line of the chosen values that links back to the controls, except right under them. Put a Controls
    and its Explores in one place: the page outside the Views, or one View, or one record of a filled View. frame gets all
    the set's values in the order written, so list first the ones most figures read: (period, host) => ... may leave later ones
-   out. It is called for every combination, and each Explore carries its own frames (100 KB): add a control for what changes the
+   out. Each precomputed Explore carries its own frames (100 KB): add a control for what changes the
    figures, not for what one figure shows; a slider of many steps among others suits a "use client" frame. A frame that turns
    something back on says so: legend: { show: view === "breakdown" }, not {}. */
 import { type ComponentChildren, Fragment, h } from "preact";
@@ -105,13 +106,45 @@ const fail = (message: string): never => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
 
-/** Every combination of the controls' value indices, the first control outermost: the order explore-view.tsx indexes frames in. */
-const combinations = (controls: ExploreControl[]): number[][] =>
-	controls.reduce<number[][]>(
-		(combos, c) =>
-			combos.flatMap((combo) => Array.from({ length: valueCount(c) }, (_, i) => [...combo, i])),
-		[[]],
-	);
+/** Bounds client validation work independently of the product; 255 stride points leave room for the defaults. */
+const CLIENT_FRAME_LIMIT = 256;
+
+/** A row-major rank as control indices; BigInt keeps huge products and their endpoints exact. */
+function combinationAt(counts: bigint[], rank: bigint): number[] {
+	const indices: number[] = [];
+	for (const count of counts.toReversed()) {
+		indices.unshift(Number(rank % count));
+		rank /= count;
+	}
+	return indices;
+}
+
+/**
+ * Lazily visits row-major combinations. A client frame's large product instead gets the defaults and an evenly spaced
+ * stride including both ends; no array or loop grows with the product. Precomputed frames still need every combination.
+ */
+function* combinations(
+	controls: ExploreControl[],
+	start: number[],
+	live: boolean,
+): Generator<number[]> {
+	const counts = controls.map((control) => BigInt(valueCount(control)));
+	const total = counts.reduce((product, count) => product * count, 1n);
+	if (live && total > BigInt(CLIENT_FRAME_LIMIT)) {
+		const initial = counts.reduce((rank, count, i) => rank * count + BigInt(start[i] ?? 0), 0n);
+		const ranks = new Set([initial]);
+		for (let i = 0; i < CLIENT_FRAME_LIMIT - 1; i++) {
+			ranks.add(((total - 1n) * BigInt(i)) / BigInt(CLIENT_FRAME_LIMIT - 2));
+		}
+		for (const rank of ranks) {
+			yield combinationAt(counts, rank);
+		}
+		return;
+	}
+	for (let rank = 0n; rank < total; rank++) {
+		yield combinationAt(counts, rank);
+	}
+}
 
 /** frame's result for `values`, checked, with the call written as the author would (`frame(0.5)`) for messages. */
 function called(frame: FrameFunction, values: ExploreValue[]): [string, ExploreFrame] {
@@ -286,7 +319,7 @@ function followed({ controls, use }: ExploreControls, place: Place) {
 }
 
 /**
- * Calls frame for every combination of the controls' values (in the browser, only for the starting ones), checks the results,
+ * Checks all precomputed frames or a bounded sample of client frames (in the browser, only the starting values),
  * and renders the island for the figure they draw: with the frame function when a client module exports it, else with the
  * frames precomputed. Inside your own client component frame always runs in the browser.
  */
@@ -307,8 +340,8 @@ export function Explore({
 	const { controls: shown, start } = followed(own, place);
 	const live = isClientExport(frame) || typeof document !== "undefined";
 	const fn = frame as FrameFunction;
-	const combos = typeof document === "undefined" ? combinations(shown) : [start];
-	const frames = combos.map((combo) =>
+	const combos = typeof document === "undefined" ? combinations(shown, start, live) : [start];
+	const frames = Array.from(combos, (combo) =>
 		called(
 			fn,
 			combo.map((i, c) => valueAt(shown[c] as ExploreControl, i)),
