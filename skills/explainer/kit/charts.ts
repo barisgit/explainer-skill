@@ -201,6 +201,10 @@
 			},
 			set(patch, replace = []) {
 				mergeOption(option, patch, replace);
+				// An open axis tooltip retains data from series replaceMerge can remove.
+				if (replace.length) {
+					chart?.dispatchAction({ type: "hideTip" });
+				}
 				chart?.setOption(
 					resolveOption(patch),
 					replace.length ? { replaceMerge: replace } : undefined,

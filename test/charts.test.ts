@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, statSync } from "node:fs";
-import { inPage, packAndRun, packedMdx, packMdx, scratch } from "./support.ts";
+import { runStep } from "../skills/explainer/src/steps.ts";
+import { inPage, packAndRun, packedMdx, packHtml, packMdx, scratch, until } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -25,6 +26,47 @@ var contract = new Promise((found) => Charts.make(document.getElementById("c"), 
 
 test("colour tokens resolve in any element of a series' data, not only when it starts with an object", async () => {
 	expect(await packAndRun(dir, "mixed", PAGE)).toEqual([]);
+}, 30_000);
+
+test("swapping series with an open tooltip leaves the next hover working", async () => {
+	const output = dir.path("tooltip-swap.out.html");
+	const packed = await packHtml(
+		dir.write(
+			"tooltip-swap.html",
+			`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Swap series</h1>
+<button id="swap">Swap</button><div class="chart" id="c"></div></main>
+<script src="kit:echarts.js"></script><script src="kit:charts.js"></script><script>
+const series = (id) => [{ id, name: id, type: "bar", stack: "total", data: [2, 3] }];
+const h = Charts.make(document.getElementById("c"), {
+ tooltip: { trigger: "axis", className: "swap-tip", hideDelay: 0 },
+ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [...series("Before"), ...series("Removed")]
+});
+document.getElementById("swap").onclick = () => h.set({ series: series("After") }, ["series"]);
+</script></body></html>`,
+		),
+		output,
+	);
+	expect(packed.error).toBe("");
+	await inPage(output, async (cdp) => {
+		const tip = (name: string) => `(() => {
+			const el = document.querySelector(".swap-tip");
+			return el && getComputedStyle(el).visibility === "visible" && el.textContent.includes(${JSON.stringify(name)});
+		})()`;
+		expect(await runStep(cdp, "hover:#c", () => "")).toEqual({});
+		expect(await until(cdp, tip("Before"))).toBe(true);
+		// A keyboard activation swaps while the pointer and the tooltip stay over the chart.
+		expect(await runStep(cdp, "focus:#swap", () => "")).toEqual({});
+		expect(await runStep(cdp, "key:Enter", () => "")).toEqual({});
+		const point = await cdp.evaluate<{ x: number; y: number }>(`(() => {
+			const b = document.getElementById("c").getBoundingClientRect();
+			return { x: b.x + b.width / 2 + 10, y: b.y + b.height / 2 };
+		})()`);
+		expect(
+			await runStep(cdp, `hover:${Math.round(point.x)},${Math.round(point.y)}`, () => ""),
+		).toEqual({});
+		expect(await until(cdp, tip("After"))).toBe(true);
+	});
 }, 30_000);
 
 test("custom series pack without an approximate drawing and render in the browser", async () => {
