@@ -121,7 +121,10 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 		);
 		await cdp.evaluate(`window.captureEvents = [];
 			addEventListener('scroll', () => window.captureEvents.push('scroll'));
-			addEventListener('resize', () => window.captureEvents.push('resize'));`);
+			addEventListener('resize', () => {
+				window.captureEvents.push('resize');
+				document.getElementById('panel').scrollTop = 0;
+			});`);
 		const state = `({
 			open: document.getElementById('details').open,
 			tab: document.getElementById('tab').value,
@@ -146,6 +149,48 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 	expect(captured?.colours.inner.count).toBe(20);
 	expect(captured?.colours.scoped.count).toBe(20);
 }, 30_000);
+
+test.each([false, true])(
+	"pending one-shot timers and rAF chains survive capture (failure=%p)",
+	async (fails) => {
+		await withPage(async (cdp) => {
+			await cdp.send("Page.enable");
+			await cdp.load(`file://${fixture}`);
+			const send = cdp.send.bind(cdp);
+			cdp.send = async <T>(method: string, params?: object, deadline?: number): Promise<T> => {
+				if (method === "Page.captureScreenshot") {
+					await cdp.evaluate(`window.once = false; window.frames = 0;
+						setTimeout(() => window.once = true, 20);
+						window.frameId = requestAnimationFrame(function frame() {
+							window.frames++; window.frameId = requestAnimationFrame(frame);
+						});`);
+					await Bun.sleep(100);
+					if (fails) {
+						throw new Error("capture failed");
+					}
+				}
+				return send<T>(method, params, deadline);
+			};
+			try {
+				if (fails) {
+					await expect(fullPageScreenshot(cdp, 390)).rejects.toThrow("capture failed");
+				} else {
+					await fullPageScreenshot(cdp, 390);
+				}
+			} finally {
+				cdp.send = send;
+			}
+			const frames = await cdp.evaluate<number>("window.frames");
+			await cdp.evaluate("new Promise(done => setTimeout(done, 50))", true);
+			expect({
+				once: await cdp.evaluate("window.once"),
+				chain: (await cdp.evaluate<number>("window.frames")) > frames,
+			}).toEqual({ once: true, chain: true });
+			await cdp.evaluate("cancelAnimationFrame(window.frameId)");
+		});
+	},
+	30_000,
+);
 
 test("a failed full-page capture restores styles and page callbacks", async () => {
 	await withPage(async (cdp) => {

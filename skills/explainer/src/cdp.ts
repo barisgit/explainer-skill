@@ -51,6 +51,7 @@ interface CdpEvents {
 	"Network.requestWillBeSent": { request: { url: string } };
 	"Network.loadingFailed": { errorText: string; canceled?: boolean };
 	"Page.loadEventFired": object;
+	"Debugger.paused": object;
 	"Inspector.targetCrashed": object;
 	"Target.detachedFromTarget": { sessionId: string };
 }
@@ -295,6 +296,22 @@ export class Cdp {
 			throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
 		}
 		return result.value;
+	}
+	/** Runs inspector work at a debugger stop; page tasks wait rather than being discarded, and resume even on failure. */
+	async paused<T>(work: () => Promise<T>): Promise<T> {
+		await this.send("Debugger.enable");
+		const paused = this.once("Debugger.paused", "the page's debugger stop", CALL_DEADLINE_MS);
+		paused.catch(() => undefined);
+		const stopped = this.send("Runtime.evaluate", { expression: "debugger;" });
+		stopped.catch(() => undefined);
+		try {
+			await paused;
+			return await work();
+		} finally {
+			await this.send("Debugger.disable");
+			// This evaluation replies only on resume. If work stalled, keep its own error rather than the trigger's deadline.
+			await stopped.catch(() => undefined);
+		}
 	}
 	/** Calls `fn` on every later `event` of the page (of the browser before attachPage), for as long as the client lives. */
 	on<E extends keyof CdpEvents>(event: E, fn: (params: CdpEvents[E]) => void) {

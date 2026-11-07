@@ -46,27 +46,25 @@ const PREPARE_JS = `(() => {
 
 /**
  * Returns a base64 PNG of the document at its current width/state, with viewport overlays normalized only for this capture.
- * Chrome's beyond-viewport capture can deliver resize events even when innerHeight ends unchanged. Suspend page callbacks
- * during the capture, then restore declarations and script execution even on failure. First-screen and element shots stay live.
+ * Chrome's beyond-viewport scrollbar workaround briefly resizes the layout. Stop at a debugger statement while capturing:
+ * page tasks defer rather than being discarded by script-execution suppression. Restore styles before resuming, even on failure.
+ * First-screen and element shots stay live.
  */
 export async function fullPageScreenshot(cdp: Cdp, width: number): Promise<string> {
-	try {
-		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
-		await cdp.evaluate(PREPARE_JS);
-		const { contentSize } = await cdp.send<{ contentSize: { height: number } }>(
-			"Page.getLayoutMetrics",
-		);
-		const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
-			format: "png",
-			captureBeyondViewport: true,
-			clip: { x: 0, y: 0, width, height: Math.ceil(contentSize.height), scale: 1 },
-		});
-		return data;
-	} finally {
+	return cdp.paused(async () => {
 		try {
-			await cdp.evaluate(`window[${RESTORE_KEY}]?.()`);
+			await cdp.evaluate(PREPARE_JS);
+			const { contentSize } = await cdp.send<{ contentSize: { height: number } }>(
+				"Page.getLayoutMetrics",
+			);
+			const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
+				format: "png",
+				captureBeyondViewport: true,
+				clip: { x: 0, y: 0, width, height: Math.ceil(contentSize.height), scale: 1 },
+			});
+			return data;
 		} finally {
-			await cdp.send("Emulation.setScriptExecutionDisabled", { value: false });
+			await cdp.evaluate(`window[${RESTORE_KEY}]?.()`);
 		}
-	}
+	});
 }
