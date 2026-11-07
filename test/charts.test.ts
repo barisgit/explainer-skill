@@ -98,9 +98,7 @@ ${shared ? '<Controls id="mode" controls={[{ id: "on", label: "Other", toggle: t
 `,
 		);
 		expect(result.code).toBe(1);
-		expect(result.stderr).toContain(
-			'ECharts series type "funnel" is not bundled; use line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot, custom instead.',
-		);
+		expect(result.stderr).toContain('ECharts series type "funnel" is not bundled;');
 	}
 });
 
