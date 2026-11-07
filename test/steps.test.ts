@@ -33,6 +33,16 @@ test("a stepper over hand-built SVG parts", async () => {
 	expect(await packAndRun(dir, "steps", PAGE(CHECKS))).toEqual([]);
 }, 30_000);
 
+test("print shows every stepper part and caption, even on the opening step", async () => {
+	const checks = pageContract({
+		"all SVG and HTML parts print at full opacity":
+			'[...document.querySelectorAll("[data-step]")].every((part) => getComputedStyle(part).opacity === "1")',
+		"every caption prints as a list item":
+			'[...document.querySelectorAll("[data-captions] > li")].every((caption) => getComputedStyle(caption).display === "list-item")',
+	});
+	expect(await packAndRun(dir, "steps-print", PAGE(checks), { media: "print" })).toEqual([]);
+}, 30_000);
+
 test("a stepper that still has v0.7.0's data-labels hears it through check", async () => {
 	const input = dir.write("legacy.html", PAGE(""));
 	const output = dir.path("legacy.out.html");

@@ -2502,10 +2502,10 @@ dialog.reply-dialog[open] {
 	pointer-events: none;
 }
 @media print {
-	[data-live] [data-step] {
+	[data-live] [data-step]:not(.is-on) {
 		opacity: 1;
 	}
-	[data-live] [data-captions] > li {
+	[data-live] [data-captions] > li:not(.is-now) {
 		display: list-item;
 	}
 	.reply-ui,
