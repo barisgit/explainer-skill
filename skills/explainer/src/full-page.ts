@@ -32,10 +32,23 @@ const PREPARE_JS = `(() => {
 		}
 		return false;
 	};
+	const viewportFixed = (el) => {
+		if (el instanceof HTMLElement) return el.offsetParent === null;
+		// SVG has no offsetParent. Follow the CSS properties that establish a fixed-position containing block instead.
+		for (let p = el.parentElement; p; p = p.parentElement) {
+			const s = getComputedStyle(p);
+			if (p.localName === "foreignObject" || s.transformStyle === "preserve-3d"
+				|| [s.transform, s.translate, s.rotate, s.scale, s.perspective].some(v => v !== "none")
+				|| (p !== document.documentElement && (s.filter !== "none" || s.backdropFilter !== "none"))
+				|| /layout|paint|strict|content/.test(s.contain) || s.contentVisibility === "auto"
+				|| /transform|translate|rotate|scale|perspective|filter|contain|content-visibility/.test(s.willChange)) return false;
+		}
+		return true;
+	};
 	// Decide before editing any element: an ancestor's temporary style must not change a descendant's classification.
 	const targets = [...document.querySelectorAll("*")].map((el) => ({ el, position: getComputedStyle(el).position }))
 		.filter(({ el, position }) => (position === "sticky" && !innerSticky(el))
-			|| (position === "fixed" && (!(el instanceof HTMLElement) || el.offsetParent === null)));
+			|| (position === "fixed" && viewportFixed(el)));
 	const insets = ["top", "right", "bottom", "left", "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end"]
 		.map((inset) => inset + ":auto!important").join(";");
 	for (const { el, position } of targets) {

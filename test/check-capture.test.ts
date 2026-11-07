@@ -19,7 +19,16 @@ interface Pixels {
 	width: number;
 	height: number;
 	colours: Record<
-		"header" | "footer" | "fixed" | "open" | "tab" | "chart" | "panel" | "inner" | "scoped",
+		| "header"
+		| "footer"
+		| "fixed"
+		| "open"
+		| "tab"
+		| "chart"
+		| "panel"
+		| "inner"
+		| "scoped"
+		| "scopedSvg",
 		Stripe
 	>;
 }
@@ -37,7 +46,7 @@ async function pixels(files: string[]): Promise<Pixels[]> {
 				const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
 				const colours = {};
 				const samples = { header: [250, '0,128,0'], footer: [250, '255,128,0'], fixed: [img.width - 2, '255,0,0'],
-					open: [90, '0,0,255'], tab: [90, '0,255,0'], chart: [90, '255,0,255'], panel: [190, '0,255,255'], inner: [190, '128,128,0'], scoped: [90, '128,128,255'] };
+					open: [90, '0,0,255'], tab: [90, '0,255,0'], chart: [90, '255,0,255'], panel: [190, '0,255,255'], inner: [190, '128,128,0'], scoped: [90, '128,128,255'], scopedSvg: [190, '0,128,255'] };
 				for (const [key, [x, rgb]] of Object.entries(samples)) {
 					const column = ctx.getImageData(Math.min(x, img.width - 1), 0, 1, img.height).data;
 					const hits = [];
@@ -113,7 +122,7 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 			panel.style.height = '10vh';
 			panel.insertAdjacentHTML('afterbegin', '<div id="inner-sticky" style="position:sticky;top:0;height:20px;background:rgb(128,128,0)">Panel header</div>');
 			panel.scrollTop = 180;
-			document.body.insertAdjacentHTML('beforeend', '<div style="transform:translateZ(0);height:40px"><span id="scoped-fixed" style="position:fixed;top:0;width:100px;height:20px;background:rgb(128,128,255)">Scoped</span></div>');
+			document.body.insertAdjacentHTML('beforeend', '<div style="transform:translateZ(0);height:40px"><span id="scoped-fixed" style="position:fixed;top:0;width:100px;height:20px;background:rgb(128,128,255)">Scoped</span><svg id="scoped-svg" width="100" height="20" style="position:fixed;left:100px;top:0"><rect width="100" height="20" fill="rgb(0,128,255)" /></svg></div><svg width="30" height="30" style="position:fixed;right:0;top:0"><rect width="30" height="30" fill="red" /></svg>');
 		`);
 		await cdp.evaluate(
 			`new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))`,
@@ -148,6 +157,8 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 	const [captured] = await pixels([output]);
 	expect(captured?.colours.inner.count).toBe(20);
 	expect(captured?.colours.scoped.count).toBe(20);
+	expect(captured?.colours.scopedSvg.count).toBe(20);
+	expect(captured?.colours.fixed.count).toBe(0);
 }, 30_000);
 
 test.each([false, true])(
