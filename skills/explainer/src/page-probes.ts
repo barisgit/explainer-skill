@@ -124,7 +124,7 @@ export const DISCOVER_JS = `(() => {
 const SWEEP_BUDGET_MS = 3000;
 const SWEEP_TICK_MS = 80;
 /** Stable report identity; coverage details can differ across screens of the same overview or view. */
-export const SWEEP_WARNING = `scroll sweep incomplete after ${SWEEP_BUDGET_MS / 1000} s`;
+export const SWEEP_WARNING = "scroll sweep incomplete";
 /**
  * Runs in the page: sweeps the document, then laid-out auto/scroll containers on both axes, following growing content and waiting
  * for scroll events and observers. The 3 s budget is shared by all targets per page load, never multiplied by inner scrollers.
@@ -175,14 +175,48 @@ export const SWEEP_JS = `(async () => {
 		const { x, y } = axes(el);
 		return { x: x ? el.scrollWidth - el.clientWidth : 0, y: y ? el.scrollHeight - el.clientHeight : 0 };
 	};
+	// Convert the visible padding box back to CSS pixels: client sizes alone can be larger than what the reader sees.
+	const box = (el) => {
+		const r = el.getBoundingClientRect();
+		const sx = r.width / (el.offsetWidth || r.width || 1), sy = r.height / (el.offsetHeight || r.height || 1);
+		const left = r.left + el.clientLeft * sx, top = r.top + el.clientTop * sy;
+		return { left, top, right: left + el.clientWidth * sx, bottom: top + el.clientHeight * sy, sx, sy };
+	};
+	const visible = (el) => {
+		if (el === root) return { width: el.clientWidth, height: Math.min(el.clientHeight, innerHeight) };
+		const r = box(el);
+		let left = Math.max(0, r.left), top = Math.max(0, r.top);
+		let right = Math.min(innerWidth, r.right), bottom = Math.min(innerHeight, r.bottom);
+		for (let child = el, p; child; child = p) {
+			const s = getComputedStyle(child);
+			// Positioned boxes can escape intervening clips; a viewport-fixed containing block ends the chain.
+			p = s.position === "absolute" || s.position === "fixed" ? child.offsetParent : child.parentElement;
+			if (!p || p === root) break;
+			const style = getComputedStyle(p);
+			const html = getComputedStyle(document.documentElement);
+			if (p === document.body && html.overflowX === "visible" && html.overflowY === "visible"
+				&& html.contain === "none" && style.contain === "none") continue;
+			const clip = box(p);
+			if (style.overflowX !== "visible") { left = Math.max(left, clip.left); right = Math.min(right, clip.right); }
+			if (style.overflowY !== "visible") { top = Math.max(top, clip.top); bottom = Math.min(bottom, clip.bottom); }
+		}
+		return { width: Math.max(0, right - left) / (r.sx || 1), height: Math.max(0, bottom - top) / (r.sy || 1) };
+	};
+	const reveal = (el) => {
+		const before = [];
+		for (let p = el.parentElement; p; p = p.parentElement) before.push([p, p.scrollLeft, p.scrollTop]);
+		el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+		return before.some(([p, left, top]) => p.scrollLeft !== left || p.scrollTop !== top);
+	};
 	let moved = false;
 	const walk = async (target) => {
 		const { el } = target;
 		if (performance.now() >= end) return;
 		const direction = getComputedStyle(el).direction === "rtl" ? -1 : 1;
 		const reset = el.scrollLeft !== 0 || el.scrollTop !== 0;
+		const brought = el !== root && reveal(el);
 		el.scrollTo({ left: 0, top: 0, behavior: "instant" });
-		if (reset) {
+		if (reset || brought) {
 			moved = true;
 			// Yield at the beginning too: otherwise reset and advance coalesce into one scroll/observer delivery.
 			await tick();
@@ -191,13 +225,20 @@ export const SWEEP_JS = `(async () => {
 			const max = limits(el);
 			if (Math.abs(el.scrollLeft) >= max.x && el.scrollTop >= max.y) { target.done = true; return; }
 			if (performance.now() >= end) return;
-			if (el !== root) el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+			if (el !== root && reveal(el)) {
+				moved = true;
+				await tick();
+				continue;
+			}
+			const span = visible(el);
+			// A box that scrolling cannot expose stays incomplete, but must not starve later visible panels.
+			if (!span.width || !span.height) return;
 			moved = true;
 			// Visit each row, not just the diagonal: observers can sit in either off-diagonal corner.
 			const nextRow = Math.abs(el.scrollLeft) >= max.x;
 			el.scrollTo({
-				left: nextRow ? 0 : direction * Math.min(Math.abs(el.scrollLeft) + el.clientWidth, max.x),
-				top: nextRow ? Math.min(el.scrollTop + el.clientHeight, max.y) : el.scrollTop,
+				left: nextRow ? 0 : direction * Math.min(Math.abs(el.scrollLeft) + span.width, max.x),
+				top: nextRow ? Math.min(el.scrollTop + span.height, max.y) : el.scrollTop,
 				behavior: "instant",
 			});
 			await tick();
@@ -218,7 +259,8 @@ export const SWEEP_JS = `(async () => {
 	if (missed.some((t) => t.el === root)) parts.push("document not reached");
 	const panels = missed.filter((t) => t.el !== root);
 	if (panels.length) parts.push(panels.length + " inner scroller(s) not reached (" + panels.slice(0, 3).map((t) => name(t.el)).join(", ") + (panels.length > 3 ? ", …" : "") + ")");
-	return ["${SWEEP_WARNING}: " + parts.join("; ") + ": scroll the rest by hand"];
+	const cutoff = performance.now() >= end ? "${SWEEP_BUDGET_MS / 1000} s budget exhausted; " : "";
+	return ["${SWEEP_WARNING}: " + cutoff + parts.join("; ") + ": scroll the rest by hand"];
 })()`;
 
 const STEPPER_BUDGET_MS = 3000;

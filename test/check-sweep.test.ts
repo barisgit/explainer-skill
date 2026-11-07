@@ -146,6 +146,69 @@ test("the sweep restores non-target hidden ancestors moved by scrollIntoView", a
 	});
 }, 30_000);
 
+test("oversized scrollers advance by the viewport-visible area, including ancestor clipping", async () => {
+	await withPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		await cdp.send("Emulation.setDeviceMetricsOverride", {
+			width: 300,
+			height: 300,
+			deviceScaleFactor: 1,
+			mobile: false,
+		});
+		for (const [size, offset] of [
+			[300, 400],
+			[180, 220],
+		]) {
+			await cdp.load(
+				`file://${dir.write(
+					`visible-${size}.html`,
+					page(
+						`<div style="position:fixed;left:0;top:0;overflow:hidden;width:${size}px;height:${size}px">
+				<div id="panel" style="overflow:auto;width:600px;height:600px"><div style="position:relative;width:1200px;height:1200px">
+				<span id="sentinel" style="position:absolute;left:${offset}px;top:${offset}px;width:10px;height:10px">Mark</span>
+				</div></div></div>`,
+						`window.seen = false;
+				new IntersectionObserver(entries => {
+					if (entries.some(e => e.isIntersecting)) window.seen = true;
+				}).observe(document.getElementById('sentinel'));`,
+					),
+				)}`,
+			);
+			await cdp.evaluate(
+				`new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))`,
+				true,
+			);
+			expect(await cdp.evaluate("window.seen")).toBe(false);
+			expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+			expect(await cdp.evaluate("window.seen")).toBe(true);
+		}
+	});
+}, 30_000);
+
+test("an unreachable off-canvas scroller does not starve later visible panels", async () => {
+	await withPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		await cdp.load(
+			`file://${dir.write(
+				"off-canvas.html",
+				page(
+					`<div id="offcanvas" style="position:fixed;left:-1000px;overflow:auto;width:100px;height:100px"><div style="height:300px">Offscreen</div></div>
+			<div id="visible" style="overflow:auto;width:100px;height:100px"><div style="height:300px">Visible</div></div>`,
+					`window.visited = false;
+			document.getElementById('visible').addEventListener('scroll', e => { if (e.target.scrollTop) window.visited = true; });`,
+				),
+			)}`,
+		);
+		const started = performance.now();
+		const warnings = await cdp.evaluate<string[]>(SWEEP_JS, true);
+		expect(await cdp.evaluate("window.visited")).toBe(true);
+		expect(performance.now() - started).toBeLessThan(1000);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("1 inner scroller(s) not reached (div#offcanvas)");
+		expect(warnings[0]).not.toContain("budget exhausted");
+	});
+}, 30_000);
+
 test("check reports budget exhaustion once across screens, naming the unreached document", async () => {
 	const file = dir.write(
 		"budget.html",
@@ -167,7 +230,8 @@ addEventListener("scroll", () => { if (scrollY) elapsed += 4000; });`,
 		dir.path("budget-shots"),
 	]);
 	expect(result.code).toBe(0);
-	expect(result.stdout).toContain("scroll sweep incomplete after 3 s (overview)");
+	expect(result.stdout).toContain("scroll sweep incomplete (overview)");
+	expect(result.stdout).toContain("3 s budget exhausted; document not reached");
 	expect(result.stdout).toContain("document not reached: scroll the rest by hand");
 	expect(result.stdout.match(/scroll sweep incomplete/g)).toHaveLength(1);
 	expect(result.stdout).toContain("Verdict: ok, 0 problems, 1 warning.");
@@ -186,7 +250,7 @@ test("incomplete sweeps group differing screen details once per overview or view
 	const text = report(
 		"shots",
 		[
-			shot("desktop 1440x900", "", "document not reached"),
+			shot("desktop 1440x900", "", "3 s budget exhausted; document not reached"),
 			shot("narrow 390x844", "", "2 inner scroller(s) not reached (div#one, div#two)"),
 			shot("desktop 1440x900", "#detail/a", "document not reached"),
 			shot("narrow 390x844", "#detail/a", "1 inner scroller(s) not reached (div#one)"),
