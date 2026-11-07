@@ -3,7 +3,7 @@ import { basename, join, resolve } from "node:path";
 import type { Cdp, ExceptionDetails } from "./cdp.ts";
 import { ChromeError } from "./cdp.ts";
 import { withPage } from "./chrome.ts";
-import { fullPageScreenshot } from "./full-page.ts";
+import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import {
@@ -42,7 +42,7 @@ export interface ElementShot {
  * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
  * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
- * change only its captions, an incomplete scroll sweep).
+ * change only its captions, an incomplete scroll sweep, visible fixed elements omitted from a full-page PNG).
  */
 export interface Shot {
 	theme: string;
@@ -245,7 +245,7 @@ interface Screen {
 }
 
 /** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
-async function capture(run: Run, png: string, screen: Screen): Promise<string[]> {
+async function capture(run: Run, png: string, screen: Screen, view = ""): Promise<string[]> {
 	const { cdp, log } = run;
 	const narrow = screen.name === "narrow";
 	const page = await cdp.evaluate<PageReport>(PAGE_JS(narrow));
@@ -255,10 +255,12 @@ async function capture(run: Run, png: string, screen: Screen): Promise<string[]>
 			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
 		);
 	}
-	const data = await fullPageScreenshot(cdp, screen.vp.width);
+	const { data, omitted } = await fullPageScreenshot(cdp, screen.vp.width);
 	writeFileSync(png, Buffer.from(data, "base64"));
+	const inspect = view ? "open this view to inspect them" : "use --do shot:<css> to capture them";
 	return [
 		...page.warnings,
+		...(omitted.length ? [`${OMITTED_FIXED_WARNING}: ${omitted.join(", ")}; ${inspect}`] : []),
 		...page.scrolls.map((s) => `scrolls sideways: ${s}`),
 		...new Set(log.warnings),
 	];
@@ -385,7 +387,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 	await sweep(run);
 	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
 	const png = join(run.outDir, `${run.stem}-view-${slug}-${theme}-${name}.png`);
-	const warnings = await capture(run, png, screen);
+	const warnings = await capture(run, png, screen, hash);
 	run.shots.push({
 		theme,
 		viewport: `${name} ${vp.width}x${vp.height}`,

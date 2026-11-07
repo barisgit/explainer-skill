@@ -1,8 +1,10 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { fullPageScreenshot } from "../skills/explainer/src/full-page.ts";
+import { report } from "../skills/explainer/src/report.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import { runCli, scratch } from "./support.ts";
 
@@ -125,6 +127,16 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 			document.body.insertAdjacentHTML('beforeend', '<div style="transform:translateZ(0);height:40px"><span id="scoped-fixed" style="position:fixed;top:0;width:100px;height:20px;background:rgb(128,128,255)">Scoped</span><svg id="scoped-svg" width="100" height="20" style="position:fixed;left:100px;top:0"><rect width="100" height="20" fill="rgb(0,128,255)" /></svg></div><svg width="30" height="30" style="position:fixed;right:0;top:0"><rect width="30" height="30" fill="red" /></svg>');
 		`);
 		await cdp.evaluate(
+			`document.body.insertAdjacentHTML('beforeend', '<span style="transform:translateZ(0)"><svg id="inline-svg" width="30" height="30" style="position:fixed;right:0;top:40px"><rect width="30" height="30" fill="red" /></svg><span id="inline-html" style="position:fixed;right:40px;top:40px;width:30px;height:30px;background:red"></span></span>');`,
+		);
+		expect(await cdp.evaluate("document.getElementById('inline-html').offsetParent")).toBeNull();
+		await cdp.evaluate(
+			`document.body.insertAdjacentHTML('beforeend', '<span id="inline-filter" style="filter:blur(0)"><svg width="100" height="20" style="position:fixed;left:100px;top:0"><rect width="100" height="20" fill="rgb(0,128,255)" /></svg><span id="filter-html" style="position:fixed;left:40px;top:0;width:30px;height:30px"></span></span><div style="height:40px"></div>');`,
+		);
+		expect(await cdp.evaluate("document.getElementById('filter-html').offsetParent.id")).toBe(
+			"inline-filter",
+		);
+		await cdp.evaluate(
 			`new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))`,
 			true,
 		);
@@ -145,7 +157,7 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 			scopedFixed: getComputedStyle(document.getElementById('scoped-fixed')).opacity,
 		})`;
 		const before = await cdp.evaluate(state);
-		const png = await fullPageScreenshot(cdp, 390);
+		const { data: png } = await fullPageScreenshot(cdp, 390);
 		writeFileSync(output, Buffer.from(png, "base64"));
 		expect(Buffer.from(png, "base64").readUInt32BE(16)).toBe(390);
 		await cdp.evaluate(
@@ -157,7 +169,7 @@ test("full-page capture restores styles without scrolling, resizing or changing 
 	const [captured] = await pixels([output]);
 	expect(captured?.colours.inner.count).toBe(20);
 	expect(captured?.colours.scoped.count).toBe(20);
-	expect(captured?.colours.scopedSvg.count).toBe(20);
+	expect(captured?.colours.scopedSvg.count).toBe(40);
 	expect(captured?.colours.fixed.count).toBe(0);
 }, 30_000);
 
@@ -220,6 +232,42 @@ test("restoring an omitted overlay does not restart its important opacity transi
 		await fullPageScreenshot(cdp, 390);
 		expect(await cdp.evaluate(state)).toEqual(before);
 	});
+}, 30_000);
+
+test("omitted overlays opened by a step or confined to a view are grouped in text and retained in JSON", async () => {
+	const result = await runCli([
+		"check",
+		join(import.meta.dir, "fixtures/check-overlays.html"),
+		"--quick",
+		"--view",
+		"all",
+		"--do",
+		"click:#open",
+		"--out",
+		dir.path("overlay-shots"),
+		"--json",
+	]);
+	expect(result.code).toBe(0);
+	const checked = JSON.parse(result.stdout) as CheckResult;
+	expect(checked.shots).toHaveLength(4);
+	for (const shot of checked.shots) {
+		const selector = shot.view
+			? "#view-fixed"
+			: shot.viewport.startsWith("desktop")
+				? "#desktop-open"
+				: "#narrow-open";
+		expect(shot.warnings).toEqual([
+			`fixed elements omitted from full-page PNG: ${selector}; ${shot.view ? "open this view to inspect them" : "use --do shot:<css> to capture them"}`,
+		]);
+	}
+	const text = report("shots", checked.shots, checked.views, checked.stepNotes);
+	expect(text.match(/fixed elements omitted from full-page PNG/g)).toHaveLength(2);
+	expect(text).toContain("fixed elements omitted from full-page PNG (overview)");
+	expect(text).toContain("fixed elements omitted from full-page PNG (#detail)");
+	expect(text).toContain("#desktop-open");
+	expect(text).toContain("#narrow-open");
+	expect(text).toContain("#view-fixed");
+	expect(text).toContain("Verdict: ok, 0 problems, 2 warnings.");
 }, 30_000);
 
 test("a failed full-page capture restores styles and page callbacks", async () => {

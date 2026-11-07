@@ -1,4 +1,8 @@
 import type { Cdp } from "./cdp.ts";
+import { REGION_VISIBLE_JS } from "./page-js.ts";
+
+/** Stable report identity; omitted elements may differ across screens of one overview or view. */
+export const OMITTED_FIXED_WARNING = "fixed elements omitted from full-page PNG";
 
 const RESTORE_KEY = `Symbol.for("explainer.check.fullPage")`;
 
@@ -37,11 +41,15 @@ const PREPARE_JS = `(() => {
 		// SVG has no offsetParent. Follow the CSS properties that establish a fixed-position containing block instead.
 		for (let p = el.parentElement; p; p = p.parentElement) {
 			const s = getComputedStyle(p);
-			if (p.localName === "foreignObject" || s.transformStyle === "preserve-3d"
-				|| [s.transform, s.translate, s.rotate, s.scale, s.perspective].some(v => v !== "none")
-				|| (p !== document.documentElement && (s.filter !== "none" || s.backdropFilter !== "none"))
-				|| /layout|paint|strict|content/.test(s.contain) || s.contentVisibility === "auto"
-				|| /transform|translate|rotate|scale|perspective|filter|contain|content-visibility/.test(s.willChange)) return false;
+			if (s.display === "contents") continue;
+			// Non-replaced inline boxes ignore transforms and layout containment, but filters still establish a block.
+			const box = s.display !== "inline" || p.clientWidth > 0 || p.clientHeight > 0;
+			if (p.localName === "foreignObject"
+				|| (p !== document.documentElement && ([s.filter, s.backdropFilter].some(v => v && v !== "none") || /filter/.test(s.willChange)))
+				|| (box && (s.transformStyle === "preserve-3d"
+					|| [s.transform, s.translate, s.rotate, s.scale, s.perspective].some(v => v && v !== "none")
+					|| /layout|paint|strict|content/.test(s.contain) || s.contentVisibility === "auto"
+					|| /transform|translate|rotate|scale|perspective|contain|content-visibility/.test(s.willChange)))) return false;
 		}
 		return true;
 	};
@@ -49,6 +57,13 @@ const PREPARE_JS = `(() => {
 	const targets = [...document.querySelectorAll("*")].map((el) => ({ el, position: getComputedStyle(el).position }))
 		.filter(({ el, position }) => (position === "sticky" && !innerSticky(el))
 			|| (position === "fixed" && viewportFixed(el)));
+	const shown = ${REGION_VISIBLE_JS};
+	const omitted = targets.filter(({ el, position }) => {
+		if (position !== "fixed" || !shown(el)) return false;
+		for (let p = el; p; p = p.parentElement) if (getComputedStyle(p).opacity === "0") return false;
+		const r = el.getBoundingClientRect();
+		return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+	}).map(({ el }) => el.id ? "#" + CSS.escape(el.id) : el.localName + (el.classList[0] ? "." + CSS.escape(el.classList[0]) : ""));
 	const insets = ["top", "right", "bottom", "left", "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end"]
 		.map((inset) => inset + ":auto!important").join(";");
 	for (const { el, position } of targets) {
@@ -58,18 +73,22 @@ const PREPARE_JS = `(() => {
 		// Attribute writes avoid Chrome lazily recreating an empty style attribute after CSSOM edits and removal.
 		el.setAttribute("style", (style ?? "") + ";transition:none!important;" + rules);
 	}
+	return [...new Set(omitted)];
 })()`;
 
 /**
- * Returns a base64 PNG of the document at its current width/state, with viewport overlays normalized only for this capture.
+ * Returns the base64 document PNG and short selectors of visible viewport-fixed boxes omitted only for this capture.
  * Chrome's beyond-viewport scrollbar workaround briefly resizes the layout. Stop at a debugger statement while capturing:
  * page tasks defer rather than being discarded by script-execution suppression. Restore styles before resuming, even on failure.
  * First-screen and element shots stay live.
  */
-export async function fullPageScreenshot(cdp: Cdp, width: number): Promise<string> {
+export async function fullPageScreenshot(
+	cdp: Cdp,
+	width: number,
+): Promise<{ data: string; omitted: string[] }> {
 	return cdp.paused(async () => {
 		try {
-			await cdp.evaluate(PREPARE_JS);
+			const omitted = await cdp.evaluate<string[]>(PREPARE_JS);
 			const { contentSize } = await cdp.send<{ contentSize: { height: number } }>(
 				"Page.getLayoutMetrics",
 			);
@@ -78,7 +97,7 @@ export async function fullPageScreenshot(cdp: Cdp, width: number): Promise<strin
 				captureBeyondViewport: true,
 				clip: { x: 0, y: 0, width, height: Math.ceil(contentSize.height), scale: 1 },
 			});
-			return data;
+			return { data, omitted };
 		} finally {
 			await cdp.evaluate(`window[${RESTORE_KEY}]?.()`);
 		}

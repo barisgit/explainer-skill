@@ -1,4 +1,5 @@
 import type { Shot, ViewReport } from "./check.ts";
+import { OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { SWEEP_WARNING } from "./page-probes.ts";
 
 /** A list of this many in-page links in the first viewport counts as a deliberate text map. */
@@ -43,9 +44,15 @@ function pages(shots: Shot[], stepNotes: string[]): string[] {
 	return [...out, ...stepNotes.map((n) => `  --do ${n}`)];
 }
 
-/** A sweep is one warning per load kind, not a new warning for each screen's coverage details. */
-const warningKey = (s: Shot, w: string) =>
-	w.startsWith(`${SWEEP_WARNING}:`) ? `${SWEEP_WARNING} (${s.view || "overview"})` : w;
+/** Per-load warning identity, separate from details that can differ across screens. */
+const warningPrefix = (w: string) =>
+	[SWEEP_WARNING, OMITTED_FIXED_WARNING].find((prefix) => w.startsWith(`${prefix}:`));
+
+/** Group coverage warnings per overview/view, retaining each screen's details. */
+const warningKey = (s: Shot, w: string) => {
+	const prefix = warningPrefix(w);
+	return prefix ? `${prefix} (${s.view || "overview"})` : w;
+};
 
 /** Warnings grouped by identity, retaining each distinct coverage detail and the places it occurred. */
 function warnings(shots: Shot[]): string[] {
@@ -66,7 +73,7 @@ function warnings(shots: Shot[]): string[] {
 		out.push(`  ${key}`);
 		for (const [w, at] of details) {
 			if (w !== key) {
-				out.push(`         ${w.slice(SWEEP_WARNING.length + 2)}`);
+				out.push(`         ${w.slice(w.indexOf(": ") + 2)}`);
 			}
 			out.push(`         at: ${[...new Set(at)].join(", ")}`);
 		}
