@@ -229,7 +229,8 @@ h3,
 	font-weight: 500;
 	color: var(--muted);
 }
-.page section:not(.view) {
+/* Sections inside a figure belong to its content, not the page's rhythm. */
+.page section:not(.view, .fig *) {
 	margin-block: clamp(3.5rem, 9vw, 6rem);
 	padding-block-start: clamp(1.5rem, 3vw, 2rem);
 	border-block-start: 1px solid var(--rule);
@@ -307,7 +308,10 @@ h3,
 	background: var(--under);
 	border: 1px solid var(--rule);
 	border-radius: var(--radius);
-	overflow: hidden;
+	/* Clip edge-to-edge children to the corners without trapping sticky rows in a scroll container.
+	   Keep hidden's formatting context so floats and child margins stay contained. */
+	display: flow-root;
+	overflow: clip;
 
 	/* In a panel the diagram runs edge to edge on the blueprint surface; on a plain figure it sits on the page like a chart. */
 	& > :is(.mermaid, .schematic) {
@@ -2303,6 +2307,7 @@ details > :last-child:not(summary) {
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
    Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
+   For an intended restyle, add a class the kit does not use to the element and the selector's last compound: class="chip verdict", .chip.verdict.
    Files: the rules live by concern in parts/theme/*.css (base and tokens, layout, graphics, controls, data, notes and views, navigation, trees); pack
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
