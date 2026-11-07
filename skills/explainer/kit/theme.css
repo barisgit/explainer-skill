@@ -30,6 +30,9 @@
    gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
      <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
        <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
+   Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
+   Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
+   controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.

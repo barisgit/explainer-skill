@@ -4,6 +4,8 @@
 
 - `Explore` checks at most 256 combinations of a client frame at pack time instead of enumerating the full control product: defaults plus an evenly spaced sample including both endpoints. Small products remain fully checked; untested combinations can fail for readers. Precomputed frames are still checked in full.
 
+- Ranking rows now use `ol.rank > li > details > summary + .more`: click, Enter and Space open and close the detail without a page script. Replace the old button with the details/summary wrapper and remove `hidden` from `.more`; titles wrap in a flexible column instead of being capped at 7rem.
+
 - An `aria-label` names a view link or note target explicitly. Tree-branch notes use the summary's first cell instead of gluing its numbers and descendant rows into the label.
 
 - `data-nav` on an `h2` inside an author-written section now names its contents-rail entry; the section's own `data-nav` takes precedence.

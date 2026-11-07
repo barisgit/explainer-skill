@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndRun, pageContract, scratch } from "./support.ts";
+import { runStep } from "../skills/explainer/src/steps.ts";
+import { FRAMES, inPage, packAndRun, packHtml, pageContract, scratch, WIDTHS } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -24,6 +25,51 @@ ${pageContract({
 })}</script></body></html>`;
 
 	expect(await packAndRun(dir, "num", page)).toEqual([]);
+}, 30_000);
+
+test("ranking rows disclose by click, Enter and Space, with room for titles (#35)", async () => {
+	const row = `<li><details><summary><span class="name">A long item title that needs more than seven rem</span><span class="bar"><i style="--w:100%"></i></span><span class="val">100%</span></summary><div class="more">Row detail</div></details></li>`;
+	const output = dir.path("ranking.out.html");
+	expect(
+		(
+			await packHtml(
+				dir.write(
+					"ranking.html",
+					`${HEAD}<ol class="rank">${row}${row.replaceAll("100%", "99%")}</ol></main></body></html>`,
+				),
+				output,
+			)
+		).error,
+	).toBe("");
+	for (const viewport of WIDTHS) {
+		await inPage(
+			output,
+			async (cdp) => {
+				const state = `Array.from(document.querySelectorAll(".rank details"), (row) => row.open)`;
+				expect(await cdp.evaluate(state)).toEqual([false, false]);
+				expect(
+					await cdp.evaluate(`(() => {
+				const name = document.querySelector(".rank .name");
+				const summary = name.parentElement;
+				const tracks = Array.from(document.querySelectorAll(".rank .bar"), (bar) => bar.getBoundingClientRect());
+				return tracks[0].width === tracks[1].width && tracks[0].left === tracks[1].left && getComputedStyle(summary).display === "grid" && name.clientWidth > 112 && name.scrollWidth <= name.clientWidth && document.documentElement.scrollWidth === innerWidth;
+			})()`),
+				).toBe(true);
+				await cdp.evaluate(`document.querySelector(".rank summary").click()`);
+				expect(await cdp.evaluate(state)).toEqual([true, false]);
+				await cdp.evaluate(`document.querySelector(".rank summary").focus()`);
+				for (const [key, open] of [
+					["Enter", false],
+					["Space", true],
+				] as const) {
+					await runStep(cdp, `key:${key}`, () => dir.path("ranking.png"));
+					await cdp.evaluate(FRAMES, true);
+					expect(await cdp.evaluate(state)).toEqual([open, false]);
+				}
+			},
+			viewport,
+		);
+	}
 }, 30_000);
 
 for (const panel of ["explicit", "automatic"]) {

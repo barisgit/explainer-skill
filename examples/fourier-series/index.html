@@ -1170,7 +1170,7 @@ output {
 	margin-block: 0.75rem;
 }
 
-/* Ranking rows: ol.rank > li > button (aria-expanded) + .more (inline detail, hidden until opened) */
+/* Ranking rows: ol.rank > li > details > summary + .more; native disclosure, no page script. */
 .rank {
 	list-style: none;
 	margin: 0;
@@ -1184,9 +1184,15 @@ output {
 .rank > li:last-child {
 	border-block-end: 0;
 }
-.rank > li > button {
+.rank > li > details {
+	margin: 0;
+	border: 0;
+}
+/* Keep button rows styled for pages that already supply their own toggle. */
+.rank > li > button,
+.rank > li > details > summary {
 	display: grid;
-	grid-template-columns: minmax(4rem, 7rem) 1fr minmax(3.5rem, 6rem);
+	grid-template-columns: minmax(0, 2fr) minmax(2rem, 1fr) minmax(3.5rem, 6rem);
 	align-items: center;
 	gap: 0.75rem;
 	inline-size: 100%;
@@ -1196,8 +1202,14 @@ output {
 	text-align: start;
 	cursor: pointer;
 }
+.rank > li > details > summary {
+	/* A shared value width keeps the bars on the same scale when digit counts differ. */
+	grid-template-columns: auto minmax(0, 2fr) minmax(2rem, 1fr) minmax(3.5rem, 6rem);
+	margin: 0;
+}
 .rank .name {
 	font-weight: 600;
+	overflow-wrap: anywhere;
 }
 .rank .bar {
 	display: flex;
@@ -1219,10 +1231,13 @@ output {
 	font-variant-numeric: tabular-nums;
 }
 .rank > li > button:hover .name,
-.rank > li > button[aria-expanded="true"] .name {
+.rank > li > button[aria-expanded="true"] .name,
+.rank > li > details > summary:hover .name,
+.rank > li > details[open] > summary .name {
 	color: var(--accent);
 }
 .rank .more {
+	margin: 0;
 	padding: 0.25rem 0 1rem;
 }
 
@@ -2302,6 +2317,9 @@ details > :last-child:not(summary) {
    gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
      <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
        <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
+   Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
+   Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
+   controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
    --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.

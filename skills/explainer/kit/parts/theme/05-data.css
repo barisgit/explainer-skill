@@ -88,7 +88,7 @@
 	margin-block: 0.75rem;
 }
 
-/* Ranking rows: ol.rank > li > button (aria-expanded) + .more (inline detail, hidden until opened) */
+/* Ranking rows: ol.rank > li > details > summary + .more; native disclosure, no page script. */
 .rank {
 	list-style: none;
 	margin: 0;
@@ -102,9 +102,15 @@
 .rank > li:last-child {
 	border-block-end: 0;
 }
-.rank > li > button {
+.rank > li > details {
+	margin: 0;
+	border: 0;
+}
+/* Keep button rows styled for pages that already supply their own toggle. */
+.rank > li > button,
+.rank > li > details > summary {
 	display: grid;
-	grid-template-columns: minmax(4rem, 7rem) 1fr minmax(3.5rem, 6rem);
+	grid-template-columns: minmax(0, 2fr) minmax(2rem, 1fr) minmax(3.5rem, 6rem);
 	align-items: center;
 	gap: 0.75rem;
 	inline-size: 100%;
@@ -114,8 +120,14 @@
 	text-align: start;
 	cursor: pointer;
 }
+.rank > li > details > summary {
+	/* A shared value width keeps the bars on the same scale when digit counts differ. */
+	grid-template-columns: auto minmax(0, 2fr) minmax(2rem, 1fr) minmax(3.5rem, 6rem);
+	margin: 0;
+}
 .rank .name {
 	font-weight: 600;
+	overflow-wrap: anywhere;
 }
 .rank .bar {
 	display: flex;
@@ -137,10 +149,13 @@
 	font-variant-numeric: tabular-nums;
 }
 .rank > li > button:hover .name,
-.rank > li > button[aria-expanded="true"] .name {
+.rank > li > button[aria-expanded="true"] .name,
+.rank > li > details > summary:hover .name,
+.rank > li > details[open] > summary .name {
 	color: var(--accent);
 }
 .rank .more {
+	margin: 0;
 	padding: 0.25rem 0 1rem;
 }
 
