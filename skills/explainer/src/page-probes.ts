@@ -123,10 +123,13 @@ export const DISCOVER_JS = `(() => {
 
 const SWEEP_BUDGET_MS = 3000;
 const SWEEP_TICK_MS = 80;
+/** Stable report identity; coverage details can differ across screens of the same overview or view. */
+export const SWEEP_WARNING = `scroll sweep incomplete after ${SWEEP_BUDGET_MS / 1000} s`;
 /**
- * Runs in the page: scrolls the document down one viewport at a time to its end and back to the top in one jump, waiting after each step for the
- * frames that deliver IntersectionObserver callbacks and scroll events. Every position is seen, content that grows while scrolling is
- * followed, and the run is cut off after 3 s. Page errors those handlers throw reach the check as they would at any other time.
+ * Runs in the page: sweeps the document, then laid-out auto/scroll containers on both axes, following growing content and waiting
+ * for scroll events and observers. The 3 s budget is shared by all targets per page load, never multiplied by inner scrollers.
+ * Returns at most one incomplete-sweep warning per load; report.ts groups it per overview/view, even when coverage differs across screens.
+ * Restores inner positions and returns the document to the top, with one bounded event-delivery tick after restoration.
  */
 export const SWEEP_JS = `(async () => {
 	const end = performance.now() + ${SWEEP_BUDGET_MS};
@@ -134,11 +137,62 @@ export const SWEEP_JS = `(async () => {
 		const timer = setTimeout(done, ${SWEEP_TICK_MS});
 		requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(timer); done(); }));
 	});
-	const maxTop = () => document.documentElement.scrollHeight - innerHeight;
-	let y = 0;
-	const to = async (top) => { y = top; scrollTo({ top, behavior: "instant" }); await tick(); };
-	while (y < maxTop() && performance.now() < end) await to(Math.min(y + innerHeight, maxTop()));
-	if (y > 0) await to(0);
+	const shown = ${REGION_VISIBLE_JS};
+	const name = ${ELEMENT_NAME_JS};
+	const root = document.scrollingElement;
+	const axes = (el) => {
+		const style = getComputedStyle(el);
+		const allows = (overflow) => overflow === "auto" || overflow === "scroll";
+		return {
+			x: (el === root || allows(style.overflowX)) && el.scrollWidth > el.clientWidth,
+			y: (el === root || allows(style.overflowY)) && el.scrollHeight > el.clientHeight,
+		};
+	};
+	const inner = [document.body, ...document.body.querySelectorAll("*")].filter((el) => {
+		const { x, y } = axes(el);
+		return el !== root && (x || y) && el.clientWidth > 0 && el.clientHeight > 0 && shown(el);
+	});
+	const targets = [root, ...inner].filter(Boolean).map((el) => ({
+		el, left: el === root ? 0 : el.scrollLeft, top: el === root ? 0 : el.scrollTop, done: false,
+	}));
+	const limits = (el) => {
+		const { x, y } = axes(el);
+		return { x: x ? el.scrollWidth - el.clientWidth : 0, y: y ? el.scrollHeight - el.clientHeight : 0 };
+	};
+	let moved = false;
+	const walk = async (target) => {
+		const { el } = target;
+		const direction = getComputedStyle(el).direction === "rtl" ? -1 : 1;
+		el.scrollTo({ left: 0, top: 0, behavior: "instant" });
+		for (;;) {
+			const max = limits(el);
+			if (Math.abs(el.scrollLeft) >= max.x && el.scrollTop >= max.y) { target.done = true; return; }
+			if (performance.now() >= end) return;
+			if (el !== root) el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+			moved = true;
+			// Visit each row, not just the diagonal: observers can sit in either off-diagonal corner.
+			const nextRow = Math.abs(el.scrollLeft) >= max.x;
+			el.scrollTo({
+				left: nextRow ? 0 : direction * Math.min(Math.abs(el.scrollLeft) + el.clientWidth, max.x),
+				top: nextRow ? Math.min(el.scrollTop + el.clientHeight, max.y) : el.scrollTop,
+				behavior: "instant",
+			});
+			await tick();
+		}
+	};
+	try {
+		for (const target of targets) await walk(target);
+	} finally {
+		for (const { el, left, top } of [...targets].reverse()) el.scrollTo({ left, top, behavior: "instant" });
+		if (moved) await tick();
+	}
+	const missed = targets.filter((t) => !t.done);
+	if (!missed.length) return [];
+	const parts = [];
+	if (missed.some((t) => t.el === root)) parts.push("document not reached");
+	const panels = missed.filter((t) => t.el !== root);
+	if (panels.length) parts.push(panels.length + " inner scroller(s) not reached (" + panels.slice(0, 3).map((t) => name(t.el)).join(", ") + (panels.length > 3 ? ", …" : "") + ")");
+	return ["${SWEEP_WARNING}: " + parts.join("; ") + ": scroll the rest by hand"];
 })()`;
 
 const STEPPER_BUDGET_MS = 3000;

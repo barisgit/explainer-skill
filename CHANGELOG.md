@@ -18,6 +18,7 @@
 - Swapping chart series with `set(patch, ["series"])` closes any open tooltip first, so the next hover no longer throws in ECharts.
 
 - Steppers print every part at full opacity and every caption, whichever step is open on screen.
+- `check` now sweeps inner `overflow: auto/scroll` containers on both axes as well as the document. They share one 3 s budget per page load; an incomplete sweep warns which ends were not reached, grouped across screens in the report, instead of silently passing unchecked content (#15).
 
 `Chart` now supports ECharts' `custom` series for shapes drawn by `renderItem`, including ranges and timeline bars. These charts draw in the browser, not at pack time. `kit Chart` lists the bundled series and components; `pack` rejects other series types in options it can see, naming the type and what to use instead. Options computed only in client code still reach ECharts at runtime; `check` reports its console errors.
 

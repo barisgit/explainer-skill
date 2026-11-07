@@ -41,7 +41,7 @@ export interface ElementShot {
  * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
  * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
- * change only its captions).
+ * change only its captions, an incomplete scroll sweep).
  */
 export interface Shot {
 	theme: string;
@@ -293,8 +293,10 @@ async function firstScreen(run: Run, screen: Screen): Promise<FirstScreen> {
 	};
 }
 
-/** Scrolls the page end to end and back, so what only runs on scroll (observers, scroll listeners) runs before the shots; ends at the top. */
-const sweep = (run: Run) => run.cdp.evaluate(SWEEP_JS, true);
+/** Sweeps the document and inner scrollers under one per-load budget, recording incomplete coverage as one warning. */
+async function sweep(run: Run) {
+	run.log.warnings.push(...(await run.cdp.evaluate<string[]>(SWEEP_JS, true)));
+}
 
 /** Finds the drill-down hashes on the freshly loaded overview and records them in the report and in `run.viewHashes`. */
 async function discoverViews(run: Run) {
@@ -489,7 +491,7 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
  * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
  * Reports as problems console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
- * missing viewport meta, tall diagrams and charts, and steppers that change only their captions. Reduced motion is emulated so animations are
+ * missing viewport meta, tall diagrams and charts, steppers that change only their captions, and incomplete scroll sweeps. Reduced motion is emulated so animations are
  * finished in the shots.
  * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed
  * `opts.timeoutSeconds`. The PNGs of a run that succeeds replace those of the same name in `outDir`.
