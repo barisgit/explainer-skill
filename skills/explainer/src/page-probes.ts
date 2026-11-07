@@ -168,8 +168,15 @@ export const SWEEP_JS = `(async () => {
 	let moved = false;
 	const walk = async (target) => {
 		const { el } = target;
+		if (performance.now() >= end) return;
 		const direction = getComputedStyle(el).direction === "rtl" ? -1 : 1;
+		const reset = el.scrollLeft !== 0 || el.scrollTop !== 0;
 		el.scrollTo({ left: 0, top: 0, behavior: "instant" });
+		if (reset) {
+			moved = true;
+			// Yield at the beginning too: otherwise reset and advance coalesce into one scroll/observer delivery.
+			await tick();
+		}
 		for (;;) {
 			const max = limits(el);
 			if (Math.abs(el.scrollLeft) >= max.x && el.scrollTop >= max.y) { target.done = true; return; }

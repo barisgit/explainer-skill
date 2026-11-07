@@ -79,6 +79,38 @@ test("check discovers scrollers revealed and inserted by document scrolling", as
 	expect(result.stdout).toContain("console.error: late inserted");
 }, 30_000);
 
+test("a nonzero scroller exposes its reset position before advancing and is restored", async () => {
+	await withPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		await cdp.load(
+			`file://${dir.write(
+				"nonzero.html",
+				page(
+					'<div id="panel" style="overflow:auto;width:100px;height:100px"><div style="width:300px;height:300px"><span id="start">Start</span></div></div>',
+				),
+			)}`,
+		);
+		await cdp.evaluate(
+			`document.getElementById('panel').scrollTo(200, 200);
+			new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))`,
+			true,
+		);
+		await cdp.evaluate(`window.atStart = { scroll: false, observer: false };
+			const panel = document.getElementById('panel');
+			panel.addEventListener('scroll', () => { if (!panel.scrollTop && !panel.scrollLeft) window.atStart.scroll = true; });
+			new IntersectionObserver(entries => {
+				if (entries.some(e => e.isIntersecting)) window.atStart.observer = true;
+			}, { root: panel }).observe(document.getElementById('start'));`);
+		expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+		expect(await cdp.evaluate("window.atStart")).toEqual({ scroll: true, observer: true });
+		expect(
+			await cdp.evaluate(
+				"[document.getElementById('panel').scrollLeft, document.getElementById('panel').scrollTop]",
+			),
+		).toEqual([200, 200]);
+	});
+}, 30_000);
+
 test("check reports budget exhaustion once across screens, naming the unreached document", async () => {
 	const file = dir.write(
 		"budget.html",
