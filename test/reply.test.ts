@@ -554,6 +554,24 @@ ${onLoad(2, "the postal code field starts empty and no city answer waits for it"
 	expect(checked.code).toBe(0);
 }, 60_000);
 
+test("tree note targets use their label cell, with aria-label taking precedence", async () => {
+	const body = `<div class="tree"><details data-ref="group" open><summary><span>Group</span><span>70 h</span></summary>
+<details id="row" data-ref="row" open><summary><span>Item</span><span>24 h</span></summary><p>Nested content</p></details>
+</details></div><div id="explicit" data-ref="explicit" aria-label="Chosen name"><span>Other</span><span>123</span></div>
+<div class="tree"><details data-ref="named" aria-label="Named group" open><summary><span>Ignored</span><span>9 h</span></summary></details></div>`;
+	const checks = pageContract({
+		"notes use only tree labels, never numbers or descendant rows": `replyButton().click(), document.querySelector(".reply-md").textContent.includes('part "Group"') && document.querySelector(".reply-md").textContent.includes('part "Item"') && !document.querySelector(".reply-md").textContent.includes('70 h') && !document.querySelector(".reply-md").textContent.includes('24 h')`,
+		"explicit aria-label names plain and tree targets": `document.querySelector(".reply-md").textContent.includes('part "Chosen name"') && document.querySelector(".reply-md").textContent.includes('part "Named group"')`,
+	});
+	const steps = ["[data-ref=group]", "#row", "#explicit", "[data-ref=named]"].flatMap((target) => [
+		`focus:${target}`,
+		"key:Enter",
+		"key:n",
+		"click:.reply-pop .btn.primary",
+	]);
+	expect(await packAndRun(dir, "note-labels", SMALL(body, checks), { steps })).toEqual([]);
+}, 30_000);
+
 test("the reply lists answers with their notes under them, marks defaults, and folds the unanswered into one line", async () => {
 	const body = `<fieldset data-reply><legend>Pick one?</legend><label><input type="radio" name="p" value="a"> A</label> <label><input type="radio" name="p" value="b" id="pick-b"> B</label></fieldset>
 <fieldset data-reply><legend>Starts on</legend><label><input type="radio" name="s" value="a" checked> A</label> <label><input type="radio" name="s" value="b"> B</label></fieldset>

@@ -112,12 +112,16 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		text.focus({ preventScroll: true });
 	}
 
-	const partTarget = (part: Part) => ({
-		part:
-			clean(part.getAttribute("aria-label") || part.textContent || "").slice(0, 60) ||
-			(part.dataset.ref?.split(" ")[0] ?? ""),
-		...located(part),
-	});
+	/** A tree branch uses its summary's label cell, not its numbers or descendants; an explicit label always wins. */
+	function partTarget(part: Part) {
+		const row = part.matches(".tree details") ? part.querySelector(":scope > summary") : null;
+		const label =
+			part.getAttribute("aria-label") || (row?.firstElementChild ?? row ?? part).textContent;
+		return {
+			part: clean(label ?? "").slice(0, 60) || (part.dataset.ref?.split(" ")[0] ?? ""),
+			...located(part),
+		};
+	}
 
 	/** Elements the browser already makes focusable. */
 	const FOCUSABLE = "a[href], button, input, select, textarea, summary";

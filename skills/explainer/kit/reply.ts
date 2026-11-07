@@ -16,7 +16,8 @@
    "(default)", and every one with nothing chosen and no note is left out of the list and named in one line, "Not answered: a; b".
    Notes come from selected text and clicks on [data-ref] parts
    (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
-   is-annotatable (a faint underline), also those rendered later.
+   is-annotatable (a faint underline), also those rendered later. An aria-label names a note target explicitly; otherwise a tree
+   branch uses its summary's first cell, other parts their text. Put a tree ref on its details, leaving the summary free to fold it.
    The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is

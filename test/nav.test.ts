@@ -342,3 +342,21 @@ var contract = settled.then(async () => {
 </script></body></html>`;
 	expect(await packAndRun(dir, "data-nav", page)).toEqual([]);
 }, 30_000);
+
+test("aria-label names multi-cell links before tree cells or generic-text fallback", async () => {
+	const page = `${HEAD}<main class="page"><div data-overview><h1>Labels</h1>
+<section><h2>Items</h2>
+<a href="#i/1" aria-label="Open"><span>One</span><span>1,234.50</span></a>
+<div class="tree"><a href="#i/2" aria-label="Open"><span>Two</span><span>70 h</span></a>
+<a href="#i/3"><span>Three</span><span>24 h</span></a></div></section></div>
+<section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item heading</h1></section></main>
+<script src="kit:views.js"></script><script>
+${pageContract({
+	"explicit labels override row text and remain names even when shared": `document.querySelector(".view.active .crumbs li:last-child")?.textContent === "Open" && document.querySelector(".view.active .sibs [rel=prev]")?.textContent === "Open"`,
+	"an unlabelled tree link still uses only its first cell": `document.querySelector(".view.active .sibs [rel=next]")?.textContent === "Three"`,
+})}
+</script></body></html>`;
+	expect(await packAndRun(dir, "link-labels", page, { steps: ["click:a[href='#i/2']"] })).toEqual(
+		[],
+	);
+}, 30_000);

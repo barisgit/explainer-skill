@@ -3848,7 +3848,7 @@ window.ViewsFolds = (kitText) => {
    was left from, and replace(hash) rewrites the entry's hash without losing its trail.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
-               its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
+               its view (an aria-label takes precedence, else a .tree row link's first cell, without its numbers); inferred text that is empty or names two different views
                ("Open", "→") is passed over for the view's heading, else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the rows a records
@@ -3905,17 +3905,21 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const siblingsOf = (step) => step.list ?? allSiblings(nameOf(step.hash));
   const linkText = (a) => {
     const row = a.parentElement?.matches(".tree, .tree details");
-    return clean((row && a.firstElementChild || a).textContent);
+    return clean(a.getAttribute("aria-label")) || clean((row && a.firstElementChild || a).textContent);
   };
   function linkLabels(name) {
     const texts = new Map;
-    const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
+    const links = linksTo(name).map((a) => ({
+      hash: hashOf(a),
+      text: linkText(a),
+      explicit: clean(a.getAttribute("aria-label")) !== ""
+    }));
     for (const { hash, text } of links) {
       texts.set(text, (texts.get(text) ?? new Set).add(hash));
     }
     const found = new Map;
-    for (const { hash, text } of links) {
-      if (text && texts.get(text)?.size === 1 && !found.has(hash)) {
+    for (const { hash, text, explicit } of links) {
+      if (text && (explicit || texts.get(text)?.size === 1) && !found.has(hash)) {
         found.set(hash, text);
       }
     }
@@ -4018,7 +4022,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     return section.id;
   }
   function entry(section, heading, n, claimed) {
-    const text = clean(section.dataset.nav) || clean(heading.textContent);
+    const text = clean(section.dataset.nav) || clean(heading.dataset.nav) || clean(heading.textContent);
     const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
     const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
     for (const name of owns) {
@@ -4168,12 +4172,12 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
    Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it briefly
-   ("Blaž", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the view's
-   heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
+   ("Blaž", "1.6.3 Login form"): an aria-label names a link explicitly; otherwise tree links use their first cell, other links their
+   text, and a shared generic text ("Open") gives way to the view's heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
-   data-nav="Price" when the heading states an answer and a short name finds it faster; the crumbs and previous/next keep the
+   data-nav="Price" on the section or its h2 (the section wins) when a short name finds it faster; the crumbs and previous/next keep the
    link texts. Names in the navigation wrap and are never cut off. A section with two or more <details> gets Expand all, which
    opens them at every level, at the end of the section's .toolbar when one comes before them. A <details class="answer"> (a
    question's model answer) is not counted or opened: the reader opens each answer after writing their own.

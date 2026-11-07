@@ -4,7 +4,7 @@
    was left from, and replace(hash) rewrites the entry's hash without losing its trail.
    All of it is derived from markup the page already has:
      siblings  every #name/param the page links to (and static data-view="name/x" views), in document order. A link's text names
-               its view (a .tree row link's first cell, without its numbers); text that is empty or names two different views
+               its view (an aria-label takes precedence, else a .tree row link's first cell, without its numbers); inferred text that is empty or names two different views
                ("Open", "→") is passed over for the view's heading, else its param.
      trail     the views the reader came through, one step per view name: opening a view whose name is in the trail replaces
                that step (next person, next item). Each step keeps its label and the sibling list it walks: the rows a records
@@ -110,22 +110,28 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 
 	const siblingsOf = (step: Step) => step.list ?? allSiblings(nameOf(step.hash));
 
-	/** A link's text; a link that stands as a .tree row is named by its first cell, its label, without the numbers after it. */
+	/** An explicit label names a link; otherwise a .tree row uses its first cell, without the numbers after it. */
 	const linkText = (a: HTMLAnchorElement) => {
 		const row = a.parentElement?.matches(".tree, .tree details");
-		return clean(((row && a.firstElementChild) || a).textContent);
+		return (
+			clean(a.getAttribute("aria-label")) || clean(((row && a.firstElementChild) || a).textContent)
+		);
 	};
 
-	/** The first link text of each hash of one view name, kept only when no other hash shares it. */
+	/** The first label of each route: explicit labels always name it; inferred text must name only one route. */
 	function linkLabels(name: string): Labels {
 		const texts = new Map<string, Set<string>>();
-		const links = linksTo(name).map((a) => ({ hash: hashOf(a), text: linkText(a) }));
+		const links = linksTo(name).map((a) => ({
+			hash: hashOf(a),
+			text: linkText(a),
+			explicit: clean(a.getAttribute("aria-label")) !== "",
+		}));
 		for (const { hash, text } of links) {
 			texts.set(text, (texts.get(text) ?? new Set()).add(hash));
 		}
 		const found: Labels = new Map();
-		for (const { hash, text } of links) {
-			if (text && texts.get(text)?.size === 1 && !found.has(hash)) {
+		for (const { hash, text, explicit } of links) {
+			if (text && (explicit || texts.get(text)?.size === 1) && !found.has(hash)) {
 				found.set(hash, text);
 			}
 		}

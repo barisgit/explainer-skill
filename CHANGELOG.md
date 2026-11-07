@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- An `aria-label` names a view link or note target explicitly. Tree-branch notes use the summary's first cell instead of gluing its numbers and descendant rows into the label.
+
 - `data-nav` on an `h2` inside an author-written section now names its contents-rail entry; the section's own `data-nav` takes precedence.
 
 `Chart` now supports ECharts' `custom` series for shapes drawn by `renderItem`, including ranges and timeline bars. These charts draw in the browser, not at pack time. `kit Chart` lists the bundled series and components; `pack` rejects other series types in options it can see, naming the type and what to use instead. Options computed only in client code still reach ECharts at runtime; `check` reports its console errors.
