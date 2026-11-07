@@ -9,6 +9,7 @@ import { echarts } from "./echarts-charts.ts";
 echarts.use([SVGRenderer]);
 
 export const { init, setPlatformAPI } = echarts;
+export { seriesTypes } from "./echarts-charts.ts";
 
 /** The colours of ECharts' own look (its light tokens), which it draws as they are where an option sets none. */
 export const ownColors: string[] = Object.values(tokens.color).flat();

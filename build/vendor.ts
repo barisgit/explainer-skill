@@ -19,6 +19,7 @@
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BunPlugin } from "bun";
+import { seriesTypes } from "./echarts-charts.ts";
 
 const root = join(import.meta.dir, "..");
 const skill = join(root, "skills", "explainer");
@@ -66,7 +67,7 @@ async function build(
 const bundle = async (...args: Parameters<typeof build>) => (await build(...args)).text;
 
 const echartsHeader = `/* echarts: Apache ECharts ${await versionOf("echarts")}, custom build, global echarts.
-   Charts: line bar scatter pie heatmap treemap sankey sunburst radar boxplot. Components: grid polar radar calendar axisPointer tooltip legend
+   Charts: ${seriesTypes.join(" ")}. Components: grid polar radar calendar axisPointer tooltip legend
    dataZoom brush toolbox visualMap markLine/Area/Point title dataset transform aria. Features: label layout, universal transition. Canvas renderer.
    Apache-2.0, licenses/echarts.txt. Rebuild with: bun run vendor */\n`;
 writeFileSync(
@@ -77,7 +78,10 @@ mkdirSync(join(skill, "vendor"), { recursive: true });
 writeFileSync(
 	join(skill, "vendor/echarts-ssr.js"),
 	echartsHeader
-		.replace("global echarts", "ES module exporting init, setPlatformAPI and ownColors")
+		.replace(
+			"global echarts",
+			"ES module exporting init, setPlatformAPI, ownColors and seriesTypes",
+		)
 		.replace("Canvas renderer", "SVG renderer, for pack") +
 		(await bundle(join(import.meta.dir, "echarts-ssr-entry.ts"), "bun", "esm")),
 );

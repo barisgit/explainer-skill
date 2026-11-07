@@ -2,3 +2,5 @@
 export { init, setPlatformAPI } from "echarts/core";
 /** The colours of ECharts' own look (its light tokens), which it draws as they are where an option sets none. */
 export declare const ownColors: string[];
+/** The bundled series names, derived from the installers both bundles register. */
+export declare const seriesTypes: string[];

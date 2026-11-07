@@ -3,7 +3,10 @@
      el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width and ECharts has
              unpacked (a packed page carries it compressed). The chart pack drew in it (.chart-drawn) stays until then, and the first
              draw over it does not animate
-     option  any ECharts option; colours default to --c1..--c6, text to the page font
+     option  ECharts options for line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot and custom series;
+             colours default to --c1..--c6, text to the page font. kit echarts.js lists the bundled components.
+             Use these series for other shapes (custom supplies renderItem). pack rejects other types in options it sees;
+             client-only options reach ECharts at runtime, where check reports its console errors.
      setup   (chart) => void, run after every (re)mount: attach chart.on("click", ...), chart.group, echarts.connect(...)
      chart   the live instance (null until mounted)
      set(patch)            merges into the instance and into the option remounts reuse: objects merge, series/axes match by id else position

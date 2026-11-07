@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+`Chart` now supports ECharts' `custom` series for shapes drawn by `renderItem`, including ranges and timeline bars. These charts draw in the browser, not at pack time. `kit Chart` and `kit charts.js` list the bundled series; `pack` rejects other series types in options it can see, naming the type and what to use instead. Options computed only in client code still reach ECharts at runtime; `check` reports its console errors.
+
 ## v0.12.1
 
 `check` stops Chrome by closing its debugging pipe, so Chrome exits cleanly. On macOS, Chrome ended by a signal left a copy of the whole app (its code-signing clone, about 1,340 files) in the user's temp area on every run; a clean exit removes it. A Chrome that does not exit within 3 s still gets SIGTERM, then SIGKILL.

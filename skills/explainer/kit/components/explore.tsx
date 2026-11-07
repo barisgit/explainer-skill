@@ -32,6 +32,7 @@ import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
 import { Controls as ControlsIsland } from "./parts/controls-island.tsx";
+import { validateChart } from "./parts/drawn.ts";
 import { Explore as ExploreChart } from "./parts/explore-chart.tsx";
 import { type ExploreControlProps, parseControls } from "./parts/explore-controls.ts";
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
@@ -313,7 +314,13 @@ export function Explore({
 			combo.map((i, c) => valueAt(shown[c] as ExploreControl, i)),
 		),
 	);
-	const merged = frames.map(([call, f]): [string, ExploreFrame] => [call, withBase(base, f)]);
+	const merged = frames.map(([call, f]): [string, ExploreFrame] => {
+		const result = withBase(base, f);
+		if (result.chart) {
+			validateChart(result.chart);
+		}
+		return [call, result];
+	});
 	const kind = figureKind(merged.map(([, f]) => f));
 	if (kind && !label) {
 		fail(`needs a label: the accessible name of its ${kind}`);

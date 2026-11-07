@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, statSync } from "node:fs";
-import { inPage, packAndRun, packedMdx, scratch } from "./support.ts";
+import { inPage, packAndRun, packedMdx, packMdx, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -26,6 +26,83 @@ var contract = new Promise((found) => Charts.make(document.getElementById("c"), 
 test("colour tokens resolve in any element of a series' data, not only when it starts with an object", async () => {
 	expect(await packAndRun(dir, "mixed", PAGE)).toEqual([]);
 }, 30_000);
+
+test("custom series pack without an approximate drawing and render in the browser", async () => {
+	const output = await packedMdx(
+		dir,
+		"custom",
+		`import { Chart } from "kit";
+import { renderItem } from "./custom.ts";
+
+# Ranges
+
+<Chart label="Ranges" option={{ xAxis: {}, yAxis: {}, series: [{ type: "custom", data: [[1, 2]], itemStyle: { color: "#123456" }, renderItem }] }} />
+`,
+		{
+			"custom.ts": `"use client";
+export function renderItem() {
+	return { type: "rect", shape: { x: 40, y: 40, width: 120, height: 30 }, style: { fill: "#123456" } };
+}`,
+		},
+	);
+	expect(readFileSync(output, "utf8")).not.toContain('class="chart-drawn"');
+	const state = await inPage(output, (cdp) =>
+		cdp.evaluate(`(() => {
+		const chart = echarts.getInstanceByDom(document.querySelector(".chart"));
+		const shapes = chart.getZr().storage.getDisplayList();
+		return shapes.some(shape => shape.type === "rect" && shape.shape.width === 120 && shape.style.fill === "#123456");
+	})()`),
+	);
+	expect(state).toBe(true);
+}, 30_000);
+
+test("pack rejects unbundled series even in responsive options or when drawing is skipped", async () => {
+	for (const option of [
+		'{ series: { type: "gauge" } }',
+		'{ series: [{ type: "gauge" }] }',
+		'{ baseOption: { series: [{ type: "gauge" }] } }',
+		'{ options: [{ series: [{ type: "gauge" }] }] }',
+		'{ media: [{ query: { maxWidth: 639 }, option: { series: [{ type: "gauge" }] } }] }',
+	]) {
+		const { result } = await packMdx(
+			dir,
+			"unsupported",
+			`import { Chart } from "kit";
+
+# Unsupported
+
+<Chart label="Unsupported" height="50%" option={${option}} />
+`,
+		);
+		expect(result.code).toBe(1);
+		expect(result.stderr.trim()).toBe(
+			'pack failed:\nECharts series type "gauge" is not bundled; use line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot, custom instead.',
+		);
+	}
+});
+
+test("pack rejects unbundled series in a non-initial Explore frame, with own or shared controls", async () => {
+	for (const shared of [false, true]) {
+		const { result } = await packMdx(
+			dir,
+			"unsupported-frame",
+			`import { Explore, Controls } from "kit";
+
+export const frame = (on) => ({ chart: { series: [{ type: on ? "funnel" : "pie", data: [1, 2] }] } });
+
+# Explore
+
+${shared ? '<Controls id="mode" controls={[{ id: "on", label: "Other", toggle: true }]} />' : ""}
+
+<Explore label="Switch" ${shared ? 'use="mode"' : 'controls={[{ id: "on", label: "Other", toggle: true }]}'} frame={frame} />
+`,
+		);
+		expect(result.code).toBe(1);
+		expect(result.stderr).toContain(
+			'ECharts series type "funnel" is not bundled; use line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot, custom instead.',
+		);
+	}
+});
 
 test("a page with a Chart carries ECharts compressed, and the live chart takes the drawn one's place once it has unpacked", async () => {
 	const output = await packedMdx(

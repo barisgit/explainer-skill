@@ -13,6 +13,7 @@ export interface Place {
 
 /** Draws a figure as markup for the inside of its element, sized for `place` as the theme and the page's CSS size it. */
 export interface Drawer {
+	validateChart(option: ChartOption): void;
 	chart(option: ChartOption, place: Place): string;
 	plot(option: PlotOption, place: Place): string;
 }
@@ -22,6 +23,11 @@ let drawer: Drawer | undefined;
 /** Sets the drawer pack renders the page with. */
 export function setDrawer(next: Drawer): void {
 	drawer = next;
+}
+
+/** Checks a pack-visible chart option even when it is not the initial drawing (Explore's computed frames). No-op in the browser. */
+export function validateChart(option: ChartOption): void {
+	drawer?.validateChart(option);
 }
 
 /**

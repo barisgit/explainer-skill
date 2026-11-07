@@ -6,6 +6,7 @@
 import {
 	BarChart,
 	BoxplotChart,
+	CustomChart,
 	HeatmapChart,
 	LineChart,
 	PieChart,
@@ -38,17 +39,26 @@ import {
 import * as echarts from "echarts/core";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 
+/** The series names and their installers: registration, bundle docs and pack validation all derive from this registry. */
+const charts = {
+	line: LineChart,
+	bar: BarChart,
+	scatter: ScatterChart,
+	pie: PieChart,
+	heatmap: HeatmapChart,
+	treemap: TreemapChart,
+	sankey: SankeyChart,
+	sunburst: SunburstChart,
+	radar: RadarChart,
+	boxplot: BoxplotChart,
+	custom: CustomChart,
+};
+
+/** Shipped in the SSR bundle so an installed pack validates without the build sources or dev dependencies. */
+export const seriesTypes = Object.keys(charts);
+
 echarts.use([
-	BarChart,
-	BoxplotChart,
-	HeatmapChart,
-	LineChart,
-	PieChart,
-	RadarChart,
-	SankeyChart,
-	ScatterChart,
-	SunburstChart,
-	TreemapChart,
+	...Object.values(charts),
 	AriaComponent,
 	AxisPointerComponent,
 	BrushComponent,

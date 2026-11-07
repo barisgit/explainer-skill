@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type * as EChartsSsr from "../../vendor/echarts-ssr.js";
 import { textWidth } from "../geist.ts";
 import { runKitPart } from "../kit.ts";
+import { PackError } from "../pack-error.ts";
 import { SKILL_ROOT } from "../paths.ts";
 import { lengthAt, type Place, pageBoxTouch, type Viewport } from "./chart-box.ts";
 import { chartColours } from "./chart-colours.ts";
@@ -123,6 +124,47 @@ function loadEcharts(): typeof EChartsSsr {
 	return echarts;
 }
 
+/** Explicit series types in ordinary, base and responsive options; missing types are valid in merge patches. */
+function seriesIn(option: unknown): string[] {
+	if (!option || typeof option !== "object") {
+		return [];
+	}
+	const value = option as {
+		series?: unknown;
+		media?: unknown;
+		options?: unknown;
+		baseOption?: unknown;
+	};
+	const series = Array.isArray(value.series) ? value.series : [value.series];
+	const types = series.flatMap((item: unknown) => {
+		if (item && typeof item === "object" && "type" in item && typeof item.type === "string") {
+			return [item.type];
+		}
+		return [];
+	});
+	const media = Array.isArray(value.media) ? value.media : [];
+	const options = Array.isArray(value.options) ? value.options : [];
+	return types.concat(
+		seriesIn(value.baseOption),
+		options.flatMap(seriesIn),
+		media.flatMap((entry: unknown) =>
+			entry && typeof entry === "object" && "option" in entry ? seriesIn(entry.option) : [],
+		),
+	);
+}
+
+/** Rejects unsupported series independently of drawing, including options in non-initial Explore frames. */
+function validateChart(option: unknown): void {
+	const bundled = loadEcharts().seriesTypes;
+	for (const type of seriesIn(option)) {
+		if (!bundled.includes(type)) {
+			throw new PackError(
+				`ECharts series type "${type}" is not bundled; use ${bundled.join(", ")} instead.`,
+			);
+		}
+	}
+}
+
 /** Runs `draw` with the console silenced: ECharts' warnings about an option are the browser's to show, where check reports them. */
 function quietly<T>(draw: () => T): T {
 	const { warn, error, log } = console;
@@ -212,24 +254,31 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	}
 	const chartsOption = runKitPart("charts/option.ts", "ChartsOption") as ChartsOptionPart;
 	const plots = (runKitPart("plot/draw.ts", "PlotDraw") as PlotDrawPart)({ lang: () => lang });
+	const drawChart = orNothing((option: Option, place: Place) => {
+		const heights = heightsOf(place);
+		const colours = chartColours(option, loadEcharts().ownColors);
+		if (!(heights && colours)) {
+			return "";
+		}
+		// Each chart has stand-ins of its own, clear of the colours its option writes as they are.
+		const { color, paintOf } = standIns(colours);
+		const charts = chartsOption({ color, lang: () => lang });
+		const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
+		const resolved = charts.resolveOption(option);
+		const copies = COPIES.map((copy, i) => {
+			const height = heights[i] as number;
+			return kitSvg(chartSvg(resolved, theme, copy.width, height), svgTag(copy, height), paintOf);
+		});
+		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
+	});
 	return {
-		chart: orNothing((option: Option, place: Place) => {
-			const heights = heightsOf(place);
-			const colours = chartColours(option, loadEcharts().ownColors);
-			if (!(heights && colours)) {
-				return "";
-			}
-			// Each chart has stand-ins of its own, clear of the colours its option writes as they are.
-			const { color, paintOf } = standIns(colours);
-			const charts = chartsOption({ color, lang: () => lang });
-			const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
-			const resolved = charts.resolveOption(option);
-			const copies = COPIES.map((copy, i) => {
-				const height = heights[i] as number;
-				return kitSvg(chartSvg(resolved, theme, copy.width, height), svgTag(copy, height), paintOf);
-			});
-			return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
-		}),
+		validateChart,
+		chart(option: Option, place: Place) {
+			// Validate before the optional drawing: an absent SVG must not hide an unsupported series.
+			validateChart(option);
+			// renderItem is arbitrary drawing code: its geometry and colours cannot be proven exact by the SVG pass.
+			return seriesIn(option).includes("custom") ? "" : drawChart(option, place);
+		},
 		plot: orNothing((option: Option, place: Place) => {
 			const heights = heightsOf(place);
 			if (!heights) {

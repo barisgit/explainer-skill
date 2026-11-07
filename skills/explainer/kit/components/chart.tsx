@@ -1,8 +1,9 @@
 /* Chart: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light and dark.
    pack includes ECharts when a page uses it.
    <Chart option={{ xAxis: {...}, yAxis: {}, series: [...] }} label="What the chart shows" />
-     option  any ECharts option. Colours default to --c1..--c6; write "var(--accent)" for a token. A new option re-applies:
-             series follow its list, other components merge into what the chart shows.
+     option  ECharts options for line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot and custom series.
+             Colours default to --c1..--c6; write "var(--accent)" for a token. A new option re-applies: series follow its list,
+             other components merge into what the chart shows.
      label   the accessible name (role="img")
      class   more classes after "chart", e.g. "tall"
      height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them, e.g. "clamp(16rem, 34vw, 21rem)". Size a
@@ -16,6 +17,9 @@
    Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
+   pack rejects other series types in options it sees (including baseOption and media). Options computed only in client code
+   are checked by ECharts at runtime; check reports its console errors. kit echarts.js lists the bundled components.
+   custom series run only in the browser: renderItem can draw arbitrary shapes and colours that pack cannot prove exact.
    pack draws the chart into the page as SVG, shown until ECharts draws it, with scripts off and in print. The option's functions
    run in pack too. ECharts alone draws a chart whose functions fail there (reading the page, say), whose colours are
    functions or transformed (colorAlpha, colorLightness, a visualMap's opacity), whose element a page rule sizes (height,
