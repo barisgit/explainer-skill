@@ -18,7 +18,9 @@
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
    pack rejects other series types in options it sees (including baseOption and media). Options computed only in client code
-   are checked by ECharts at runtime; check reports its console errors. kit echarts.js lists the bundled components.
+   are checked by ECharts at runtime; check reports its console errors.
+   Bundled components: grid, polar, radar, calendar, axisPointer, tooltip, legend, dataZoom, brush, toolbox, visualMap,
+   markLine, markArea, markPoint, title, dataset, transform and aria. Features: label layout and universal transition.
    custom series run only in the browser: renderItem can draw arbitrary shapes and colours that pack cannot prove exact.
    pack draws the chart into the page as SVG, shown until ECharts draws it, with scripts off and in print. The option's functions
    run in pack too. ECharts alone draws a chart whose functions fail there (reading the page, say), whose colours are

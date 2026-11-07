@@ -184,7 +184,7 @@ const COMPRESSED = new Set(["echarts.js"]);
 /**
  * What a page carries for the kit file `path`. The ECharts runtime is carried deflated (deflate-raw, base64 as the smallest
  * encoding every browser's DecompressionStream reads) and kit/unpack.ts is the text: the script's leading comment, which stays
- * readable for its licence and `kit echarts.js`, then the loader. Any other file is its readKitText.
+ * readable for its licence, then the loader. Any other file is its readKitText.
  */
 export function pageFile(path: string): PageFile {
 	const text = readKitText(path);

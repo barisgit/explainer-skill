@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-`Chart` now supports ECharts' `custom` series for shapes drawn by `renderItem`, including ranges and timeline bars. These charts draw in the browser, not at pack time. `kit Chart` and `kit charts.js` list the bundled series; `pack` rejects other series types in options it can see, naming the type and what to use instead. Options computed only in client code still reach ECharts at runtime; `check` reports its console errors.
+`Chart` now supports ECharts' `custom` series for shapes drawn by `renderItem`, including ranges and timeline bars. These charts draw in the browser, not at pack time. `kit Chart` lists the bundled series and components; `pack` rejects other series types in options it can see, naming the type and what to use instead. Options computed only in client code still reach ECharts at runtime; `check` reports its console errors.
 
 ## v0.12.1
 
