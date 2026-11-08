@@ -77,7 +77,7 @@ export class CheckedPage {
 			"Page.addScriptToEvaluateOnNewDocument",
 			{
 				source:
-					"window[Symbol.for('explainer.check.fresh')] = true; localStorage.clear(); sessionStorage.clear();",
+					"window[Symbol.for('explainer.check.fresh')] = true; for (const store of [localStorage, sessionStorage]) for (const key of Object.keys(store)) store.removeItem(key);",
 			},
 		);
 		try {
