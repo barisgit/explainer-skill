@@ -73,13 +73,12 @@ export class CheckedPage {
 		this.problems = [];
 		this.warnings = [];
 		await this.cdp.load("about:blank");
-		await this.cdp.send("Storage.clearDataForOrigin", {
-			origin: "file://",
-			storageTypes: "local_storage",
-		});
 		const { identifier } = await this.cdp.send<{ identifier: string }>(
 			"Page.addScriptToEvaluateOnNewDocument",
-			{ source: "window[Symbol.for('explainer.check.fresh')] = true; sessionStorage.clear();" },
+			{
+				source:
+					"window[Symbol.for('explainer.check.fresh')] = true; localStorage.clear(); sessionStorage.clear();",
+			},
 		);
 		try {
 			await this.cdp.load(this.url + hash);
