@@ -2,8 +2,10 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { ChromeError } from "../skills/explainer/src/cdp.ts";
 import type { CheckResult } from "../skills/explainer/src/check.ts";
+import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { CONTROL_LIMIT } from "../skills/explainer/src/control-sweep.ts";
+import { runStep } from "../skills/explainer/src/steps.ts";
 import { packedMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -78,12 +80,14 @@ const FRESH_CHOICES = `"use client";
 import { Question } from "kit";
 let clicks = 0;
 let innerScrolls = 0;
+const session = typeof sessionStorage === "undefined" ? "server" : sessionStorage.getItem("probe-state") ?? "empty";
 export function FreshChoices({prefix}) {
 	const probe = event => {
 		if (!(event.target instanceof HTMLInputElement)) return;
 		const others = [...document.querySelectorAll('fieldset input:checked')].filter(el => el !== event.target).length;
-		console.warn("fresh " + prefix + " memory=" + (++clicks) + " storage=" + (localStorage.getItem("probe-state") ?? "empty") + " other=" + others + " inner=" + innerScrolls);
+		console.warn("fresh " + prefix + " memory=" + (++clicks) + " storage=" + (localStorage.getItem("probe-state") ?? "empty") + " session=" + session + " other=" + others + " inner=" + innerScrolls);
 		localStorage.setItem("probe-state", "dirty");
+		sessionStorage.setItem("probe-state", "dirty");
 		if (event.target.id === prefix + "-second-One") document.getElementById(prefix + "-leak").style.width = "3000px";
 	};
 	return <div onClickCapture={probe}>
@@ -125,8 +129,8 @@ import { FreshChoices } from "./fresh.tsx";
 	const warnings = shots.flatMap((s) => s.warnings).filter((w) => w.startsWith("control "));
 	expect(warnings.filter((w) => w.includes("view link clicked"))).toHaveLength(1);
 	expect(warnings.filter((w) => w.includes("fresh "))).toEqual([
-		"control #overview-first-One: console.warning: fresh overview memory=1 storage=empty other=0 inner=0",
-		"control #overview-second-One: console.warning: fresh overview memory=1 storage=empty other=0 inner=0",
+		"control #overview-first-One: console.warning: fresh overview memory=1 storage=empty session=empty other=0 inner=0",
+		"control #overview-second-One: console.warning: fresh overview memory=1 storage=empty session=empty other=0 inner=0",
 	]);
 	const failed = shots.filter((s) => s.problems.length);
 	expect(failed.map((s) => [s.theme, s.viewport, s.view])).toEqual([
@@ -135,6 +139,37 @@ import { FreshChoices } from "./fresh.tsx";
 	expect(failed[0]?.problems.join("\n")).toContain(
 		"control #overview-second-One: horizontal page overflow at 1440px",
 	);
+}, 30_000);
+
+test("fresh loads clear session storage before author scripts, while explicit reload preserves it", async () => {
+	// A normal origin avoids depending on Chrome's file:// storage-clearing quirks.
+	const server = Bun.serve({
+		hostname: "127.0.0.1",
+		port: 0,
+		fetch: () =>
+			new Response(
+				`<!doctype html><body>
+		<script>document.body.dataset.initial = sessionStorage.getItem('sample') ?? 'empty';</script>
+		<button id="sample" onclick="sessionStorage.setItem('sample', 'dirty')">Sample</button>`,
+				{ headers: { "content-type": "text/html" } },
+			),
+	});
+	try {
+		await withPage(async (cdp) => {
+			const page = new CheckedPage(cdp, server.url.href);
+			await page.start();
+			await page.open();
+			const initial = () => cdp.evaluate("document.body.dataset.initial");
+			expect(await initial()).toBe("empty");
+			await runStep(cdp, "click:#sample", () => "unused");
+			await runStep(cdp, "reload", () => "unused");
+			expect(await initial()).toBe("dirty");
+			await page.open();
+			expect(await initial()).toBe("empty");
+		});
+	} finally {
+		await server.stop(true);
+	}
 }, 30_000);
 
 const MANY_CHOICES = `"use client";

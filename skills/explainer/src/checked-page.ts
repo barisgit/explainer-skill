@@ -68,7 +68,7 @@ export class CheckedPage {
 		});
 	}
 
-	/** Unloads before clearing Keep storage: an unloading page may save again. Always settles the new document. */
+	/** Unloads before clearing saved state; clears tab storage before author scripts on this load only, not explicit reloads. */
 	async open(hash = ""): Promise<void> {
 		this.problems = [];
 		this.warnings = [];
@@ -77,7 +77,15 @@ export class CheckedPage {
 			origin: "file://",
 			storageTypes: "local_storage",
 		});
-		await this.cdp.load(this.url + hash);
+		const { identifier } = await this.cdp.send<{ identifier: string }>(
+			"Page.addScriptToEvaluateOnNewDocument",
+			{ source: "sessionStorage.clear();" },
+		);
+		try {
+			await this.cdp.load(this.url + hash);
+		} finally {
+			await this.cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
+		}
 		const missing = await settlePage(this.cdp);
 		if (missing) {
 			this.problems.push(`${hash ? `${hash}: ` : ""}${missing}`);
