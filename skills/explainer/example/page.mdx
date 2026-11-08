@@ -1,15 +1,19 @@
 import { Explore, Plot, Question, Stepper, Table, View } from "kit";
 import { baseline, curve, fixes, fmt, loadFrame } from "./cafe.ts";
 
-{/* First screen: the answer, the line under it that orients, and the one figure that shows it. */}
+{/* First screen: the answer, a next action with a quick route, brief orientation, and the figure that shows it. */}
 
-# At 90% busy, one barista means an *18-minute* wait. A second barista cuts it to 30 seconds.
+# A second barista cuts an *18-minute* wait to 30 seconds.
 
-Waiting barely grows until the last bit of slack disappears, then it explodes. A queueing model of a café where customers arrive at random and orders take 2 minutes on average, some much longer, for deciding what to change first.
+Explore why the queue grows below, or [compare fixes and choose one to try](#fixes).
+
+The baseline is a café at 90% busy: random arrivals and orders averaging 2 minutes, some much longer. A queueing model predicts the wait.
 
 Illustrative model, not measured in a real café
 
 {/* frame comes from a module without "use client", so pack computes every slider position and the page carries no model code. */}
+
+Move “Barista busy” from 90% to 50%; notice how much the wait falls. Return to 90% for the baseline used to compare fixes.
 
 <Explore label="Average wait against how busy the barista is" controls={[{ id: "load", label: "Barista busy", range: [50, 95, 1], value: 90, format: { unit: "%" } }]} frame={loadFrame} />
 
@@ -62,7 +66,7 @@ Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ ord
 
 <section class="band">
 
-<h2 data-nav="Fixes">A second barista saves 97% of the wait; every other fix saves about half</h2>
+<h2 id="fixes" data-nav="Fixes">A second barista saves 97% of the wait; every other fix saves about half</h2>
 
 <Plot label="Average wait at 90% busy for each fix" option={{ categories: fixes.map((f) => f.name), horizontal: true, series: [{ name: "Average wait", type: "bar", data: fixes.map((f) => f.wait), label: { digits: 1, unit: "min" } }], x: { format: { unit: "min" } } }} />
 

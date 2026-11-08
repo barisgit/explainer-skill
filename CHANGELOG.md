@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The guide now fits a short first route to the reader's knowledge and time, puts their next action and its size beneath the answer, and uses worked examples before novice practice. It calls for a screen per question with folded reference, readable source images and candidate links, guided controls and comparable states, and decisions beside their evidence with realistic choices, marked recommendations and consistent counts (#115).
+
 - Click/drag hit notes now survive a later settle timeout alongside its problem in text and JSON; actions that never execute still report only their problem (#19, #132 review).
 
 - `check --do drag:x,y-x,y` performs a real left-button drag, including ECharts canvas dataZoom sliders. Points are viewport-relative after preceding scrolls; `hover:<css>` scrolls to its target and hovers its centre. Click/drag notes identify event targets, chart containers, observed chart events and hash changes per theme/size, without dumping chart data or adding mark-index targeting (#19).
