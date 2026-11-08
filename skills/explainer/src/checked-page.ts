@@ -82,7 +82,27 @@ export class CheckedPage {
 		} else {
 			const storageDocument = new URL("../kit/licenses/preact.txt", import.meta.url).href;
 			await this.cdp.load(storageDocument);
-			await this.cdp.evaluate("localStorage.clear(); sessionStorage.clear();");
+			const eager = this.url.includes("fresh-storage-eager-");
+			const clearState = await this.cdp.evaluate<{
+				url: string;
+				ready: string;
+				type: string;
+			}>(`(() => {
+				const before = { url: location.href, ready: document.readyState, type: document.contentType };
+				${eager ? "void localStorage.length; void sessionStorage.length;" : ""}
+				localStorage.clear(); sessionStorage.clear(); return before;
+			})()`);
+			if (this.url.includes("fresh-storage-")) {
+				this.warnings.push(
+					"clear-state " +
+						JSON.stringify({
+							eager,
+							helper: clearState.url === storageDocument,
+							ready: clearState.ready,
+							type: clearState.type,
+						}),
+				);
+			}
 			if (/\/(?:keep|forms)\.out\.html$/.test(this.url)) {
 				const { frameTree } = await this.cdp.send<{
 					frameTree: { frame: { id: string; url: string } };

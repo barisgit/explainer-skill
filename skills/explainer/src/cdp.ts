@@ -56,6 +56,9 @@ interface CdpEvents {
 	"Network.requestWillBeSent": { request: { url: string } };
 	"Network.loadingFailed": { errorText: string; canceled?: boolean };
 	"Page.loadEventFired": object;
+	"Page.frameNavigated": {
+		frame: { id: string; url: string; loaderId: string; parentId?: string };
+	};
 	"Debugger.paused": object;
 	"Inspector.targetCrashed": object;
 	"Target.detachedFromTarget": { sessionId: string };

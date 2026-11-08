@@ -142,29 +142,48 @@ import { FreshChoices } from "./fresh.tsx";
 	);
 }, 30_000);
 
-test("fresh file loads clear both stores before author scripts, while explicit reload preserves them", async () => {
-	const file = dir.write(
-		"fresh-storage.html",
-		`<!doctype html><body><script>
+test.each(
+	Array.from({ length: 10 }, (_, iteration) =>
+		["plain", "eager"].map((mode) => ({ mode, iteration })),
+	).flat(),
+)(
+	"fresh file loads clear both stores ($mode $iteration)",
+	async ({ mode, iteration }) => {
+		const file = dir.write(
+			`fresh-storage-${mode}-${iteration}.html`,
+			`<!doctype html><body><script>
 		const keys = ['sample', 'length'];
 		document.body.dataset.initial = [localStorage, sessionStorage].flatMap(store => keys.map(key => store.getItem(key) ?? 'empty')).join('|');
 		const save = () => { for (const store of [localStorage, sessionStorage]) for (const key of keys) store.setItem(key, 'dirty'); };
 		addEventListener('pagehide', save);
 		</script><button id="sample" onclick="save()">Sample</button>`,
-	);
-	await withPage(async (cdp) => {
-		const page = new CheckedPage(cdp, `file://${file}`);
-		await page.start();
-		await page.open();
-		const initial = () => cdp.evaluate("document.body.dataset.initial");
-		expect(await initial()).toBe("empty|empty|empty|empty");
-		await runStep(cdp, "click:#sample", () => "unused");
-		await runStep(cdp, "reload", () => "unused");
-		expect(await initial()).toBe("dirty|dirty|dirty|dirty");
-		await page.open();
-		expect(await initial()).toBe("empty|empty|empty|empty");
-	});
-}, 30_000);
+		);
+		await withPage(async (cdp) => {
+			const navigations: string[] = [];
+			const contexts: string[] = [];
+			cdp.on("Page.frameNavigated", ({ frame }) => navigations.push(JSON.stringify(frame)));
+			const page = new CheckedPage(cdp, `file://${file}`);
+			await page.start();
+			try {
+				await page.open();
+				contexts.push(...page.warnings);
+				const initial = () => cdp.evaluate("document.body.dataset.initial");
+				expect(await initial()).toBe("empty|empty|empty|empty");
+				await runStep(cdp, "click:#sample", () => "unused");
+				await runStep(cdp, "reload", () => "unused");
+				expect(await initial()).toBe("dirty|dirty|dirty|dirty");
+				await page.open();
+				contexts.push(...page.warnings);
+				expect(await initial()).toBe("empty|empty|empty|empty");
+			} finally {
+				console.log(
+					JSON.stringify({ mode, iteration, contexts, navigations, problems: page.problems }),
+				);
+			}
+		});
+	},
+	30_000,
+);
 
 test("fresh file loads leave another tab's session state intact", async () => {
 	const file = dir.write("tab-session.html", "<!doctype html><h1>Session</h1>");

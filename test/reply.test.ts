@@ -18,6 +18,7 @@ const STORAGE_TRACE = `<script>(() => {
 const keepKey = "explainer:" + location.href.split(/[?#]/)[0];
 const writes = [];
 let hiding = false;
+let enabled = false;
 const set = Storage.prototype.setItem;
 const snapshot = phase => {
 	const raw = localStorage.getItem(keepKey);
@@ -32,6 +33,7 @@ const report = shot => {
 for (const method of ["setItem", "removeItem", "clear"]) {
 	const original = Storage.prototype[method];
 	Storage.prototype[method] = function (...args) {
+		if (!enabled) return original.apply(this, args);
 		try {
 			const result = original.apply(this, args);
 			const write = {method, store:this === localStorage ? "local" : "session", key:String(args[0] ?? "").startsWith("explainer:") ? "keep" : args[0], length:String(args[1] ?? "").length, ms:Math.round(performance.now()), load:sessionStorage.loads};
@@ -42,6 +44,9 @@ for (const method of ["setItem", "removeItem", "clear"]) {
 	};
 }
 window.keepStorageTrace = () => {
+	try { if (!localStorage || !sessionStorage) return; } catch { return; }
+	enabled = true;
+	console.warn("helper-sentinels " + JSON.stringify([localStorage.getItem("trace:helper"), sessionStorage.getItem("trace:helper")]));
 	for (const key of ["trace:before-hide", "trace:after-hide", "trace:last-write"]) {
 		const previous = sessionStorage.getItem(key); if (previous) report(JSON.parse(previous));
 	}
@@ -49,7 +54,7 @@ window.keepStorageTrace = () => {
 	addEventListener("load", () => report(snapshot("load")));
 	addEventListener("pagehide", () => set.call(sessionStorage, "trace:after-hide", JSON.stringify(snapshot("after-hide"))));
 };
-addEventListener("pagehide", () => { hiding = true; set.call(sessionStorage, "trace:before-hide", JSON.stringify(snapshot("before-hide"))); }, true);
+addEventListener("pagehide", () => { if (!enabled) return; hiding = true; set.call(sessionStorage, "trace:before-hide", JSON.stringify(snapshot("before-hide"))); }, true);
 })();</script>`;
 
 /** Helpers every test page carries: element lookup, saved-state count, the Clear and Reply buttons. */
@@ -60,8 +65,7 @@ const clearButton = () => document.querySelector(".reply-bar .btn:not(.primary)"
 const replyButton = () => document.querySelector(".reply-bar .primary");
 const armed = () => clearButton().classList.contains("is-armed");
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
-window.keepStorageTrace();
-console.warn("helper-sentinels " + JSON.stringify([localStorage.getItem("trace:helper"), sessionStorage.getItem("trace:helper")]));`;
+window.keepStorageTrace();`;
 
 /** A small page as pack writes one with reply: true: \`body\` inside <main>, then keep.js and reply.js, then the helpers and \`script\`. */
 const SMALL = (body: string, script: string) =>
