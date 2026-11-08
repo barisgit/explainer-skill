@@ -60,7 +60,8 @@ const clearButton = () => document.querySelector(".reply-bar .btn:not(.primary)"
 const replyButton = () => document.querySelector(".reply-bar .primary");
 const armed = () => clearButton().classList.contains("is-armed");
 sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
-window.keepStorageTrace();`;
+window.keepStorageTrace();
+console.warn("helper-sentinels " + JSON.stringify([localStorage.getItem("trace:helper"), sessionStorage.getItem("trace:helper")]));`;
 
 /** A small page as pack writes one with reply: true: \`body\` inside <main>, then keep.js and reply.js, then the helpers and \`script\`. */
 const SMALL = (body: string, script: string) =>
