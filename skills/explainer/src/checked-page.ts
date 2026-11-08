@@ -72,26 +72,35 @@ export class CheckedPage {
 	async open(hash = ""): Promise<void> {
 		this.problems = [];
 		this.warnings = [];
-		const storageDocument = new URL("../kit/licenses/preact.txt", import.meta.url).href;
-		await this.cdp.load(storageDocument);
-		await this.cdp.evaluate("localStorage.clear(); sessionStorage.clear();");
-		if (/\/(?:keep|forms)\.out\.html$/.test(this.url)) {
-			const { frameTree } = await this.cdp.send<{
-				frameTree: { frame: { id: string; url: string } };
-			}>("Page.getFrameTree");
-			const key = await this.cdp.send("Storage.getStorageKeyForFrame", {
-				frameId: frameTree.frame.id,
+		const { EXPLAINER_STORAGE_DIAGNOSTIC } = process.env;
+		if (EXPLAINER_STORAGE_DIAGNOSTIC === "before-a9") {
+			await this.cdp.load("about:blank");
+			await this.cdp.send("Storage.clearDataForOrigin", {
+				origin: "file://",
+				storageTypes: "local_storage",
 			});
-			const state = await this.cdp.evaluate(
-				"({type:document.contentType, ready:document.readyState})",
-			);
-			this.warnings.push(
-				"storage-context " +
-					JSON.stringify({ helper: frameTree.frame.url === storageDocument, key, state }),
-			);
-			await this.cdp.evaluate(
-				"localStorage.setItem('trace:helper', 'alive'); sessionStorage.setItem('trace:helper', 'alive');",
-			);
+		} else {
+			const storageDocument = new URL("../kit/licenses/preact.txt", import.meta.url).href;
+			await this.cdp.load(storageDocument);
+			await this.cdp.evaluate("localStorage.clear(); sessionStorage.clear();");
+			if (/\/(?:keep|forms)\.out\.html$/.test(this.url)) {
+				const { frameTree } = await this.cdp.send<{
+					frameTree: { frame: { id: string; url: string } };
+				}>("Page.getFrameTree");
+				const key = await this.cdp.send("Storage.getStorageKeyForFrame", {
+					frameId: frameTree.frame.id,
+				});
+				const state = await this.cdp.evaluate(
+					"({type:document.contentType, ready:document.readyState})",
+				);
+				this.warnings.push(
+					"storage-context " +
+						JSON.stringify({ helper: frameTree.frame.url === storageDocument, key, state }),
+				);
+				await this.cdp.evaluate(
+					"localStorage.setItem('trace:helper', 'alive'); sessionStorage.setItem('trace:helper', 'alive');",
+				);
+			}
 		}
 		await this.cdp.load(this.url + hash);
 		const missing = await settlePage(this.cdp);
