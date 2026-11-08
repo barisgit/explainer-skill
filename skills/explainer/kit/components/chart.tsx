@@ -14,9 +14,11 @@
      colour: keep palette tokens opaque, as pack mixes them (a visualMap range) like color-mix() does.
    Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
      { currency: "EUR", compact: true } (written for the page's lang), or one text per data item or tick: ["Low", "", "Peak"].
-   Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
+   Layout: one grid with one unpositioned horizontal legend reserves bottom room from ECharts’ rendered legend box, live and
+     in pack’s drawings. Explicit grid top/bottom/height or legend placement keeps your layout.
+     Write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
-     with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
+     with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; pack evaluates each drawn width.
    Imperative API: Charts.make(el, option, setup?) returns {chart,set,dispose}; chart is null until width, fonts and ECharts
      are ready. set(patch, replace?) merges saved/live components by id or position; replace names whole component lists.
      setup runs on each mount. Scheme remounts reset zoom/legend state; dispose removes chart and observers.
@@ -29,7 +31,9 @@
    pack draws the chart into the page as SVG, shown until ECharts draws it, with scripts off and in print. The option's functions
    run in pack too. ECharts alone draws a chart whose functions fail there (reading the page, say), whose colours are
    functions or transformed (colorAlpha, colorLightness, a visualMap's opacity), whose element a page rule sizes (height,
-   padding, border on it) or whose height is not a plain length; so does what setup changes.
+   padding, border on it) or whose height is not a plain length; so does what setup changes. A legend whose height changes
+   within a copy's width range, or whose geometry pack cannot certify, also stays live-only, even when positioned explicitly.
+   A horizontal scrolling legend can keep one row across widths.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
    scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice

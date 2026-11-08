@@ -198,6 +198,8 @@ declare var ChartsOption: (env: {
 }) => {
 	resolveOption<T>(option: T): T;
 	theme(place: { under: string; font: string; animation: boolean }): ChartOption;
+	/** Install the shared legend-box layout before the first setOption, on a live or SSR ECharts instance. */
+	layout(chart: unknown): void;
 	/** Normalize zrender's line-height probe while delegating actual glyph widths to the renderer. */
 	measureText(
 		base: (text: string, font?: string) => { width: number },

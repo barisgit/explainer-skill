@@ -35,6 +35,7 @@
 	const {
 		resolveOption,
 		theme: tokenTheme,
+		layout,
 		measureText,
 	} = window.ChartsOption({
 		color: resolve,
@@ -148,6 +149,7 @@
 			chart?.dispose();
 			const look = theme(el);
 			chart = echarts.init(el, look);
+			layout(chart);
 			chart.setOption(resolveOption(shown ? { ...option, animation: false } : option));
 			if (shown) {
 				chart.setOption({

@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { pageDrawer } from "../skills/explainer/src/mdx/draw.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import { withTestPage } from "./browser.ts";
 import { inPage, packedMdx, scratch, WIDTHS } from "./support.ts";
@@ -140,6 +141,112 @@ const CHART = (extra: string) =>
 /** A Plot whose legend has four names: it takes one row from half a column up, and two on a phone. */
 const LEGEND_PLOT = (names: string[]) =>
 	`{ series: [${names.map((name, i) => `{ name: "${name}", data: [[0, ${i}], [1, ${i + 1}]] }`).join(", ")}] }`;
+
+test("only stable dataset and styled legends keep their drawings", async () => {
+	const names = ["Northwest region", "Northeast region", "Southwest region", "Southeast region"];
+	const series = names.map((name) => ({ name, type: "bar", data: [1, 3] }));
+	const option = { legend: {}, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series };
+	const dataset = {
+		...option,
+		dataset: {
+			source: [
+				["Category", "First", "Second", "Third", "Fourth"],
+				["a", 1, 2, 3, 4],
+			],
+		},
+		series: Array.from({ length: 4 }, () => ({ type: "bar" })),
+	};
+	const figures = drawnFigures(
+		await packedMdx(
+			dir,
+			"chart-legends",
+			`import { Chart } from "kit";
+
+# Chart legends
+
+<Chart id="wraps" label="Wraps" option={${JSON.stringify(option)}} />
+<Chart id="dataset" label="Dataset" option={${JSON.stringify(dataset)}} />
+<Chart id="dataset-wraps" label="Dataset wraps" option={${JSON.stringify({ ...dataset, legend: { textStyle: { fontSize: 36 } } })}} />
+<Chart id="stroke" label="Thick legend lines" option={${JSON.stringify({ ...option, series: ["First", "Second", "Third", "Fourth"].map((name) => ({ name, type: "line", data: [1, 3] })), legend: { lineStyle: { width: 40 } } })}} />
+<Chart id="hidden" label="Hidden legend" option={${JSON.stringify({ ...option, legend: { show: false } })}} />
+`,
+		),
+	);
+	for (const id of ["wraps", "dataset-wraps", "stroke"]) {
+		expect(figures.get(id), id).toBeUndefined();
+	}
+	expect(figures.get("dataset")).toContain("First");
+	expect(figures.get("hidden")).toContain("chart-drawn");
+}, 30_000);
+
+test("documented numeric formats retain their drawings, including locale spaces and euros", () => {
+	const drawer = pageDrawer("sl", []);
+	for (const format of [{ unit: "min" }, { currency: "EUR" }, { percent: true }]) {
+		const svg = drawer.chart(
+			{
+				xAxis: { type: "category", data: ["a", "b"] },
+				yAxis: { axisLabel: { formatter: format } },
+				series: [{ type: "bar", data: [1, 2] }],
+			},
+			{ classes: ["chart"], id: undefined, height: undefined },
+		);
+		expect(svg).toContain("chart-drawn");
+	}
+});
+
+test("each SSR copy lays out the effective legend and keeps electricity-mix's explicit drawing", async () => {
+	const base = {
+		legend: {},
+		grid: [{}],
+		xAxis: [{ type: "category", data: ["a", "b"] }],
+		yAxis: [{}],
+		series: ["Load"].map((name) => ({
+			name,
+			type: "bar",
+			data: [1, 3],
+		})),
+	};
+	const path = await packedMdx(
+		dir,
+		"effective-drawn-legends",
+		`import { Chart } from "kit";
+import { WorldMix } from "${import.meta.dir}/../examples/electricity-mix/figures.tsx";
+
+# Effective legends
+
+<Chart id="inherited" height="520px" label="Inherited" option={${JSON.stringify({ ...base, textStyle: { fontSize: 60 } })}} />
+<Chart id="media" height="520px" label="Responsive" option={${JSON.stringify({ baseOption: { ...base, textStyle: { fontSize: 60 } }, media: [{ query: { minWidth: 440 }, option: { textStyle: { fontSize: 12 } } }] })}} />
+<Chart id="unknown" label="Unknown glyphs" option={${JSON.stringify({ ...base, series: [{ name: "東京", type: "bar", data: [1, 3] }] })}} />
+<WorldMix />
+`,
+	);
+	const figures = drawnFigures(path);
+	expect(figures.get("world")).toContain("chart-drawn");
+	expect(figures.get("unknown")).toBeUndefined();
+	for (const id of ["inherited", "media"]) {
+		expect(viewBoxes(figures.get(id))).toEqual(["1054x520", "527x520", "356x520"]);
+	}
+	const gaps = await withTestPage(async (cdp) => {
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		await cdp.load(`file://${path}`);
+		return cdp.evaluate<number[]>(
+			`document.fonts.ready.then(() => {
+			return [...document.querySelectorAll("#inherited .chart-drawn > svg, #media .chart-drawn > svg")].map(svg => {
+				svg.style.cssText = "display:block;width:" + svg.viewBox.baseVal.width + "px;max-width:none;height:auto";
+				const bar = svg.querySelector('path[style*="fill:var(--c1)"]');
+				const legend = [...svg.querySelectorAll("text")].filter(t => t.textContent === "Load");
+				return Math.min(...legend.map(t => t.getBoundingClientRect().top)) - bar.getBoundingClientRect().bottom;
+			});
+		})`,
+			true,
+		);
+	});
+	expect(gaps).toHaveLength(6);
+	for (const gap of gaps) {
+		expect(gap).toBeGreaterThanOrEqual(8);
+	}
+}, 30_000);
 
 describe("what pack draws is exact, or nothing", () => {
 	test("a colour pack cannot read back exactly leaves its figure to the live chart", async () => {
@@ -423,8 +530,8 @@ test("SSR legend rows and plot bounds match the live chart's text metrics", asyn
 
 # Legend metrics
 
-<Chart id="metrics" height="520px" label="Metrics" option={{ legend: { textStyle: { fontSize: 36 } }, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: ["First", "Second", "Third", "Fourth"].map(name => ({ name, type: "bar", data: [1, 2] })) }} />
-<Chart id="explicit-metrics" height="520px" label="Explicit line height" option={{ legend: { textStyle: { fontSize: 36, lineHeight: 52 } }, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: ["First", "Second", "Third", "Fourth"].map(name => ({ name, type: "bar", data: [1, 2] })) }} />
+<Chart id="metrics" height="520px" label="Metrics" option={{ grid: { bottom: 180 }, legend: { width: 280, textStyle: { fontSize: 36 } }, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: ["First", "Second", "Third", "Fourth"].map(name => ({ name, type: "bar", data: [1, 2] })) }} />
+<Chart id="explicit-metrics" height="520px" label="Explicit line height" option={{ grid: { bottom: 180 }, legend: { width: 280, textStyle: { fontSize: 36, lineHeight: 52 } }, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: ["First", "Second", "Third", "Fourth"].map(name => ({ name, type: "bar", data: [1, 2] })) }} />
 `,
 	);
 	const drawn = await withTestPage(async (cdp) => {

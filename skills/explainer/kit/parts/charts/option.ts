@@ -1,10 +1,4 @@
-/* charts option: the option a Chart's ECharts draws, not referenced from pages: pack joins it in front of charts.js, and runs it
-   itself to draw each chart into the page (src/mdx/draw.ts). ChartsOption({ color, lang }) gives
-     resolveOption(option)  a copy of the option with every colour expression under a colour key made color(expression), and
-                            every JSON formatter a function writing numbers in lang()
-     theme({ under, font, animation })  the ECharts theme from the kit's tokens, each as color("var(--token)"); under is the
-                            colour under the chart, font its font family
-   charts.js resolves colours to the rgb of the current scheme; pack to stand-ins it turns back into the expressions. */
+/* Shared ECharts theme, layout and metrics. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ChartsOption = ({ color, lang }) => {
 	const COLOR_KEY = /(olor|^fill|^stroke)$/;
@@ -115,6 +109,171 @@ window.ChartsOption = ({ color, lang }) => {
 				? { width: Number(/(\d+(?:\.\d+)?)px/.exec(font ?? "")?.[1] ?? 12) }
 				: base(text, font);
 
+	/**
+	 * Layout provenance travels through ECharts' own component merges, including media/baseOption and singleton arrays. Defaults
+	 * alone cannot distinguish authored top: 65 from ECharts' top: 65. Never mark generated grid patches as authored.
+	 */
+	function authoredLayout(option: ChartOption): ChartOption {
+		const component = (value: unknown, keys: string[]): unknown => {
+			if (Array.isArray(value)) {
+				return value.map((item) => component(item, keys));
+			}
+			return isObject(value) && keys.some((key) => key in value)
+				? { ...value, __kitLegendRoom: false }
+				: value;
+		};
+		const result = { ...option };
+		if ("grid" in result) {
+			result.grid = component(result.grid, ["top", "bottom", "height", "y", "y2"]);
+		}
+		if ("legend" in result) {
+			result.legend = component(result.legend, [
+				"top",
+				"bottom",
+				"left",
+				"right",
+				"width",
+				"height",
+				"x",
+				"x2",
+				"y",
+				"y2",
+			]);
+		}
+		if (isObject(result.baseOption)) {
+			result.baseOption = authoredLayout(result.baseOption);
+		}
+		if (Array.isArray(result.options)) {
+			result.options = result.options.map((item: unknown) =>
+				isObject(item) ? authoredLayout(item) : item,
+			);
+		}
+		if (Array.isArray(result.media)) {
+			result.media = result.media.map((item: unknown) =>
+				isObject(item) && isObject(item.option)
+					? { ...item, option: authoredLayout(item.option) }
+					: item,
+			);
+		}
+		return result;
+	}
+
+	interface LayoutComponent {
+		get(key: string): unknown;
+		coordinateSystem?: object;
+	}
+	interface LayoutRect {
+		y: number;
+		height: number;
+		clone(): LayoutRect;
+		applyTransform(matrix: number[]): void;
+	}
+	/** ECharts 6.1's model/view API is private in its public declarations; keep the assertion and the contract here. */
+	interface LayoutChart {
+		setOption(option: ChartOption, ...args: unknown[]): void;
+		resize(...args: unknown[]): void;
+		getHeight(): number;
+		isDisposed(): boolean;
+		getZr(): {
+			animation: {
+				on(event: "frame", fn: () => void): void;
+				off(event: "frame", fn: () => void): void;
+			};
+		};
+		getModel(): { queryComponents(query: { mainType: string }): LayoutComponent[] };
+		getViewOfComponentModel(model: LayoutComponent): {
+			group: { getBoundingRect(): LayoutRect; getComputedTransform(): number[] | null };
+		};
+	}
+
+	/** A component only when it is the sole one of its kind; ECharts has already normalized object and array options. */
+	function single(chart: LayoutChart, mainType: string): LayoutComponent | undefined {
+		const items = chart.getModel().queryComponents({ mainType });
+		return items.length === 1 ? items[0] : undefined;
+	}
+
+	/** The rendered box in chart coordinates, padding included; group bounds alone are local. */
+	function legendBox(chart: LayoutChart, legend: LayoutComponent): LayoutRect {
+		const group = chart.getViewOfComponentModel(legend).group;
+		const box = group.getBoundingRect().clone();
+		const transform = group.getComputedTransform();
+		if (transform) {
+			box.applyTransform(transform);
+		}
+		return box;
+	}
+
+	/** ECharts registered its deferred render first. Measure once after that frame, including silent lazy updates. */
+	function afterFrame(chart: LayoutChart, apply: () => void) {
+		const animation = chart.getZr().animation;
+		const done = () => {
+			animation.off("frame", done);
+			apply();
+		};
+		animation.on("frame", done);
+	}
+
+	/** Install once before the first option. Restore only our bottom before author updates, never over an authored top + height. */
+	function layout(instance: unknown): void {
+		const chart = instance as LayoutChart;
+		const setOption = chart.setOption.bind(chart);
+		const resize = chart.resize.bind(chart);
+		let saved: number | undefined;
+		let revision = 0;
+		const restore = (lazy = false) => {
+			if (saved !== undefined && !chart.isDisposed()) {
+				setOption({ grid: { bottom: saved } }, { silent: true, lazyUpdate: lazy });
+			}
+			saved = undefined;
+		};
+		const reserve = (version: number) => {
+			// An updated handler can queue another lazy option during this frame; its view is not ready yet.
+			if (version !== revision || chart.isDisposed()) {
+				return;
+			}
+			const grid = single(chart, "grid");
+			const legend = single(chart, "legend");
+			if (
+				!grid?.coordinateSystem ||
+				!legend ||
+				!grid.get("__kitLegendRoom") ||
+				!legend.get("__kitLegendRoom") ||
+				!legend.get("show") ||
+				legend.get("orient") !== "horizontal"
+			) {
+				return;
+			}
+			const box = legendBox(chart, legend);
+			if (!box.height) {
+				return;
+			}
+			const original = Number(grid.get("bottom"));
+			const bottom = Math.max(original, chart.getHeight() - box.y + 12);
+			if (bottom !== original) {
+				saved = original;
+				setOption({ grid: { bottom } }, { silent: true });
+			}
+		};
+		chart.setOption = (option, ...args) => {
+			const version = ++revision;
+			const lazy = Boolean(isObject(args[0]) ? args[0].lazyUpdate : args[1]);
+			// Merge our restoration into the same deferred frame, never flush the unreserved grid first.
+			restore(lazy);
+			setOption(authoredLayout(option), ...args);
+			if (lazy && !chart.isDisposed()) {
+				afterFrame(chart, () => reserve(version));
+			} else {
+				reserve(version);
+			}
+		};
+		chart.resize = (...args) => {
+			const version = ++revision;
+			restore();
+			resize(...args);
+			reserve(version);
+		};
+	}
+
 	/** The series types whose labels the theme writes in ink. */
 	const LABELLED = [
 		"line",
@@ -150,7 +309,7 @@ window.ChartsOption = ({ color, lang }) => {
 		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
 		return {
 			...Object.fromEntries(LABELLED.map((type) => [type, label])),
-			grid: { outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
+			grid: { __kitLegendRoom: true, outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
 			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
 			backgroundColor: "transparent",
 			animation,
@@ -164,6 +323,7 @@ window.ChartsOption = ({ color, lang }) => {
 			timeAxis: axis,
 			logAxis: axis,
 			legend: {
+				__kitLegendRoom: true,
 				textStyle: { color: ink },
 				inactiveColor: ruleStrong,
 				pageTextStyle: { color: muted },
@@ -204,5 +364,5 @@ window.ChartsOption = ({ color, lang }) => {
 		};
 	}
 
-	return { resolveOption, theme, measureText };
+	return { resolveOption, theme, layout, measureText };
 };

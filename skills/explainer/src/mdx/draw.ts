@@ -12,12 +12,14 @@
  */
 import { join } from "node:path";
 import type * as EChartsSsr from "../../vendor/echarts-ssr.js";
-import { textWidth } from "../geist.ts";
+import { unescapeHtml } from "../escape.ts";
+import { geistAdvance, textWidth } from "../geist.ts";
 import { runKitPart } from "../kit.ts";
 import { PackError } from "../pack-error.ts";
 import { SKILL_ROOT } from "../paths.ts";
 import { lengthAt, type Place, pageBoxTouch, type Viewport } from "./chart-box.ts";
 import { chartColours } from "./chart-colours.ts";
+import { legendHeights, legendWidths } from "./chart-legend.ts";
 import { kitSvg, shorterPaths } from "./drawn-svg.ts";
 import { standIns } from "./stand-ins.ts";
 
@@ -28,6 +30,7 @@ type Option = Record<string, unknown> & { series?: unknown[] };
 interface ChartsOption {
 	resolveOption<T>(option: T): T;
 	theme(place: { under: string; font: string; animation: boolean }): Option;
+	layout(chart: unknown): void;
 	measureText(base: typeof measureText): typeof measureText;
 }
 type ChartsOptionPart = (env: {
@@ -183,13 +186,23 @@ function chartSvg(
 	width: number,
 	height: number,
 	charts: ChartsOption,
-): string {
+): { svg: string; legends: number[] } | undefined {
 	const renderer = loadEcharts();
 	renderer.setPlatformAPI({ measureText: charts.measureText(measureText) });
 	const chart = renderer.init(null, theme, { renderer: "svg", ssr: true, width, height });
 	try {
+		charts.layout(chart);
 		quietly(() => chart.setOption(option));
-		return chart.renderToSVGString();
+		const legends = legendHeights(chart);
+		if (!legends) {
+			return undefined;
+		}
+		const svg = chart.renderToSVGString();
+		// Check drawn text, not author names: ECharts derives dataset names and runs formatters. Its text cache can bypass measureText.
+		const known = [...svg.matchAll(/<text\b[^>]*>([^<]*)<\/text>/g)].every((match) =>
+			[...unescapeHtml(match[1] ?? "")].every((char) => geistAdvance(char, 400) !== undefined),
+		);
+		return known ? { svg, legends } : undefined;
 	} finally {
 		// A live instance keeps an animation timer, which would keep pack from exiting.
 		chart.dispose();
@@ -275,11 +288,23 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const resolved = charts.resolveOption(option);
 		const copies = COPIES.map((copy, i) => {
 			const height = heights[i] as number;
-			return kitSvg(
-				chartSvg(resolved, theme, copy.width, height, charts),
-				svgTag(copy, height),
-				paintOf,
-			);
+			const drawing = chartSvg(resolved, theme, copy.width, height, charts);
+			if (!drawing) {
+				return undefined;
+			}
+			const widths = legendWidths(resolved, height, copy.shown, copy.fit === "");
+			// With no legend or media transitions, there is no width-sensitive legend geometry to certify.
+			const stable =
+				(drawing.legends.length === 0 && widths.length === 2) ||
+				widths.every((width) => {
+					const sample =
+						width === copy.width ? drawing : chartSvg(resolved, theme, width, height, charts);
+					return (
+						sample !== undefined &&
+						JSON.stringify(sample.legends) === JSON.stringify(drawing.legends)
+					);
+				});
+			return stable ? kitSvg(drawing.svg, svgTag(copy, height), paintOf) : undefined;
 		});
 		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 	});

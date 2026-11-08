@@ -92,9 +92,8 @@ function mixOption(place: Place, mode: Unit): ChartOption {
 	};
 	return {
 		grid: { top: 64, left: 8, right: 24, bottom: 8 },
-		legend: { top: 8, left: 8, right: 8 },
-		// Below 640 px the legend wraps, so the plot starts lower. As a media query, pack's drawings follow it too.
-		media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }],
+		// One scrolling row has the same height throughout every drawn copy's width range.
+		legend: { type: "scroll", top: 8, left: 8, right: 8 },
 		tooltip: {
 			trigger: "axis",
 			formatter: (params: AxisParam[]) => {

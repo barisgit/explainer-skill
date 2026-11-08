@@ -6,6 +6,8 @@
 
 - Ranking rows now use `ol.rank > li > details > summary + .more`: click, Enter and Space open and close the detail without a page script. Replace the old button with the details/summary wrapper and remove `hidden` from `.more`; titles wrap in a flexible column instead of being capped at 7rem.
 
+- A single unpositioned horizontal legend now gets room below an ordinary grid chart on mount, resize and option updates. Live charts and pack's three copies use ECharts' rendered box, including inherited text styles and responsive options, with a shared line-height basis across platforms. Explicit vertical grid bounds or legend placement win. A Chart whose legend wraps differently across a drawn copy's widths is left to the script, as Plot already is; this applies to positioned legends too. Uncertifiable legend geometry and glyphs outside pack's Geist metrics also stay live-only. Electricity's world chart keeps its drawing with a single-row scrolling legend.
+
 - An `aria-label` names a view link or note target explicitly. Tree-branch notes use the summary's first cell instead of gluing its numbers and descendant rows into the label.
 
 - `data-nav` on an `h2` inside an author-written section now names its contents-rail entry; the section's own `data-nav` takes precedence.
