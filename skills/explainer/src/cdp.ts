@@ -8,8 +8,8 @@ const CALL_DEADLINE_MS = 20_000;
 /** How long a page may take from navigation to its load event: a packed page loads nothing, so only a stalled Chrome comes close. */
 const LOAD_DEADLINE_MS = 10_000;
 
-/** How long a page's browser context may take to be disposed of. */
-const DISPOSE_DEADLINE_MS = 2_000;
+/** Maximum disposal wait for a temporary target/context; callers reserve this inside their total budget. */
+export const DISPOSE_DEADLINE_MS = 2_000;
 
 /** A duration for an error message: `20 s`. */
 export const seconds = (ms: number) => `${ms / 1000} s`;
@@ -19,6 +19,10 @@ export class ChromeError extends Error {}
 
 /** The reason a call fails once Chrome has closed the pipe or the page's session. */
 const CONNECTION_CLOSED = "Chrome closed the DevTools connection";
+
+/** Preserves a caller's timeout identity while normalizing other abort reasons to Chrome failures. */
+const abortError = (reason: unknown): ChromeError =>
+	reason instanceof ChromeError ? reason : new ChromeError(String(reason));
 
 /** One call-stack entry of an exception; line and column numbers are 0-based. */
 interface CallFrame {
@@ -54,6 +58,7 @@ interface CdpEvents {
 	"Debugger.paused": object;
 	"Inspector.targetCrashed": object;
 	"Target.detachedFromTarget": { sessionId: string };
+	"Target.targetDestroyed": { targetId: string };
 }
 
 type Reply = { result?: unknown; error?: { message: string } };
@@ -157,12 +162,7 @@ export class Cdp {
 	static open(input: Readable, output: Writable, limit?: AbortSignal): Cdp {
 		const wire = new Wire(output);
 		const browser = new Cdp(wire, undefined);
-		const stop = () =>
-			wire.abort(
-				limit?.reason instanceof ChromeError
-					? limit.reason
-					: new ChromeError(String(limit?.reason)),
-			);
+		const stop = () => wire.abort(abortError(limit?.reason));
 		if (limit?.aborted) {
 			stop();
 		}
@@ -217,6 +217,73 @@ export class Cdp {
 			).catch(() => undefined);
 		}
 	}
+	/** A disposable default-context page: abort only its work, reconcile acquisition, and confirm target destruction. */
+	async temporaryPage<T>(fn: (cdp: Cdp) => Promise<T>, signal: AbortSignal): Promise<T> {
+		const scoped = new Cdp(this.wire, undefined);
+		const destroyed = new Set<string>();
+		scoped.on("Target.targetDestroyed", ({ targetId }) => destroyed.add(targetId));
+		let targetId: string | undefined;
+		let page: Cdp | undefined;
+		let abortedAt: number | undefined;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const stop = () => {
+			abortedAt = performance.now();
+			page?.abort(abortError(signal.reason));
+			// Creating/attaching is irreversible. Retain its reply through the reserved cleanup window, not just the work budget.
+			timer = setTimeout(
+				() =>
+					scoped.abort(
+						new ChromeError("temporary page acquisition did not finish within its cleanup budget"),
+					),
+				DISPOSE_DEADLINE_MS,
+			);
+		};
+		signal.addEventListener("abort", stop, { once: true });
+		if (signal.aborted) {
+			stop();
+		}
+		try {
+			if (signal.aborted) {
+				throw abortError(signal.reason);
+			}
+			await scoped.send("Target.setDiscoverTargets", { discover: true });
+			if (signal.aborted) {
+				throw abortError(signal.reason);
+			}
+			({ targetId } = await scoped.send<{ targetId: string }>("Target.createTarget", {
+				url: "about:blank",
+			}));
+			if (signal.aborted) {
+				throw abortError(signal.reason);
+			}
+			const { sessionId } = await scoped.send<{ sessionId: string }>("Target.attachToTarget", {
+				targetId,
+				flatten: true,
+			});
+			page = new Cdp(this.wire, sessionId);
+			if (signal.aborted) {
+				page.abort(abortError(signal.reason));
+			}
+			await page.send("Inspector.enable");
+			return await fn(page);
+		} finally {
+			signal.removeEventListener("abort", stop);
+			clearTimeout(timer);
+			try {
+				if (targetId) {
+					const remaining =
+						DISPOSE_DEADLINE_MS - (abortedAt === undefined ? 0 : performance.now() - abortedAt);
+					await this.closeTarget(targetId, scoped, destroyed, remaining);
+				}
+			} finally {
+				if (page) {
+					this.wire.clients.delete(page);
+				}
+				this.wire.clients.delete(scoped);
+			}
+		}
+	}
+
 	private async attach<T>(fn: (cdp: Cdp) => Promise<T>, browserContextId: string | undefined) {
 		const { targetId } = await this.send<{ targetId: string }>("Target.createTarget", {
 			url: "about:blank",
@@ -234,6 +301,38 @@ export class Cdp {
 			this.wire.clients.delete(page);
 		}
 	}
+
+	/** Destruction is observable even if cancellation preceded attachment; an acknowledgement alone is not closure. */
+	private async closeTarget(
+		targetId: string,
+		observer: Cdp,
+		destroyed: Set<string>,
+		remaining: number,
+	): Promise<void> {
+		if (destroyed.has(targetId)) {
+			return;
+		}
+		if (remaining <= 0) {
+			throw new ChromeError("temporary page could not be closed within its cleanup budget");
+		}
+		const closed = this.wait<void>(
+			"the temporary page did not close within its cleanup budget",
+			remaining,
+			(ok) => {
+				const onDestroyed = (event: { targetId: string }) => {
+					if (event.targetId === targetId) {
+						ok();
+					}
+				};
+				observer.on("Target.targetDestroyed", onDestroyed);
+				return () => observer.off("Target.targetDestroyed", onDestroyed);
+			},
+		);
+		closed.catch(() => undefined);
+		await this.send("Target.closeTarget", { targetId }, remaining);
+		await closed;
+	}
+
 	/**
 	 * Fails every pending and later call and awaited event with `error`: for a caller whose own deadline has passed. The first
 	 * reason wins, so a later close does not replace it.
@@ -325,7 +424,7 @@ export class Cdp {
 			return () => this.off(event, listener);
 		});
 	}
-	private off(event: keyof CdpEvents, fn: () => void) {
+	private off<E extends keyof CdpEvents>(event: E, fn: (params: CdpEvents[E]) => void) {
 		this.listeners.set(
 			event,
 			(this.listeners.get(event) ?? []).filter((listener) => listener !== fn),

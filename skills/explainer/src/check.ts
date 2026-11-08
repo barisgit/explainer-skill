@@ -1,26 +1,18 @@
 import { mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import type { Cdp, ExceptionDetails } from "./cdp.ts";
 import { ChromeError } from "./cdp.ts";
+import { CheckedPage, type Screen } from "./checked-page.ts";
 import { withPage } from "./chrome.ts";
+import { sweepControls } from "./control-sweep.ts";
 import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
-import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
-import {
-	DISCOVER_JS,
-	FIRST_SCREEN_JS,
-	PAGE_JS,
-	type PageReport,
-	STEPPERS_JS,
-	SWEEP_JS,
-} from "./page-probes.ts";
-import { runStep, settlePage } from "./steps.ts";
+import { DISCOVER_JS, FIRST_SCREEN_JS, STEPPERS_JS, SWEEP_JS } from "./page-probes.ts";
+import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
 	desktop: { width: 1440, height: 900 },
 	narrow: { width: 390, height: 844 },
 } as const;
-const STACK_FRAMES = 3;
 const THEMES = ["light", "dark"] as const;
 /**
  * The first viewport before any `--do` step: its PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
@@ -132,79 +124,9 @@ function chooseViews(
 	return { capture: firsts, skipped: found.filter((h) => !firsts.includes(h)) };
 }
 
-/** Collects what the page reports while it loads and runs: problems fail the check, warnings are only listed. */
-class PageLog {
-	problems: string[] = [];
-	warnings: string[] = [];
-
-	constructor(cdp: Cdp) {
-		cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: d }) => {
-			const message = `page error: ${d.exception?.description ?? d.text}`;
-			this.problems.push(`${message.split("\n")[0] ?? message} (at ${errorLocation(d)})`);
-		});
-		cdp.on("Runtime.consoleAPICalled", ({ type, args }) => this.onConsole(type, consoleText(args)));
-		cdp.on("Log.entryAdded", ({ entry }) => {
-			if (entry.level === "warning" && entry.source !== "console-api") {
-				this.warnings.push(shorten(`${entry.source} warning: ${entry.text}`));
-			}
-			if (entry.level === "error") {
-				this.problems.push(`${entry.source}: ${entry.text} ${entry.url ?? ""}`);
-			}
-		});
-		cdp.on("Network.requestWillBeSent", ({ request }) => {
-			if (/^(https?|wss?|ftp):/.test(request.url)) {
-				this.problems.push(`network request: ${request.url}`);
-			}
-		});
-		cdp.on("Network.loadingFailed", ({ canceled, errorText }) => {
-			if (!canceled) {
-				this.problems.push(`failed load: ${errorText}`);
-			}
-		});
-	}
-
-	/** Forgets everything reported so far, before the next page load. */
-	reset() {
-		this.problems = [];
-		this.warnings = [];
-	}
-
-	private onConsole(type: string, text: string) {
-		if (type === "error") {
-			this.problems.push(`console.error: ${text}`);
-		}
-		// ECharts reports its own warnings (bad option, missing component) with console.log, so its prefix counts as a warning too.
-		if (type === "warning" || /^\[ECharts\]/.test(text)) {
-			const hint = /grid\.containLabel/.test(text)
-				? " [kit: delete containLabel; charts.js already keeps axis labels inside the grid margins]"
-				: "";
-			this.warnings.push(shorten(`console.${type}: ${text}`) + hint);
-		}
-	}
-}
-
-/** Where an exception was thrown, in the page's own line:column: the top frames ("fmt 3:38, render 4:28") or, without a stack (a syntax error), the position alone. */
-function errorLocation(d: ExceptionDetails): string {
-	const frames = (d.stackTrace?.callFrames ?? [])
-		.filter((f) => f.url !== TIMERS_URL)
-		.slice(0, STACK_FRAMES);
-	if (!frames.length) {
-		return `${d.lineNumber + 1}:${d.columnNumber + 1}`;
-	}
-	return frames
-		.map((f) => `${f.functionName || "<anonymous>"} ${f.lineNumber + 1}:${f.columnNumber + 1}`)
-		.join(", ");
-}
-
-const consoleText = (args: Array<{ value?: unknown; description?: string }>) =>
-	args.map((a) => a.value ?? a.description ?? "").join(" ");
-const shorten = (text: string) => (text.length > 220 ? `${text.slice(0, 217)}...` : text);
-
 /** Everything one check run shares: the page, its log, where files go, and what has been collected. */
 interface Run {
-	cdp: Cdp;
-	log: PageLog;
-	url: string;
+	page: CheckedPage;
 	/** Where the run writes its PNGs: the staging directory (see staged), whose files move into --out once the run has succeeded. */
 	outDir: string;
 	stem: string;
@@ -218,51 +140,18 @@ interface Run {
 	where: string;
 }
 
-/**
- * Loads the page fresh (via about:blank, so a hash-only change is a real load), then waits until it has settled (settlePage); what
- * is still missing then is a problem of the shot. Local storage is emptied once the old page is gone: every file:// page shares one
- * origin and one profile serves all shots, so a page that keeps what the reader entered (kit:keep.js) would otherwise carry one
- * shot's `--do` state into the next, and the old page saves again as it unloads.
- */
-async function open(run: Run, hash: string) {
-	const { cdp } = run;
-	await cdp.load("about:blank");
-	await cdp.send("Storage.clearDataForOrigin", {
-		origin: "file://",
-		storageTypes: "local_storage",
-	});
-	await cdp.load(run.url + hash);
-	const missing = await settlePage(cdp);
-	if (missing) {
-		run.log.problems.push(`${hash ? `${hash}: ` : ""}${missing}`);
-	}
-}
-
-interface Screen {
-	theme: string;
-	name: string;
-	vp: { width: number; height: number };
-}
-
 /** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
 async function capture(run: Run, png: string, screen: Screen, view = ""): Promise<string[]> {
-	const { cdp, log } = run;
-	const narrow = screen.name === "narrow";
-	const page = await cdp.evaluate<PageReport>(PAGE_JS(narrow));
-	log.problems.push(...page.repeated);
-	if (page.overflow) {
-		log.problems.push(
-			`horizontal page overflow at ${screen.vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
-		);
-	}
+	const page = await run.page.inspect(screen);
+	const cdp = run.page.cdp;
 	const { data, omitted } = await fullPageScreenshot(cdp, screen.vp.width);
 	writeFileSync(png, Buffer.from(data, "base64"));
 	const inspect = view ? "open this view to inspect them" : "use --do shot:<css> to capture them";
 	return [
 		...page.warnings,
 		...(omitted.length ? [`${OMITTED_FIXED_WARNING}: ${omitted.join(", ")}; ${inspect}`] : []),
-		...page.scrolls.map((s) => `scrolls sideways: ${s}`),
-		...new Set(log.warnings),
+		...page.scrolls,
+		...new Set(run.page.warnings),
 	];
 }
 
@@ -279,24 +168,24 @@ function overviewPng(run: Run, { theme, name }: Screen, part = "") {
 /** The first viewport before any step: PNG, headline and the figures in view. */
 async function firstScreen(run: Run, screen: Screen): Promise<FirstScreen> {
 	const png = overviewPng(run, screen, "first");
-	const { data } = await run.cdp.send<{ data: string }>("Page.captureScreenshot", {
+	const { data } = await run.page.cdp.send<{ data: string }>("Page.captureScreenshot", {
 		format: "png",
 	});
 	writeFileSync(png, Buffer.from(data, "base64"));
 	return {
 		png,
-		...(await run.cdp.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)),
+		...(await run.page.cdp.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)),
 	};
 }
 
 /** Sweeps the document and inner scrollers under one per-load budget, recording incomplete coverage as one warning. */
 async function sweep(run: Run) {
-	run.log.warnings.push(...(await run.cdp.evaluate<string[]>(SWEEP_JS, true)));
+	run.page.warnings.push(...(await run.page.cdp.evaluate<string[]>(SWEEP_JS, true)));
 }
 
 /** Finds the drill-down hashes on the freshly loaded overview and records them in the report and in `run.viewHashes`. */
 async function discoverViews(run: Run) {
-	const found = await run.cdp.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
+	const found = await run.page.cdp.evaluate<{ hashes: string[]; templates: string[] }>(DISCOVER_JS);
 	const chosen = chooseViews(run.opts.views, found.hashes);
 	run.views.found = found.hashes;
 	run.views.uncaptured = chosen.skipped;
@@ -328,11 +217,11 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 	for (const [i, step] of run.opts.steps.entries()) {
 		run.where = `${where}, --do step ${i + 1}: ${step}`;
 		const shot = step.startsWith("shot:") ? ++ordinal : 0;
-		const result = await runStep(run.cdp, step, (selector, index) =>
+		const result = await runStep(run.page.cdp, step, (selector, index) =>
 			overviewPng(run, screen, shotPart(shot, selector, index)),
 		);
 		if (result.problem) {
-			run.log.problems.push(`--do ${result.problem}`);
+			run.page.problems.push(`--do ${result.problem}`);
 		}
 		if (result.note) {
 			run.stepNotes.add(result.note);
@@ -348,8 +237,7 @@ async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name, vp } = screen;
 	const { opts } = run;
 	run.where = `at ${theme} ${name}, overview`;
-	run.log.reset();
-	await open(run, "");
+	await run.page.open();
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
 	const firstPass = theme === THEMES[0] && name === "desktop";
 	if (firstPass) {
@@ -357,10 +245,17 @@ async function shootOverview(run: Run, screen: Screen) {
 	}
 	await sweep(run);
 	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
-	const stepperWarnings = firstPass ? await run.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
+	const stepperWarnings = firstPass ? await run.page.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
 	const elements = await runSteps(run, screen);
 	const png = overviewPng(run, screen);
 	const warnings = [...stepperWarnings, ...(await capture(run, png, screen))];
+	const problems = [...run.page.problems];
+	if (firstPass && !opts.quick && !opts.steps.length) {
+		run.where += ", kit control sweep";
+		const controls = await sweepControls(run.page, screen);
+		problems.push(...controls.problems);
+		warnings.push(...controls.warnings);
+	}
 	run.shots.push({
 		theme,
 		viewport: `${name} ${vp.width}x${vp.height}`,
@@ -368,7 +263,7 @@ async function shootOverview(run: Run, screen: Screen) {
 		png,
 		first,
 		elements,
-		problems: [...new Set(run.log.problems)],
+		problems: [...new Set(problems)],
 		warnings,
 	});
 }
@@ -377,12 +272,13 @@ async function shootOverview(run: Run, screen: Screen) {
 async function shootView(run: Run, screen: Screen, hash: string) {
 	const { theme, name, vp } = screen;
 	run.where = `at ${theme} ${name}, view ${hash}`;
-	run.log.reset();
-	await open(run, hash);
+	await run.page.open(hash);
 	if (
-		!(await run.cdp.evaluate<boolean>(`document.documentElement.classList.contains("in-view")`))
+		!(await run.page.cdp.evaluate<boolean>(
+			`document.documentElement.classList.contains("in-view")`,
+		))
 	) {
-		run.log.problems.push(`${hash}: no view is shown for this hash`);
+		run.page.problems.push(`${hash}: no view is shown for this hash`);
 	}
 	await sweep(run);
 	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
@@ -394,7 +290,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 		view: hash,
 		png,
 		elements: [],
-		problems: [...new Set(run.log.problems)],
+		problems: [...new Set(run.page.problems)],
 		warnings,
 	});
 	if (!run.views.captured.includes(hash)) {
@@ -404,23 +300,10 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 
 /** Every theme x viewport: the overview, then each chosen view. */
 async function shootAll(run: Run, themes: readonly string[]) {
-	const { cdp } = run;
-	await Promise.all(["Page", "Runtime", "Log", "Network"].map((d) => cdp.send(`${d}.enable`)));
-	await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: TIMERS_JS });
+	await run.page.start();
 	for (const theme of themes) {
 		for (const [name, vp] of Object.entries(VIEWPORTS)) {
-			const narrow = name === "narrow";
-			await cdp.send("Emulation.setDeviceMetricsOverride", {
-				...vp,
-				deviceScaleFactor: 1,
-				mobile: narrow,
-			});
-			await cdp.send("Emulation.setEmulatedMedia", {
-				features: [
-					{ name: "prefers-color-scheme", value: theme },
-					{ name: "prefers-reduced-motion", value: "reduce" },
-				],
-			});
+			await run.page.screen({ theme, name, vp });
 			const screen = { theme, name, vp };
 			await shootOverview(run, screen);
 			for (const hash of run.viewHashes) {
@@ -514,9 +397,7 @@ export async function check(
 		const result = await staged(outDir, (staging) =>
 			withPage(async (cdp) => {
 				const run: Run = {
-					cdp,
-					log: new PageLog(cdp),
-					url: `file://${resolve(file)}`,
+					page: new CheckedPage(cdp, `file://${resolve(file)}`),
 					outDir: staging,
 					stem,
 					opts,

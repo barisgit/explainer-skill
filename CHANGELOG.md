@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Default `check` samples visible kit controls once on the light-desktop overview, each from a fresh Keep-cleared load. Findings name the control; one warning reports incomplete coverage under the 12-control cap or shared 8 s budget (cleanup included). These loads add neither scroll sweeps nor PNGs. `--quick` and explicit `--do` skip the sample; use `--do` for other controls or a failing state (#14).
+
 - `Explore` checks at most 256 combinations of a client frame at pack time instead of enumerating the full control product: defaults plus an evenly spaced sample including both endpoints. Small products remain fully checked; untested combinations can fail for readers. Precomputed frames are still checked in full.
 
 - Ranking rows now use `ol.rank > li > details > summary + .more`: click, Enter and Space open and close the detail without a page script. Replace the old button with the details/summary wrapper and remove `hidden` from `.more`; titles wrap in a flexible column instead of being capped at 7rem.
