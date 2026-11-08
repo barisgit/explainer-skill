@@ -14,6 +14,44 @@ import {
 const dir = scratch();
 afterAll(dir.cleanup);
 
+const STORAGE_TRACE = `<script>(() => {
+const keepKey = "explainer:" + location.href.split(/[?#]/)[0];
+const writes = [];
+let hiding = false;
+const set = Storage.prototype.setItem;
+const snapshot = phase => {
+	const raw = localStorage.getItem(keepKey);
+	return {phase, load:sessionStorage.loads, keep:raw?.length ?? 0,
+		controls:[...document.querySelectorAll("input, select, textarea")].map(el => [el.id || el.name, el.value, el.checked]),
+		stored:Object.entries(JSON.parse(raw || "{}").controls || {}).map(([key, entry]) => [key, entry.value]), writes:writes.slice(-4)};
+};
+const report = shot => {
+	console.warn("storage-snapshot " + JSON.stringify({phase:shot.phase, load:shot.load, keep:shot.keep}));
+	for (const field of ["controls", "stored", "writes"]) for (const value of shot[field]) console.warn("storage-snapshot " + field + " " + JSON.stringify(value));
+};
+for (const method of ["setItem", "removeItem", "clear"]) {
+	const original = Storage.prototype[method];
+	Storage.prototype[method] = function (...args) {
+		try {
+			const result = original.apply(this, args);
+			const write = {method, store:this === localStorage ? "local" : "session", key:String(args[0] ?? "").startsWith("explainer:") ? "keep" : args[0], length:String(args[1] ?? "").length, ms:Math.round(performance.now()), load:sessionStorage.loads};
+			writes.push(write); console.warn("storage-trace " + JSON.stringify(write));
+			if (hiding) set.call(sessionStorage, "trace:last-write", JSON.stringify(snapshot("unload-write")));
+			return result;
+		} catch (error) { console.warn("storage-failure " + method + " " + error); throw error; }
+	};
+}
+window.keepStorageTrace = () => {
+	for (const key of ["trace:before-hide", "trace:after-hide", "trace:last-write"]) {
+		const previous = sessionStorage.getItem(key); if (previous) report(JSON.parse(previous));
+	}
+	report(snapshot("script"));
+	addEventListener("load", () => report(snapshot("load")));
+	addEventListener("pagehide", () => set.call(sessionStorage, "trace:after-hide", JSON.stringify(snapshot("after-hide"))));
+};
+addEventListener("pagehide", () => { hiding = true; set.call(sessionStorage, "trace:before-hide", JSON.stringify(snapshot("before-hide"))); }, true);
+})();</script>`;
+
 /** Helpers every test page carries: element lookup, saved-state count, the Clear and Reply buttons. */
 const COMMON = `
 const $ = (id) => document.getElementById(id);
@@ -21,12 +59,13 @@ const saved = () => Object.keys(localStorage).filter((k) => k.startsWith("explai
 const clearButton = () => document.querySelector(".reply-bar .btn:not(.primary)");
 const replyButton = () => document.querySelector(".reply-bar .primary");
 const armed = () => clearButton().classList.contains("is-armed");
-sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;`;
+sessionStorage.loads = Number(sessionStorage.loads ?? 0) + 1;
+window.keepStorageTrace();`;
 
 /** A small page as pack writes one with reply: true: \`body\` inside <main>, then keep.js and reply.js, then the helpers and \`script\`. */
 const SMALL = (body: string, script: string) =>
 	`<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main data-asks-reply><h1>Small</h1>${body}</main>
-<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${COMMON}
+${STORAGE_TRACE}<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${COMMON}
 ${script}</script></body></html>`;
 
 /** A page with reply: true. The page's own listeners are the only thing that updates #out, and it starts as "authored", so a restore that skips them shows. */
@@ -43,16 +82,7 @@ const PAGE = (
 <label><input type="checkbox" id="cb"> Tick</label>
 <select id="sel"><option value="x">X</option><option value="y">Y</option></select>
 <button type="button" id="pick-y">Y by script</button> <output id="out">authored</output></main>
-<script>
-for (const method of ["setItem", "removeItem", "clear"]) {
-	const original = Storage.prototype[method];
-	Storage.prototype[method] = function (...args) {
-		console.warn("storage-trace " + JSON.stringify({method, store:this === localStorage ? "local" : "session", key:String(args[0] ?? "").startsWith("explainer:") ? "keep" : args[0], length:String(args[1] ?? "").length, ms:Math.round(performance.now()), load:sessionStorage.loads}));
-		return original.apply(this, args);
-	};
-}
-addEventListener("storage", e => console.warn("storage-event " + JSON.stringify({key:e.key, before:e.oldValue?.length, after:e.newValue?.length, ms:Math.round(performance.now())})));
-</script><script src="kit:keep.js"></script><script src="kit:reply.js"></script>
+${STORAGE_TRACE}<script src="kit:keep.js"></script><script src="kit:reply.js"></script>
 <script>
 ${COMMON}
 $("pick-y").addEventListener("click", () => { $("sel").value = "y"; });
@@ -361,23 +391,28 @@ test("an answer equal to the default is still an answer after a reload", async (
 	expect(changedBack.code).toBe(0);
 }, 90_000);
 
-test("two forms with the same radio names are kept apart", async () => {
-	const form = (id: string, b: string) =>
-		`<form id="${id}"><input type="radio" name="s" value="a" checked> <input type="radio" name="s" value="b"${b}></form>`;
-	const script = onLoad(
-		2,
-		"each form has its own choice",
-		`document.querySelector("#f1 :checked")?.value === "b" && document.querySelector("#f2 :checked")?.value === "a"`,
-	);
-	const input = dir.write("forms.html", SMALL(form("f1", ' id="b1"') + form("f2", ""), script));
-	const output = dir.path("forms.out.html");
+test.each([1, 2, 3, 4, 5])(
+	"two forms with the same radio names are kept apart (diagnostic %p)",
+	async () => {
+		const form = (id: string, b: string) =>
+			`<form id="${id}"><input type="radio" name="s" value="a" checked> <input type="radio" name="s" value="b"${b}></form>`;
+		const script = onLoad(
+			2,
+			"each form has its own choice",
+			`document.querySelector("#f1 :checked")?.value === "b" && document.querySelector("#f2 :checked")?.value === "a"`,
+		);
+		const input = dir.write("forms.html", SMALL(form("f1", ' id="b1"') + form("f2", ""), script));
+		const output = dir.path("forms.out.html");
 
-	await packHtml(input, output);
-	const checked = await run(output, ["click:#b1", "reload"]);
+		await packHtml(input, output);
+		const checked = await run(output, ["click:#b1", "reload"]);
+		console.log(checked.stdout, checked.stderr);
 
-	expect(checked.stdout).not.toContain("keep contract");
-	expect(checked.code).toBe(0);
-}, 60_000);
+		expect(checked.stdout).not.toContain("keep contract");
+		expect(checked.code).toBe(0);
+	},
+	60_000,
+);
 
 test("Clear on a radio group that starts with no choice tells the page nothing is chosen", async () => {
 	const body = `<fieldset data-reply><legend>Which?</legend><label><input type="radio" name="w" value="p"> P</label> <label><input type="radio" name="w" value="q" id="q"> Q</label></fieldset><output id="out">none</output>`;
