@@ -51,6 +51,7 @@ interface ConsoleArg {
 interface CdpEvents {
 	"Runtime.exceptionThrown": { exceptionDetails: ExceptionDetails };
 	"Runtime.consoleAPICalled": { type: string; args: ConsoleArg[] };
+	"Runtime.bindingCalled": { name: string; payload: string };
 	"Log.entryAdded": { entry: { level: string; source: string; text: string; url?: string } };
 	"Network.requestWillBeSent": { request: { url: string } };
 	"Network.loadingFailed": { errorText: string; canceled?: boolean };
@@ -425,9 +426,10 @@ export class Cdp {
 			await stopped.catch(() => undefined);
 		}
 	}
-	/** Calls `fn` on every later `event` of the page (of the browser before attachPage), for as long as the client lives. */
-	on<E extends keyof CdpEvents>(event: E, fn: (params: CdpEvents[E]) => void) {
+	/** Subscribes to the client's events (the browser's before attachment); returns a remover for shorter-lived observers. */
+	on<E extends keyof CdpEvents>(event: E, fn: (params: CdpEvents[E]) => void): () => void {
 		this.listeners.set(event, [...(this.listeners.get(event) ?? []), fn]);
+		return () => this.off(event, fn);
 	}
 	/** Resolves on the next `event`; `what` names it in the error when it does not come within `deadline` ms. */
 	private once(event: keyof CdpEvents, what: string, deadline: number): Promise<void> {

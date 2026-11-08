@@ -224,7 +224,7 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 			run.page.problems.push(`--do ${result.problem}`);
 		}
 		if (result.note) {
-			run.stepNotes.add(result.note);
+			run.stepNotes.add(`${result.note} [${screen.theme} ${screen.name}]`);
 		}
 		elements.push(...(result.pngs ?? []).map((png) => ({ step, png })));
 	}

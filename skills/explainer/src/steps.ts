@@ -1,6 +1,8 @@
 import { writeFileSync } from "node:fs";
 import type { Cdp } from "./cdp.ts";
 import { ELEMENT_NAME_JS, REGION_VISIBLE_JS, SETTLE_JS } from "./page-js.ts";
+import { DRAG_FORM, dragStep, parseDrag } from "./step-drag.ts";
+import { beginHit } from "./step-hit.ts";
 
 /** Key name to [virtual key code, DOM code] for Input.dispatchKeyEvent; a single character types itself. */
 const KEYS: Record<string, [number, string]> = {
@@ -17,7 +19,7 @@ const KEYS: Record<string, [number, string]> = {
 	Backspace: [8, "Backspace"],
 };
 /** The `--do` step kinds, each written `<kind>:<arg>`; `reload` is the one step without an argument. */
-const KINDS = ["click", "key", "hover", "focus", "type", "set", "shot"] as const;
+const KINDS = ["click", "drag", "key", "hover", "focus", "type", "set", "shot"] as const;
 type StepKind = (typeof KINDS)[number];
 /** Dot-all, so the text of a type: step may span lines. */
 const STEP = new RegExp(`^(${KINDS.join("|")}):(.+)$`, "s");
@@ -77,9 +79,12 @@ export function stepError(step: string): string {
 	}
 	const parsed = parseStep(step);
 	if (!parsed) {
-		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, hover:<css | x,y>, focus:<css>, key:<Key>, ${VALUE_FORMS.type}, ${VALUE_FORMS.set}, shot:<css>[@all|@index] or reload`;
+		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, ${DRAG_FORM}, hover:<css | x,y>, focus:<css>, key:<Key>, ${VALUE_FORMS.type}, ${VALUE_FORMS.set}, shot:<css>[@all|@index] or reload`;
 	}
 	const { kind, arg, value } = parsed;
+	if (kind === "drag" && !parseDrag(arg)) {
+		return `step "${step}" needs two unsigned-integer viewport points: ${DRAG_FORM}, e.g. drag:100,200-180,200`;
+	}
 	if ((kind === "type" || kind === "set") && (value === undefined || !arg)) {
 		return `step "${step}" needs a selector and a value: ${VALUE_FORMS[kind]}, e.g. ${kind}:#year=2030`;
 	}
@@ -110,7 +115,7 @@ interface Point {
 	y: number;
 }
 
-/** Page coordinates of a hover/click target: literal `x,y`, or the centre of the `index`-th matching element scrolled into view (null if none). */
+/** Viewport coordinates of a hover/click target: literal `x,y`, or the centre of the `index`-th matching element scrolled into view (null if none). */
 async function pointOf(cdp: Cdp, arg: string, index: number): Promise<Point | null> {
 	const xy = POINT.exec(arg);
 	if (xy) {
@@ -135,7 +140,7 @@ const valueOnNth = <T>(cdp: Cdp, selector: string, index: number, body: string) 
 	);
 
 /**
- * What a step reported: a `problem` fails the check, a `note` just says what happened (how many elements an `@all` click hit,
+ * What a step reported: a `problem` fails the check, a `note` says what happened (click/drag hits and chart events, `@all` counts,
  * matches a shot: could not capture), `pngs` are the files a shot: step wrote.
  */
 export interface StepResult {
@@ -444,13 +449,26 @@ export const settlePage = (cdp: Cdp) => cdp.evaluate<string>(SETTLE_JS, true);
  */
 export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
 	let result: StepResult = {};
-	if (step === RELOAD) {
-		await cdp.load();
-	} else {
-		result = await act(cdp, step, shotPath);
+	const finish = /^(click|drag):/.test(step) ? await beginHit(cdp) : undefined;
+	try {
+		if (step === RELOAD) {
+			await cdp.load();
+		} else {
+			result = await act(cdp, step, shotPath);
+		}
+		const missing = await settlePage(cdp);
+		if (missing && !result.problem) {
+			result.problem = `${step}: ${missing}`;
+		}
+	} finally {
+		if (finish) {
+			const hit = await finish();
+			if (!result.problem) {
+				result.note = `${result.note ?? step}: ${hit}`;
+			}
+		}
 	}
-	const missing = await settlePage(cdp);
-	return missing && !result.problem ? { ...result, problem: `${step}: ${missing}` } : result;
+	return result;
 }
 
 /** Runs one step other than reload, without waiting for the page afterwards. */
@@ -458,6 +476,14 @@ async function act(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResu
 	const parsed = parseStep(step);
 	if (!parsed) {
 		return { problem: stepError(step) };
+	}
+	if (parsed.kind === "drag") {
+		const gesture = parseDrag(parsed.arg);
+		if (!gesture) {
+			return { problem: stepError(step) };
+		}
+		await dragStep(cdp, gesture);
+		return {};
 	}
 	if (parsed.kind === "key") {
 		return keyStep(cdp, parsed.arg);
