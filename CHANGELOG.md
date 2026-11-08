@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fresh `check` loads clear storage through the page, not an origin-wide DevTools deletion that also invalidates session storage. Explicit reloads keep their state, and control probes leave the screenshot tab's session storage intact (#145).
+
 - The guide now fits a short first route to the reader's knowledge and time, puts their next action and its size beneath the answer, and uses worked examples before novice practice. It calls for a screen per question with folded reference, readable source images and candidate links, guided controls and comparable states, and decisions beside their evidence with realistic choices, marked recommendations and consistent counts (#115).
 
 - Click/drag hit notes now survive a later settle timeout alongside its problem in text and JSON; actions that never execute still report only their problem (#19, #132 review).
@@ -14,7 +16,7 @@
 
 - A canceled control sweep now closes its known temporary tab while attachment is still pending, preserving the cleanup reserve even if attachment never replies (#14, #131 review).
 
-- Fresh `check` control loads now clear tab session storage before author scripts run, as well as Keep storage after unload; an explicit `--do reload` still keeps saved state (#14, #131 review).
+- Fresh `check` control loads now clear local and tab session storage before author scripts run, after the previous page unloads; an explicit `--do reload` still keeps saved state (#14, #131 review).
 
 - Default `check` samples visible kit controls once on the light-desktop overview, each from a fresh Keep-cleared load. Findings name the control; one warning reports incomplete coverage under the 12-control cap or shared 8 s budget (cleanup included). These loads add neither scroll sweeps nor PNGs. `--quick` and explicit `--do` skip the sample; use `--do` for other controls or a failing state (#14).
 

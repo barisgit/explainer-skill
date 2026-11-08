@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { ChromeError } from "../skills/explainer/src/cdp.ts";
 import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
-import { withPage } from "../skills/explainer/src/chrome.ts";
+import { openBrowser, withPage } from "../skills/explainer/src/chrome.ts";
 import { CONTROL_LIMIT, CONTROLS_JS } from "../skills/explainer/src/control-sweep.ts";
 import { DISCOVER_JS } from "../skills/explainer/src/page-probes.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
@@ -142,34 +142,49 @@ import { FreshChoices } from "./fresh.tsx";
 	);
 }, 30_000);
 
-test("fresh loads clear session storage before author scripts, while explicit reload preserves it", async () => {
-	// A normal origin avoids depending on Chrome's file:// storage-clearing quirks.
-	const server = Bun.serve({
-		hostname: "127.0.0.1",
-		port: 0,
-		fetch: () =>
-			new Response(
-				`<!doctype html><body>
-		<script>document.body.dataset.initial = sessionStorage.getItem('sample') ?? 'empty';</script>
-		<button id="sample" onclick="sessionStorage.setItem('sample', 'dirty')">Sample</button>`,
-				{ headers: { "content-type": "text/html" } },
-			),
+test("fresh file loads clear both stores before author scripts, while explicit reload preserves them", async () => {
+	const file = dir.write(
+		"fresh-storage.html",
+		`<!doctype html><body><script>
+		document.body.dataset.initial = [localStorage, sessionStorage].map(store => store.getItem('sample') ?? 'empty').join('|');
+		const save = () => { for (const store of [localStorage, sessionStorage]) store.setItem('sample', 'dirty'); };
+		addEventListener('pagehide', save);
+		</script><button id="sample" onclick="save()">Sample</button>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		const initial = () => cdp.evaluate("document.body.dataset.initial");
+		expect(await initial()).toBe("empty|empty");
+		await runStep(cdp, "click:#sample", () => "unused");
+		await runStep(cdp, "reload", () => "unused");
+		expect(await initial()).toBe("dirty|dirty");
+		await page.open();
+		expect(await initial()).toBe("empty|empty");
 	});
+}, 30_000);
+
+test("fresh file loads leave another tab's session state intact", async () => {
+	const file = dir.write("tab-session.html", "<!doctype html><h1>Session</h1>");
+	const url = `file://${file}`;
+	const browser = await openBrowser();
 	try {
-		await withPage(async (cdp) => {
-			const page = new CheckedPage(cdp, server.url.href);
-			await page.start();
-			await page.open();
-			const initial = () => cdp.evaluate("document.body.dataset.initial");
-			expect(await initial()).toBe("empty");
-			await runStep(cdp, "click:#sample", () => "unused");
-			await runStep(cdp, "reload", () => "unused");
-			expect(await initial()).toBe("dirty");
-			await page.open();
-			expect(await initial()).toBe("empty");
+		await browser.page(async (primary) => {
+			await primary.send("Page.enable");
+			await primary.load(url);
+			await primary.evaluate("sessionStorage.setItem('reader', 'kept')");
+			await browser.page(async (probe) => {
+				const page = new CheckedPage(probe, url);
+				await page.start();
+				await page.open();
+			});
+			expect(await primary.evaluate("sessionStorage.getItem('reader')")).toBe("kept");
+			await primary.load();
+			expect(await primary.evaluate("sessionStorage.getItem('reader')")).toBe("kept");
 		});
 	} finally {
-		await server.stop(true);
+		await browser.close();
 	}
 }, 30_000);
 

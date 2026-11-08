@@ -68,18 +68,15 @@ export class CheckedPage {
 		});
 	}
 
-	/** Unloads before clearing saved state; clears tab storage before author scripts on this load only, not explicit reloads. */
+	/** Unloads before clearing this page's storage in its next document, before author scripts, never on explicit reloads. */
 	async open(hash = ""): Promise<void> {
 		this.problems = [];
 		this.warnings = [];
 		await this.cdp.load("about:blank");
-		await this.cdp.send("Storage.clearDataForOrigin", {
-			origin: "file://",
-			storageTypes: "local_storage",
-		});
+		// The origin-wide DevTools clear also deletes every tab's session namespaces, invalidating their live caches.
 		const { identifier } = await this.cdp.send<{ identifier: string }>(
 			"Page.addScriptToEvaluateOnNewDocument",
-			{ source: "sessionStorage.clear();" },
+			{ source: "localStorage.clear(); sessionStorage.clear();" },
 		);
 		try {
 			await this.cdp.load(this.url + hash);
