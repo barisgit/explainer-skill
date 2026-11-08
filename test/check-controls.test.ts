@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
-import { ChromeError } from "../skills/explainer/src/cdp.ts";
+import { type Cdp, ChromeError } from "../skills/explainer/src/cdp.ts";
 import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
 import { openBrowser, withPage } from "../skills/explainer/src/chrome.ts";
 import { CONTROL_LIMIT, CONTROLS_JS } from "../skills/explainer/src/control-sweep.ts";
-import { TIMERS_JS } from "../skills/explainer/src/page-js.ts";
 import { DISCOVER_JS } from "../skills/explainer/src/page-probes.ts";
+import { settlePage } from "../skills/explainer/src/steps.ts";
 import { packedMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -142,18 +142,44 @@ import { FreshChoices } from "./fresh.tsx";
 	);
 }, 30_000);
 
+/** Replays the historical fresh-load path, varying only a9caa8e's session-storage preload. */
+async function historicalFresh(cdp: Cdp, url: string, preload: boolean): Promise<void> {
+	await cdp.load("about:blank");
+	await cdp.send("Storage.clearDataForOrigin", {
+		origin: "file://",
+		storageTypes: "local_storage",
+	});
+	const script = preload
+		? await cdp.send<{ identifier: string }>("Page.addScriptToEvaluateOnNewDocument", {
+				source: "sessionStorage.clear();",
+			})
+		: undefined;
+	try {
+		await cdp.load(url);
+	} finally {
+		if (script) {
+			await cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: script.identifier });
+		}
+	}
+	const missing = await settlePage(cdp);
+	if (missing) {
+		throw new ChromeError(missing);
+	}
+}
+
 test.each(
-	Array.from({ length: 50 }, (_, iteration) =>
-		["native", "clock"].map((mode) => ({ mode, iteration })),
+	Array.from({ length: 30 }, (_, iteration) =>
+		["before", "preload", "loaded"].map((mode) => ({ mode, iteration })),
 	).flat(),
 )(
-	"native file reload preserves both stores ($mode $iteration)",
+	"storage reload comparison ($mode $iteration)",
 	async ({ mode, iteration }) => {
+		const stored =
+			"[localStorage, sessionStorage].flatMap(store => keys.map(key => store.getItem(key) ?? 'empty')).join('|')";
 		const file = dir.write(
 			`fresh-storage-${mode}-${iteration}.html`,
 			`<!doctype html><body><script>
 		const keys = ['sample', 'length'];
-		document.body.dataset.initial = [localStorage, sessionStorage].flatMap(store => keys.map(key => store.getItem(key) ?? 'empty')).join('|');
 		const save = () => { for (const store of [localStorage, sessionStorage]) for (const key of keys) store.setItem(key, 'dirty'); };
 		addEventListener('pagehide', save);
 		</script><button id="sample" onclick="save()">Sample</button>`,
@@ -163,17 +189,16 @@ test.each(
 			const contexts: string[] = [];
 			cdp.on("Page.frameNavigated", ({ frame }) => navigations.push(JSON.stringify(frame)));
 			const page = new CheckedPage(cdp, `file://${file}`);
-			await Promise.all(
-				["Page", "Runtime", "Log", "Network"].map((domain) => cdp.send(`${domain}.enable`)),
-			);
-			if (mode === "clock") {
-				await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: TIMERS_JS });
-			}
+			await page.start();
+			const open = () =>
+				mode === "loaded"
+					? page.open()
+					: historicalFresh(cdp, `file://${file}`, mode === "preload");
 			try {
-				await cdp.load(`file://${file}`);
+				await open();
 				const state = () =>
 					cdp.evaluate<{ initial: string; origin: number }>(
-						"({initial:document.body.dataset.initial, origin:performance.timeOrigin})",
+						`({initial:${stored}, origin:performance.timeOrigin})`,
 					);
 				const before = await state();
 				expect(before.initial).toBe("empty|empty|empty|empty");
@@ -183,9 +208,21 @@ test.each(
 				contexts.push(JSON.stringify({ before, after }));
 				expect(after.origin).not.toBe(before.origin);
 				expect(after.initial).toBe("dirty|dirty|dirty|dirty");
+				if (mode === "loaded") {
+					await open();
+					expect((await state()).initial).toBe("empty|empty|empty|empty");
+				}
+				expect(page.problems).toEqual([]);
 			} finally {
 				console.log(
-					JSON.stringify({ mode, iteration, contexts, navigations, problems: page.problems }),
+					JSON.stringify({
+						mode,
+						iteration,
+						contexts,
+						navigations,
+						problems: page.problems,
+						browser: await cdp.send("Browser.getVersion"),
+					}),
 				);
 			}
 		});

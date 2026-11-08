@@ -23,6 +23,8 @@ jobs:
         run: time timeout 120 google-chrome --headless=new --no-sandbox --disable-gpu --user-data-dir="$(mktemp -d)" --dump-dom about:blank > /dev/null 2>&1
       # The runner's preinstalled Google Chrome (/usr/bin/google-chrome) drives check; pack renders Mermaid without it.
       # Ubuntu 24.04 restricts the user namespaces Chrome's sandbox needs, so this also covers the no-sandbox retry.
-      - name: Test native file storage without any clearing or helper document
-        run: bun test test/check-controls.test.ts -t 'native file reload preserves both stores'
+      - name: Exercise the original Keep and forms journeys
+        run: bun test test/reply.test.ts -t 'what the reader entered survives|two forms with the same radio names'
+      - name: Contrast native inline storage with the returned checked page state
+        run: bun test test/check-controls.test.ts -t 'storage reload comparison'
       - run: bun run ci
