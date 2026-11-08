@@ -146,8 +146,9 @@ test("fresh file loads clear both stores before author scripts, while explicit r
 	const file = dir.write(
 		"fresh-storage.html",
 		`<!doctype html><body><script>
-		document.body.dataset.initial = [localStorage, sessionStorage].map(store => store.getItem('sample') ?? 'empty').join('|');
-		const save = () => { for (const store of [localStorage, sessionStorage]) store.setItem('sample', 'dirty'); };
+		const keys = ['sample', 'length'];
+		document.body.dataset.initial = [localStorage, sessionStorage].flatMap(store => keys.map(key => store.getItem(key) ?? 'empty')).join('|');
+		const save = () => { for (const store of [localStorage, sessionStorage]) for (const key of keys) store.setItem(key, 'dirty'); };
 		addEventListener('pagehide', save);
 		</script><button id="sample" onclick="save()">Sample</button>`,
 	);
@@ -156,12 +157,15 @@ test("fresh file loads clear both stores before author scripts, while explicit r
 		await page.start();
 		await page.open();
 		const initial = () => cdp.evaluate("document.body.dataset.initial");
-		expect(await initial()).toBe("empty|empty");
+		expect(await initial()).toBe("empty|empty|empty|empty");
+		expect(page.problems).toEqual([]);
 		await runStep(cdp, "click:#sample", () => "unused");
 		await runStep(cdp, "reload", () => "unused");
-		expect(await initial()).toBe("dirty|dirty");
+		expect(await initial()).toBe("dirty|dirty|dirty|dirty");
+		expect(page.problems).toEqual([]);
 		await page.open();
-		expect(await initial()).toBe("empty|empty");
+		expect(await initial()).toBe("empty|empty|empty|empty");
+		expect(page.problems).toEqual([]);
 	});
 }, 30_000);
 

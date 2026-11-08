@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fresh `check` loads clear storage through the page, not an origin-wide DevTools deletion that also invalidates session storage. Explicit reloads keep their state, and control probes leave the screenshot tab's session storage intact (#145).
+- Fresh `check` loads clear storage from an already-loaded, script-free file document, avoiding storage binding races before author scripts run. Explicit reloads keep their state, and control probes leave the screenshot tab's session storage intact (#145).
 
 - The guide now fits a short first route to the reader's knowledge and time, puts their next action and its size beneath the answer, and uses worked examples before novice practice. It calls for a screen per question with folded reference, readable source images and candidate links, guided controls and comparable states, and decisions beside their evidence with realistic choices, marked recommendations and consistent counts (#115).
 

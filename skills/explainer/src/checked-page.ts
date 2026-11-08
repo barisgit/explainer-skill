@@ -10,7 +10,7 @@ export interface Screen {
 	vp: { width: number; height: number };
 }
 
-/** A live checked page: error collection, fresh Keep-cleared loads, emulation and layout analysis without screenshots. */
+/** A live checked file page: error collection, fresh Keep-cleared loads, emulation and layout analysis without screenshots. */
 export class CheckedPage {
 	readonly cdp: Cdp;
 	readonly url: string;
@@ -68,21 +68,15 @@ export class CheckedPage {
 		});
 	}
 
-	/** Unloads before clearing this page's storage in its next document, before author scripts, never on explicit reloads. */
+	/** Clears storage from a loaded, script-free file document after author unload, never on explicit reloads. */
 	async open(hash = ""): Promise<void> {
 		this.problems = [];
 		this.warnings = [];
-		await this.cdp.load("about:blank");
-		// The origin-wide DevTools clear also deletes every tab's session namespaces, invalidating their live caches.
-		const { identifier } = await this.cdp.send<{ identifier: string }>(
-			"Page.addScriptToEvaluateOnNewDocument",
-			{ source: "localStorage.clear(); sessionStorage.clear();" },
-		);
-		try {
-			await this.cdp.load(this.url + hash);
-		} finally {
-			await this.cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
-		}
+		// The shipped plaintext license supplies a script-free document for Chrome's shared file:// origin.
+		// First accessing Storage in a new-document preload can race Chrome's commit-time storage binding.
+		await this.cdp.load(new URL("../kit/licenses/preact.txt", import.meta.url).href);
+		await this.cdp.evaluate("localStorage.clear(); sessionStorage.clear();");
+		await this.cdp.load(this.url + hash);
 		const missing = await settlePage(this.cdp);
 		if (missing) {
 			this.problems.push(`${hash ? `${hash}: ` : ""}${missing}`);
