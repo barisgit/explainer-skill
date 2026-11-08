@@ -30,6 +30,12 @@ const GEIST_WIDTHS: Record<number, readonly number[]> = {
 		297, 892, 601, 603, 621, 621, 409, 553, 427, 597, 584, 839, 628, 570, 567, 401, 284, 401, 523,
 	],
 };
+/** Advance widths of the spaces and euro sign written by number formats, in thousandths of an em. */
+const GEIST_FORMAT_WIDTHS: Record<number, Readonly<Record<string, number>>> = {
+	"400": { " ": 250, " ": 125, "€": 727 },
+	"500": { " ": 243, " ": 121, "€": 740 },
+	"600": { " ": 236, " ": 118, "€": 752 },
+};
 // geist-widths:end
 
 /** Geist's average lowercase advance in em: the width of a character the table does not hold. */
@@ -48,14 +54,16 @@ const LATIN_BASES: Record<string, string> = {
 };
 
 /**
- * A character's Geist advance in em, or undefined outside printable ASCII and the Latin letters built on it. Weights 400, 500
- * and 600 are measured; others use the nearest below.
+ * A character's Geist advance in em, or undefined outside printable ASCII, its Latin derivatives and measured format glyphs.
+ * Weights 400, 500 and 600 are measured; others use the nearest below.
  */
 export function geistAdvance(char: string, weight: number): number | undefined {
-	const widths = GEIST_WIDTHS[weight >= 600 ? 600 : weight >= 500 ? 500 : 400];
+	const measuredWeight = weight >= 600 ? 600 : weight >= 500 ? 500 : 400;
+	const widths = GEIST_WIDTHS[measuredWeight];
 	const base = LATIN_BASES[char] ?? char.normalize("NFD")[0] ?? char;
 	const code = base.codePointAt(0) ?? 0;
-	const width = code >= 32 && code <= 126 ? widths?.[code - 32] : undefined;
+	const width =
+		code >= 32 && code <= 126 ? widths?.[code - 32] : GEIST_FORMAT_WIDTHS[measuredWeight]?.[base];
 	return width === undefined ? undefined : width / 1000;
 }
 

@@ -414,3 +414,51 @@ const TOOLTIP = `[...document.querySelectorAll("#bars div")].some((d) => getComp
 
 /** Page expression: the first legend button's state and the lines the plot draws after it was pressed. */
 const PLOT_LEGEND = `({ pressed: document.querySelector("#lines .plot-legend button").getAttribute("aria-pressed"), lines: document.querySelectorAll("#lines svg path.line").length })`;
+
+test("SSR legend rows and plot bounds match the live chart's text metrics", async () => {
+	const path = await packedMdx(
+		dir,
+		"legend-metrics",
+		`import { Chart } from "kit";
+
+# Legend metrics
+
+<Chart id="metrics" height="520px" label="Metrics" option={{ legend: { textStyle: { fontSize: 36 } }, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: ["First", "Second", "Third", "Fourth"].map(name => ({ name, type: "bar", data: [1, 2] })) }} />
+<Chart id="explicit-metrics" height="520px" label="Explicit line height" option={{ legend: { textStyle: { fontSize: 36, lineHeight: 52 } }, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: ["First", "Second", "Third", "Fourth"].map(name => ({ name, type: "bar", data: [1, 2] })) }} />
+`,
+	);
+	const drawn = await withTestPage(async (cdp) => {
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		await cdp.load(`file://${path}`);
+		return cdp.evaluate<{ advance: number; bottom: number }[]>(
+			`document.fonts.ready.then(() => ["metrics", "explicit-metrics"].map(id => {
+			const svg = document.querySelector('#' + id + ' svg[data-fit="phone"]');
+			svg.style.cssText = "display:block;width:356px;height:auto";
+			const texts = [...svg.querySelectorAll("text")];
+			const y = name => texts.find(t => t.textContent === name).getBoundingClientRect().top;
+			return { advance: y("Third") - y("First"), bottom: svg.querySelector('path[style*="fill:var(--c1)"]').getBoundingClientRect().bottom - svg.getBoundingClientRect().top };
+		}))`,
+			true,
+		);
+	});
+	const live = await inPage(
+		path,
+		(cdp) =>
+			cdp.evaluate<
+				{ advance: number; bottom: number }[]
+			>(`["metrics", "explicit-metrics"].map(id => {
+		const chart = echarts.getInstanceByDom(document.getElementById(id));
+		const model = chart.getModel();
+		const items = chart.getViewOfComponentModel(model.getComponent("legend")).getContentGroup().children();
+		const grid = model.getComponent("grid").coordinateSystem.getRect();
+		return { advance: items[2].y - items[0].y, bottom: grid.y + grid.height };
+	})`),
+		{ width: 390, height: 844, mobile: false },
+	);
+	for (const [i, metric] of live.entries()) {
+		expect(Math.abs((drawn[i]?.advance ?? 0) - metric.advance)).toBeLessThan(1);
+		expect(Math.abs((drawn[i]?.bottom ?? 0) - metric.bottom)).toBeLessThan(1);
+	}
+	expect(live[1]?.advance).toBeCloseTo(60, 2);
+}, 30_000);

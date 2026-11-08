@@ -28,6 +28,7 @@ type Option = Record<string, unknown> & { series?: unknown[] };
 interface ChartsOption {
 	resolveOption<T>(option: T): T;
 	theme(place: { under: string; font: string; animation: boolean }): Option;
+	measureText(base: typeof measureText): typeof measureText;
 }
 type ChartsOptionPart = (env: {
 	color: (expression: string) => string;
@@ -119,7 +120,6 @@ function loadEcharts(): typeof EChartsSsr {
 	if (!echarts) {
 		// require loads the ES module synchronously, as the page's render, which calls this, is synchronous.
 		echarts = require(join(SKILL_ROOT, "vendor/echarts-ssr.js")) as typeof EChartsSsr;
-		echarts.setPlatformAPI({ measureText });
 	}
 	return echarts;
 }
@@ -177,8 +177,16 @@ function quietly<T>(draw: () => T): T {
 }
 
 /** One chart's SVG at a size, as ECharts draws it without animation. */
-function chartSvg(option: Option, theme: Option, width: number, height: number): string {
-	const chart = loadEcharts().init(null, theme, { renderer: "svg", ssr: true, width, height });
+function chartSvg(
+	option: Option,
+	theme: Option,
+	width: number,
+	height: number,
+	charts: ChartsOption,
+): string {
+	const renderer = loadEcharts();
+	renderer.setPlatformAPI({ measureText: charts.measureText(measureText) });
+	const chart = renderer.init(null, theme, { renderer: "svg", ssr: true, width, height });
 	try {
 		quietly(() => chart.setOption(option));
 		return chart.renderToSVGString();
@@ -267,7 +275,11 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const resolved = charts.resolveOption(option);
 		const copies = COPIES.map((copy, i) => {
 			const height = heights[i] as number;
-			return kitSvg(chartSvg(resolved, theme, copy.width, height), svgTag(copy, height), paintOf);
+			return kitSvg(
+				chartSvg(resolved, theme, copy.width, height, charts),
+				svgTag(copy, height),
+				paintOf,
+			);
 		});
 		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 	});

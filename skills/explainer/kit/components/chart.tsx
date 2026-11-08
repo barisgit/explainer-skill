@@ -17,6 +17,10 @@
    Layout: write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; what pack draws follows it.
+   Imperative API: Charts.make(el, option, setup?) returns {chart,set,dispose}; chart is null until width, fonts and ECharts
+     are ready. set(patch, replace?) merges saved/live components by id or position; replace names whole component lists.
+     setup runs on each mount. Scheme remounts reset zoom/legend state; dispose removes chart and observers.
+     Charts.color(token) is a CSS var, not RGB.
    pack rejects other series types in options it sees (including baseOption and media). Options computed only in client code
    are checked by ECharts at runtime; check reports its console errors.
    Bundled components: grid, polar, radar, calendar, axisPointer, tooltip, legend, dataZoom, brush, toolbox, visualMap,

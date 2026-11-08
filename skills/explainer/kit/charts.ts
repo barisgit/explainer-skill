@@ -1,28 +1,4 @@
-/* charts: rich interactive charts (zoom, drill-down, heatmap, sankey, ...) with ECharts, themed from the page's CSS tokens and following light/dark. Load after kit:echarts.js.
-   Charts.make(el, option, setup?)  -> { chart, set(patch), dispose() }
-     el      element with a height (.chart); a hidden or zero-width element mounts when it first gets width and ECharts has
-             unpacked (a packed page carries it compressed). The chart pack drew in it (.chart-drawn) stays until then, and the first
-             draw over it does not animate
-     option  ECharts options for line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot and custom series;
-             colours default to --c1..--c6, text to the page font. kit Chart lists the bundled components.
-             Use these series for other shapes (custom supplies renderItem). pack rejects other types in options it sees;
-             client-only options reach ECharts at runtime, where check reports its console errors.
-     setup   (chart) => void, run after every (re)mount: attach chart.on("click", ...), chart.group, echarts.connect(...)
-     chart   the live instance (null until mounted)
-     set(patch)            merges into the instance and into the option remounts reuse: objects merge, series/axes match by id else position
-     set(patch, ["series"]) ReplaceMerge: the listed components become exactly the patch's list (same id merges, others are removed;
-                           set({ series: [] }, ["series"]) clears them). Use it to remove or swap series; set(patch) alone cannot.
-     dispose()             removes the chart and stops watching el, for code that takes the element away
-   Colours: write "var(--accent)", "color-mix(in srgb, var(--accent) 20%, transparent)" or Charts.color("accent") (the same var string)
-     in any colour option (color, borderColor, fill, colorStops[].color, ...). They are resolved when the chart mounts, so they follow
-     light/dark. Charts.color(token) is not a resolved rgb: do not use it in canvas code or alpha maths.
-   Formats as JSON: a formatter, valueFormatter or labelFormatter may be a format, { digits: 1, unit: "min" }, { percent: true },
-     { currency: "EUR", compact: true }, written for the page's lang, or one text per data item (series labels) or tick: ["Low", "", "Peak"].
-   Layout: write grid: { top, left, right, bottom } as padding. Axis labels stay inside it (the theme sets outerBoundsMode "same" and
-     outerBoundsContain "axisLabel", ECharts 6's form of containLabel), so margins of 8 to 24 px are enough and labels never clip.
-     Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it.
-   The page's colour scheme changing (system setting, or color-scheme / class / style on <html>) remounts the chart: zoom and legend
-   state reset. Reduced motion turns animation off. */
+/* charts: Chart runtime; see kit Chart for the imperative API. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	// pack sends ECharts compressed: echarts is defined once window.echartsReady resolves, and a chart mounts only then.
@@ -56,9 +32,25 @@
 		return `rgba(${r}, ${g}, ${b}, ${+(a / 255).toFixed(3)})`;
 	}
 
-	const { resolveOption, theme: tokenTheme } = window.ChartsOption({
+	const {
+		resolveOption,
+		theme: tokenTheme,
+		measureText,
+	} = window.ChartsOption({
 		color: resolve,
 		lang: () => document.documentElement.lang || "en",
+	});
+
+	// Install before consumers await ECharts: zrender caches its font metrics globally on first use.
+	window.echartsReady = Promise.resolve(window.echartsReady).then(() => {
+		if (pixel) {
+			echarts.setPlatformAPI({
+				measureText: measureText((text, font) => {
+					pixel.font = font ?? "12px sans-serif";
+					return pixel.measureText(text);
+				}),
+			});
+		}
 	});
 
 	/** The ECharts theme for a chart on `el`, whose --under (the tone under it) changes by block: page, panel, band. */

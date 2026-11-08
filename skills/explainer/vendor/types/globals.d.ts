@@ -198,6 +198,10 @@ declare var ChartsOption: (env: {
 }) => {
 	resolveOption<T>(option: T): T;
 	theme(place: { under: string; font: string; animation: boolean }): ChartOption;
+	/** Normalize zrender's line-height probe while delegating actual glyph widths to the renderer. */
+	measureText(
+		base: (text: string, font?: string) => { width: number },
+	): (text: string, font?: string) => { width: number };
 };
 declare var PlotDraw: (env: {
 	/** The language numbers are written in. */

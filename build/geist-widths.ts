@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**
  * Measures the kit's Geist in Chrome and writes the advance-width table into skills/explainer/src/geist.ts, between its
- * geist-widths markers: printable ASCII at the weights text is drawn in, in thousandths of an em, kerning left out. pack
+ * geist-widths markers: printable ASCII and number-format spaces/euro at the weights text is drawn in, in thousandths of an em,
+ * kerning left out. pack
  * measures chart and plot labels with it, and the beautiful-mermaid patch sizes diagram boxes with it. Geist Mono needs no
  * table: its 0.6 em advance is the diagram renderer's own monospace estimate.
  *
@@ -15,6 +16,8 @@ import { withPage } from "../skills/explainer/src/chrome.ts";
 
 /** The weights text is drawn in: diagram edge labels and messages 400, node labels and plot labels 500, group headers 600. */
 const WEIGHTS = [400, 500, 600];
+/** Characters the documented number formats add beyond printable ASCII. */
+const FORMAT_CHARS = ["\u00a0", "\u202f", "€"];
 const root = join(import.meta.dir, "..");
 const fonts = join(root, "skills", "explainer", "kit", "fonts");
 const target = join(root, "skills", "explainer", "src", "geist.ts");
@@ -35,6 +38,7 @@ const MEASURE = `(async () => {
 	const em = (font, c) => { ctx.font = font; return Math.round(ctx.measureText(c).width * 10); };
 	return {
 		sans: Object.fromEntries(weights.map((w) => [w, chars.map((c) => em(w + " 100px Geist", c))])),
+		formats: Object.fromEntries(weights.map(w => [w, Object.fromEntries(${JSON.stringify(FORMAT_CHARS)}.map(c => [c, em(w + " 100px Geist", c)]))])),
 		loaded: [...document.fonts].some((f) => f.status === "loaded"),
 	};
 })()`;
@@ -44,7 +48,11 @@ try {
 		await cdp.send("Runtime.enable");
 		await cdp.send("Page.enable");
 		await cdp.load(pathToFileURL(page).href);
-		return cdp.evaluate<{ sans: Record<string, number[]>; loaded: boolean }>(MEASURE, true);
+		return cdp.evaluate<{
+			sans: Record<string, number[]>;
+			formats: Record<string, Record<string, number>>;
+			loaded: boolean;
+		}>(MEASURE, true);
 	});
 	if (!table.loaded) {
 		throw new Error(`Chrome did not load ${join(fonts, "geist.woff2")}`);
@@ -58,6 +66,8 @@ try {
 const GEIST_WIDTHS: Record<number, readonly number[]> = {
 ${rows.join("\n")}
 }
+/** Advance widths of the spaces and euro sign written by number formats, in thousandths of an em. */
+const GEIST_FORMAT_WIDTHS: Record<number, Readonly<Record<string, number>>> = ${JSON.stringify(table.formats)};
 ${END}`;
 	const source = readFileSync(target, "utf8");
 	const [before, rest] = source.split(START);

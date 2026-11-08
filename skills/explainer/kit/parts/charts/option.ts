@@ -103,6 +103,18 @@ window.ChartsOption = ({ color, lang }) => {
 		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveOption(v, k)]));
 	}
 
+	type TextMeasure = (text: string, font?: string) => { width: number };
+	/**
+	 * zrender uses this square-glyph width as line height. Native fallback fonts vary by platform, so use
+	 * its one-em SSR metric on both sides. Ordinary widths and explicit lineHeight options still belong to the renderer.
+	 */
+	const measureText =
+		(base: TextMeasure): TextMeasure =>
+		(text, font) =>
+			text === "国"
+				? { width: Number(/(\d+(?:\.\d+)?)px/.exec(font ?? "")?.[1] ?? 12) }
+				: base(text, font);
+
 	/** The series types whose labels the theme writes in ink. */
 	const LABELLED = [
 		"line",
@@ -192,5 +204,5 @@ window.ChartsOption = ({ color, lang }) => {
 		};
 	}
 
-	return { resolveOption, theme };
+	return { resolveOption, theme, measureText };
 };
