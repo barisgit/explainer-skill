@@ -2,8 +2,9 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
+import { report } from "../skills/explainer/src/report.ts";
 import { runStep, stepError } from "../skills/explainer/src/steps.ts";
-import { packedMdx, runCli, scratch } from "./support.ts";
+import { packedMdx, packHtml, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -126,6 +127,53 @@ test("a full-document navigation preserves the outgoing hit without leaking it i
 		expect(page.problems).toEqual([]);
 	});
 }, 30_000);
+
+test("an observed click keeps its hit note beside a settle failure in JSON and text", async () => {
+	const file = dir.path("unsettled.html");
+	const packed = await packHtml(
+		dir.write(
+			"unsettled-source.html",
+			`<!doctype html><html><head>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="kit:theme.css">
+		<style>@media(max-width:600px) { #never { display:none; } }</style></head><body>
+		<main><div data-overview><a id="open" href="#detail">Open chart</a></div>
+		<section class="view" data-view="detail"><h1>Undrawn chart</h1><div id="never" class="chart"></div></section></main>
+		<script src="kit:echarts.js"></script><script src="kit:views.js"></script></body></html>`,
+		),
+		file,
+	);
+	expect(packed.error).toBe("");
+	const result = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--view",
+		"none",
+		"--do",
+		"click:#missing",
+		"--do",
+		"click:#open",
+		"--json",
+		"--out",
+		dir.path("unsettled-shots"),
+	]);
+	expect(result.code).toBe(1);
+	expect(result.stderr).toBe("");
+	const checked = JSON.parse(result.stdout) as CheckResult;
+	const problem =
+		"--do click:#open: still waiting after 10 s for charts to be drawn: div#never.chart";
+	expect(checked.shots.find((s) => s.viewport.startsWith("desktop"))?.problems).toContain(problem);
+	expect(
+		checked.stepNotes.some(
+			(n) => n.startsWith("click:#open: hit a#open") && n.endsWith("[light desktop]"),
+		),
+	).toBe(true);
+	expect(checked.stepNotes.some((n) => n.startsWith("click:#missing:"))).toBe(false);
+	const text = report(file, checked.shots, checked.views, checked.stepNotes);
+	expect(text).toContain(problem);
+	expect(text).toMatch(/--do click:#open: hit a#open[^\n]*\[light desktop\]/);
+}, 60_000);
 
 test.each(["drag:#zoom", "drag:1,2", "drag:1,2-3", "drag:1,2-3,4@all"])(
 	"%s fails with a copyable drag form",

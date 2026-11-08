@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Click/drag hit notes now survive a later settle timeout alongside its problem in text and JSON; actions that never execute still report only their problem (#19, #132 review).
+
 - `check --do drag:x,y-x,y` performs a real left-button drag, including ECharts canvas dataZoom sliders. Points are viewport-relative after preceding scrolls; `hover:<css>` scrolls to its target and hovers its centre. Click/drag notes identify event targets, chart containers, observed chart events and hash changes per theme/size, without dumping chart data or adding mark-index targeting (#19).
 
 - The control cap now samples the first of each eligible kind before filling in document order, so an early run of Questions cannot exclude every later stepper, Plot or other kind; the 12-sample cap and shared budget are unchanged (#14, #131 review).

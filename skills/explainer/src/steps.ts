@@ -449,6 +449,7 @@ export const settlePage = (cdp: Cdp) => cdp.evaluate<string>(SETTLE_JS, true);
  */
 export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
 	let result: StepResult = {};
+	let missing = "";
 	const finish = /^(click|drag):/.test(step) ? await beginHit(cdp) : undefined;
 	try {
 		if (step === RELOAD) {
@@ -456,10 +457,7 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 		} else {
 			result = await act(cdp, step, shotPath);
 		}
-		const missing = await settlePage(cdp);
-		if (missing && !result.problem) {
-			result.problem = `${step}: ${missing}`;
-		}
+		missing = await settlePage(cdp);
 	} finally {
 		if (finish) {
 			const hit = await finish();
@@ -468,7 +466,8 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 			}
 		}
 	}
-	return result;
+	// An action problem suppresses feedback; a later settling problem must retain the executed action's observations.
+	return missing && !result.problem ? { ...result, problem: `${step}: ${missing}` } : result;
 }
 
 /** Runs one step other than reload, without waiting for the page afterwards. */
