@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The control cap now samples the first of each eligible kind before filling in document order, so an early run of Questions cannot exclude every later stepper, Plot or other kind; the 12-sample cap and shared budget are unchanged (#14, #131 review).
+
 - The control sweep now recognizes stateful view links such as `#team?crew?view=table`; it shares route matching with view discovery, including escaped parameters and exact static-view claims (#14, #131 review).
 
 - A canceled control sweep now closes its known temporary tab while attachment is still pending, preserving the cleanup reserve even if attachment never replies (#14, #131 review).

@@ -198,6 +198,30 @@ test("control selection claims stateful and escaped view routes like discovery",
 	});
 }, 30_000);
 
+test("the cap spreads samples across control kinds before filling in document order", async () => {
+	const questions = Array.from(
+		{ length: 13 },
+		(_, i) =>
+			`<fieldset class="self-check"><div class="seg"><input id="q${i}" type="radio"></div></fieldset>`,
+	).join("");
+	const file = dir.write(
+		"spread.html",
+		`<!doctype html>${questions}<div data-stepper><button id="next" data-go="1">Next</button></div>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		const selected = await cdp.evaluate<{ name: string }[]>(CONTROLS_JS);
+		expect(selected).toHaveLength(14);
+		expect(selected.slice(0, CONTROL_LIMIT).map((c) => c.name)).toEqual([
+			"#q0",
+			"#next",
+			...Array.from({ length: 10 }, (_, i) => `#q${i + 1}`),
+		]);
+	});
+}, 30_000);
+
 const MANY_CHOICES = `"use client";
 import { Question } from "kit";
 export function ManyChoices({count, hang}) {

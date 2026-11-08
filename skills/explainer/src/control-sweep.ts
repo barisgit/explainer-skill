@@ -13,16 +13,16 @@ interface Control {
 	name: string;
 }
 
-/** Visible, enabled initial-state samples, deduplicated by element and returned in document order. */
+/** Visible initial-state samples: stable first-per-kind, then remaining candidates in document order, so the cap is not prefix-only. */
 export const CONTROLS_JS = `(() => {
 	const paints = ${PAINTS_JS};
 	const eligible = el => paints(el) && !el.matches(':disabled, [aria-disabled="true"]') && !el.closest('[inert]');
 	const seen = new Set();
 	const picked = [];
-	const add = (el, query) => {
+	const add = (el, query, kind) => {
 		if (!el || seen.has(el) || !eligible(el)) return;
 		seen.add(el);
-		picked.push({el, query});
+		picked.push({el, query, kind});
 	};
 	// One meaningful click per role/instance, not every radio, series or tree row. Prefer Next when it can advance.
 	const rules = [
@@ -37,12 +37,12 @@ export const CONTROLS_JS = `(() => {
 		['.fig > .controls .field > .seg[role="radiogroup"]', ['input[type="radio"]:not(:checked)']],
 		['.fig > .controls label.toggle', ['input[type="checkbox"]']],
 	];
-	for (const [rootQuery, selectors] of rules) {
+	for (const [kind, [rootQuery, selectors]] of rules.entries()) {
 		for (const root of document.querySelectorAll(rootQuery)) {
 			for (const selector of selectors) {
 				const el = [...root.querySelectorAll(selector)].find(el => eligible(el) && !seen.has(el));
 				if (!el) continue;
-				add(el, ':is(' + rootQuery + ') ' + selector);
+				add(el, ':is(' + rootQuery + ') ' + selector, kind);
 				break;
 			}
 		}
@@ -55,10 +55,16 @@ export const CONTROLS_JS = `(() => {
 		const {name} = route(href.slice(1));
 		if (!name || linked.has(name) || !eligible(el)) continue;
 		linked.add(name);
-		add(el, 'a[href="' + CSS.escape(href) + '"]');
+		add(el, 'a[href="' + CSS.escape(href) + '"]', rules.length);
 	}
 	picked.sort((a, b) => a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
-	return picked.map(({el, query}) => {
+	const kinds = new Set();
+	const first = [], rest = [];
+	for (const candidate of picked) {
+		(kinds.has(candidate.kind) ? rest : first).push(candidate);
+		kinds.add(candidate.kind);
+	}
+	return [...first, ...rest].map(({el, query}) => {
 		const id = el.id && '#' + CSS.escape(el.id);
 		const unique = id && document.querySelectorAll(id).length === 1;
 		const selector = unique ? id : query;
