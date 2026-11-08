@@ -94,27 +94,41 @@ const run = (file: string, steps: string[]) =>
 		...steps.flatMap((step) => ["--do", step]),
 	]);
 
-test("what the reader entered survives a reload, reaches the page's listeners, and one button clears it", async () => {
-	const script = `
-${onLoad(1, "nothing is saved before the reader enters anything", "saved() === 0 && clearButton().hidden")}
-${onLoad(2, "the entered values are back and the page's own listener drew them", `$("out").textContent === "${ENTERED}" && state() === "${ENTERED}"`)}
-${onLoad(2, "the Clear button and the note are back", `clearButton() && !clearButton().hidden && clearButton().textContent === "Clear answers and notes" && replyButton().textContent === "Reply (1)" && saved() === 1`)}
-${onLoad(3, "after Clear and a reload the defaults stay and nothing is stored", `state() === "${DEFAULTS}" && saved() === 0 && clearButton().hidden`)}
+test.each([1, 2, 3, 4, 5])(
+	"what the reader entered survives a reload, reaches the page's listeners, and one button clears it (diagnostic %p)",
+	async () => {
+		const script = `
+const timers = window[Symbol.for("explainer.check.timers")];
+const trace = phase => console.warn("keep-trace " + JSON.stringify({phase, ms:Math.round(performance.now()), load:sessionStorage.loads, ready:document.readyState, tracker:!!timers, native:String(setTimeout).includes("[native code]"), state:state(), saved:saved(), clear:clearButton()?.hidden}));
+trace("script");
+if (timers) {
+	const ran = timers.ran;
+	timers.ran = () => { trace("settle:start"); return ran().then(n => { trace("settle:timers=" + n); return n; }); };
+}
+addEventListener("load", () => trace("load"));
+document.addEventListener("click", e => trace("click:" + (e.target.id || e.target.className)), true);
+${onLoad(1, "nothing is saved before the reader enters anything", '(trace("assert:initial"), saved() === 0 && clearButton().hidden)')}
+${onLoad(2, "the entered values are back and the page's own listener drew them", `(trace("assert:restored"), $("out").textContent === "${ENTERED}" && state() === "${ENTERED}")`)}
+${onLoad(2, "the Clear button and the note are back", '(trace("assert:note"), clearButton() && !clearButton().hidden && clearButton().textContent === "Clear answers and notes" && replyButton().textContent === "Reply (1)" && saved() === 1)')}
+${onLoad(3, "after Clear and a reload the defaults stay and nothing is stored", `(trace("assert:cleared"), state() === "${DEFAULTS}" && saved() === 0 && clearButton().hidden)`)}
 document.addEventListener("click", (e) => {
 	if (e.target === clearButton() && !armed()) {
 		setTimeout(() => { if (!(state() === "${DEFAULTS}" && $("out").textContent === "${DEFAULTS}" && saved() === 0 && clearButton().hidden && replyButton().hidden)) throw new Error("keep contract: Clear resets the controls, the display, the notes and the storage"); }, 150);
 	}
 });`;
-	const input = dir.write("keep.html", PAGE(script));
-	const output = dir.path("keep.out.html");
+		const input = dir.write("keep.html", PAGE(script));
+		const output = dir.path("keep.out.html");
 
-	const packed = await packHtml(input, output);
-	const checked = await run(output, [...ENTER, "reload", ...CLEAR, "reload"]);
+		const packed = await packHtml(input, output);
+		const checked = await run(output, [...ENTER, "reload", ...CLEAR, "reload"]);
+		console.log(checked.stdout, checked.stderr);
 
-	expect(packed.error).toBe("");
-	expect(checked.stdout).not.toContain("keep contract");
-	expect(checked.code).toBe(0);
-}, 60_000);
+		expect(packed.error).toBe("");
+		expect(checked.stdout).not.toContain("keep contract");
+		expect(checked.code).toBe(0);
+	},
+	60_000,
+);
 
 /** A page with one answered radio group; `script` gets `answer()`, the chosen value, and `probe(...checks)`. */
 const CONFIRM_BODY = `<fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" checked> A</label> <label><input type="radio" name="p" value="b" id="b"> B</label></fieldset><input type="text" id="name" aria-label="Name">`;
