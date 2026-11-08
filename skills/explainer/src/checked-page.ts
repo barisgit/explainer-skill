@@ -75,7 +75,13 @@ export class CheckedPage {
 		// The shipped plaintext license supplies a script-free document for Chrome's shared file:// origin.
 		// First accessing Storage in a new-document preload can race Chrome's commit-time storage binding.
 		await this.cdp.load(new URL("../kit/licenses/preact.txt", import.meta.url).href);
-		await this.cdp.evaluate("localStorage.clear(); sessionStorage.clear();");
+		// Unavailable storage needs no clearing; still clear the other area for memory-only pages.
+		await this.cdp.evaluate(`for (const name of ["localStorage", "sessionStorage"]) {
+			try { window[name]?.clear(); }
+			catch (error) {
+				if (!(error instanceof DOMException && error.name === "SecurityError")) throw error;
+			}
+		}`);
 		await this.cdp.load(this.url + hash);
 		const missing = await settlePage(this.cdp);
 		if (missing) {

@@ -169,6 +169,34 @@ test("fresh file loads clear both stores before author scripts, while explicit r
 	});
 }, 30_000);
 
+test.each(["disabled", "denied"])(
+	"fresh loads clear available storage when local storage is %s",
+	async (mode) => {
+		const file = dir.write(
+			"unavailable-storage.html",
+			`<!doctype html><body><script>
+		document.body.dataset.initial = sessionStorage.getItem('sample') ?? 'empty';
+		</script>`,
+		);
+		await withPage(async (cdp) => {
+			await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+				source:
+					mode === "disabled"
+						? 'Object.defineProperty(window, "localStorage", { value: null });'
+						: 'Object.defineProperty(window, "localStorage", { get() { throw new DOMException("denied", "SecurityError"); } });',
+			});
+			const page = new CheckedPage(cdp, `file://${file}`);
+			await page.start();
+			await page.open();
+			await cdp.evaluate("sessionStorage.setItem('sample', 'dirty')");
+			await page.open();
+			expect(await cdp.evaluate("document.body.dataset.initial")).toBe("empty");
+			expect(page.problems).toEqual([]);
+		});
+	},
+	30_000,
+);
+
 test("fresh file loads leave another tab's session state intact", async () => {
 	const file = dir.write("tab-session.html", "<!doctype html><h1>Session</h1>");
 	const url = `file://${file}`;
