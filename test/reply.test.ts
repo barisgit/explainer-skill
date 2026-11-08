@@ -43,7 +43,16 @@ const PAGE = (
 <label><input type="checkbox" id="cb"> Tick</label>
 <select id="sel"><option value="x">X</option><option value="y">Y</option></select>
 <button type="button" id="pick-y">Y by script</button> <output id="out">authored</output></main>
-<script src="kit:keep.js"></script><script src="kit:reply.js"></script>
+<script>
+for (const method of ["setItem", "removeItem", "clear"]) {
+	const original = Storage.prototype[method];
+	Storage.prototype[method] = function (...args) {
+		console.warn("storage-trace " + JSON.stringify({method, store:this === localStorage ? "local" : "session", key:String(args[0] ?? "").startsWith("explainer:") ? "keep" : args[0], length:String(args[1] ?? "").length, ms:Math.round(performance.now()), load:sessionStorage.loads}));
+		return original.apply(this, args);
+	};
+}
+addEventListener("storage", e => console.warn("storage-event " + JSON.stringify({key:e.key, before:e.oldValue?.length, after:e.newValue?.length, ms:Math.round(performance.now())})));
+</script><script src="kit:keep.js"></script><script src="kit:reply.js"></script>
 <script>
 ${COMMON}
 $("pick-y").addEventListener("click", () => { $("sel").value = "y"; });
@@ -106,6 +115,7 @@ if (timers) {
 	timers.ran = () => { trace("settle:start"); return ran().then(n => { trace("settle:timers=" + n); return n; }); };
 }
 addEventListener("load", () => trace("load"));
+addEventListener("pagehide", () => trace("pagehide"));
 document.addEventListener("click", e => trace("click:" + (e.target.id || e.target.className)), true);
 ${onLoad(1, "nothing is saved before the reader enters anything", '(trace("assert:initial"), saved() === 0 && clearButton().hidden)')}
 ${onLoad(2, "the entered values are back and the page's own listener drew them", `(trace("assert:restored"), $("out").textContent === "${ENTERED}" && state() === "${ENTERED}")`)}
