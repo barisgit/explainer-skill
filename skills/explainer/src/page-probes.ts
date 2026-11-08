@@ -4,7 +4,7 @@
  * Chrome through them and turns their results into the report.
  */
 import { READABLE_PX } from "./mermaid.ts";
-import { ELEMENT_NAME_JS, PAINTS_JS, REGION_VISIBLE_JS } from "./page-js.ts";
+import { ELEMENT_NAME_JS, PAINTS_JS, REGION_VISIBLE_JS, VIEW_ROUTES_JS } from "./page-js.ts";
 
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
@@ -109,13 +109,16 @@ export const FIRST_SCREEN_JS = `(() => {
  * links to.
  */
 export const DISCOVER_JS = `(() => {
-	const key = (route) => { try { return decodeURIComponent(route); } catch { return route; } };
 	const names = new Set([...document.querySelectorAll("[data-view]")].map((v) => v.dataset.view));
-	const byRoute = new Map([...names].filter((n) => n.includes("/")).map((n) => [key(n), "#" + n]));
+	const route = (${VIEW_ROUTES_JS})([...names]);
+	const byRoute = new Map([...names].filter((n) => n.includes("/")).map((n) => {
+		const hash = n.replace(/\\?/g, '%3F');
+		return [route(hash).key, '#' + hash];
+	}));
 	for (const a of document.querySelectorAll('a[href^="#"]')) {
 		const h = a.getAttribute("href").slice(1);
-		const route = h.split("?")[0];
-		if (route && (names.has(route) || names.has(route.split("/")[0])) && !byRoute.has(key(route))) byRoute.set(key(route), "#" + h);
+		const {key, name} = route(h);
+		if (name && !byRoute.has(key)) byRoute.set(key, "#" + h);
 	}
 	const reached = (n) => [...byRoute.keys()].some((r) => r === n || r.startsWith(n + "/"));
 	return { hashes: [...byRoute.values()], templates: [...names].filter((n) => !n.includes("/") && !reached(n)) };

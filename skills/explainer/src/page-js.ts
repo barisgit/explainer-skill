@@ -34,6 +34,24 @@ export const REGION_VISIBLE_JS = `(el) => {
 	return paints(el) || [...el.querySelectorAll("*")].some(paints);
 }`;
 
+/** Page-side factory matching declared view names: split local state before decoding, prefer exact static routes, then templates (as views.js). */
+export const VIEW_ROUTES_JS = `(names) => {
+	const canonical = text => new URL('#' + text, 'file:///').hash.slice(1);
+	const decode = text => { try { return decodeURIComponent(text); } catch { return text; } };
+	const statics = new Map();
+	for (const view of names.filter(name => name.includes('/'))) {
+		const key = decode(canonical(view.replace(/\\?/g, '%3F')));
+		if (!statics.has(key)) statics.set(key, view);
+	}
+	return hash => {
+		const path = canonical(hash).split('?')[0];
+		const key = decode(path);
+		const name = path.split('/')[0];
+		const view = (path.includes('/') ? statics.get(key) : undefined) ?? names.find(view => view === name);
+		return {key, name: view?.split('/')[0]};
+	};
+}`;
+
 /** Timers due within this time count as work the page is about to do: check waits for them. */
 const SHORT_TIMER_MS = 1000;
 /** How long SETTLE_JS waits before it gives up and says what is still missing. */

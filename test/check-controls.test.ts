@@ -4,7 +4,8 @@ import { ChromeError } from "../skills/explainer/src/cdp.ts";
 import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
-import { CONTROL_LIMIT } from "../skills/explainer/src/control-sweep.ts";
+import { CONTROL_LIMIT, CONTROLS_JS } from "../skills/explainer/src/control-sweep.ts";
+import { DISCOVER_JS } from "../skills/explainer/src/page-probes.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import { packedMdx, runCli, scratch } from "./support.ts";
 
@@ -170,6 +171,31 @@ test("fresh loads clear session storage before author scripts, while explicit re
 	} finally {
 		await server.stop(true);
 	}
+}, 30_000);
+
+test("control selection claims stateful and escaped view routes like discovery", async () => {
+	const file = dir.write(
+		"routes.html",
+		`<!doctype html>
+		<a id="unclaimed" href="#static/missing">Not a view</a>
+		<a id="team" href="#team?crew?view=table">Team table</a>
+		<a id="duplicate" href="#team?crew?view=tree">Same view</a>
+		<a id="escaped" href="#static/a%3Fb?panel?open=1">Escaped param</a>
+		<a id="malformed" href="#percent/100%?panel">Literal percent</a>
+		<section data-view="team" hidden></section>
+		<section data-view="static/a%3Fb" hidden></section>
+		<section data-view="percent/100%" hidden></section>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		const selected = await cdp.evaluate<{ name: string }[]>(CONTROLS_JS);
+		expect(selected.map((c) => c.name)).toEqual(["#team", "#escaped", "#malformed"]);
+		const discovered = await cdp.evaluate<{ hashes: string[] }>(DISCOVER_JS);
+		expect(discovered.hashes).toContain("#team?crew?view=table");
+		expect(discovered.hashes).not.toContain("#static/missing");
+	});
 }, 30_000);
 
 const MANY_CHOICES = `"use client";

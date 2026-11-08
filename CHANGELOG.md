@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The control sweep now recognizes stateful view links such as `#team?crew?view=table`; it shares route matching with view discovery, including escaped parameters and exact static-view claims (#14, #131 review).
+
 - A canceled control sweep now closes its known temporary tab while attachment is still pending, preserving the cleanup reserve even if attachment never replies (#14, #131 review).
 
 - Fresh `check` control loads now clear tab session storage before author scripts run, as well as Keep storage after unload; an explicit `--do reload` still keeps saved state (#14, #131 review).

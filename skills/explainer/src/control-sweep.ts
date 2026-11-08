@@ -1,6 +1,6 @@
 import { ChromeError, DISPOSE_DEADLINE_MS } from "./cdp.ts";
 import { CheckedPage, type Screen } from "./checked-page.ts";
-import { PAINTS_JS } from "./page-js.ts";
+import { PAINTS_JS, VIEW_ROUTES_JS } from "./page-js.ts";
 import { runStep } from "./steps.ts";
 
 /** One wall-clock ceiling, including temporary-tab creation and bounded disposal, never renewed per control. */
@@ -48,13 +48,12 @@ export const CONTROLS_JS = `(() => {
 		}
 	}
 	// The view runtime drives ordinary fragment links too. Sample the first visible link per view name, not per record.
-	const names = new Set([...document.querySelectorAll('[data-view]')].map(el => el.dataset.view.split('/')[0]));
+	const route = (${VIEW_ROUTES_JS})([...document.querySelectorAll('[data-view]')].map(el => el.dataset.view));
 	const linked = new Set();
 	for (const el of document.querySelectorAll('a[href^="#"]')) {
 		const href = el.getAttribute('href');
-		let name;
-		try { name = decodeURIComponent(href.slice(1)).split('/')[0]; } catch { continue; }
-		if (!names.has(name) || linked.has(name) || !eligible(el)) continue;
+		const {name} = route(href.slice(1));
+		if (!name || linked.has(name) || !eligible(el)) continue;
 		linked.add(name);
 		add(el, 'a[href="' + CSS.escape(href) + '"]');
 	}
