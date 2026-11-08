@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A canceled control sweep now closes its known temporary tab while attachment is still pending, preserving the cleanup reserve even if attachment never replies (#14, #131 review).
+
 - Fresh `check` control loads now clear tab session storage before author scripts run, as well as Keep storage after unload; an explicit `--do reload` still keeps saved state (#14, #131 review).
 
 - Default `check` samples visible kit controls once on the light-desktop overview, each from a fresh Keep-cleared load. Findings name the control; one warning reports incomplete coverage under the 12-control cap or shared 8 s budget (cleanup included). These loads add neither scroll sweeps nor PNGs. `--quick` and explicit `--do` skip the sample; use `--do` for other controls or a failing state (#14).

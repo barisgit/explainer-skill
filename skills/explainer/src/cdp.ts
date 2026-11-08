@@ -226,9 +226,26 @@ export class Cdp {
 		let page: Cdp | undefined;
 		let abortedAt: number | undefined;
 		let timer: ReturnType<typeof setTimeout> | undefined;
+		let closing: Promise<void> | undefined;
+		const close = () => {
+			if (!targetId) {
+				return;
+			}
+			const remaining =
+				DISPOSE_DEADLINE_MS - (abortedAt === undefined ? 0 : performance.now() - abortedAt);
+			closing ??= this.closeTarget(targetId, scoped, destroyed, remaining);
+			// Cancellation may start disposal before acquisition unwinds; finally still awaits its result.
+			closing.catch(() => undefined);
+			return closing;
+		};
 		const stop = () => {
 			abortedAt = performance.now();
 			page?.abort(abortError(signal.reason));
+			// A known target can close while attach is pending. Confirmed destruction releases that wait, even without its reply.
+			close()?.then(
+				() => scoped.abort(abortError(signal.reason)),
+				(error: unknown) => scoped.abort(abortError(error)),
+			);
 			// Creating/attaching is irreversible. Retain its reply through the reserved cleanup window, not just the work budget.
 			timer = setTimeout(
 				() =>
@@ -270,11 +287,7 @@ export class Cdp {
 			signal.removeEventListener("abort", stop);
 			clearTimeout(timer);
 			try {
-				if (targetId) {
-					const remaining =
-						DISPOSE_DEADLINE_MS - (abortedAt === undefined ? 0 : performance.now() - abortedAt);
-					await this.closeTarget(targetId, scoped, destroyed, remaining);
-				}
+				await close();
 			} finally {
 				if (page) {
 					this.wire.clients.delete(page);

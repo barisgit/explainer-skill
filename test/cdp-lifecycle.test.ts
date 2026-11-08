@@ -93,6 +93,41 @@ test.each(["Target.createTarget", "Target.attachToTarget"])(
 	},
 );
 
+test("cancellation closes a known target even when attachment never replies", async () => {
+	const attaching = Promise.withResolvers<void>();
+	let closed = false;
+	const wire = protocol((command, reply) => {
+		if (command.method === "Target.attachToTarget") {
+			attaching.resolve();
+			return;
+		}
+		reply(command, command.method === "Target.createTarget" ? { targetId: "temporary" } : {});
+		if (command.method === "Target.closeTarget") {
+			closed = true;
+			wire.emit({ method: "Target.targetDestroyed", params: { targetId: "temporary" } });
+		}
+	});
+	const limit = new AbortController();
+	const reason = new ChromeError("work budget ended");
+	let ran = false;
+	const work = wire.cdp
+		.temporaryPage(async () => {
+			ran = true;
+		}, limit.signal)
+		.catch((error: unknown) => error);
+	try {
+		await attaching.promise;
+		limit.abort(reason);
+		expect(await work).toBe(reason);
+		expect(closed).toBe(true);
+		expect(ran).toBe(false);
+		expect(await wire.cdp.send("Runtime.enable")).toEqual({});
+	} finally {
+		wire.close();
+		await work;
+	}
+});
+
 test("unreconciled target creation fails instead of masquerading as incomplete coverage", async () => {
 	const held = Promise.withResolvers<void>();
 	const wire = protocol((command, reply) => {
