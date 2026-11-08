@@ -23,4 +23,6 @@ jobs:
         run: time timeout 120 google-chrome --headless=new --no-sandbox --disable-gpu --user-data-dir="$(mktemp -d)" --dump-dom about:blank > /dev/null 2>&1
       # The runner's preinstalled Google Chrome (/usr/bin/google-chrome) drives check; pack renders Mermaid without it.
       # Ubuntu 24.04 restricts the user namespaces Chrome's sandbox needs, so this also covers the no-sandbox retry.
+      - name: Diagnose Keep reload before the full suite
+        run: bun test test/reply.test.ts -t 'what the reader entered'
       - run: bun run ci

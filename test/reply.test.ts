@@ -99,7 +99,7 @@ test.each([1, 2, 3, 4, 5])(
 	async () => {
 		const script = `
 const timers = window[Symbol.for("explainer.check.timers")];
-const trace = phase => console.warn("keep-trace " + JSON.stringify({phase, ms:Math.round(performance.now()), load:sessionStorage.loads, ready:document.readyState, tracker:!!timers, native:String(setTimeout).includes("[native code]"), state:state(), saved:saved(), clear:clearButton()?.hidden}));
+const trace = phase => console.warn("keep-trace " + JSON.stringify({phase, ms:Math.round(performance.now()), load:sessionStorage.loads, ready:document.readyState, tracker:!!timers, fresh:!!window[Symbol.for("explainer.check.fresh")], state:state(), saved:saved(), clear:clearButton()?.hidden}));
 trace("script");
 if (timers) {
 	const ran = timers.ran;

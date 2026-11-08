@@ -79,7 +79,7 @@ export class CheckedPage {
 		});
 		const { identifier } = await this.cdp.send<{ identifier: string }>(
 			"Page.addScriptToEvaluateOnNewDocument",
-			{ source: "sessionStorage.clear();" },
+			{ source: "window[Symbol.for('explainer.check.fresh')] = true; sessionStorage.clear();" },
 		);
 		try {
 			await this.cdp.load(this.url + hash);
