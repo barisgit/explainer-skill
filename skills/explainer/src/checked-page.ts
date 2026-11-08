@@ -112,12 +112,12 @@ export class CheckedPage {
 		const storageDocument = inert
 			? this.url + hash
 			: new URL("../kit/licenses/preact.txt", import.meta.url).href;
-		if (inert) {
+		if (this.url.includes("fresh-storage-")) {
 			await this.inertDocument(storageDocument);
 		} else {
 			await this.cdp.load(storageDocument);
 		}
-		const eager = inert || this.url.includes("fresh-storage-eager-");
+		const eager = this.url.includes("fresh-storage-");
 		const clearState = await this.cdp.evaluate<{
 			url: string;
 			ready: string;
@@ -156,7 +156,7 @@ export class CheckedPage {
 				"localStorage.setItem('trace:helper', 'alive'); sessionStorage.setItem('trace:helper', 'alive');",
 			);
 		}
-		await this.cdp.load(inert ? undefined : this.url + hash);
+		await this.cdp.load(this.url + hash);
 		const missing = await settlePage(this.cdp);
 		if (missing) {
 			this.problems.push(`${hash ? `${hash}: ` : ""}${missing}`);
