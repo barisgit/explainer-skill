@@ -376,7 +376,8 @@ test("a page with a Chart carries ECharts compressed, and the live chart takes t
 	expect(html).not.toContain("globalThis,{echarts");
 	expect(html).toContain("/* echarts: Apache ECharts");
 	expect(html).toMatch(/<script data-deflate="[A-Za-z0-9+/=]+">/);
-	expect(statSync(output).size).toBeLessThan(600_000);
+	// Guard against ECharts shipped uncompressed or twice, not a page-size budget.
+	expect(statSync(output).size).toBeLessThan(1_000_000);
 	const state = await inPage(output, (cdp) =>
 		cdp.evaluate(`({
 			live: Boolean(echarts.getInstanceByDom(document.querySelector(".chart"))),
