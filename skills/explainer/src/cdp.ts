@@ -55,6 +55,7 @@ interface CdpEvents {
 	"Log.entryAdded": { entry: { level: string; source: string; text: string; url?: string } };
 	"Network.requestWillBeSent": { request: { url: string } };
 	"Network.loadingFailed": { errorText: string; canceled?: boolean };
+	"Fetch.requestPaused": { requestId: string };
 	"Page.loadEventFired": object;
 	"Page.frameNavigated": {
 		frame: { id: string; url: string; loaderId: string; parentId?: string };

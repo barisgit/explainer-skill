@@ -1,4 +1,4 @@
-import type { Cdp, ExceptionDetails } from "./cdp.ts";
+import { type Cdp, ChromeError, type ExceptionDetails } from "./cdp.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import { PAGE_JS, type PageReport } from "./page-probes.ts";
 import { settlePage } from "./steps.ts";
@@ -68,61 +68,95 @@ export class CheckedPage {
 		});
 	}
 
+	/** Loads an inert HTML document at the author URL, without executing author code or retaining interception. */
+	private async inertDocument(url: string): Promise<void> {
+		await this.cdp.load("about:blank");
+		await this.cdp.send("Fetch.enable", {
+			patterns: [{ resourceType: "Document", requestStage: "Request" }],
+		});
+		const responses: Promise<unknown>[] = [];
+		let fail: (reason: unknown) => void = () => undefined;
+		const failed = new Promise<never>((_, reject) => {
+			fail = reject;
+		});
+		const stop = this.cdp.on("Fetch.requestPaused", ({ requestId }) => {
+			const response = this.cdp.send("Fetch.fulfillRequest", {
+				requestId,
+				responseCode: 200,
+				responseHeaders: [
+					{ name: "Content-Type", value: "text/html" },
+					{ name: "Cache-Control", value: "no-store" },
+				],
+				body: btoa("<!doctype html>"),
+			});
+			responses.push(response);
+			response.catch(fail);
+		});
+		try {
+			await Promise.race([this.cdp.load(url), failed]);
+			if (!responses.length) {
+				throw new ChromeError("Chrome did not intercept the storage document");
+			}
+			await Promise.all(responses);
+		} finally {
+			stop();
+			await this.cdp.send("Fetch.disable");
+		}
+	}
+
 	/** Unloads before clearing saved state; clears tab storage before author scripts on this load only, not explicit reloads. */
 	async open(hash = ""): Promise<void> {
 		this.problems = [];
 		this.warnings = [];
-		const { EXPLAINER_STORAGE_DIAGNOSTIC } = process.env;
-		if (EXPLAINER_STORAGE_DIAGNOSTIC === "before-a9") {
-			await this.cdp.load("about:blank");
-			await this.cdp.send("Storage.clearDataForOrigin", {
-				origin: "file://",
-				storageTypes: "local_storage",
-			});
+		const inert = this.url.includes("fresh-storage-inert-");
+		const storageDocument = inert
+			? this.url + hash
+			: new URL("../kit/licenses/preact.txt", import.meta.url).href;
+		if (inert) {
+			await this.inertDocument(storageDocument);
 		} else {
-			const storageDocument = new URL("../kit/licenses/preact.txt", import.meta.url).href;
 			await this.cdp.load(storageDocument);
-			const eager = this.url.includes("fresh-storage-eager-");
-			const clearState = await this.cdp.evaluate<{
-				url: string;
-				ready: string;
-				type: string;
-			}>(`(() => {
-				const before = { url: location.href, ready: document.readyState, type: document.contentType };
-				${eager ? "void localStorage.length; void sessionStorage.length;" : ""}
-				localStorage.clear(); sessionStorage.clear(); return before;
-			})()`);
-			if (this.url.includes("fresh-storage-")) {
-				this.warnings.push(
-					"clear-state " +
-						JSON.stringify({
-							eager,
-							helper: clearState.url === storageDocument,
-							ready: clearState.ready,
-							type: clearState.type,
-						}),
-				);
-			}
-			if (/\/(?:keep|forms)\.out\.html$/.test(this.url)) {
-				const { frameTree } = await this.cdp.send<{
-					frameTree: { frame: { id: string; url: string } };
-				}>("Page.getFrameTree");
-				const key = await this.cdp.send("Storage.getStorageKeyForFrame", {
-					frameId: frameTree.frame.id,
-				});
-				const state = await this.cdp.evaluate(
-					"({type:document.contentType, ready:document.readyState})",
-				);
-				this.warnings.push(
-					"storage-context " +
-						JSON.stringify({ helper: frameTree.frame.url === storageDocument, key, state }),
-				);
-				await this.cdp.evaluate(
-					"localStorage.setItem('trace:helper', 'alive'); sessionStorage.setItem('trace:helper', 'alive');",
-				);
-			}
 		}
-		await this.cdp.load(this.url + hash);
+		const eager = inert || this.url.includes("fresh-storage-eager-");
+		const clearState = await this.cdp.evaluate<{
+			url: string;
+			ready: string;
+			type: string;
+		}>(`(() => {
+			const before = { url: location.href, ready: document.readyState, type: document.contentType };
+			${eager ? "void localStorage.length; void sessionStorage.length;" : ""}
+			localStorage.clear(); sessionStorage.clear(); return before;
+		})()`);
+		if (this.url.includes("fresh-storage-")) {
+			this.warnings.push(
+				"clear-state " +
+					JSON.stringify({
+						eager,
+						helper: clearState.url === storageDocument,
+						ready: clearState.ready,
+						type: clearState.type,
+					}),
+			);
+		}
+		if (/\/(?:keep|forms)\.out\.html$/.test(this.url)) {
+			const { frameTree } = await this.cdp.send<{
+				frameTree: { frame: { id: string; url: string } };
+			}>("Page.getFrameTree");
+			const key = await this.cdp.send("Storage.getStorageKeyForFrame", {
+				frameId: frameTree.frame.id,
+			});
+			const state = await this.cdp.evaluate(
+				"({type:document.contentType, ready:document.readyState})",
+			);
+			this.warnings.push(
+				"storage-context " +
+					JSON.stringify({ helper: frameTree.frame.url === storageDocument, key, state }),
+			);
+			await this.cdp.evaluate(
+				"localStorage.setItem('trace:helper', 'alive'); sessionStorage.setItem('trace:helper', 'alive');",
+			);
+		}
+		await this.cdp.load(inert ? undefined : this.url + hash);
 		const missing = await settlePage(this.cdp);
 		if (missing) {
 			this.problems.push(`${hash ? `${hash}: ` : ""}${missing}`);

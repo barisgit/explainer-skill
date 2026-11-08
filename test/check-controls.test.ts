@@ -144,7 +144,7 @@ import { FreshChoices } from "./fresh.tsx";
 
 test.each(
 	Array.from({ length: 10 }, (_, iteration) =>
-		["plain", "eager"].map((mode) => ({ mode, iteration })),
+		["eager", "inert"].map((mode) => ({ mode, iteration })),
 	).flat(),
 )(
 	"fresh file loads clear both stores ($mode $iteration)",
