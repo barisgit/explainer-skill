@@ -5,8 +5,8 @@ import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
 import { openBrowser, withPage } from "../skills/explainer/src/chrome.ts";
 import { CONTROL_LIMIT, CONTROLS_JS } from "../skills/explainer/src/control-sweep.ts";
+import { TIMERS_JS } from "../skills/explainer/src/page-js.ts";
 import { DISCOVER_JS } from "../skills/explainer/src/page-probes.ts";
-import { runStep } from "../skills/explainer/src/steps.ts";
 import { packedMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -144,10 +144,10 @@ import { FreshChoices } from "./fresh.tsx";
 
 test.each(
 	Array.from({ length: 50 }, (_, iteration) =>
-		["cross", "inert"].map((mode) => ({ mode, iteration })),
+		["native", "clock"].map((mode) => ({ mode, iteration })),
 	).flat(),
 )(
-	"fresh file loads clear both stores ($mode $iteration)",
+	"native file reload preserves both stores ($mode $iteration)",
 	async ({ mode, iteration }) => {
 		const file = dir.write(
 			`fresh-storage-${mode}-${iteration}.html`,
@@ -163,18 +163,26 @@ test.each(
 			const contexts: string[] = [];
 			cdp.on("Page.frameNavigated", ({ frame }) => navigations.push(JSON.stringify(frame)));
 			const page = new CheckedPage(cdp, `file://${file}`);
-			await page.start();
+			await Promise.all(
+				["Page", "Runtime", "Log", "Network"].map((domain) => cdp.send(`${domain}.enable`)),
+			);
+			if (mode === "clock") {
+				await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: TIMERS_JS });
+			}
 			try {
-				await page.open();
-				contexts.push(...page.warnings);
-				const initial = () => cdp.evaluate("document.body.dataset.initial");
-				expect(await initial()).toBe("empty|empty|empty|empty");
-				await runStep(cdp, "click:#sample", () => "unused");
-				await runStep(cdp, "reload", () => "unused");
-				expect(await initial()).toBe("dirty|dirty|dirty|dirty");
-				await page.open();
-				contexts.push(...page.warnings);
-				expect(await initial()).toBe("empty|empty|empty|empty");
+				await cdp.load(`file://${file}`);
+				const state = () =>
+					cdp.evaluate<{ initial: string; origin: number }>(
+						"({initial:document.body.dataset.initial, origin:performance.timeOrigin})",
+					);
+				const before = await state();
+				expect(before.initial).toBe("empty|empty|empty|empty");
+				await cdp.evaluate("save()");
+				await cdp.load();
+				const after = await state();
+				contexts.push(JSON.stringify({ before, after }));
+				expect(after.origin).not.toBe(before.origin);
+				expect(after.initial).toBe("dirty|dirty|dirty|dirty");
 			} finally {
 				console.log(
 					JSON.stringify({ mode, iteration, contexts, navigations, problems: page.problems }),
