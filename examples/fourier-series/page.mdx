@@ -21,7 +21,7 @@ Sines at 1×, 3×, 5× the base frequency, with relative amplitudes 1, ⅓, ⅕,
 	frame={hero}
 />
 
-## Six questions to answer before you read on
+<h2 data-nav="Questions">Six questions to answer before you read on</h2>
 
 Write what you think in the box, then open the answer.
 
@@ -67,7 +67,7 @@ $x^2$ is even: all $b_n$ are zero, only cosines (and $a_0$) remain. $x^3$ is odd
 
 </div>
 
-## Why sines and cosines are enough
+<h2 data-nav="Why sines">Why sines and cosines are enough</h2>
 
 Take a signal that repeats every 2π. Its Fourier series is a constant plus sines and cosines of whole-number multiples of the base frequency:
 
@@ -82,7 +82,7 @@ The figure above is the series in action. With one term the square wave is a sin
 {/* The switch shows one wave's derivation and coefficients through page.css alone; print shows both. Each stepper's captions are
    written as its list (ol data-captions), so they can hold maths. */}
 
-## The square wave keeps only odd harmonics, at 4/(nπ); the sawtooth keeps every one, at 2/n with alternating sign
+<h2 data-nav="Coefficients">The square wave keeps only odd harmonics, at 4/(nπ); the sawtooth keeps every one, at 2/n with alternating sign</h2>
 
 Pick a wave and step through its integral, one line at a time. Both waves are odd, so the cosine integrals vanish at once and only the sine integral takes work.
 
@@ -208,13 +208,13 @@ $$
 
 {/* These two sections' headings follow their controls, so each component renders its section's heading, then the intro written here, then its figure. */}
 
-<section>
+<section data-nav="Gibbs overshoot">
 <Gibbs>
 Here is the square wave from the top, close to its jump at $x = 0$. Drag the slider from 1 term up to 200 and watch two things: the width of the bump and its height.
 </Gibbs>
 </section>
 
-<section>
+<section data-nav="Symmetry">
 <Symmetry>
 An even function ($f(-x) = f(x)$) is a mirror image across the vertical axis; an odd one flips sign. Cosines are even and sines are odd, so a mirror-symmetric signal can only contain cosines and an odd one only sines. Try the three cases; the coefficients are computed by numerical integration.
 </Symmetry>
@@ -223,7 +223,7 @@ Spotting the symmetry first halves the work, and saves a mistake: a stray cosine
 
 </section>
 
-## Everything above on one table
+<h2 data-nav="Formula sheet">Everything above on one table</h2>
 
 | Rule | Formula | Where |
 |---|---|---|
