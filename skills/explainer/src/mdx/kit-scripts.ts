@@ -1,6 +1,7 @@
 /**
  * Which kit scripts an .mdx page needs, from one table of the markup each script reads. A page needs a script when its
- * prerendered HTML holds that markup, or when its client code can write it later: the code is searched for the same markup as
+ * prerendered HTML holds that markup (as often as the row asks: four named sections for a contents rail), or when its client
+ * code can write it later: the code is searched for the same markup as
  * it appears in compiled JSX and DOM calls (`"data-reply"`, `dataset.reply`, `Charts.make`). The kit components are markup
  * generators, so their code holds the markers too and needs no list of its own; a new attribute a kit script reads needs a row.
  * Question and Records are the exceptions: which markup they write depends on their props (a self-check, chosen or written,
@@ -123,8 +124,21 @@ function controlWithId(code: string): boolean {
 	return false;
 }
 
-/** What each script reads: as a selector over the HTML, and as a test of compiled code. */
-const MARKERS: { html: string; code: (code: string) => boolean; scripts: KitScript[] }[] = [
+/**
+ * How many overview sections named by data-nav (on the section or its h2) give a page its contents rail when it has fewer than
+ * two view names; kit/parts/views/nav.ts draws the rail at the same count.
+ */
+const RAIL_SECTIONS = 4;
+
+/**
+ * What each script reads: as a selector over the HTML, matched at least `min` times (default once), and as a test of compiled code.
+ */
+const MARKERS: {
+	html: string;
+	min?: number;
+	code: (code: string) => boolean;
+	scripts: KitScript[];
+}[] = [
 	{
 		html: ".chart:not(.plot)",
 		code: matches(/\bCharts\.make\b/),
@@ -138,6 +152,13 @@ const MARKERS: { html: string; code: (code: string) => boolean; scripts: KitScri
 				`${literal("data-view")}|${literal("details")}|\\bdataset\\.view\\b|\\bViews\\.(?:local|setLocal)\\b`,
 			),
 		),
+		scripts: ["views.js"],
+	},
+	{
+		// The contents rail of a long page. Sections a client component renders are in the prerendered page, so code adds none.
+		html: "[data-overview] > section[data-nav], [data-overview] > section:not([data-nav]) > h2[data-nav]",
+		min: RAIL_SECTIONS,
+		code: () => false,
 		scripts: ["views.js"],
 	},
 	{
@@ -374,17 +395,17 @@ function questionCodeScripts(): Set<KitScript> {
 
 /** The kit scripts an HTML page or fragment needs for the markup it holds. */
 export async function scriptsInHtml(html: string): Promise<Set<KitScript>> {
-	const needed = new Set<KitScript>();
+	const found = MARKERS.map(() => 0);
 	let rewriter = new HTMLRewriter();
-	for (const { html: selector, scripts } of MARKERS) {
+	for (const [i, { html: selector }] of MARKERS.entries()) {
 		rewriter = rewriter.on(selector, {
 			element() {
-				for (const script of scripts) {
-					needed.add(script);
-				}
+				found[i] = (found[i] ?? 0) + 1;
 			},
 		});
 	}
 	await rewriter.transform(new Response(html)).text();
-	return needed;
+	return new Set(
+		MARKERS.filter((marker, i) => (found[i] ?? 0) >= (marker.min ?? 1)).flatMap((m) => m.scripts),
+	);
 }

@@ -26,9 +26,9 @@
    Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it
    briefly ("Ana", "1.6.3 Login form"): the crumbs and previous/next show that text, and a generic one ("Open") gives way to the
    view's heading. Previous and next walk the views of its kind (the ones the view it was opened from links to, else all of
-   them); a page with views inside views (two or more view names) gets a contents rail of its sections. A section with two or
-   more folds gets Expand all. A View belongs to the page: put client components inside it, not a View inside a client component
-   or a record. A Controls and the Explores that follow it (kit Explore) belong together: all on the page outside the views, or all in
+   them); a page with views inside views (two or more view names) gets a contents rail of its sections, as any page does with
+   four or more data-nav sections (kit page). A section with two or more folds gets Expand all. A View belongs to the page: put
+   client components inside it, not a View inside a client component or a record. A Controls and the Explores that follow it (kit Explore) belong together: all on the page outside the views, or all in
    one view or record. */
 import { type ComponentChildren, h } from "preact";
 import { PlaceContext, placeNamed } from "./parts/place.ts";

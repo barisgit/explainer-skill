@@ -1,9 +1,12 @@
 import { afterAll, expect, test } from "bun:test";
 import {
+	kitScriptsIn,
 	packAndCheck,
 	packAndRun,
+	packedMdx,
 	pageAssertion,
 	pageContract,
+	runPacked,
 	SETTLED,
 	scratch,
 } from "./support.ts";
@@ -359,4 +362,68 @@ ${pageContract({
 	expect(await packAndRun(dir, "link-labels", page, { steps: ["click:a[href='#i/2']"] })).toEqual(
 		[],
 	);
+}, 30_000);
+
+/** A long page with no views: five sections of several screens each, the first `named` of them with a data-nav label. */
+const LONG = (named: number, end = "") => `# A long page
+
+The lede.
+
+${["Cause", "Fix", "Cost", "Risks", "Plan"]
+	.map(
+		(
+			name,
+			i,
+		) => `${i < named ? `<h2 data-nav="${name}">` : "## "}The ${name.toLowerCase()}, as its answer${i < named ? "</h2>" : ""}
+
+${"Words in the reading column. ".repeat(150)}
+`,
+	)
+	.join("\n")}
+${end}`;
+
+test("a long page without views gets the contents rail from four data-nav sections, the current section following the scroll", async () => {
+	const contract = `const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const current = () => document.querySelector('.toc [aria-current="location"]')?.textContent;
+const frames = () => new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame));
+${SETTLED}
+var contract = settled.then(async () => {
+	const failures = [];
+	const expect = (ok, name) => ok || failures.push(name);
+	expect(document.documentElement.classList.contains("has-toc"), "the page takes its rail-side width");
+	expect(texts("#toc-list > li > a") === "Overview|Cause|Fix|Cost|Risks|The plan, as its answer", "the rail: " + texts("#toc-list > li > a"));
+	const sections = document.querySelectorAll("[data-overview] > section");
+	for (const [i, name] of [[2, "Cost"], [3, "Risks"]]) {
+		sections[i].scrollIntoView();
+		await frames();
+		expect(current() === name, "scrolled to " + name + ", it is current: " + current());
+	}
+	scrollTo(0, 0);
+	await frames();
+	return failures;
+});`;
+	const output = await packedMdx(dir, "long", LONG(4, '<script src="contract.js"></script>'), {
+		"contract.js": contract,
+	});
+	expect(kitScriptsIn(output)).toContain("views");
+	expect(await runPacked(output)).toEqual([]);
+}, 30_000);
+
+test("three data-nav sections give no rail: pack brings no views.js for them, and views.js a fold brings draws none", async () => {
+	expect(kitScriptsIn(await packedMdx(dir, "three", LONG(3)))).not.toContain("views");
+	const output = await packedMdx(
+		dir,
+		"three-folds",
+		LONG(
+			3,
+			'<details><summary>More</summary>More words.</details>\n\n<script src="contract.js"></script>',
+		),
+		{
+			"contract.js": pageContract({
+				"no rail and no rail-side width": `!document.querySelector(".toc") && !document.documentElement.classList.contains("has-toc")`,
+			}),
+		},
+	);
+	expect(kitScriptsIn(output)).toContain("views");
+	expect(await runPacked(output)).toEqual([]);
 }, 30_000);
