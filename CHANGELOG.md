@@ -5,6 +5,7 @@
 - An Explore `readout` takes block content (a `div`, a paragraph) as written; it is now a `div[data-readout]` instead of a `p`, which the browser split around a `div` so the figure vanished. Plain-text and inline readouts look the same; a page rule or script that selected `#id > p` for the readout selects `[data-readout]` (#139). Control rows tighten their gaps on phones, so four short toggles stay in one row (#142).
 
 - Typecheck pages with `bun --check` after `kit types > tsconfig.json`, so a repository’s `check` script cannot silently replace the checker.
+- The guide now walks a homework page's deliverables one at a time in the source's order and numbering, with the hard ones worked through, flags errors in the source, grounds steps in the reader's own tools and starting point, and says how to choose the page's language (#140).
 
 - Fresh `check` loads clear local and session storage from a loaded, script-free file document instead of a new-document preload or origin-wide deletion. Explicit reloads keep their state, and control probes no longer clear the screenshot tab's session storage (#145).
 
