@@ -162,7 +162,7 @@ export const level = (m: number, kind: string) => ({ readout: kind + " at " + m.
 			)?.[1] ?? "";
 		// Each island carries its references to the frame, not the controls again.
 		expect(islands.length).toBeLessThan(1_200);
-		const seen = `[document.querySelector("#curve svg path.line").getAttribute("d"), document.querySelector("#level > p:not(.controls-state)").textContent, document.getElementById("m").value]`;
+		const seen = `[document.querySelector("#curve svg path.line").getAttribute("d"), document.querySelector("#level > [data-readout]").textContent, document.getElementById("m").value]`;
 		const state = await inPage(output, async (cdp) => {
 			const start = await cdp.evaluate<string[]>(seen);
 			await cdp.evaluate(`document.getElementById("m").focus()`);
@@ -378,7 +378,7 @@ export function Item({ record }: { record: { id: string } }) {
 		);
 		const output = await packedMdx(dir, "places", page);
 		const readout = (id: string) =>
-			`document.querySelector("#${id} > p:not(.controls-state)")?.textContent`;
+			`document.querySelector("#${id} > [data-readout]")?.textContent`;
 		const seen = `[document.getElementById("again").textContent, ${readout("p-out")}]`;
 		const state = await inPage(output, async (cdp) => {
 			const here = (hash: string, id: string, control: string) =>

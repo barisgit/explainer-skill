@@ -97,7 +97,7 @@ async function press(cdp: Cdp, key: string, keyCode: number) {
 
 /** The slider page as the reader sees it: the slider, its output, the readout, the plot's first line and the caption. */
 const SLIDER_STATE = `[document.getElementById("m").value, document.querySelector("output[for=m]").textContent,
-	document.querySelector("#env > p").textContent, document.querySelector("#env svg path.line")?.getAttribute("d").length > 100,
+	document.querySelector("#env > [data-readout]").textContent, document.querySelector("#env svg path.line")?.getAttribute("d").length > 100,
 	document.querySelector("#env svg path.line")?.getAttribute("d") === window.firstLine, document.querySelector("#env figcaption").textContent]`;
 
 describe("Explore client validation", () => {
@@ -134,7 +134,7 @@ import { bounded } from "./bounded.ts";
 			act(
 				cdp,
 				`const v = document.getElementById("bounded-2"); v.value = "8"; v.dispatchEvent(new Event("input", { bubbles: true }))`,
-				`document.querySelector("#bounded > p").textContent`,
+				`document.querySelector("#bounded > [data-readout]").textContent`,
 			),
 		);
 		expect(readout).toBe("7,7,8");
@@ -297,7 +297,7 @@ describe("Explore ranges", () => {
 		);
 		const { output } = await pack("tiny", TINY);
 		const seen = (id: string) =>
-			`[document.querySelector("output[for=${id}-v]").textContent, document.querySelector("#${id} > p").textContent]`;
+			`[document.querySelector("output[for=${id}-v]").textContent, document.querySelector("#${id} > [data-readout]").textContent]`;
 		const moved = (id: string) =>
 			`const v = document.getElementById("${id}-v"); v.value = "0.0000002"; v.dispatchEvent(new Event("input", { bubbles: true }))`;
 		const state = await inPage(output, async (cdp) => ({
@@ -352,5 +352,54 @@ describe("client exports as props", () => {
 			),
 		);
 		expect(ticks).toBe(true);
+	}, 30_000);
+});
+
+describe("Explore readout", () => {
+	test("block content in a readout stays inside it, in a frame pack computes and in one the browser runs", async () => {
+		dir.write(
+			"block.tsx",
+			`"use client";\nexport const block = (v: number) => ({ readout: <div class="big">Value {v}</div>, plot: { series: [{ type: "line", data: [[0, 1], [1, v]] }] } });\n`,
+		);
+		const page = (id: string, frame: string) =>
+			`<Explore id="${id}" label="Block" controls={[{ id: "${id}-v", label: "v", range: [1, 3, 1] }]} frame={${frame}} />`;
+		const { output } = await pack(
+			"block",
+			`import { Explore } from "kit";\nimport { block } from "./block.tsx";\n\n# Block\n\n${page("client", "block")}\n\n${page("packed", '(v) => ({ readout: <div class="big">Value {v}</div>, plot: { series: [{ type: "line", data: [[0, 1], [1, v]] }] } })')}\n`,
+		);
+		const state = await inPage(output, (cdp) =>
+			cdp.evaluate(
+				`["client", "packed"].map((id) => { const big = document.querySelector("#" + id + " [data-readout] > .big"); return [big?.textContent, !!document.querySelector("#" + id + " svg"), big?.closest("p") === null]; })`,
+			),
+		);
+		expect(state).toEqual([
+			["Value 1", true, true],
+			["Value 1", true, true],
+		]);
+	}, 30_000);
+});
+
+describe("Explore control rows", () => {
+	test("four short toggles stay in one row, in order, on a phone", async () => {
+		const bits = [3, 2, 1, 0]
+			.map((n) => `{ id: "a${n}", label: "A(${n})", toggle: true }`)
+			.join(", ");
+		const { output } = await pack(
+			"bits",
+			`import { Explore } from "kit";\n\n# Bits\n\n<Explore id="bits" label="Bits" controls={[${bits}]} frame={() => ({ readout: "x" })} />\n`,
+		);
+		const phone = WIDTHS[1];
+		if (!phone) {
+			throw new Error("no phone width");
+		}
+		const tops = await inPage(
+			output,
+			(cdp) =>
+				cdp.evaluate<number[]>(
+					`[...document.querySelectorAll("#bits .toggle")].map((t) => Math.round(t.getBoundingClientRect().top))`,
+				),
+			phone,
+		);
+		expect(new Set(tops).size).toBe(1);
 	}, 30_000);
 });

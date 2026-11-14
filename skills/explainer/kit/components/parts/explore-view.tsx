@@ -280,7 +280,9 @@ export function ExploreView({
 					))}
 				</dl>
 			)}
-			{frame.readout !== undefined && <p aria-live="polite" {...content(frame.readout)} />}
+			{frame.readout !== undefined && (
+				<div data-readout="" aria-live="polite" {...content(frame.readout)} />
+			)}
 			{figure && option !== undefined && figure(option)}
 			{frame.caption !== undefined && <figcaption {...content(frame.caption)} />}
 		</figure>

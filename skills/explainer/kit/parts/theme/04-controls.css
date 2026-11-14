@@ -9,9 +9,22 @@
 	border-block-end: 1px solid var(--rule);
 	font-size: 0.875rem;
 }
+/* A phone is about 20rem wide inside the panel: tighter gaps keep a row of short toggles (four bits) in one row, in order. */
+@media (max-width: 40rem) {
+	.controls {
+		column-gap: 1rem;
+	}
+	.controls > .toggle {
+		gap: 0.375rem;
+	}
+}
 .controls:has(+ .controls) {
 	padding-block-end: 0.25rem;
 	border-block-end: 0;
+}
+/* Explore's readout is a block, so it can hold a paragraph or a div; it keeps the spacing of a figure's own paragraph. */
+.fig > [data-readout] {
+	padding-block: 0.75rem;
 }
 /* What a figure that follows a Controls shows, and the way back to them. On screen it is left out of a figure right under its
    Controls (pack marks it, data-under), where the controls are in sight; printed, the controls are not, so every figure says it. */
