@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Treat saved answers in a `file://` page as browser-local convenience, not a durable record; use reply's “Copy reply” to save important answers outside the page (#148).
+
 - Inspect the exact current reply Markdown with `check --do reply`, after any answer or note steps, without copying or sending it. Text output prints it verbatim; `--json` returns `replies` with each action’s step, theme, viewport and Markdown. Repack older exports to make their reply text available (#156).
 
 - Set text linked to a figure, diagram or code in `<div class="beside">` (the text, then the figure or a code fence): from 56rem the two stand side by side at `.wide`'s width and the figure stays in view while the text scrolls; phones stack them. `check` warns when parts sharing a `data-ref`, or a stepper's captions and the parts they light, are more than a screen apart at desktop width, naming the ref or stepper (#159).
