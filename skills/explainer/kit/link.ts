@@ -13,7 +13,14 @@
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
-   Refs a client component renders or removes after load link and unlink at once. */
+   Refs a client component renders or removes after load link and unlink at once.
+   States: a Stepper step (kit Stepper) or an Explore frame (kit Explore) can give the parts of a ref a named state, which this
+   script writes as data-state on every element carrying that ref, wherever it is on the page (Mermaid parts too), linked or not:
+     [data-state="imports"] { background: var(--accent-soft); }   the page's CSS styles its own state names
+   The kit styles only the stepper's: now (lit) and not-yet (faded until its step, still there for keyboards and screen readers;
+   print shows it). pack writes the starting state into the file, so it reads without scripts, and fails on a state for a ref no
+   element has. A part given states by two controls carries both, space separated: match one with [data-state~="imports"]; now
+   wins over not-yet. A data-state you write yourself on a part no control names stays as written, unstyled by the kit. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const refsOf = (el: Part | null) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
@@ -100,9 +107,79 @@
 		}
 	}
 
+	/** One declaration: the JSON map of ref to state ("" for none) that kit:steps.js or an Explore writes in data-ref-states. */
+	function declared(el: Part): [string, unknown][] {
+		try {
+			const map: unknown = JSON.parse(el.dataset.refStates ?? "");
+			return map !== null && typeof map === "object" ? Object.entries(map) : [];
+		} catch {
+			return [];
+		}
+	}
+
+	/** The states the declarations give each ref they name, in page order, each once; a ref named with "" alone gets none. */
+	function givenStates(): Map<string, string[]> {
+		const given = new Map<string, string[]>();
+		for (const el of document.querySelectorAll<Part>("[data-ref-states]")) {
+			for (const [ref, state] of declared(el)) {
+				const states = given.get(ref) ?? [];
+				if (typeof state === "string" && state && !states.includes(state)) {
+					states.push(state);
+				}
+				given.set(ref, states);
+			}
+		}
+		return given;
+	}
+
+	/** The joined state of a part's refs, each once in page order; the kit's now wins over not-yet when two steppers name one part. */
+	function joined(states: string[]): string {
+		const set = new Set(states);
+		if (set.has("now")) {
+			set.delete("not-yet");
+		}
+		return [...set].join(" ");
+	}
+
+	/** Clears a state the kit wrote, with its data-kit-state marker. */
+	function unstate(el: Part) {
+		el.removeAttribute("data-state");
+		delete el.dataset.kitState;
+	}
+
+	/** Writes `value` as the kit's state of `el`, marked data-kit-state, or clears it when empty; an unchanged one is left. */
+	function state(el: Part, value: string) {
+		if (!value) {
+			unstate(el);
+		} else if (el.getAttribute("data-state") !== value || el.dataset.kitState === undefined) {
+			el.setAttribute("data-state", value);
+			el.dataset.kitState = "";
+		}
+	}
+
+	/**
+	 * The one writer of data-state: every element carrying a ref some declaration names gets the states its refs are given,
+	 * marked data-kit-state (the kit styles now and not-yet only there), and loses both when none is given. Elements no
+	 * declaration names are left as they are, so a page's own data-state (a Table row's fit) stays.
+	 */
+	function writeStates(parts: Part[]) {
+		const given = givenStates();
+		const named = given.size ? parts.filter((el) => refsOf(el).some((ref) => given.has(ref))) : [];
+		const still = new Set(named);
+		for (const el of document.querySelectorAll<Part>("[data-kit-state]")) {
+			if (!still.has(el)) {
+				unstate(el);
+			}
+		}
+		for (const el of named) {
+			state(el, joined(refsOf(el).flatMap((ref) => given.get(ref) ?? [])));
+		}
+	}
+
 	/** Recounts the places of every ref, re-marks the elements and repaints, since the lit part may have gained or lost its partners. */
 	function refresh() {
 		const parts = [...document.querySelectorAll<Part>("[data-ref]")];
+		writeStates(parts);
 		linked = linkingRefs(parts);
 		// Unmark the previous set, then mark the new one (the sets overlap, so the order matters). The previous set also holds
 		// elements removed from the page or stripped of their data-ref, which the query no longer finds.
@@ -157,22 +234,27 @@
 		}
 	}
 
-	// A refresh reads every data-ref on the page, so it runs only for a changed data-ref (the one observed attribute) or an added or
-	// removed node that holds one, not for every DOM change a page script or another kit script makes.
+	// A refresh reads every data-ref on the page, so it runs only for a changed data-ref or an added or removed node that holds a
+	// ref or a declaration, not for every DOM change a page script or another kit script makes. A changed declaration alone (a
+	// step, a choice) only rewrites the states.
+	const WATCHED = "[data-ref], [data-ref-states]";
 	const holdsRef = (n: Node) =>
-		n instanceof Element && (n.matches("[data-ref]") || n.querySelector("[data-ref]") !== null);
+		n instanceof Element && (n.matches(WATCHED) || n.querySelector(WATCHED) !== null);
 	new MutationObserver((records) => {
 		if (
 			records.some(
-				(r) => r.type === "attributes" || [...r.addedNodes, ...r.removedNodes].some(holdsRef),
+				(r) =>
+					r.attributeName === "data-ref" || [...r.addedNodes, ...r.removedNodes].some(holdsRef),
 			)
 		) {
 			refresh();
+		} else if (records.some((r) => r.attributeName === "data-ref-states")) {
+			writeStates([...document.querySelectorAll<Part>("[data-ref]")]);
 		}
 	}).observe(document.documentElement, {
 		subtree: true,
 		childList: true,
-		attributeFilter: ["data-ref"],
+		attributeFilter: ["data-ref", "data-ref-states"],
 	});
 	refresh();
 

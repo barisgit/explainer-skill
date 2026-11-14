@@ -2377,12 +2377,14 @@ details > :last-child:not(summary) {
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js), keep's Clear (kit:keep.js). Tokens only.
-   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
-/* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
-[data-live] [data-step] {
+   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed, and write data-state (marked data-kit-state) on the parts of a ref a step names (now, not-yet);
+   page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
+/* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture.
+   A ref a step names, anywhere on the page, does the same through data-state, which kit:link.js writes and marks data-kit-state; a page's own data-state is not the kit's. */
+:is([data-live] [data-step], [data-kit-state]:is([data-state~="now"], [data-state~="not-yet"])) {
 	transition: opacity 0.3s var(--ease);
 }
-[data-live] [data-step]:not(.is-on) {
+:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 	opacity: 0.15;
 }
 [data-captions] {
@@ -2411,10 +2413,10 @@ details > :last-child:not(summary) {
 	border-radius: 0.25rem;
 	cursor: pointer;
 }
-:is(.is-lit, [data-step].is-now):not(svg *) {
+:is(.is-lit, [data-step].is-now, [data-kit-state][data-state~="now"]):not(svg *) {
 	background: var(--accent-soft);
 }
-svg :is(.is-lit, .is-now) {
+svg :is(.is-lit, .is-now, [data-kit-state][data-state~="now"]) {
 	filter: drop-shadow(0 0 0.25rem var(--accent));
 }
 svg.has-lit [data-ref]:not(.is-lit) {
@@ -2567,7 +2569,7 @@ dialog.reply-dialog[open] {
 	pointer-events: none;
 }
 @media print {
-	[data-live] [data-step]:not(.is-on) {
+	:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 		opacity: 1;
 	}
 	[data-live] [data-captions] > li:not(.is-now) {

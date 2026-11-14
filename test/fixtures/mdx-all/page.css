@@ -29,3 +29,14 @@
 .roof {
 	max-inline-size: 18rem;
 }
+/* The System figure's parts by the time of day the Explore picks; its readout says the same in words. */
+[data-state~="idle"] {
+	opacity: 0.45;
+}
+span[data-state~="supplies"] {
+	font-weight: 600;
+}
+svg [data-state~="supplies"] rect {
+	stroke: var(--accent);
+	stroke-width: 3;
+}

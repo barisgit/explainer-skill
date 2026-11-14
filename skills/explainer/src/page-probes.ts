@@ -266,11 +266,19 @@ export const SWEEP_JS = `(async () => {
 	return ["${SWEEP_WARNING}: " + cutoff + parts.join("; ") + ": scroll the rest by hand"];
 })()`;
 
+/** Page function: the elements, anywhere on the page, of the refs a stepper's own captions name in data-refs (kit Stepper refs). */
+const NAMED_PARTS_JS = `(stepper) => {
+	const refs = (text) => (text ?? "").split(/\\s+/).filter(Boolean);
+	const named = new Set([...stepper.querySelectorAll("[data-captions] > [data-refs]")].filter((li) => li.closest("[data-stepper]") === stepper).flatMap((li) => refs(li.dataset.refs)));
+	return named.size ? [...document.querySelectorAll("[data-ref]")].filter((el) => refs(el.dataset.ref).some((ref) => named.has(ref))) : [];
+}`;
+
 /** The most elements of one ref, or parts of one stepper, that LINKED_JS compares: enough for any prose a reader links by hand. */
 const LINKED_MAX = 40;
 /**
  * Runs in the page at desktop width: linked parts a reader cannot see on one screen. The elements kit:link.js links (is-linked)
- * that share a ref, and each stepper's captions and its data-step parts, are seen together when some scroll position shows a
+ * that share a ref, and each stepper's captions and its parts (its data-step parts and, anywhere on the page, the elements of
+ * the refs its captions name in data-refs), are seen together when some scroll position shows a
  * part of each (24 px, or half of a smaller one). Parts of one SVG are one place, as kit:link.js counts places, and never
  * partners of each other. A part under a sticky box
  * (a .beside figure) is measured by scrolling the other part to the top and the bottom of the viewport, so a pinned figure
@@ -317,6 +325,7 @@ export const LINKED_JS = `(() => {
 		const partners = (a, b) => place(a) !== place(b) && (prose || !(mention(a) && mention(b)));
 		return parts.filter((a) => !parts.some((b) => partners(a, b) && together(a, b)));
 	};
+	const namedParts = ${NAMED_PARTS_JS};
 	const warnings = [];
 	try {
 		const byRef = new Map();
@@ -332,9 +341,10 @@ export const LINKED_JS = `(() => {
 		for (const stepper of document.querySelectorAll("[data-stepper][data-live]")) {
 			const captions = stepper.querySelector("[data-captions]");
 			if (!captions || !shown(captions)) continue;
-			const parts = [...stepper.querySelectorAll("[data-step]")].filter((el) => shown(el) && el.closest("[data-stepper]") === stepper).slice(0, ${LINKED_MAX});
+			const own = [...stepper.querySelectorAll("[data-step]")].filter((el) => el.closest("[data-stepper]") === stepper);
+			const parts = [...own, ...namedParts(stepper)].filter(shown).slice(0, ${LINKED_MAX});
 			const far = parts.filter((el) => !together(captions, el));
-			if (far.length) warnings.push(tag(stepper) + ": its captions and the parts they light are more than a screen apart at " + screen + " (" + far.slice(0, 3).map(name).join(", ") + "): make the picture shorter, so it fits one screen with its captions, or put the captions first (Stepper captionsFirst)");
+			if (far.length) warnings.push(tag(stepper) + ": its captions and the parts they light are more than a screen apart at " + screen + " (" + far.slice(0, 3).map(name).join(", ") + "): make the picture shorter, so it fits one screen with its captions, put the captions first (Stepper captionsFirst), or name in refs only parts near them");
 		}
 	} finally {
 		root.scrollTo({ top: start, behavior: "instant" });
@@ -347,7 +357,8 @@ const STEPPER_MAX_STEPS = 40;
 /**
  * Runs in the page: steps every working stepper (kit:steps.js) until its content, captions and controls aside, looks different
  * from the step it opened on, then returns it there, also when stepping throws. A caption-only stepper is legitimate when the
- * page redraws on stepchange (the stepper's own markup then changes), so pack cannot tell; stepping it shows it. Canvases
+ * page redraws on stepchange (the stepper's own markup then changes), so pack cannot tell; stepping it shows it. The states
+ * of the parts its captions name (kit Stepper refs) count wherever those parts are. Canvases
  * count by their pixels, since a chart redraw leaves the markup as it was. One stepper takes at most 40 steps and the page 3 s;
  * a stepper still unchanged when either runs out is reported as not fully checked rather than as caption-only.
  */
@@ -356,10 +367,11 @@ export const STEPPERS_JS = `(async () => {
 	const name = ${ELEMENT_NAME_JS};
 	const end = performance.now() + ${STEPPER_BUDGET_MS};
 	const frame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 30)));
+	const namedParts = ${NAMED_PARTS_JS};
 	const look = (root) => {
 		const copy = root.cloneNode(true);
 		copy.querySelectorAll("[data-captions], .player").forEach((el) => el.remove());
-		return copy.innerHTML + [...root.querySelectorAll("canvas")].map((c) => c.toDataURL()).join("");
+		return copy.innerHTML + [...root.querySelectorAll("canvas")].map((c) => c.toDataURL()).join("") + namedParts(root).map((el) => el.getAttribute("data-state")).join();
 	};
 	/** The steps taken before the stepper looked different, or -1 when it did. */
 	const unchangedSteps = async (root, start, total) => {
@@ -390,7 +402,7 @@ export const STEPPERS_JS = `(async () => {
 		if (taken < 0 || total < 2) continue;
 		warnings.push(taken + 1 < total
 			? name(root) + " was not fully checked: its first " + (taken + 1) + " of " + total + " steps change only the captions, and check stops after ${STEPPER_MAX_STEPS} steps or ${STEPPER_BUDGET_MS / 1000} s: step through the rest by hand"
-			: name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without a Stepper, or mark its parts with data-step=\\"<n>\\" (kit Stepper)");
+			: name(root) + " steps through " + total + " captions, but nothing else in it changes: show it whole without a Stepper, mark its parts with data-step=\\"<n>\\" or name their refs in refs (kit Stepper)");
 	}
 	return warnings;
 })()`;

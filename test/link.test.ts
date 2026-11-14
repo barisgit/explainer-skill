@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
-import { packAndRun, SETTLED, scratch } from "./support.ts";
+import { readFileSync } from "node:fs";
+import { packAndRun, packHtml, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -211,3 +212,41 @@ test("a note target moved out of the text loses its mark, and one moved within k
 	expect($("#stay").classList.contains("is-annotatable") && $("#stay").tabIndex === 0, "a target moved within main stays one");`;
 	expect(await packAndRun(dir, "moved", PAGE(script, body, ["reply"]))).toEqual([]);
 }, 30_000);
+
+test("the states controls declare by ref become each part's data-state, in the file and as they change; a part none names keeps its own", async () => {
+	// What a Stepper or an Explore declares: a map of ref to state, "" for a ref named with none.
+	const body = `<figure id="one" data-ref-states='{"pkg":"imports","other":""}'></figure>
+<figure id="two" data-ref-states='{"pkg":"gpu"}'></figure>
+<p><span id="pkg" data-ref="pkg">pkg</span> <span id="other" data-ref="other">other</span> <span id="own" data-ref="own" data-state="fit">own</span></p>`;
+	const script = `
+	const state = () => ["pkg", "other", "own"].map((id) => $("#" + id).getAttribute("data-state")).join();
+	expect(state() === "imports gpu,,fit", "two controls' states join on one part, and a part no control names keeps its data-state");
+	$("#two").dataset.refStates = "{}";
+	await Promise.resolve();
+	expect(state() === "imports,,fit", "a state a control drops leaves its part");
+	$("#one").remove();
+	await Promise.resolve();
+	expect(state() === ",,fit", "a control removed from the page takes its states with it");`;
+	expect(await packAndRun(dir, "states", PAGE(script, body))).toEqual([]);
+	expect(readFileSync(dir.path("states.out.html"), "utf8")).toContain(
+		'<span id="pkg" data-ref="pkg" data-state="imports gpu" data-kit-state="">',
+	);
+}, 30_000);
+
+test("the file's starting states are what kit:link.js writes: a named ref with no state loses the data-state written on it", async () => {
+	const input = dir.write(
+		"cleared.html",
+		PAGE(
+			"",
+			`<figure data-ref-states='{"pkg":""}'></figure>
+<p><span id="pkg" data-ref="pkg" data-state="old">pkg</span> <span id="own" data-ref="own" data-state="fit">own</span></p>`,
+		),
+	);
+
+	const packed = await packHtml(input, dir.path("cleared.out.html"));
+
+	expect(packed.error).toBe("");
+	const html = readFileSync(dir.path("cleared.out.html"), "utf8");
+	expect(html).toContain('<span id="pkg" data-ref="pkg">');
+	expect(html).toContain('<span id="own" data-ref="own" data-state="fit">');
+});

@@ -10,6 +10,7 @@ import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
 import { PackError } from "./pack-error.ts";
+import { type PlacedRecord, writeRefStates } from "./ref-states.ts";
 import { renderSchematic } from "./schematic/index.ts";
 import { themeSvgImages } from "./svg-theme.ts";
 
@@ -57,13 +58,13 @@ const DATA_REF = /\bdata-ref="([^"]*)"/g;
 const refsIn = (markup: string) =>
 	[...markup.matchAll(DATA_REF)].flatMap((m) => (m[1] ?? "").split(/\s+/).filter(Boolean));
 
-const STEPPED = `diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)`;
+const STEPPED = `a diagram steps through its parts' refs, not data-steps: drop the attribute, put the diagram in a Stepper and name the refs each step shows in its refs (kit Stepper)`;
 
 /**
  * Replaces the source of every `pre.mermaid` (or `div.mermaid`) block with its rendered diagram in a `div`: an SVG whose
  * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy, then the phone copy when
  * renderMermaid makes one. The source is the block's text, decoded, as Mermaid reads it in a browser: a ```mermaid fence
- * becomes such a block with its source escaped, so a `<br>` in a label breaks the line. Syntax errors, unsupported types and data-steps or data-step on a block (diagrams do not step)
+ * becomes such a block with its source escaped, so a `<br>` in a label breaks the line. Syntax errors, unsupported types and data-steps or data-step on a block (a diagram steps through refs)
  * are returned as problems. `diagramRefs` collects every part id.
  */
 function renderMermaidBlocks(
@@ -140,14 +141,17 @@ function renderSchematicBlocks(
 		.text();
 }
 
-/** data-ref values the author wrote that nothing else carries: a typo, or a link to nothing. Diagram parts count as partners. */
-function loneRefs(source: string, diagramRefs: Set<string>): string[] {
+/**
+ * data-ref values the author wrote that nothing else carries: a typo, or a link to nothing. Diagram parts count as partners, and
+ * a ref a Stepper or Explore names (`stated`) is addressed by it.
+ */
+function loneRefs(source: string, diagramRefs: Set<string>, stated: Set<string>): string[] {
 	const counts = new Map<string, number>();
 	for (const ref of refsIn(source)) {
 		counts.set(ref, (counts.get(ref) ?? 0) + 1);
 	}
 	return [...counts]
-		.filter(([ref, count]) => count === 1 && !diagramRefs.has(ref))
+		.filter(([ref, count]) => count === 1 && !diagramRefs.has(ref) && !stated.has(ref))
 		.map(([ref]) => ref);
 }
 
@@ -289,26 +293,29 @@ export async function pack(mdxPath: string): Promise<{ html: string; warnings: s
 	const packed = await packPage(dirname(path), async (drawDiagrams) => {
 		const page = await mdxPage(path, drawDiagrams);
 		warnings.push(...page.warnings);
-		return page.html;
+		return page;
 	});
 	return { html: packed.html, warnings: [...warnings, ...packed.warnings] };
 }
 
 /**
  * Everything after prerendering: the page `render` returns (it draws the Mermaid blocks with the function it is given, in this
- * process) becomes one HTML file with local CSS, scripts, images and fonts inlined, relative to `baseDir`. Authors reach it only
+ * process), with the records its filled Views drew, becomes one HTML file with local CSS, scripts, images and fonts inlined, relative to `baseDir`. Authors reach it only
  * through `pack`; the kit runtime tests hand it hand-written HTML. Throws PackError listing every remaining network dependency
  * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render,
- * then, once those are fixed, every id the finished page has on more than one element.
+ * then, once those are fixed, every ref a Stepper or Explore names that no element carries (ref-states.ts, which also writes the
+ * starting states) and every id the finished page has on more than one element.
  * `warnings` lists links that go nowhere and page classes the kit styles too (see classCollisions).
  */
 export async function packPage(
 	baseDir: string,
-	render: (drawDiagrams: (html: string) => Promise<string>) => Promise<string>,
+	render: (
+		drawDiagrams: (html: string) => Promise<string>,
+	) => Promise<{ html: string; records?: PlacedRecord[] }>,
 ): Promise<{ html: string; warnings: string[] }> {
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
-	const source = await render(async (html) =>
+	const { html: source, records } = await render(async (html) =>
 		renderSchematicBlocks(
 			await renderMermaidBlocks(html, problems, diagramRefs),
 			problems,
@@ -316,7 +323,8 @@ export async function packPage(
 		),
 	);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
-	const html = await themeSvgImages(inlined);
+	const states = await writeRefStates(await themeSvgImages(inlined), records);
+	const html = states.html;
 	// The inliner names the loads it sees as written; findLoads also finds the escaped ones, so the same load can come twice.
 	const all = [...new Set([...problems, ...(await findLoads(html)).map(loadMessage)])];
 	if (all.length) {
@@ -325,13 +333,13 @@ export async function packPage(
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and import or reference them relatively." : ""}`,
 		);
 	}
-	const repeated = await repeatedIdProblems(html);
-	if (repeated.length) {
-		throw new PackError(repeated.map((p) => `- ${p}`).join("\n"));
+	const unaddressed = [...states.problems, ...(await repeatedIdProblems(html))];
+	if (unaddressed.length) {
+		throw new PackError(unaddressed.map((p) => `- ${p}`).join("\n"));
 	}
 	const warnings = [
 		...(await literalLinkWarnings(html)),
-		...loneRefs(source, diagramRefs).map(
+		...loneRefs(source, diagramRefs, states.named).map(
 			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
 		),
 		...(await classCollisions(source, (href) => {

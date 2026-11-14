@@ -21,30 +21,40 @@ function describe(el: HTMLRewriterTypes.Element): string {
 	return `<${el.tagName}${shown.join("")}>`;
 }
 
+/**
+ * Makes `rewriter` follow the headings of the page it reads; the function returned gives the text of the last heading that
+ * has ended, which tells an author where an element is.
+ */
+export function followHeadings(rewriter: HTMLRewriter): () => string | undefined {
+	let heading: string | undefined;
+	let text: string[] = [];
+	rewriter.on("h1, h2, h3, h4, h5, h6", {
+		element(el) {
+			const parts: string[] = [];
+			text = parts;
+			el.onEndTag(() => {
+				heading = unescapeHtml(parts.join("")).replace(/\s+/g, " ").trim() || heading;
+			});
+		},
+		// Text inside the heading's child elements arrives here too.
+		text(chunk) {
+			text.push(chunk.text);
+		},
+	});
+	return () => heading;
+}
+
 /** Every non-empty id of `html`, with the elements that carry it in page order. */
 export async function idUses(html: string): Promise<Map<string, IdUse[]>> {
 	const uses = new Map<string, IdUse[]>();
-	let heading: string | undefined;
-	let text: string[] = [];
-	await new HTMLRewriter()
-		.on("h1, h2, h3, h4, h5, h6", {
-			element(el) {
-				const parts: string[] = [];
-				text = parts;
-				el.onEndTag(() => {
-					heading = unescapeHtml(parts.join("")).replace(/\s+/g, " ").trim() || heading;
-				});
-			},
-			// Text inside the heading's child elements arrives here too.
-			text(chunk) {
-				text.push(chunk.text);
-			},
-		})
+	const rewriter = new HTMLRewriter();
+	const heading = followHeadings(rewriter);
+	await rewriter
 		.on("[id]", {
 			element(el) {
 				const id = unescapeHtml(el.getAttribute("id") ?? "");
 				if (id) {
-					uses.set(id, [...(uses.get(id) ?? []), { tag: describe(el), under: heading }]);
+					uses.set(id, [...(uses.get(id) ?? []), { tag: describe(el), under: heading() }]);
 				}
 			},
 		})

@@ -273,7 +273,7 @@ if (sessionStorage.loads === "2") throw new Error("second load");`,
 	expect(reloaded.stdout).toContain("page error: Error: second load");
 }, 60_000);
 
-test("check warns about a stepper whose steps change only its captions, not one that redraws or marks its parts", async () => {
+test("check warns about a stepper whose steps change only its captions, not one that redraws, marks its parts or names refs", async () => {
 	const captions = "<ol data-captions><li>One</li><li>Two</li><li>Three</li></ol>";
 	const source = dir.write(
 		"steppers.html",
@@ -281,8 +281,10 @@ test("check warns about a stepper whose steps change only its captions, not one 
 <figure class="fig" id="still" data-stepper><p>A picture that never changes.</p>${captions}</figure>
 <figure class="fig" id="redrawn" data-stepper><p id="count"></p>${captions}</figure>
 <figure class="fig" id="marked" data-stepper><p data-step="2">Appears at two.</p>${captions}</figure>
+<figure class="fig" id="named" data-stepper><p>A picture that never changes.</p><ol data-captions><li data-refs="term">One</li><li>Two</li><li data-refs="term">Three</li></ol></figure>
+<p>The <span data-ref="term">term</span> each step lights.</p>
 <script>document.querySelector("#redrawn").addEventListener("stepchange", (e) => { document.querySelector("#count").textContent = "Step " + e.detail.step; });</script>
-<script src="kit:steps.js"></script></body></html>`,
+<script src="kit:steps.js"></script><script src="kit:link.js"></script></body></html>`,
 	);
 	const packed = dir.path("steppers.out.html");
 	expect((await packHtml(source, packed)).error).toBe("");
@@ -291,10 +293,11 @@ test("check warns about a stepper whose steps change only its captions, not one 
 
 	expect(result.code).toBe(0);
 	expect(result.stdout).toContain(
-		'figure#still.fig steps through 3 captions, but nothing else in it changes: show it whole without a Stepper, or mark its parts with data-step="<n>" (kit Stepper)',
+		'figure#still.fig steps through 3 captions, but nothing else in it changes: show it whole without a Stepper, mark its parts with data-step="<n>" or name their refs in refs (kit Stepper)',
 	);
 	expect(result.stdout).not.toContain("figure#redrawn");
 	expect(result.stdout).not.toContain("figure#marked");
+	expect(result.stdout).not.toContain("figure#named");
 }, 30_000);
 
 test("check stops stepping a stepper once it changes, and says so when its time runs out before that", async () => {
@@ -331,6 +334,7 @@ test("check warns once per data-ref and per stepper whose linked parts are more 
 <p>The <span data-ref="far">first</span> and <span data-ref="far">second</span> mention, and a <span data-ref="near">near</span> one.</p>
 <p>Its <span data-ref="near">partner</span> is right under it.</p>
 <p>Call <code data-ref="code">hash</code> with its <code data-ref="code">salt</code>.</p>
+<figure class="fig" id="reach" data-stepper><p>A short picture</p><ol data-captions><li data-refs="distant">One</li><li>Two</li></ol></figure>
 ${prose(60)}
 <div data-ref="far">The far part</div>
 <pre><code><span data-ref="code">hash</span>(password, <span data-ref="code">salt</span>)</code></pre>
@@ -339,6 +343,7 @@ ${prose(60)}
 <figure class="fig" id="tall" data-stepper><p data-step="1">Step one, at the top</p><div style="height: 1200px"></div><p data-step="2">Step two</p>
 <ol data-captions><li>One</li><li>Two</li></ol></figure>
 <figure class="fig" id="short" data-stepper><p data-step="1">One</p><p data-step="2">Two</p><ol data-captions><li>One</li><li>Two</li></ol></figure>
+<p data-ref="distant">The part a step names, far below it</p>
 </main><script src="kit:link.js"></script><script src="kit:steps.js"></script></body></html>`,
 	);
 	const packed = dir.path("linked.out.html");
@@ -359,6 +364,9 @@ ${prose(60)}
 	expect(result.stdout).not.toContain('data-ref "pinned"');
 	expect(result.stdout).toContain(
 		'figure#tall.fig: its captions and the parts they light are more than a screen apart at 1440x900 (p "Step one, at the top")',
+	);
+	expect(result.stdout).toContain(
+		'figure#reach.fig: its captions and the parts they light are more than a screen apart at 1440x900 (p "The part a step names..."): make the picture shorter, so it fits one screen with its captions, put the captions first (Stepper captionsFirst), or name in refs only parts near them',
 	);
 	expect(result.stdout).not.toContain("figure#short");
 }, 30_000);

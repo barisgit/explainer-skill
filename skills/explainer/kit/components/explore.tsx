@@ -1,4 +1,4 @@
-/* Explore: sliders, choices or toggles switching a plot, chart or readout through your function; Controls shares them across figures.
+/* Explore: sliders, choices or toggles switching a plot, chart, readout or parts' states through your function; Controls shares them across figures.
    <Explore label="Envelope against g(t)" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
      frame={envelope} />
      controls  one or more, each with a label and an id (its value is kept across reloads):
@@ -10,6 +10,11 @@
        plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart)
        readout  text or JSX (blocks too) in a live line over the figure; stats { "Carrier": "67%" }, text or JSX, are figures in a row
        caption  text or JSX under the figure
+       states   a state per data-ref of the page's own parts, anywhere on it (HTML, hand-built SVG, a Mermaid node by its
+                id): states: { numpy: "imports", torch: kind === "gpu" ? "imports" : "never" }. kit:link.js writes it as
+                data-state on each, and the page's CSS styles the names: [data-state="never"] { opacity: 0.4; }; add a word
+                for screen readers when colour carries the meaning. A ref the frame leaves out (or gives undefined) has no
+                state. pack writes the starting frame's states into the file and fails on a ref no element has
      base      what every frame shares (axes, colours, the caption); a frame's keys merge over it
      label     the figure's accessible name
      class     more classes on the plot or chart, e.g. "tall"
@@ -28,7 +33,9 @@
    the set's values in the order written, so list first the ones most figures read: (period, host) => ... may leave later ones
    out. Each precomputed Explore carries its own frames (100 KB): add a control for what changes the
    figures, not for what one figure shows; a slider of many steps among others suits a "use client" frame. A frame that turns
-   something back on says so: legend: { show: view === "breakdown" }, not {}. */
+   something back on says so: legend: { show: view === "breakdown" }, not {}.
+   Children: Explore and Controls take none, and pack fails on markup written inside them. Write the parts beside it with
+   data-ref and set their states from frame; a figure that draws other markup per frame is your own "use client" component. */
 import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
@@ -69,12 +76,16 @@ export type ExploreProps = ExploreControls & {
 	id?: string;
 	/** Set by pack on an Explore with `use` written right under its Controls, which leaves out its line on screen. */
 	under?: boolean;
+	/** Markup written inside it, which pack refuses: Explore shows only what its frames return. */
+	children?: ComponentChildren;
 };
 
 /** What Controls takes: the set's `id`, which Explores name in `use`, and the controls as Explore writes them. */
 export interface ControlsProps {
 	id: string;
 	controls: readonly ExploreControlProps[];
+	/** Markup written inside it, which pack refuses. */
+	children?: ComponentChildren;
 }
 
 /** A precomputed frame as the island gets it (explore-view.tsx): the figure's option as JSON, and HTML for the rest. */
@@ -84,6 +95,7 @@ interface Shown {
 	readout?: string;
 	stats?: Record<string, string>;
 	caption?: string;
+	states?: Record<string, string>;
 }
 
 /** The English texts the component adds, by kitLabels key; `kit labels` lists them with the kit scripts' own. */
@@ -95,7 +107,7 @@ const LABELS = {
 const kitText = (key: keyof typeof LABELS) =>
 	(typeof kitLabels === "undefined" ? undefined : kitLabels?.[key]) || LABELS[key];
 
-const FRAME_KEYS = new Set(["plot", "chart", "readout", "stats", "caption"]);
+const FRAME_KEYS = new Set(["plot", "chart", "readout", "stats", "caption", "states"]);
 /** The most precomputed frames may take in the page; past it, the browser computing them is the better trade. */
 const PRECOMPUTED_LIMIT = 100_000;
 
@@ -156,16 +168,57 @@ function called(frame: FrameFunction, values: ExploreValue[]): [string, ExploreF
 		return fail(`${call} threw: ${e instanceof Error ? e.message : String(e)}`);
 	}
 	if (!isRecord(result)) {
-		return fail(`${call} returned no frame: return { plot, chart, readout, stats, caption }`);
+		return fail(
+			`${call} returned no frame: return { plot, chart, readout, stats, caption, states }`,
+		);
 	}
 	const unknown = Object.keys(result).find((key) => !FRAME_KEYS.has(key));
 	if (unknown) {
-		fail(`${call} returned "${unknown}": a frame holds plot, chart, readout, stats or caption`);
+		fail(
+			`${call} returned "${unknown}": a frame holds plot, chart, readout, stats, caption or states`,
+		);
 	}
 	if (result.plot && result.chart) {
 		fail(`${call} returned a plot and a chart: an Explore draws one`);
 	}
 	return [call, result];
+}
+
+/** A ref or a state name: one word, as data-ref and data-state hold space-separated words. */
+const WORD = /^\S+$/;
+
+/** The states of a frame (`call`), base merged in, checked: a map of one-word refs to one-word states or undefined. */
+function checkStates(call: string, states: unknown) {
+	if (!isRecord(states)) {
+		return fail(`${call}.states is not a map of ref to state: return states: { cache: "hit" }`);
+	}
+	for (const [ref, state] of Object.entries(states)) {
+		if (!WORD.test(ref)) {
+			fail(
+				`${call}.states names the ref ${JSON.stringify(ref)}: a ref is one word, as in data-ref`,
+			);
+		}
+		if (state !== undefined && !(typeof state === "string" && WORD.test(state))) {
+			fail(
+				`${call}.states.${ref} is ${JSON.stringify(state)}: a state is one word the page's CSS styles ([data-state="hit"]), or undefined for none`,
+			);
+		}
+	}
+}
+
+/** Whether `children` holds anything but whitespace: what MDX passes for markup written between a component's tags. */
+const holds = (children: ComponentChildren): boolean =>
+	Array.isArray(children)
+		? children.some(holds)
+		: children != null && typeof children !== "boolean" && String(children).trim() !== "";
+
+/** Fails for markup written inside an Explore or Controls (`tag`), which neither shows. */
+function refuseChildren(tag: string, children: ComponentChildren) {
+	if (holds(children)) {
+		throw new Error(
+			`${tag} shows nothing written inside it: write those parts before or after it; to change them with the controls, give them data-ref and return states from frame (kit Explore)`,
+		);
+	}
 }
 
 /** Text or JSX as HTML, rendered now: the island shows it as it is. */
@@ -194,6 +247,12 @@ function shownFrame([call, frame]: [string, ExploreFrame], kind: "plot" | "chart
 	}
 	if (frame.caption != null) {
 		shown.caption = toHtml(frame.caption);
+	}
+	const states = Object.entries(frame.states ?? {}).filter((entry): entry is [string, string] =>
+		Boolean(entry[1]),
+	);
+	if (states.length) {
+		shown.states = Object.fromEntries(states);
 	}
 	return shown;
 }
@@ -331,11 +390,13 @@ export function Explore({
 	height,
 	id,
 	under,
+	children,
 	...own
 }: ExploreProps) {
 	if (typeof frame !== "function") {
 		fail("needs frame, a function of the controls' values");
 	}
+	refuseChildren("<Explore>", children);
 	const place = usePlace();
 	const { controls: shown, start } = followed(own, place);
 	const live = isClientExport(frame) || typeof document !== "undefined";
@@ -352,8 +413,12 @@ export function Explore({
 		if (result.chart) {
 			validateChart(result.chart);
 		}
+		if (result.states !== undefined) {
+			checkStates(call, result.states);
+		}
 		return [call, result];
 	});
+	const stated = [...new Set(merged.flatMap(([, f]) => Object.keys(f.states ?? {})))];
 	const kind = figureKind(merged.map(([, f]) => f));
 	if (kind && !label) {
 		fail(`needs a label: the accessible name of its ${kind}`);
@@ -374,6 +439,7 @@ export function Explore({
 				}),
 		label: label ?? "",
 		...present({ class: extra, height, id }),
+		...(stated.length && { stated }),
 		...(live ? { frame: fn, base } : precomputed(merged, kind)),
 	};
 	const Island = kind === "plot" ? ExplorePlot : kind === "chart" ? ExploreChart : ExploreText;
@@ -384,11 +450,13 @@ export function Explore({
  * The row of controls that Explores with `use` of its `id` follow. Its island declares the set as it renders, so an Explore
  * after it in the same place (parts/place.ts) finds the controls, and every one of them updates as the reader chooses.
  */
-export function Controls({ id, controls }: ControlsProps) {
+export function Controls({ id, controls, children }: ControlsProps) {
 	const place = usePlace();
+	const tag = `<Controls${id ? ` id="${id}"` : ""}>`;
 	const failed = (message: string): never => {
-		throw new Error(`<Controls${id ? ` id="${id}"` : ""}> ${message}`);
+		throw new Error(`${tag} ${message}`);
 	};
+	refuseChildren(tag, children);
 	if (!id) {
 		failed("needs an id, which the Explores that follow it name in use");
 	}

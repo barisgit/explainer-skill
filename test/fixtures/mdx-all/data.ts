@@ -120,3 +120,14 @@ export const quote = (item: string, price: string) =>
 	}) satisfies RecordsProps;
 
 export const euro = (n: number) => `${n.toLocaleString("en")} €`;
+
+/** What feeds the house at each time of day, as states of the System figure's parts (kit Explore states). */
+export function supplier(hour: "morning" | "evening" | "night") {
+	const source = { morning: "panels", evening: "battery", night: "grid" }[hour];
+	return {
+		readout: `The house runs on the ${source}.`,
+		states: Object.fromEntries(
+			["panels", "battery", "grid"].map((part) => [part, part === source ? "supplies" : "idle"]),
+		),
+	};
+}

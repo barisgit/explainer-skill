@@ -5,6 +5,7 @@ import { safeScript } from "../escape.ts";
 import { idUses, recordIdProblems } from "../ids.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
+import type { PlacedRecord } from "../ref-states.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
 import { CLIENT_LOAD_FIX, clientLoads } from "./client-loads.ts";
 import { holdsFence } from "./code.ts";
@@ -97,7 +98,7 @@ interface RecordsBlockUse {
 }
 
 /** Each record a filled View drew at pack time, with the hash that opens it (its id escaped as View escapes it) as its place. */
-const filledRecords = (islands: Island[]) =>
+const filledRecords = (islands: Island[]): PlacedRecord[] =>
 	islands.flatMap(({ view, drawn = {} }) =>
 		Object.entries(drawn).map(([param, record]) => ({
 			place: `#${view}/${param.replace(/[%?#]/g, encodeURIComponent)}`,
@@ -221,12 +222,13 @@ async function kitScripts(html: string, scan: string, front: Frontmatter): Promi
  * into the page shell with kit:math.css when it holds math, kit:code.css when it or its client code holds a code fence, the stylesheets its modules import, the islands' props and client
  * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one and `<main
  * data-asks-reply>` for reply: true, which keeps reply.js's bar on a page with no reply question. Every error the author can fix is a PackError;
+ * `records` are the filled Views' records drawn at pack time, which pack checks the refs their controls name against;
  * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
  */
 export async function mdxPage(
 	file: string,
 	drawDiagrams: (html: string) => Promise<string>,
-): Promise<{ html: string; warnings: string[] }> {
+): Promise<{ html: string; records: PlacedRecord[]; warnings: string[] }> {
 	// The bundler loads modules by their real path (/tmp is /private/tmp on macOS), and the page is recognised by it.
 	const path = realpathSync(file);
 	const page = await compileMdx(path, true);
@@ -297,5 +299,9 @@ export async function mdxPage(
 		"</html>",
 		"",
 	];
-	return { html: shell.join("\n"), warnings: frontmatterWarnings(page.front) };
+	return {
+		html: shell.join("\n"),
+		records: filledRecords(islands),
+		warnings: frontmatterWarnings(page.front),
+	};
 }

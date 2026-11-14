@@ -2377,12 +2377,14 @@ details > :last-child:not(summary) {
    puts them in name order before this file, which ends the cascade with the stepper, highlighting and reply rules. */
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js), keep's Clear (kit:keep.js). Tokens only.
-   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed; page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
-/* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture. */
-[data-live] [data-step] {
+   Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed, and write data-state (marked data-kit-state) on the parts of a ref a step names (now, not-yet);
+   page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
+/* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture.
+   A ref a step names, anywhere on the page, does the same through data-state, which kit:link.js writes and marks data-kit-state; a page's own data-state is not the kit's. */
+:is([data-live] [data-step], [data-kit-state]:is([data-state~="now"], [data-state~="not-yet"])) {
 	transition: opacity 0.3s var(--ease);
 }
-[data-live] [data-step]:not(.is-on) {
+:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 	opacity: 0.15;
 }
 [data-captions] {
@@ -2411,10 +2413,10 @@ details > :last-child:not(summary) {
 	border-radius: 0.25rem;
 	cursor: pointer;
 }
-:is(.is-lit, [data-step].is-now):not(svg *) {
+:is(.is-lit, [data-step].is-now, [data-kit-state][data-state~="now"]):not(svg *) {
 	background: var(--accent-soft);
 }
-svg :is(.is-lit, .is-now) {
+svg :is(.is-lit, .is-now, [data-kit-state][data-state~="now"]) {
 	filter: drop-shadow(0 0 0.25rem var(--accent));
 }
 svg.has-lit [data-ref]:not(.is-lit) {
@@ -2567,7 +2569,7 @@ dialog.reply-dialog[open] {
 	pointer-events: none;
 }
 @media print {
-	[data-live] [data-step]:not(.is-on) {
+	:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 		opacity: 1;
 	}
 	[data-live] [data-captions] > li:not(.is-now) {
@@ -3857,7 +3859,14 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
    A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
-   Refs a client component renders or removes after load link and unlink at once. */
+   Refs a client component renders or removes after load link and unlink at once.
+   States: a Stepper step (kit Stepper) or an Explore frame (kit Explore) can give the parts of a ref a named state, which this
+   script writes as data-state on every element carrying that ref, wherever it is on the page (Mermaid parts too), linked or not:
+     [data-state="imports"] { background: var(--accent-soft); }   the page's CSS styles its own state names
+   The kit styles only the stepper's: now (lit) and not-yet (faded until its step, still there for keyboards and screen readers;
+   print shows it). pack writes the starting state into the file, so it reads without scripts, and fails on a state for a ref no
+   element has. A part given states by two controls carries both, space separated: match one with [data-state~="imports"]; now
+   wins over not-yet. A data-state you write yourself on a part no control names stays as written, unstyled by the kit. */
 (() => {
   const refsOf = (el) => (el?.dataset.ref ?? "").split(/\s+/).filter(Boolean);
   const NATIVE = "a[href], button, input, select, textarea, summary";
@@ -3914,8 +3923,62 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       delete el.dataset.kitFocusable;
     }
   }
+  function declared(el) {
+    try {
+      const map = JSON.parse(el.dataset.refStates ?? "");
+      return map !== null && typeof map === "object" ? Object.entries(map) : [];
+    } catch {
+      return [];
+    }
+  }
+  function givenStates() {
+    const given = new Map;
+    for (const el of document.querySelectorAll("[data-ref-states]")) {
+      for (const [ref, state] of declared(el)) {
+        const states = given.get(ref) ?? [];
+        if (typeof state === "string" && state && !states.includes(state)) {
+          states.push(state);
+        }
+        given.set(ref, states);
+      }
+    }
+    return given;
+  }
+  function joined(states) {
+    const set = new Set(states);
+    if (set.has("now")) {
+      set.delete("not-yet");
+    }
+    return [...set].join(" ");
+  }
+  function unstate(el) {
+    el.removeAttribute("data-state");
+    delete el.dataset.kitState;
+  }
+  function state(el, value) {
+    if (!value) {
+      unstate(el);
+    } else if (el.getAttribute("data-state") !== value || el.dataset.kitState === undefined) {
+      el.setAttribute("data-state", value);
+      el.dataset.kitState = "";
+    }
+  }
+  function writeStates(parts) {
+    const given = givenStates();
+    const named = given.size ? parts.filter((el) => refsOf(el).some((ref) => given.has(ref))) : [];
+    const still = new Set(named);
+    for (const el of document.querySelectorAll("[data-kit-state]")) {
+      if (!still.has(el)) {
+        unstate(el);
+      }
+    }
+    for (const el of named) {
+      state(el, joined(refsOf(el).flatMap((ref) => given.get(ref) ?? [])));
+    }
+  }
   function refresh() {
     const parts = [...document.querySelectorAll("[data-ref]")];
+    writeStates(parts);
     linked = linkingRefs(parts);
     for (const el of linkedParts) {
       mark(el, false);
@@ -3959,15 +4022,18 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       svg.classList.add("has-lit");
     }
   }
-  const holdsRef = (n) => n instanceof Element && (n.matches("[data-ref]") || n.querySelector("[data-ref]") !== null);
+  const WATCHED = "[data-ref], [data-ref-states]";
+  const holdsRef = (n) => n instanceof Element && (n.matches(WATCHED) || n.querySelector(WATCHED) !== null);
   new MutationObserver((records) => {
-    if (records.some((r) => r.type === "attributes" || [...r.addedNodes, ...r.removedNodes].some(holdsRef))) {
+    if (records.some((r) => r.attributeName === "data-ref" || [...r.addedNodes, ...r.removedNodes].some(holdsRef))) {
       refresh();
+    } else if (records.some((r) => r.attributeName === "data-ref-states")) {
+      writeStates([...document.querySelectorAll("[data-ref]")]);
     }
   }).observe(document.documentElement, {
     subtree: true,
     childList: true,
-    attributeFilter: ["data-ref"]
+    attributeFilter: ["data-ref", "data-ref-states"]
   });
   refresh();
   const partOf = (e) => {

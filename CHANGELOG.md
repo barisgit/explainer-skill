@@ -8,6 +8,8 @@
 
 - Inspect the exact current reply Markdown with `check --do reply`, after any answer or note steps, without copying or sending it. Text output prints it verbatim; `--json` returns `replies` with each action’s step, theme, viewport and Markdown. Repack older exports to make their reply text available (#156).
 
+- Step through a Mermaid diagram, or light parts anywhere on the page, by naming refs: `<Stepper captions={[...]} refs={["m1", "m2 call"]}>` fades each ref until its first step and lights it on the steps that name it (a sequence diagram's messages are `m1`, `m2`, ...), and an Explore frame returns `states: { numpy: "imports" }` to set `data-state` on the parts of a ref, which the page's CSS styles. pack writes the starting states into the file and fails on a ref no element has. `data-steps` on a Mermaid block now points to Stepper `refs`, and markup written inside an Explore or Controls fails the pack instead of vanishing (#152, #153).
+
 - Set text linked to a figure, diagram or code in `<div class="beside">` (the text, then the figure or a code fence): from 56rem the two stand side by side at `.wide`'s width and the figure stays in view while the text scrolls; phones stack them. `check` warns when parts sharing a `data-ref`, or a stepper's captions and the parts they light, are more than a screen apart at desktop width, naming the ref or stepper (#159).
 
 - Put the reader's next action under the lede as a masthead paragraph that opens with a bold label (`**Start:** change one bit, 2 minutes`): it is set as prominent body text with an accent rule instead of small grey meta (#141).

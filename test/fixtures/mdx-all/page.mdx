@@ -1,8 +1,8 @@
 ---
 title: Home battery size
 ---
-import { Chart, Plot, Question, Records, Stepper, View } from "kit";
-import { euro, MONTHS, PRODUCTION, payback, quote, SIZES, USE } from "./data.ts";
+import { Chart, Explore, Plot, Question, Records, Stepper, View } from "kit";
+import { euro, MONTHS, PRODUCTION, payback, quote, SIZES, supplier, USE } from "./data.ts";
 import { Day } from "./day.tsx";
 import "./page.css";
 
@@ -49,6 +49,8 @@ Illustrative numbers, not a real quote
 
 <h2 data-nav="System">The battery sits behind the inverter</h2>
 
+<Explore controls={[{ id: "hour", label: "Time of day", choice: { morning: "Morning", evening: "Evening", night: "Night" } }]} frame={supplier} />
+
 <div class="beside">
 <div>
 
@@ -82,6 +84,25 @@ D1 led lamp 0 green b@R_lim.b 0,4 v
 ```
 
 The <span data-ref="R_lim">series resistor</span> sets the lamp's current, about 16 mA.
+
+<h2 data-nav="Meter">The meter reads the inverter every minute</h2>
+
+<Stepper start={1} label="One meter reading" captions={["The meter asks the inverter for a reading.", "The inverter asks the battery for its charge.", "The battery answers.", "The inverter answers, and the reading goes into the log."]} refs={["m1", "m2", "m3", "m4 logged"]}>
+
+```mermaid
+sequenceDiagram
+	participant mtr as Meter
+	participant inv as Inverter
+	participant bat as Battery
+	mtr->>inv: reading?
+	inv->>bat: charge?
+	bat->>inv: 62%
+	inv->>mtr: 1.4 kW, 62%
+```
+
+</Stepper>
+
+Each reading ends up in the <span data-ref="logged">meter log</span>.
 
 <h2 data-nav="Cost">The 5 kWh quote is 4,200 €, two thirds of it the battery</h2>
 

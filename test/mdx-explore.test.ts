@@ -403,3 +403,59 @@ describe("Explore control rows", () => {
 		expect(new Set(tops).size).toBe(1);
 	}, 30_000);
 });
+
+/** A choice of program that sets a state on each package of a list by its ref, written beside the Explore. */
+const STATES = (frame: string, inside = "") => `import { Explore } from "kit";
+
+# Packages
+
+<Explore id="pick" controls={[{ id: "program", label: "Program", choice: { cli: "The CLI", gpu: "The GPU trainer" } }]}
+  frame={${frame}}>${inside}</Explore>
+
+<ul>
+<li data-ref="numpy">numpy</li>
+<li data-ref="torch">torch</li>
+</ul>
+`;
+
+describe("Explore states", () => {
+	test("a frame's states reach the page's own parts by ref, written into the file for the starting choice", async () => {
+		const frame = `(p) => ({ states: { numpy: "imports", torch: p === "gpu" ? "imports" : undefined } })`;
+		const { output, html } = await pack("states", STATES(frame));
+		expect(html).toContain('<li data-ref="numpy" data-state="imports" data-kit-state="">');
+		expect(html).toContain('<li data-ref="torch">');
+		const states = `["numpy", "torch"].map((ref) => document.querySelector('li[data-ref="' + ref + '"]').getAttribute("data-state")).join()`;
+		const state = await inPage(output, async (cdp) => ({
+			start: await cdp.evaluate(states),
+			gpu: await act(cdp, `document.getElementById("program-1").click()`, states),
+			cli: await act(cdp, `document.getElementById("program-0").click()`, states),
+		}));
+		expect(state).toEqual({ start: "imports,", gpu: "imports,imports", cli: "imports," });
+	}, 30_000);
+
+	test("a state for a ref no element has, a state that is no word and markup written inside fail the pack", async () => {
+		const missing = `(p) => ({ states: p === "gpu" ? { cuda: "imports" } : {} })`;
+		expect(await failure("missing-state", STATES(missing).split("\n").slice(3).join("\n"))).toEqual(
+			[
+				1,
+				expect.stringContaining(
+					'the Explore under "Fails" sets a state on "cuda", but no element has data-ref="cuda"',
+				),
+			],
+		);
+		const spaced = `() => ({ states: { numpy: "two words" } })`;
+		expect(await failure("spaced-state", STATES(spaced).split("\n").slice(3).join("\n"))).toEqual([
+			1,
+			expect.stringContaining(
+				'<Explore> frame("cli").states.numpy is "two words": a state is one word',
+			),
+		]);
+		const inside = "\n\n- numpy\n- torch\n\n";
+		expect(
+			await failure(
+				"inside",
+				STATES(`() => ({ readout: "x" })`, inside).split("\n").slice(3).join("\n"),
+			),
+		).toEqual([1, expect.stringContaining("<Explore> shows nothing written inside it")]);
+	}, 30_000);
+});

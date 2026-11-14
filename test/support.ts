@@ -45,9 +45,9 @@ export interface Packed {
  */
 export async function packHtml(input: string, output: string): Promise<Packed> {
 	try {
-		const { html, warnings } = await packPage(dirname(input), (drawDiagrams) =>
-			drawDiagrams(readFileSync(input, "utf8")),
-		);
+		const { html, warnings } = await packPage(dirname(input), async (drawDiagrams) => ({
+			html: await drawDiagrams(readFileSync(input, "utf8")),
+		}));
 		writeFileSync(output, html);
 		return { error: "", warnings };
 	} catch (e) {

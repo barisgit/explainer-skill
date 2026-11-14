@@ -84,7 +84,7 @@ test("an unsupported diagram type fails the pack and says what to draw instead",
 	expect(result.stderr).toContain("the kit's Chart");
 });
 
-test("data-step on a Mermaid block fails the pack and points to linked highlighting", async () => {
+test("data-step on a Mermaid block fails the pack and points to stepping through its refs", async () => {
 	const input = dir.write(
 		"stepped.html",
 		`<!doctype html><html><body><figure class="fig" data-stepper><pre class="mermaid" data-step="1">flowchart LR\n  a --> b</pre></figure></body></html>`,
@@ -93,7 +93,7 @@ test("data-step on a Mermaid block fails the pack and points to linked highlight
 	const packed = await packHtml(input, dir.path("stepped.out.html"));
 
 	expect(packed.error).toContain(
-		'mermaid block 1: diagrams do not step; drop data-steps, show the diagram whole and link its parts to the text with data-ref="<id>" (kit mermaid)',
+		"mermaid block 1: a diagram steps through its parts' refs, not data-steps: drop the attribute, put the diagram in a Stepper and name the refs each step shows in its refs (kit Stepper)",
 	);
 });
 

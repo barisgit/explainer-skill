@@ -26,6 +26,8 @@ export interface ExploreFrame {
 	readout?: ComponentChildren;
 	stats?: Record<string, ComponentChildren>;
 	caption?: ComponentChildren;
+	/** A state name per data-ref of the page's own parts, which kit:link.js writes as their data-state; undefined is none. */
+	states?: Record<string, string | undefined>;
 }
 
 /** A control's value as the frame function gets it: a range's number, a choice's text, a toggle's true or false. */
@@ -45,6 +47,8 @@ export type ExploreData = {
 	class?: string;
 	height?: string;
 	id?: string;
+	/** Every ref the frames pack checked give a state, so a frame that leaves one out clears it. */
+	stated?: string[];
 } & (
 	| { controls: ExploreControl[]; start: number[] }
 	| { use: string; off: string; under?: boolean }
@@ -71,7 +75,22 @@ export const withBase = (base: ExploreFrame, frame: ExploreFrame): ExploreFrame 
 	...(frame.plot && { plot: merge(base.plot, frame.plot) as PlotOption }),
 	...(frame.chart && { chart: merge(base.chart, frame.chart) as ChartOption }),
 	...((base.stats || frame.stats) && { stats: { ...base.stats, ...frame.stats } }),
+	...((base.states || frame.states) && { states: { ...base.states, ...frame.states } }),
 });
+
+/**
+ * The declaration kit:link.js reads (data-ref-states): every ref the frames name, with this frame's state or "" for none, so
+ * the part of a ref this frame leaves out loses the state another frame gave it.
+ */
+function declaration(
+	stated: string[] | undefined,
+	states: ExploreFrame["states"],
+): string | undefined {
+	const named = [...new Set([...(stated ?? []), ...Object.keys(states ?? {})])];
+	return named.length
+		? JSON.stringify(Object.fromEntries(named.map((ref) => [ref, states?.[ref] ?? ""])))
+		: undefined;
+}
 
 /** The control's markup; `set` takes the index of the value the reader chose. */
 function Control({
@@ -259,7 +278,7 @@ export function ExploreView({
 		"frame" in data ? { children: text } : { dangerouslySetInnerHTML: { __html: String(text) } };
 	const option = frame.plot ?? frame.chart;
 	return (
-		<figure class="fig" id={data.id}>
+		<figure class="fig" id={data.id} data-ref-states={declaration(data.stated, frame.states)}>
 			{"use" in data && (
 				<ControlsState
 					use={data.use}

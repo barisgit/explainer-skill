@@ -2,20 +2,22 @@
    <figure class="fig" data-stepper>             any element; the controls are added before the captions (else at its end)
      <g data-step="2">  <p data-step="0 3">      a part appears at the first listed step and is lit (is-now) on every listed one;
                                                  0 = visible from the start, lit later; a part without data-step never changes
-     <ol data-captions><li>Step 1 text</li><li>Step 2 text</li></ol>   one li per step; the current one shows
+     <ol data-captions><li>Step 1 text</li><li data-refs="m2 call">Step 2 text</li></ol>   one li per step; the current one shows
    </figure>
+   data-refs on a caption names refs (kit link) its step shows and lights, anywhere on the page, Mermaid parts included: a ref
+   is not-yet (faded, not hidden) before the first step naming it and now (lit) on each step that names it, written as data-state by kit:link.js.
    Steps count from 1; the number of steps is the number of captions, else the highest step used. The stepper opens on the last
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
    number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
-   A Mermaid diagram does not step (pack refuses data-steps on one): show it whole and link its parts to the text with data-ref (kit mermaid).
+   A Mermaid diagram steps through its parts' refs in data-refs (pack refuses data-steps on one).
    Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in the
    page's frontmatter labels, one key: text per line (back: Nazaj). Keys here:
    back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
    (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
    Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
    is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
-   Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts must redraw on it;
-   check warns about one whose steps change only the captions.
+   Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts or data-refs must
+   redraw on it; check warns about one whose steps change only the captions.
    Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts. Replacing
    the children of the [data-captions] list is picked up by itself; after any other replacement call Steps.refresh(el, step?). It re-reads
    captions and parts, so the step count follows the new content; each stepper counts for itself, so steppers on one page may
@@ -62,6 +64,8 @@
 	/** One stepper: its controls, the current step and the content it steps through. */
 	class Stepper {
 		parts: { el: Part; steps: number[] }[] = [];
+		/** The steps whose captions name each ref in data-refs. */
+		refSteps = new Map<string, number[]>();
 		captions: Element[] = [];
 		total = 0;
 		step = 0;
@@ -111,12 +115,33 @@
 			for (const [i, caption] of this.captions.entries()) {
 				caption.classList.toggle("is-now", i === this.step - 1);
 			}
+			this.declareStates();
 			this.back.disabled = this.step === 1;
 			this.next.disabled = this.step === this.total;
 			this.range.value = String(this.step);
 			this.readout.textContent = `${this.step} / ${this.total}`;
 			if (loaded) {
 				this.announce();
+			}
+		}
+
+		/**
+		 * Declares the states of the refs the captions name, for kit:link.js to write: now on a step that names the ref, not-yet
+		 * before the first, none after. Step 0 (too few steps to step) declares nothing, so every part shows.
+		 */
+		declareStates() {
+			const states = [...this.refSteps].map(([ref, steps]) => [
+				ref,
+				steps.includes(this.step)
+					? "now"
+					: this.step && this.step < Math.min(...steps)
+						? "not-yet"
+						: "",
+			]);
+			if (states.length && this.step) {
+				this.root.dataset.refStates = JSON.stringify(Object.fromEntries(states));
+			} else {
+				delete this.root.dataset.refStates;
 			}
 		}
 
@@ -219,6 +244,12 @@
 			}));
 			const captionList = this.root.querySelector("[data-captions]");
 			this.captions = [...(captionList?.children ?? [])];
+			this.refSteps = new Map();
+			for (const [i, caption] of this.captions.entries()) {
+				for (const ref of (caption.getAttribute("data-refs") ?? "").split(/\s+/).filter(Boolean)) {
+					this.refSteps.set(ref, [...(this.refSteps.get(ref) ?? []), i + 1]);
+				}
+			}
 			this.total = this.captions.length || Math.max(0, ...this.parts.flatMap((p) => p.steps));
 			this.watcher.disconnect();
 			if (captionList) {
@@ -257,6 +288,7 @@
 				delete this.root.dataset.live;
 				this.step = this.total = 0; // so growing again reopens on the last step
 				this.announced = "";
+				this.declareStates();
 				return;
 			}
 			this.mount(captionList);
