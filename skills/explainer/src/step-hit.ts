@@ -26,10 +26,20 @@ export async function beginHit(cdp: Cdp): Promise<() => Promise<string>> {
 			observation.chart = true;
 		}
 	});
+	let removal: Promise<unknown> | undefined;
+	const release = () => {
+		stop();
+		removal ??= cdp.send("Runtime.removeBinding", { name: binding });
+		return removal;
+	};
+	let description: string | undefined;
 	try {
 		await cdp.send("Runtime.addBinding", { name: binding });
 		const before = await cdp.evaluate<string>(hitScript(binding));
 		return async () => {
+			if (description !== undefined) {
+				return description;
+			}
 			let after: string;
 			try {
 				after = await cdp.evaluate<string>(`(() => {
@@ -38,16 +48,17 @@ export async function beginHit(cdp: Cdp): Promise<() => Promise<string>> {
 					delete window[${JSON.stringify(binding)}];
 					return location.hash;
 				})()`);
-			} finally {
-				stop();
-				await cdp.send("Runtime.removeBinding", { name: binding });
+			} catch (error) {
+				await release().catch(() => undefined);
+				throw error;
 			}
-			return describe(observation, before, after);
+			await release();
+			description = describe(observation, before, after);
+			return description;
 		};
 	} catch (error) {
-		stop();
 		// Preserve setup's own error; an expired/closed target cannot accept cleanup and is being disposed by its owner.
-		await cdp.send("Runtime.removeBinding", { name: binding }).catch(() => undefined);
+		await release().catch(() => undefined);
 		throw error;
 	}
 }

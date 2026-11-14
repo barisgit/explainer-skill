@@ -451,20 +451,28 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 	let result: StepResult = {};
 	let missing = "";
 	const finish = /^(click|drag):/.test(step) ? await beginHit(cdp) : undefined;
+	let hit = "";
 	try {
-		if (step === RELOAD) {
-			await cdp.load();
-		} else {
-			result = await act(cdp, step, shotPath);
-		}
-		missing = await settlePage(cdp);
-	} finally {
-		if (finish) {
-			const hit = await finish();
-			if (!result.problem) {
-				result.note = `${result.note ?? step}: ${hit}`;
-			}
-		}
+		await cdp.followingNavigation(
+			async () => {
+				if (step === RELOAD) {
+					await cdp.load();
+				} else {
+					result = await act(cdp, step, shotPath);
+				}
+			},
+			async () => {
+				missing = await settlePage(cdp);
+				hit = finish ? await finish() : "";
+			},
+		);
+	} catch (error) {
+		// Cleanup must not replace an action/page/connection failure. The binding is removed even if its document vanished.
+		await finish?.().catch(() => undefined);
+		throw error;
+	}
+	if (finish && !result.problem) {
+		result.note = `${result.note ?? step}: ${hit}`;
 	}
 	// An action problem suppresses feedback; a later settling problem must retain the executed action's observations.
 	return missing && !result.problem ? { ...result, problem: `${step}: ${missing}` } : result;

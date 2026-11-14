@@ -1,4 +1,5 @@
 import type { Readable, Writable } from "node:stream";
+import { contextLost, Navigation } from "./cdp-navigation.ts";
 
 /**
  * How long one DevTools call may take before Chrome counts as stalled, far above any real call: the longest, check's page-side
@@ -53,9 +54,19 @@ interface CdpEvents {
 	"Runtime.consoleAPICalled": { type: string; args: ConsoleArg[] };
 	"Runtime.bindingCalled": { name: string; payload: string };
 	"Log.entryAdded": { entry: { level: string; source: string; text: string; url?: string } };
-	"Network.requestWillBeSent": { request: { url: string } };
-	"Network.loadingFailed": { errorText: string; canceled?: boolean };
-	"Page.loadEventFired": object;
+	"Network.requestWillBeSent": {
+		request: { url: string };
+		requestId?: string;
+		frameId?: string;
+		loaderId?: string;
+		type?: string;
+	};
+	"Network.loadingFailed": { errorText: string; canceled?: boolean; requestId?: string };
+	"Page.frameStartedNavigating": { frameId: string; loaderId: string; navigationType: string };
+	"Page.frameNavigated": {
+		frame: { id: string; parentId?: string; loaderId: string; url: string };
+	};
+	"Page.lifecycleEvent": { frameId: string; loaderId: string; name: string };
 	"Debugger.paused": object;
 	"Inspector.targetCrashed": object;
 	"Target.detachedFromTarget": { sessionId: string };
@@ -445,24 +456,143 @@ export class Cdp {
 			(this.listeners.get(event) ?? []).filter((listener) => listener !== fn),
 		);
 	}
+	/** Enables identified lifecycle events before taking the committed main document as the operation's baseline. */
+	private async navigation(): Promise<Navigation> {
+		await Promise.all([
+			this.send("Page.setLifecycleEventsEnabled", { enabled: true }),
+			this.send("Network.enable"),
+		]);
+		return Navigation.open(this);
+	}
+
+	private navigationReady(navigation: Navigation, ready: () => boolean, what: string, ms: number) {
+		const message = `${what} did not come in ${seconds(LOAD_DEADLINE_MS)}`;
+		if (ready()) {
+			return Promise.resolve();
+		}
+		if (ms <= 0) {
+			return Promise.reject(new ChromeError(message));
+		}
+		return this.wait<void>(message, ms, (ok) => {
+			navigation.changed = () => {
+				if (ready()) {
+					ok();
+				}
+			};
+			navigation.changed();
+			return () => {
+				navigation.changed = () => undefined;
+			};
+		});
+	}
+
 	/**
-	 * Opens `url` in the page, or reloads it when `url` is undefined, and waits for its load event. Fails when Chrome refuses the
-	 * navigation, or the load event does not come within LOAD_DEADLINE_MS.
+	 * Opens a URL or reloads the current document. Only a commit and load belonging to the requested main-frame loader finish
+	 * the wait; events received before the command reply are retained. A same-document navigate has no new loader to load.
 	 */
 	async load(url?: string): Promise<void> {
-		const what = url ? `the load event of ${url}` : "the load event after a reload";
-		const loaded = this.once("Page.loadEventFired", what, LOAD_DEADLINE_MS);
-		// The navigation may fail first; the load wait then fails too, and must not surface as an unhandled rejection.
-		loaded.catch(() => undefined);
-		if (url) {
-			const { errorText } = await this.send<{ errorText?: string }>("Page.navigate", { url });
-			if (errorText) {
-				throw new ChromeError(`Chrome could not open ${url}: ${errorText}`);
+		const navigation = await this.navigation();
+		const started = performance.now();
+		try {
+			let loaderId: string | undefined;
+			if (url !== undefined) {
+				const reply = await this.send<{
+					frameId: string;
+					loaderId?: string;
+					errorText?: string;
+					isDownload?: boolean;
+				}>("Page.navigate", { url });
+				if (reply.errorText || reply.isDownload) {
+					throw new ChromeError(
+						`Chrome could not open ${url}: ${reply.errorText ?? "navigation became a download"}`,
+					);
+				}
+				if (reply.frameId !== navigation.frameId) {
+					throw new ChromeError("Chrome navigated a different main frame");
+				}
+				if (!reply.loaderId) {
+					return;
+				}
+				loaderId = reply.loaderId;
+			} else {
+				await this.send("Page.reload", { loaderId: navigation.documentId });
 			}
-		} else {
-			await this.send("Page.reload");
+			await this.navigationReady(
+				navigation,
+				() => {
+					const requested = loaderId ?? navigation.reloadLoaderId;
+					return requested !== undefined && navigation.loaded(requested);
+				},
+				url ? `the load event of ${url}` : "the load event after a reload",
+				LOAD_DEADLINE_MS - (performance.now() - started),
+			);
+		} finally {
+			navigation.stop();
 		}
-		await loaded;
+	}
+	private invalidated(error: unknown, navigation: Navigation, loader: string): boolean {
+		return error instanceof ChromeError && contextLost(error) && loader !== navigation.loaderId;
+	}
+
+	private async readNavigation(
+		navigation: Navigation,
+		read: () => Promise<void>,
+		loaded: () => Promise<void>,
+	): Promise<void> {
+		for (;;) {
+			if (navigation.moved) {
+				await loaded();
+			}
+			if (navigation.loading) {
+				continue;
+			}
+			const loader = navigation.documentId;
+			try {
+				await read();
+			} catch (error) {
+				if (!this.invalidated(error, navigation, loader)) {
+					throw error;
+				}
+				await loaded();
+				if (loader === navigation.loaderId) {
+					throw error;
+				}
+			}
+			if (loader === navigation.loaderId) {
+				return;
+			}
+		}
+	}
+
+	/** Runs the action once; repeats only settlement/cleanup after a replacement commits and loads, within one load budget. */
+	async followingNavigation(action: () => Promise<void>, read: () => Promise<void>): Promise<void> {
+		const navigation = await this.navigation();
+		const started = performance.now();
+		const initial = navigation.documentId;
+		const loaded = () =>
+			this.navigationReady(
+				navigation,
+				() => !navigation.moved || navigation.ready,
+				"the action's destination load event",
+				LOAD_DEADLINE_MS - (performance.now() - started),
+			);
+
+		try {
+			try {
+				await action();
+			} catch (error) {
+				if (!this.invalidated(error, navigation, initial)) {
+					throw error;
+				}
+				await loaded();
+				if (!navigation.moved) {
+					throw error;
+				}
+			}
+			await this.readNavigation(navigation, read, loaded);
+		} finally {
+			navigation.stop();
+		}
 	}
 	/** Ends the pipe Chrome reads commands from; Chrome exits once it sees the pipe closed. */
 	close() {

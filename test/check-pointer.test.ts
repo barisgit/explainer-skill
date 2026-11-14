@@ -107,26 +107,70 @@ test("click notes say what the point and DOM click hit, with navigation feedback
 	expect(stepNotes.every((n) => n.length < 200)).toBe(true);
 }, 30_000);
 
-test("a full-document navigation preserves the outgoing hit without leaking it into the next step", async () => {
-	const destination = dir.write(
-		"destination.html",
-		'<!doctype html><button id="after">After</button>',
-	);
-	const file = dir.write(
-		"navigate.html",
-		`<!doctype html><a id="next" href="file://${destination}" style="display:block;position:fixed;left:20px;top:20px;width:80px;height:40px">Next</a>`,
-	);
+test("identified loads preserve same-document, no-op and native reload semantics", async () => {
+	const file = dir.write("load.html", '<!doctype html><button id="after">After</button>');
 	await withPage(async (cdp) => {
-		const page = new CheckedPage(cdp, `file://${file}`);
-		await page.start();
-		await page.open();
-		const first = await runStep(cdp, "click:60,40", () => "unused");
-		expect(first.note).toContain("hit a#next");
-		const second = await runStep(cdp, "click:#after", () => "unused");
-		expect(second.note).toBe("click:#after: hit button#after");
-		expect(page.problems).toEqual([]);
+		await cdp.send("Page.enable");
+		await cdp.load(`file://${file}`);
+		const origin = await cdp.evaluate<number>("performance.timeOrigin");
+		await cdp.load(`file://${file}#detail`);
+		expect(await cdp.evaluate<string>("location.hash")).toBe("#detail");
+		expect(await cdp.evaluate<number>("performance.timeOrigin")).toBe(origin);
+		await cdp.load(`file://${file}#detail`);
+		expect(await cdp.evaluate<number>("performance.timeOrigin")).toBe(origin);
+		await cdp.load();
+		expect(await cdp.evaluate<string>('performance.getEntriesByType("navigation")[0].type')).toBe(
+			"reload",
+		);
+		expect(await cdp.evaluate<number>("performance.timeOrigin")).not.toBe(origin);
 	});
 }, 30_000);
+
+test("a no-content navigation leaves the original document usable without waiting for a nonexistent load", async () => {
+	const server = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 204 }) });
+	const file = dir.write(
+		"no-content.html",
+		`<!doctype html><a id="go" href="http://127.0.0.1:${server.port}/empty">Go</a><button id="after">After</button>`,
+	);
+	try {
+		await withPage(async (cdp) => {
+			await cdp.send("Page.enable");
+			await cdp.send("Runtime.enable");
+			await cdp.load(`file://${file}`);
+			expect((await runStep(cdp, "click:#go", () => "unused")).note).toContain("hit a#go");
+			expect((await runStep(cdp, "click:#after", () => "unused")).note).toBe(
+				"click:#after: hit button#after",
+			);
+		});
+	} finally {
+		server.stop(true);
+	}
+}, 15_000);
+
+test.each(["", "requestAnimationFrame(() => location.href = this.href); return false"])(
+	"a full-document navigation preserves the outgoing hit without leaking it into the next step (%s)",
+	async (onclick) => {
+		const destination = dir.write(
+			"destination.html",
+			'<!doctype html><button id="after">After</button>',
+		);
+		const file = dir.write(
+			"navigate.html",
+			`<!doctype html><a id="next" onclick="${onclick}" href="file://${destination}" style="display:block;position:fixed;left:20px;top:20px;width:80px;height:40px">Next</a>`,
+		);
+		await withPage(async (cdp) => {
+			const page = new CheckedPage(cdp, `file://${file}`);
+			await page.start();
+			await page.open();
+			const first = await runStep(cdp, "click:60,40", () => "unused");
+			expect(first.note).toContain("hit a#next");
+			const second = await runStep(cdp, "click:#after", () => "unused");
+			expect(second.note).toBe("click:#after: hit button#after");
+			expect(page.problems).toEqual([]);
+		});
+	},
+	30_000,
+);
 
 test("an observed click keeps its hit note beside a settle failure in JSON and text", async () => {
 	const file = dir.path("unsettled.html");

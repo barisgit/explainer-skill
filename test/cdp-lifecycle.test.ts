@@ -1,43 +1,6 @@
 import { expect, test } from "bun:test";
-import { PassThrough } from "node:stream";
-import { Cdp, ChromeError } from "../skills/explainer/src/cdp.ts";
-
-interface Command {
-	id: number;
-	method: string;
-}
-
-/** A fake browser at the actual NUL-framed pipe boundary: tests decide when irreversible target operations reply. */
-function protocol(
-	onCommand: (command: Command, reply: (command: Command, result: object) => void) => void,
-) {
-	const input = new PassThrough();
-	const output = new PassThrough();
-	const emit = (message: object) =>
-		queueMicrotask(() => input.write(`${JSON.stringify(message)}\0`));
-	const reply = (command: Command, result: object) => emit({ id: command.id, result });
-	let pending = "";
-	output.setEncoding("utf8");
-	output.on("data", (chunk: string) => {
-		const parts = (pending + chunk).split("\0");
-		pending = parts.pop() ?? "";
-		for (const part of parts) {
-			onCommand(JSON.parse(part) as Command, reply);
-		}
-	});
-	return {
-		cdp: Cdp.open(input, output),
-		reply,
-		emit,
-		close: () => {
-			input.destroy();
-			output.destroy();
-		},
-	};
-}
-
-// Drain protocol promise continuations, not a timed guess about a browser's speed.
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+import { ChromeError } from "../skills/explainer/src/cdp.ts";
+import { type Command, protocol, tick } from "./cdp-pipe.ts";
 
 test.each(["Target.createTarget", "Target.attachToTarget"])(
 	"cancel during %s still owns the late target and waits for destruction",
