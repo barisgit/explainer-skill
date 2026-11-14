@@ -156,15 +156,7 @@ The constraints leave one real decision: whether the FIPS-140 requirement applie
 
 <Question name="option" legend="Which option will you take?" options={{ A: "A. Argon2id everywhere", B: "B. PBKDF2 everywhere", C: "C. Argon2id plus PBKDF2 for FIPS", Undecided: "Not yet" }} note />
 
-{/* A checklist of long items reads better as toggles, one per line, than as Question's segmented buttons. */}
-
-<fieldset data-reply>
-<legend>What do you still need to find out?</legend>
-<div class="controls"><label class="toggle"><input type="checkbox" id="q-fips" name="todo" value="fips" /><span>Which customers require FIPS-140 validation, and for which part of the system</span></label></div>
-<div class="controls"><label class="toggle"><input type="checkbox" id="q-mem" name="todo" value="mem" /><span>Measured memory and time per login on the smallest VM</span></label></div>
-<div class="controls"><label class="toggle"><input type="checkbox" id="q-legacy" name="todo" value="legacy" /><span>Which legacy hash types are in the database</span></label></div>
-<div class="controls"><label class="toggle"><input type="checkbox" id="q-lib" name="todo" value="lib" /><span>Whether our language has a maintained Argon2id library</span></label></div>
-</fieldset>
+<Question name="todo" legend="What do you still need to find out?" multiple options={{ fips: "Which customers require FIPS-140 validation, and for which part of the system", mem: "Measured memory and time per login on the smallest VM", legacy: "Which legacy hash types are in the database", lib: "Whether our language has a maintained Argon2id library" }} />
 
 </section>
 
