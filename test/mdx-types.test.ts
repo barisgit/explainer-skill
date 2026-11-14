@@ -8,7 +8,7 @@ afterAll(dir.cleanup);
 /** Executes the author's commands outside the repository, with a copy of the skill and no node_modules. */
 async function run(args: string[]) {
 	const proc = Bun.spawn([process.execPath, ...args], {
-		cwd: dir.path(""),
+		cwd: dir.path("page"),
 		stdout: "pipe",
 		stderr: "pipe",
 	});
@@ -20,23 +20,25 @@ async function run(args: string[]) {
 	return { stdout, stderr, code };
 }
 
-test("kit types checks an external page's own sources without installed dependencies, and not the Bun scripts and scratch files beside it", async () => {
+test("kit types checks a nested page despite a repository check script, without installs or unrelated source checks", async () => {
 	cpSync(SKILL_DIR, dir.path("skill"), { recursive: true });
 	dir.write(
+		"package.json",
+		JSON.stringify({ scripts: { check: "echo REPOSITORY_CHECK_RAN_INSTEAD" } }),
+	);
+	const write = (path: string, content: string) => dir.write(`page/${path}`, content);
+	write(
 		"page.mdx",
 		'import { Figure } from "./figure.tsx";\nimport { start } from "./data.ts";\n\n# Page\n\n<Figure start={start} />\n',
 	);
-	dir.write(
-		"data.ts",
-		'import plan from "./plan.json";\nexport const start: number = plan.start;\n',
-	);
-	dir.write("plan.json", '{ "start": 1 }');
+	write("data.ts", 'import plan from "./plan.json";\nexport const start: number = plan.start;\n');
+	write("plan.json", '{ "start": 1 }');
 	// What authors keep beside a page: a Bun script that prepares the data, and a scratch file with errors of its own.
-	dir.write(
+	write(
 		"prepare.ts",
 		'await Bun.write("plan.json", JSON.stringify({ start: Number(process.argv[2] ?? 1) }));\n',
 	);
-	dir.write(
+	write(
 		"scratch/probe.ts",
 		'const probe: number = "not checked";\nconsole.log(probe, Bun.version);\n',
 	);
@@ -64,21 +66,25 @@ export function Figure({ start = first }: { start?: number }) {
     <View name="detail"><h1>Detail</h1></View></>;
 }
 `;
-	dir.write("figure.tsx", good);
-	const config = await run(["skill/cli.ts", "kit", "types"]);
+	write("figure.tsx", good);
+	const config = await run(["../skill/cli.ts", "kit", "types"]);
 	expect(config.code).toBe(0);
 	expect(config.stderr).toContain("figure.tsx");
-	dir.write("tsconfig.json", config.stdout);
-	const checked = await run(["check"]);
+	expect(config.stderr).toContain("bun --check");
+	write("tsconfig.json", config.stdout);
+	const checked = await run(["--check"]);
 	expect(checked.stdout + checked.stderr).not.toContain("error TS");
 	expect(checked.code).toBe(0);
-	dir.write(
+	expect(checked.stdout + checked.stderr).not.toContain("REPOSITORY_CHECK_RAN_INSTEAD");
+	write(
 		"figure.tsx",
-		`${good}\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Records {...plan} cell="4rem" />;\n`,
+		`${good}\nconst badNumber: number = "wrong";\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Records {...plan} cell="4rem" />;\n`,
 	);
-	const failed = await run(["check", "--no-pretty"]);
+	const failed = await run(["--check"]);
 	expect(failed.code).not.toBe(0);
-	expect(failed.stdout + failed.stderr).toContain("'string' is not assignable");
+	expect(failed.stdout + failed.stderr).toContain(
+		"Type 'string' is not assignable to type 'number'",
+	);
 	expect(failed.stdout + failed.stderr).toContain("cell");
 	expect(failed.stdout + failed.stderr).not.toContain("prepare.ts");
 	expect(failed.stdout + failed.stderr).not.toContain("probe.ts");

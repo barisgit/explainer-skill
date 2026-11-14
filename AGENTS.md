@@ -43,7 +43,7 @@ Showcase assets stay in `examples/`, never in `skills/explainer/`, because insta
 | Command | What it does |
 |---|---|
 | `bun install` | Installs dev tools from the lockfile and the git hook (`prepare` runs husky) |
-| `bun run typecheck` | `bun check --all` for the CLI, build and tests, then for the kit (`tsconfig.kit.json`) and the records core (`tsconfig.records.json`): Bun's built-in checker, same errors as `tsc`, strictest settings |
+| `bun run typecheck` | `bun --check` for the CLI, build and tests, then with `--tsconfig-override` for the kit (`tsconfig.kit.json`) and the records core (`tsconfig.records.json`): Bun's built-in checker, same errors as `tsc`, strictest settings |
 | `bun run lint` | `biome check` (format check, lint, import order), warnings are errors; no writes |
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
 | `bun run test` | Contract tests (Chrome needed, about six minutes) |
@@ -88,7 +88,7 @@ TypeScript uses `erasableSyntaxOnly`: no parameter properties, enums or namespac
 
 The kit scripts are TypeScript sources. Authors never name them: `src/mdx/kit-scripts.ts` picks the ones a page's markup needs, and the page shell refers to each as `kit:<name>.js` internally. `src/kit.ts` maps that name to the `.ts` file and `pack` strips the types with `Bun.Transpiler` as it inlines it: the output is a plain classic script (no imports, exports or module wrapper), with the file's leading `/* ... */` documentation comment put back in front, because the transpiler drops every comment. `kit <feature>` (for example `kit keep`) prints that comment from the source for the scripts the `kit` listing names; the others are documented through the components that bring them. Keep a kit file a script: no top-level `import` or `export`, no generated `.js` next to the source. Bun's transpiler is not a pure type eraser: it drops a `"use strict"` directive, rewrites top-level `this`, and adds an import for decorators, so the kit uses none of these and wraps its code in a function or assigns to `window`.
 
-`tsconfig.kit.json` checks them with the DOM lib, no Bun types and the same strict options as the rest, except `noPropertyAccessFromIndexSignature`: `element.dataset` has an index signature, so the option would turn every `dataset.ref` into `dataset["ref"]`, which Biome's `useLiteralKeys` rejects. The window globals the scripts define (`Charts`, `Plot`, `Steps`, `Views`, `Keep`, `ReplyNotes`, and the parts pack runs too, `ChartsOption` and `PlotDraw`) and `echarts` are declared once in `kit-types/globals.d.ts`, with the option and callback types of their public API. Authors can typecheck their own `.tsx` with `kit types > tsconfig.json` then `bun check`; the generated config resolves the components and the vendored Preact, ECharts and kit declarations without an install.
+`tsconfig.kit.json` checks them with the DOM lib, no Bun types and the same strict options as the rest, except `noPropertyAccessFromIndexSignature`: `element.dataset` has an index signature, so the option would turn every `dataset.ref` into `dataset["ref"]`, which Biome's `useLiteralKeys` rejects. The window globals the scripts define (`Charts`, `Plot`, `Steps`, `Views`, `Keep`, `ReplyNotes`, and the parts pack runs too, `ChartsOption` and `PlotDraw`) and `echarts` are declared once in `kit-types/globals.d.ts`, with the option and callback types of their public API. Authors can typecheck their own `.tsx` with `kit types > tsconfig.json` then `bun --check`; the generated config resolves the components and the vendored Preact, ECharts and kit declarations without an install.
 
 ## The MDX pipeline
 
@@ -111,7 +111,7 @@ The kit scripts are TypeScript sources. Authors never name them: `src/mdx/kit-sc
 
 ## Installing
 
-Verified with `npx skills` 1.7.4 and Caplet 0.1.0 (the first npm release, `@caplet/cli`): both copy every file byte for byte (npx skills symlinks the other agents to one canonical copy when several are chosen), and `kit`, `pack`, `check` and the example's `kit types` + `bun check` run from the installed copy with no install step. `bun run verify:install` repeats this from a clone of HEAD (uncommitted changes are not tested); run it before a release and whenever `skills/explainer/` changes shape (new top-level file, dotfile, `package.json`).
+Verified with `npx skills` 1.7.4 and Caplet 0.1.0 (the first npm release, `@caplet/cli`): both copy every file byte for byte (npx skills symlinks the other agents to one canonical copy when several are chosen), and `kit`, `pack`, `check` and the example's `kit types` + `bun --check` run from the installed copy with no install step. `bun run verify:install` repeats this from a clone of HEAD (uncommitted changes are not tested); run it before a release and whenever `skills/explainer/` changes shape (new top-level file, dotfile, `package.json`).
 
 npx skills installs from any public git repository; the skills.sh listing comes from its install telemetry, so the skill appears there after people install it. Caplet takes `github:<owner>/<repo>` or `git:<url>` with a required `--pin <ref>`: a branch to follow or a tag for a fixed version.
 

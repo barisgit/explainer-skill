@@ -11,7 +11,7 @@
    import the files it shows: pack fails on a file path written in it, in its props or in a filled view's records, since the
    browser would load that file later, from beside the page. An SVG file a client component draws keeps its own colours in dark.
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
-   To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun check (no install).
+   To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun --check (no install).
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
    state and handlers work. Props from the page into such a component must be JSON, or functions a "use client" module exports
    (a formatter, Explore's frame). Markdown written between its tags is its children, rendered once as static HTML that it

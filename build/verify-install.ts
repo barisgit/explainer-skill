@@ -3,7 +3,7 @@
  * Release check for the install paths: clones the committed repo, installs the skill with `npx skills`
  * (global copy, and project scope with a symlink) and with Caplet (user and project scope) into a
  * disposable HOME, then runs `kit`, `pack` and `check` from each installed copy in an unrelated
- * directory, and typechecks a copy of the example page with `kit types` and `bun check`. It needs network (npx fetches the skills CLI) and Chrome, so it is not part of `bun run ci`.
+ * directory, and typechecks a copy of the example page with `kit types` and `bun --check`. It needs network (npx fetches the skills CLI) and Chrome, so it is not part of `bun run ci`.
  *
  * Usage: bun build/verify-install.ts [sandbox-dir]   (the directory must not exist yet; it is kept)
  * Requires `caplet` on PATH or CAPLET=/path/to/caplet.
@@ -86,15 +86,15 @@ function verifyFiles(installed: string, expected: string[]): void {
 	record(differing.length === 0, "contents identical", differing.join("\n"));
 }
 
-/** A copy of the installed example page typechecks with `kit types > tsconfig.json` then `bun check`, with nothing installed. */
+/** A copy of the installed example page typechecks with `kit types > tsconfig.json` then `bun --check`, with nothing installed. */
 function verifyTypes(cli: string, installed: string, home: string, outDir: string): void {
 	const page = join(outDir, "page");
 	cpSync(join(installed, "example"), page, { recursive: true });
 	const types = run(["bun", cli, "kit", "types"], page, home);
 	record(types.code === 0, "bun cli.ts kit types", types.out);
 	writeFileSync(join(page, "tsconfig.json"), types.code === 0 ? types.stdout : "");
-	const check = run(["bun", "check"], page, home);
-	record(check.code === 0, "bun check on the example page", check.out);
+	const check = run(["bun", "--check"], page, home);
+	record(check.code === 0, "bun --check on the example page", check.out);
 }
 
 /** The CLI runs from the installed location with no npm install, and node explains what is missing. */

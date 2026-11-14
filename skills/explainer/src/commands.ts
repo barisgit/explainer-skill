@@ -242,7 +242,7 @@ async function types(): Promise<number> {
 		console.log(authorTsconfig(dir, sources));
 		console.error(
 			sources.length
-				? `kit types: checks ${sources.map((file) => relative(dir, file)).join(", ")} and the files they import; run it again when a page imports another file`
+				? `kit types: checks ${sources.map((file) => relative(dir, file)).join(", ")} and the files they import; run bun --check; run it again when a page imports another file`
 				: "kit types: the pages import no .ts or .tsx file, so there is nothing to check yet; run it again when one does",
 		);
 		return 0;
@@ -259,7 +259,7 @@ async function types(): Promise<number> {
 export const COMMANDS: Record<string, Command> = {
 	kit: {
 		summary:
-			"List what an .mdx page can use, one line per component and feature, or print one's documentation. kit types prints a tsconfig.json that typechecks the page's own .ts and .tsx files with bun check; kit labels prints the kit's texts as a frontmatter labels block to translate.",
+			"List what an .mdx page can use, one line per component and feature, or print one's documentation. kit types prints a tsconfig.json that typechecks the page's own .ts and .tsx files with bun --check; kit labels prints the kit's texts as a frontmatter labels block to translate.",
 		usage: "kit [<name> | types | labels]",
 		flags: [],
 		examples: ["kit", "kit Stepper", "kit page", "kit types > tsconfig.json", "kit labels"],

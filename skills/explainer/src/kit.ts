@@ -77,7 +77,7 @@ export function kitLabels(): { file: string; labels: Record<string, string> }[] 
 /**
  * A tsconfig for the author's page directory `dir` that checks `sources` (the files the pages import, see mdx/sources.ts) and what
  * they import, as browser code: `kit`, Preact, ECharts and TanStack Table (which the records core uses) resolve to this skill's
- * components and vendored declarations, so `bun check` needs no install. Nothing else beside the page (a Bun script, a scratch
+ * components and vendored declarations, so `bun --check` needs no install. Nothing else beside the page (a Bun script, a scratch
  * file) is checked.
  */
 export function authorTsconfig(dir: string, sources: string[]): string {
