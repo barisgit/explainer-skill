@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Set text linked to a figure, diagram or code in `<div class="beside">` (the text, then the figure or a code fence): from 56rem the two stand side by side at `.wide`'s width and the figure stays in view while the text scrolls; phones stack them. `check` warns when parts sharing a `data-ref`, or a stepper's captions and the parts they light, are more than a screen apart at desktop width, naming the ref or stepper (#159).
+
 - Put the reader's next action under the lede as a masthead paragraph that opens with a bold label (`**Start:** change one bit, 2 minutes`): it is set as prominent body text with an accent rule instead of small grey meta (#141).
 
 - `check` follows full-document navigation through a step's settling and hit feedback without replaying its action or losing the outgoing hit. Loads now wait for the requested main-frame document's commit and load, not an earlier navigation's event (#146, #149).

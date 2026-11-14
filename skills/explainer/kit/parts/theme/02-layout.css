@@ -1,4 +1,4 @@
-/* theme part: page shell, headings, section rhythm (band, minor, beside), figures and panels, split columns. */
+/* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures and panels, split columns. */
 /* Page shell: masthead, then sections divided by hairlines. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
@@ -221,8 +221,11 @@ h3,
 .fig > figcaption:not(:last-child) {
 	border-block-end: 1px solid var(--rule);
 }
-/* Text beside its figure on wide screens, the figure taking two thirds; stacked on phones. Two children: the text, then the figure.
-   It follows the .fig rules so its margin reset wins over the figure's own. */
+/* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
+   Two children: the text, then the figure. From 56rem they stand side by side at .wide's width, the text two fifths, and the
+   figure stays in view while longer text scrolls past it, scrolling inside when it is taller than the window. Stacked on
+   phones: a figure pinned above the text there hid most of a flowchart or code block in its share of the screen. It follows
+   the .fig rules so its margin reset and scrolling win over the figure's own. */
 .beside {
 	display: grid;
 	gap: 1rem 2.5rem;
@@ -236,9 +239,19 @@ h3,
 .beside > :first-child > :first-child {
 	margin-block-start: 0;
 }
-@media (min-width: 56rem) {
+@media screen and (min-width: 56rem) {
+	/* .wide's margins: those beside the contents rail (--wide-reach, kit:views.js), else the reach to 88rem within the gutters. */
 	.beside {
-		grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+		grid-template-columns: minmax(min(100%, 20rem), 2fr) minmax(0, 3fr);
+		margin-inline: calc(-1 * var(--wide-reach, (min(44rem, 50vw - var(--gutter)) - 50%)));
+	}
+	/* Pinned below the Reply bar when the page has one (theme.css), which content passes under. */
+	.beside > :nth-child(2) {
+		--pin-top: calc(var(--reply-bar-height, var(--reply-bar, 0px)) + 1.5rem);
+		position: sticky;
+		inset-block-start: var(--pin-top);
+		max-block-size: calc(100vh - var(--pin-top) - 1.5rem);
+		overflow: auto;
 	}
 }
 .src {

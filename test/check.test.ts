@@ -322,6 +322,47 @@ test("check stops stepping a stepper once it changes, and says so when its time 
 	expect(result.stdout).not.toContain("figure#redrawn");
 }, 60_000);
 
+test("check warns once per data-ref and per stepper whose linked parts are more than a screen apart, not about parts beside a pinned figure", async () => {
+	const prose = (n: number) =>
+		"<p>Filler text that pushes the next part further down the page.</p>".repeat(n);
+	const source = dir.write(
+		"linked.html",
+		`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><h1>Linked</h1>
+<p>The <span data-ref="far">first</span> and <span data-ref="far">second</span> mention, and a <span data-ref="near">near</span> one.</p>
+<p>Its <span data-ref="near">partner</span> is right under it.</p>
+<p>Call <code data-ref="code">hash</code> with its <code data-ref="code">salt</code>.</p>
+${prose(60)}
+<div data-ref="far">The far part</div>
+<pre><code><span data-ref="code">hash</span>(password, <span data-ref="code">salt</span>)</code></pre>
+<div class="beside"><div>${prose(60)}<p>The <span data-ref="pinned">pinned part</span> stays in view.</p></div>
+<figure class="fig"><svg viewBox="0 0 100 60"><rect data-ref="pinned" width="40" height="20" /></svg></figure></div>
+<figure class="fig" id="tall" data-stepper><p data-step="1">Step one, at the top</p><div style="height: 1200px"></div><p data-step="2">Step two</p>
+<ol data-captions><li>One</li><li>Two</li></ol></figure>
+<figure class="fig" id="short" data-stepper><p data-step="1">One</p><p data-step="2">Two</p><ol data-captions><li>One</li><li>Two</li></ol></figure>
+</main><script src="kit:link.js"></script><script src="kit:steps.js"></script></body></html>`,
+	);
+	const packed = dir.path("linked.out.html");
+	expect((await packHtml(source, packed)).error).toBe("");
+
+	const result = await checkQuick(packed);
+
+	expect(result.code).toBe(0);
+	expect(result.stdout.match(/data-ref "far"/g)).toHaveLength(1);
+	expect(result.stdout).toContain(
+		'data-ref "far" links parts more than a screen apart at 1440x900; out of sight of every partner: span "first", span "second", div "The far part". A reader pointing at one cannot see the other',
+	);
+	// Two mentions in prose and two tokens in a far code block: the mentions do not vouch for each other, nor do the tokens.
+	expect(result.stdout).toContain(
+		'data-ref "code" links parts more than a screen apart at 1440x900; out of sight of every partner: code "hash", code "salt", span "hash" and 1 more.',
+	);
+	expect(result.stdout).not.toContain('data-ref "near"');
+	expect(result.stdout).not.toContain('data-ref "pinned"');
+	expect(result.stdout).toContain(
+		'figure#tall.fig: its captions and the parts they light are more than a screen apart at 1440x900 (p "Step one, at the top")',
+	);
+	expect(result.stdout).not.toContain("figure#short");
+}, 30_000);
+
 /** Width and height of a PNG, read from its IHDR chunk. */
 function pngSize(file: string): [number, number] {
 	const bytes = readFileSync(file);

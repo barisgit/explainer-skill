@@ -49,6 +49,17 @@ Illustrative numbers, not a real quote
 
 <h2 data-nav="System">The battery sits behind the inverter</h2>
 
+<div class="beside">
+<div>
+
+- The <span data-ref="panels">panels</span> stay as they are.
+- The <span data-ref="inverter">hybrid inverter</span> replaces the string inverter and decides where each kWh goes.
+- The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.
+- The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.
+
+</div>
+<figure class="fig">
+
 ```mermaid
 flowchart TD
 	panels["Roof panels, 6 kW"] --> inverter["Hybrid inverter"]
@@ -58,10 +69,8 @@ flowchart TD
 	grid["Grid"] -->|"shortfall"| house
 ```
 
-- The <span data-ref="panels">panels</span> stay as they are.
-- The <span data-ref="inverter">hybrid inverter</span> replaces the string inverter and decides where each kWh goes.
-- The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.
-- The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.
+</figure>
+</div>
 
 The status lamp on the inverter is wired like this:
 
@@ -114,7 +123,23 @@ The <span data-ref="R_lim">series resistor</span> sets the lamp's current, about
 
 # How the numbers were made
 
-A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model.
+<div class="beside">
+<div>
+
+A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model: each hour the surplus charges the battery up to its size, losing a tenth on the way, and a shortfall draws it down before the grid is asked.
+
+</div>
+
+```ts
+for (const hour of year) {
+	const surplus = hour.produced - hour.used;
+	stored = surplus > 0
+		? Math.min(size, stored + surplus * 0.9)
+		: Math.max(0, stored + surplus);
+}
+```
+
+</div>
 
 ## Assumptions
 

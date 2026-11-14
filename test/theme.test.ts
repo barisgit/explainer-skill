@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import {
+	DESKTOP,
 	FRAMES,
 	inPage,
 	packAndRun,
@@ -152,4 +153,53 @@ test("a masthead paragraph that starts with a bold label is the next action, set
 		})()`),
 	);
 	expect(style).toEqual({ masthead: ["lede", "next", "meta"], mono: false, ink: true, size: true });
+}, 30_000);
+
+test("a .beside figure stays in view while its text scrolls at .wide's width on a desktop, and stacks after the text on a phone and in print (#159)", async () => {
+	const text =
+		"<p>Prose that explains the figure beside it, long enough to scroll past it.</p>".repeat(40);
+	const page = (
+		checks: Record<string, string>,
+	) => `${HEAD}<div class="wide" id="wide">Wide</div><div class="beside"><div id="text">${text}</div>
+<figure class="fig" id="figure"><svg viewBox="0 0 360 200"><rect width="360" height="200" /></svg></figure></div>
+${text}</main><script>
+const box = (id) => document.getElementById(id).getBoundingClientRect();
+const scrolled = (y) => { scrollTo({ top: y, behavior: "instant" }); return box("figure"); };
+const mid = () => { const t = box("text"); return scrollY + t.top + t.height / 2; };
+${pageContract(checks)}</script></body></html>`;
+	const screen = page({
+		"side by side at .wide's edges on a desktop": `innerWidth < 900 || (box("figure").left > box("text").right && Math.abs(box("text").left - box("wide").left) < 1 && Math.abs(box("figure").right - box("wide").right) < 1)`,
+		"the desktop figure stays in view halfway down the text": `innerWidth < 900 || (() => { const f = scrolled(mid()); return f.top >= 0 && f.bottom <= innerHeight; })()`,
+		"the phone figure follows the text": `innerWidth >= 900 || box("figure").top >= box("text").bottom`,
+		"the figure scrolls away with the end of its text": `(() => { const end = scrollY + box("text").bottom; return scrolled(end + innerHeight).bottom < 0; })()`,
+	});
+	const print = page({
+		"in flow after the text in print": `getComputedStyle(document.getElementById("figure")).position === "static" && box("figure").top >= box("text").bottom`,
+	});
+
+	expect(await packAndRun(dir, "beside", screen)).toEqual([]);
+	expect(
+		await packAndRun(dir, "beside-print", print, { media: "print", widths: [DESKTOP] }),
+	).toEqual([]);
+}, 60_000);
+
+test("a .beside code block pins below the Reply bar, so its first line shows and its last fits the window (#159)", async () => {
+	const text = "Prose about the code beside it, long enough to scroll past it.\n\n".repeat(120);
+	const code = Array.from({ length: 60 }, (_, i) => `const line${i} = ${i};`).join("\n");
+	const output = await packedMdx(
+		dir,
+		"beside-reply",
+		`import { Question } from "kit";\n\n# Beside a reply\n\nThe lede.\n\n<Question name="pick" legend="Which?" options={["One", "Two"]} />\n\n<div class="beside">\n<div>\n\n${text}</div>\n\n\`\`\`ts\n${code}\n\`\`\`\n\n</div>\n\n${text}`,
+	);
+	const placed = await inPage(output, (cdp) =>
+		cdp.evaluate(`(() => {
+			const pre = document.querySelector(".beside > pre");
+			const text = document.querySelector(".beside > div").getBoundingClientRect();
+			scrollTo({ top: scrollY + text.top + text.height / 2, behavior: "instant" });
+			const bar = document.querySelector(".reply-bar").getBoundingClientRect();
+			const box = pre.getBoundingClientRect();
+			return { belowBar: box.top >= bar.bottom, fits: box.bottom <= innerHeight };
+		})()`),
+	);
+	expect(placed).toEqual({ belowBar: true, fits: true });
 }, 30_000);

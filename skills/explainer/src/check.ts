@@ -6,7 +6,7 @@ import { withPage } from "./chrome.ts";
 import { sweepControls } from "./control-sweep.ts";
 import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
-import { DISCOVER_JS, FIRST_SCREEN_JS, STEPPERS_JS, SWEEP_JS } from "./page-probes.ts";
+import { DISCOVER_JS, FIRST_SCREEN_JS, LINKED_JS, STEPPERS_JS, SWEEP_JS } from "./page-probes.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
@@ -34,7 +34,7 @@ export interface ElementShot {
  * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
  * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
- * change only its captions, an incomplete scroll sweep, visible fixed elements omitted from a full-page PNG).
+ * change only its captions, linked parts more than a screen apart (desktop width), an incomplete scroll sweep, visible fixed elements omitted from a full-page PNG).
  */
 export interface Shot {
 	theme: string;
@@ -248,9 +248,10 @@ async function shootOverview(run: Run, screen: Screen) {
 	await sweep(run);
 	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
 	const stepperWarnings = firstPass ? await run.page.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
+	const linkedWarnings = firstPass ? await run.page.cdp.evaluate<string[]>(LINKED_JS) : [];
 	const elements = await runSteps(run, screen);
 	const png = overviewPng(run, screen);
-	const warnings = [...stepperWarnings, ...(await capture(run, png, screen))];
+	const warnings = [...stepperWarnings, ...linkedWarnings, ...(await capture(run, png, screen))];
 	const problems = [...run.page.problems];
 	if (firstPass && !opts.quick && !opts.steps.length) {
 		run.where += ", kit control sweep";
@@ -283,9 +284,14 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 		run.page.problems.push(`${hash}: no view is shown for this hash`);
 	}
 	await sweep(run);
+	// Where parts sit is the same in both themes; desktop width is where they can stand side by side.
+	const linkedWarnings =
+		theme === THEMES[0] && name === "desktop"
+			? await run.page.cdp.evaluate<string[]>(LINKED_JS)
+			: [];
 	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
 	const png = join(run.outDir, `${run.stem}-view-${slug}-${theme}-${name}.png`);
-	const warnings = await capture(run, png, screen, hash);
+	const warnings = [...linkedWarnings, ...(await capture(run, png, screen, hash))];
 	run.shots.push({
 		theme,
 		viewport: `${name} ${vp.width}x${vp.height}`,
@@ -372,7 +378,8 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
  * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
  * Reports as problems console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
- * missing viewport meta, tall diagrams and charts, steppers that change only their captions, and incomplete scroll sweeps. Reduced motion is emulated so animations are
+ * missing viewport meta, tall diagrams and charts, steppers that change only their captions, linked parts more than a screen apart
+ * (LINKED_JS, light desktop only) and incomplete scroll sweeps. Reduced motion is emulated so animations are
  * finished in the shots.
  * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed
  * `opts.timeoutSeconds`. The PNGs of a run that succeeds replace those of the same name in `outDir`.

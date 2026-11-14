@@ -266,6 +266,82 @@ export const SWEEP_JS = `(async () => {
 	return ["${SWEEP_WARNING}: " + cutoff + parts.join("; ") + ": scroll the rest by hand"];
 })()`;
 
+/** The most elements of one ref, or parts of one stepper, that LINKED_JS compares: enough for any prose a reader links by hand. */
+const LINKED_MAX = 40;
+/**
+ * Runs in the page at desktop width: linked parts a reader cannot see on one screen. The elements kit:link.js links (is-linked)
+ * that share a ref, and each stepper's captions and its data-step parts, are seen together when some scroll position shows a
+ * part of each (24 px, or half of a smaller one). Parts of one SVG are one place, as kit:link.js counts places, and never
+ * partners of each other. A part under a sticky box
+ * (a .beside figure) is measured by scrolling the other part to the top and the bottom of the viewport, so a pinned figure
+ * counts where it is pinned; the rest by their distance in the document. One warning per ref with a part out of sight of
+ * every partner (see unseen), and per stepper with a part out of its captions' sight. Restores the scroll position.
+ */
+export const LINKED_JS = `(() => {
+	const shown = ${PAINTS_JS};
+	const tag = ${ELEMENT_NAME_JS};
+	const name = (el) => { const text = el.textContent.replace(/\\s+/g, " ").trim(); return el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (text ? ' "' + (text.length > 24 ? text.slice(0, 21) + "..." : text) + '"' : ""); };
+	const root = document.scrollingElement;
+	const start = root.scrollTop;
+	const screen = innerWidth + "x" + innerHeight;
+	/** The figure or code block a part belongs to (its outermost svg, else its pre), or null for a mention in prose. */
+	const figure = (el) => { let svg = el.closest("svg"); for (let up = svg?.parentElement?.closest("svg"); up; up = up.parentElement?.closest("svg")) svg = up; return svg ?? el.closest("pre"); };
+	const place = (el) => figure(el) ?? el;
+	const pinned = (el) => { for (let p = el; p; p = p.parentElement) { const at = getComputedStyle(p).position; if (at === "sticky" || at === "fixed") return true; } return false; };
+	const margin = (r) => Math.min(24, r.height / 2);
+	const inView = (el) => { const r = el.getBoundingClientRect(); return r.bottom >= margin(r) && r.top <= innerHeight - margin(r); };
+	const probe = (anchor, other) => {
+		const r = anchor.getBoundingClientRect();
+		for (const y of [root.scrollTop + r.top, root.scrollTop + r.bottom - innerHeight]) {
+			root.scrollTo({ top: y, behavior: "instant" });
+			if (inView(anchor) && inView(other)) return true;
+		}
+		return false;
+	};
+	const together = (a, b) => {
+		if (a.contains(b) || b.contains(a)) return true;
+		if (pinned(a) || pinned(b)) return (!pinned(a) && probe(a, b)) || (!pinned(b) && probe(b, a)) || (pinned(a) && pinned(b) && probe(a, b));
+		const [ra, rb] = [a.getBoundingClientRect(), b.getBoundingClientRect()];
+		const gap = Math.max(rb.top - ra.bottom, ra.top - rb.bottom);
+		return gap + margin(ra) + margin(rb) <= innerHeight;
+	};
+	/** A term in running text: a phrasing element (span, code, strong ...) outside every figure and code block. */
+	const phrasing = new Set(["A", "ABBR", "B", "CODE", "DFN", "EM", "I", "KBD", "MARK", "Q", "SAMP", "SMALL", "SPAN", "STRONG", "SUB", "SUP", "VAR"]);
+	const mention = (el) => phrasing.has(el.tagName) && !figure(el);
+	/**
+	 * The parts that share a screen with no partner: a part in another place and, when the ref links a figure or code, not a
+	 * mention beside a mention, so terms in neighbouring paragraphs do not vouch for each other while the figure is far.
+	 */
+	const unseen = (parts) => {
+		const prose = parts.every(mention);
+		const partners = (a, b) => place(a) !== place(b) && (prose || !(mention(a) && mention(b)));
+		return parts.filter((a) => !parts.some((b) => partners(a, b) && together(a, b)));
+	};
+	const warnings = [];
+	try {
+		const byRef = new Map();
+		for (const el of document.querySelectorAll("[data-ref].is-linked")) {
+			if (!shown(el)) continue;
+			for (const ref of el.dataset.ref.split(/\\s+/).filter(Boolean)) byRef.set(ref, [...(byRef.get(ref) ?? []), el]);
+		}
+		for (const [ref, parts] of byRef) {
+			if (new Set(parts.map(place)).size < 2) continue;
+			const far = unseen(parts.slice(0, ${LINKED_MAX}));
+			if (far.length) warnings.push('data-ref "' + ref + '" links parts more than a screen apart at ' + screen + "; out of sight of every partner: " + far.slice(0, 3).map(name).join(", ") + (far.length > 3 ? " and " + (far.length - 3) + " more" : "") + ". A reader pointing at one cannot see the other; set the text beside its figure in a .beside block, which keeps the figure in view, or keep the ref to the parts that share a screen");
+		}
+		for (const stepper of document.querySelectorAll("[data-stepper][data-live]")) {
+			const captions = stepper.querySelector("[data-captions]");
+			if (!captions || !shown(captions)) continue;
+			const parts = [...stepper.querySelectorAll("[data-step]")].filter((el) => shown(el) && el.closest("[data-stepper]") === stepper).slice(0, ${LINKED_MAX});
+			const far = parts.filter((el) => !together(captions, el));
+			if (far.length) warnings.push(tag(stepper) + ": its captions and the parts they light are more than a screen apart at " + screen + " (" + far.slice(0, 3).map(name).join(", ") + "): make the picture shorter, so it fits one screen with its captions, or put the captions first (Stepper captionsFirst)");
+		}
+	} finally {
+		root.scrollTo({ top: start, behavior: "instant" });
+	}
+	return warnings;
+})()`;
+
 const STEPPER_BUDGET_MS = 3000;
 const STEPPER_MAX_STEPS = 40;
 /**

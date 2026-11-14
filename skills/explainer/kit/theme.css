@@ -22,8 +22,11 @@
    column, beside the contents rail too.
    The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child
    replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
-   Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .beside sets text next to its figure; .minor
-   sections (method, sources) are set smaller with the heading in its own column.
+   Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .minor sections (method, sources) are set
+   smaller with the heading in its own column.
+   Text linked to a figure, diagram or code (data-ref) sits beside it, so both ends of a link share the screen:
+     <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
+   From 56rem the two stand side by side at .wide's width and the figure stays in view while the text scrolls; stacked on phones.
    Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
    <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
    class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
