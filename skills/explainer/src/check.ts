@@ -143,12 +143,14 @@ interface Run {
 /** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
 async function capture(run: Run, png: string, screen: Screen, view = ""): Promise<string[]> {
 	const page = await run.page.inspect(screen);
+	const links = await run.page.inspectLinks();
 	const cdp = run.page.cdp;
 	const { data, omitted } = await fullPageScreenshot(cdp, screen.vp.width);
 	writeFileSync(png, Buffer.from(data, "base64"));
 	const inspect = view ? "open this view to inspect them" : "use --do shot:<css> to capture them";
 	return [
 		...page.warnings,
+		...links,
 		...(omitted.length ? [`${OMITTED_FIXED_WARNING}: ${omitted.join(", ")}; ${inspect}`] : []),
 		...page.scrolls,
 		...new Set(run.page.warnings),

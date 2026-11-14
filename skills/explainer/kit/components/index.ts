@@ -6,6 +6,9 @@
    short name in the contents rail, write its heading as <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
    right-aligned column (---:) is numeric (class="num"), and on phones each row stacks its cells under the column names.
+   Markdown link destinations with spaces use angle brackets, [design](<docs/My Design Doc.md>), or %20. pack and check warn
+   when link syntax stays literal outside code; use backticks or <code> for intentional examples. check treats missing #targets
+   as problems and missing relative files as warnings: distribute those files beside the exported HTML. External links are not fetched.
    Data and styles are imported files: import plan from "./plan.json", import { rows } from "./data.ts", import "./page.css".
    An imported image or font is a data: URL pack embeds: import icon from "./icon.svg", then <img src={icon} />. Client code must
    import the files it shows: pack fails on a file path written in it, in its props or in a filled view's records, since the

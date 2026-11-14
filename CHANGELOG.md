@@ -7,6 +7,8 @@
 - Typecheck pages with `bun --check` after `kit types > tsconfig.json`, so a repository’s `check` script cannot silently replace the checker.
 - The guide now walks a homework page's deliverables one at a time in the source's order and numbering, with the hard ones worked through, flags errors in the source, grounds steps in the reader's own tools and starting point, and says how to choose the page's language (#140).
 
+- `pack` and `check` warn when Markdown link syntax stays literal outside code: put destinations with spaces in `<angle brackets>` or encode spaces as `%20`, and use code for intentional syntax examples. `check` now fails missing in-page targets and warns about missing relative files; distribute those files beside the exported HTML. Kit view routes remain valid and external links are never fetched (#150, #155).
+
 - Fresh `check` loads clear local and session storage from a loaded, script-free file document instead of a new-document preload or origin-wide deletion. Explicit reloads keep their state, and control probes no longer clear the screenshot tab's session storage (#145).
 
 - The guide now fits a short first route to the reader's knowledge and time, puts their next action and its size beneath the answer, and uses worked examples before novice practice. It calls for a screen per question with folded reference, readable source images and candidate links, guided controls and comparable states, and decisions beside their evidence with realistic choices, marked recommendations and consistent counts (#115).

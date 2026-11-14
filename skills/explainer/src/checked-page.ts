@@ -1,4 +1,5 @@
 import type { Cdp, ExceptionDetails } from "./cdp.ts";
+import { LINKS_JS, type LinkReport, missingLinkFiles } from "./link-probes.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import { PAGE_JS, type PageReport } from "./page-probes.ts";
 import { settlePage } from "./steps.ts";
@@ -98,7 +99,17 @@ export class CheckedPage {
 				`horizontal page overflow at ${vp.width}px; outside any scroll container: ${page.culprits.join(", ") || "unknown"}`,
 			);
 		}
-		return { warnings: page.warnings, scrolls: page.scrolls.map((s) => `scrolls sideways: ${s}`) };
+		return {
+			warnings: page.warnings,
+			scrolls: page.scrolls.map((s) => `scrolls sideways: ${s}`),
+		};
+	}
+
+	/** Checks each captured document state, not every control-sweep reload of that same document. */
+	async inspectLinks(): Promise<string[]> {
+		const links = await this.cdp.evaluate<LinkReport>(LINKS_JS);
+		this.problems.push(...links.problems);
+		return [...links.warnings, ...missingLinkFiles(links.files)];
 	}
 
 	private onConsole(type: string, text: string) {

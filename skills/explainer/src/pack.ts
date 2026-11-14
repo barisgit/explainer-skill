@@ -5,6 +5,7 @@ import { dataUri } from "./data-uri.ts";
 import { safeScript, unescapeHtml } from "./escape.ts";
 import { repeatedIdProblems } from "./ids.ts";
 import { kitFiles, kitPath, pageFile, readKitText } from "./kit.ts";
+import { literalLinkWarnings } from "./link-probes.ts";
 import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
@@ -329,6 +330,7 @@ export async function packPage(
 		throw new PackError(repeated.map((p) => `- ${p}`).join("\n"));
 	}
 	const warnings = [
+		...(await literalLinkWarnings(html)),
 		...loneRefs(source, diagramRefs).map(
 			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,
 		),
