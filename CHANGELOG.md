@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Put the reader's next action under the lede as a masthead paragraph that opens with a bold label (`**Start:** change one bit, 2 minutes`): it is set as prominent body text with an accent rule instead of small grey meta (#141).
+
 - `check` follows full-document navigation through a step's settling and hit feedback without replaying its action or losing the outgoing hit. Loads now wait for the requested main-frame document's commit and load, not an earlier navigation's event (#146, #149).
 
 - A long page without views gets the contents rail too, with the current section marked while scrolling: give four or more sections a `data-nav` label (`<h2 data-nav="Price">`). A page with fewer labelled sections, or none, keeps no rail (#68).

@@ -40,12 +40,16 @@ const withClass = (paragraph: Paragraph, className: string) => {
 const textOf = (node: Nodes): string =>
 	"value" in node ? node.value : "children" in node ? node.children.map(textOf).join("") : "";
 
-/** A `#` and the paragraphs right under it, as the page's `header.masthead`; the first paragraph is the `.lede`, later ones `.meta`. */
+/** The class of a masthead paragraph: the first is the `.lede`; a later one that opens with bold text (`**Start:** ...`) the `.next` action; the rest `.meta`. */
+const mastheadClass = (paragraph: Paragraph, first: boolean) =>
+	first ? "lede" : paragraph.children[0]?.type === "strong" ? "next" : "meta";
+
+/** A `#` and the paragraphs right under it, as the page's `header.masthead`, each paragraph classed by mastheadClass. */
 function mastheadOf(nodes: Flow[], at: number): { element: MdxJsxFlowElement; next: number } {
 	const children: Flow[] = nodes.slice(at, at + 1);
 	let next = at + 1;
 	for (let node = nodes[next]; node?.type === "paragraph"; node = nodes[++next]) {
-		children.push(withClass(node, next === at + 1 ? "lede" : "meta"));
+		children.push(withClass(node, mastheadClass(node, next === at + 1)));
 	}
 	return { element: element("header", { class: "masthead" }, children), next };
 }

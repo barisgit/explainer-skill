@@ -7,7 +7,7 @@
    Colour what the reader compares, each compared thing (a phase, an option, a series) in the same --c1..--c6 on every chart and
    view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
    (h1 em) and the mark a readout points at.
-   Classes: page masthead lede meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
+   Classes: page masthead lede next meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input

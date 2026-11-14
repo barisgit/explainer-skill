@@ -1,6 +1,15 @@
 import { afterAll, expect, test } from "bun:test";
 import { runStep } from "../skills/explainer/src/steps.ts";
-import { FRAMES, inPage, packAndRun, packHtml, pageContract, scratch, WIDTHS } from "./support.ts";
+import {
+	FRAMES,
+	inPage,
+	packAndRun,
+	packedMdx,
+	packHtml,
+	pageContract,
+	scratch,
+	WIDTHS,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -126,4 +135,21 @@ ${pageContract({
 })}</script></body></html>`;
 
 	expect(await packAndRun(dir, "pre", page)).toEqual([]);
+}, 30_000);
+
+test("a masthead paragraph that starts with a bold label is the next action, set as body text in ink rather than as meta (#141)", async () => {
+	const output = await packedMdx(
+		dir,
+		"next",
+		"# Flip one bit\n\nThe lede.\n\n**Start:** change one bit (2 minutes)\n\nIllustrative data\n",
+	);
+	const style = await inPage(output, (cdp) =>
+		cdp.evaluate(`(() => {
+			const masthead = [...document.querySelectorAll(".masthead > p")].map((p) => p.className);
+			const next = getComputedStyle(document.querySelector(".masthead .next"));
+			const body = getComputedStyle(document.body);
+			return { masthead, mono: next.fontFamily.includes("Mono"), ink: next.color === body.color, size: parseFloat(next.fontSize) >= parseFloat(body.fontSize) };
+		})()`),
+	);
+	expect(style).toEqual({ masthead: ["lede", "next", "meta"], mono: false, ink: true, size: true });
 }, 30_000);
