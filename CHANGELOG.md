@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Code fences are coloured when the page packs (TypeScript, TSX, JavaScript, JSON, shell, Python, C, VHDL, CSS, HTML, diff, YAML, SQL, Rust, Go and other common languages; any other stays plain), in light and dark with no script. Mark code to light with the prose that shares its ref by writing `ref:name="text"` after the fence's language (```` ```ts ref:call="api.call" ````): every `api.call` in the fence carries `data-ref="call"` and lights with a partner outside the fence (marks in one fence do not link each other). Tabs indent 4 columns, 2 on phones, and a line wrapped on a phone or on paper continues under its own start instead of at the left edge (`kit code`; #154, #166).
+
 - Treat saved answers in a `file://` page as browser-local convenience, not a durable record; use reply's “Copy reply” to save important answers outside the page (#148).
 
 - Inspect the exact current reply Markdown with `check --do reply`, after any answer or note steps, without copying or sending it. Text output prints it verbatim; `--json` returns `replies` with each action’s step, theme, viewport and Markdown. Repack older exports to make their reply text available (#156).

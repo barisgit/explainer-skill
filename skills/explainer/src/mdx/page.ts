@@ -7,6 +7,7 @@ import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
 import { CLIENT_LOAD_FIX, clientLoads } from "./client-loads.ts";
+import { holdsFence } from "./code.ts";
 import { compileMdx, type Frontmatter, frontmatterWarnings } from "./compile.ts";
 import {
 	AFTER_ISLANDS,
@@ -217,7 +218,7 @@ async function kitScripts(html: string, scan: string, front: Frontmatter): Promi
 /**
  * The HTML page an .mdx file becomes, ready for pack's HTML pass (inlining, load checks): the MDX is compiled and prerendered
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
- * into the page shell with kit:math.css when it holds math, the stylesheets its modules import, the islands' props and client
+ * into the page shell with kit:math.css when it holds math, kit:code.css when it or its client code holds a code fence, the stylesheets its modules import, the islands' props and client
  * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one and `<main
  * data-asks-reply>` for reply: true, which keeps reply.js's bar on a page with no reply question. Every error the author can fix is a PackError;
  * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
@@ -276,6 +277,7 @@ export async function mdxPage(
 		`<title>${escapeHtml(page.title ?? basename(path, extname(path)))}</title>`,
 		'<link rel="stylesheet" href="kit:theme.css">',
 		...(MATH_ELEMENT.test(html) ? ['<link rel="stylesheet" href="kit:math.css">'] : []),
+		...(holdsFence(html, scan) ? ['<link rel="stylesheet" href="kit:code.css">'] : []),
 		...links,
 		"</head>",
 		"<body>",

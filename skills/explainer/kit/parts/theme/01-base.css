@@ -118,16 +118,19 @@ pre {
 	padding: 0.75rem 1rem;
 	border-radius: var(--radius);
 	overflow-x: auto;
+	tab-size: 4;
 }
 pre code {
 	background: none;
 	padding: 0;
 }
-/* On a phone a command wraps, with its indentation, instead of scrolling: the end of a long line is what a reader came for. */
-@media (max-width: 40rem) {
+/* On a phone and on paper a command wraps instead of scrolling or being cut: the end of a long line is what a reader came for.
+   A fence's lines continue under their own start (code.css). */
+@media (max-width: 40rem), print {
 	pre {
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+		tab-size: 2;
 	}
 }
 a {

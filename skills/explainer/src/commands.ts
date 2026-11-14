@@ -135,10 +135,11 @@ const FEATURES: Feature[] = [
 	{
 		name: "mermaid",
 		files: [],
-		line: "```mermaid fences: flowchart, state, sequence, class, ER, xychart; ```schematic: circuits as netlists (kit schematic). Drawn as SVG, each part with a data-ref.",
+		line: "```mermaid: flowchart, state, sequence, class, ER, xychart; ```schematic: netlist circuits (kit schematic); both SVG, parts with data-refs. Other fences: coloured code (kit code).",
 		doc: () => MERMAID_DOC,
 	},
 	{ name: "schematic", files: [], doc: () => SCHEMATIC_DOC },
+	{ name: "code.css", files: ["code.css"], doc: () => kitHeader("code.css") },
 	{
 		name: "math.css",
 		files: ["math.css"],

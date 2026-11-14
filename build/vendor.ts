@@ -15,6 +15,8 @@
  *   vendor/math.js                remark-math and Temml, one ES module; used by `pack` to render $...$ to MathML, never inlined
  *   kit/parts/math/temml.css      Temml's stylesheet for system math fonts, and kit/fonts/temml.woff2, the font it names;
  *                                 the start of kit:math.css, which pack adds to a page that holds math
+ *   vendor/refractor.js           refractor (Prism's grammars) for the languages build/code-entry.ts lists, one ES module; used by
+ *                                 `pack` to colour code fences, never inlined
  */
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -283,3 +285,22 @@ async function vendorMath() {
 	}
 }
 await vendorMath();
+
+/** Code fences: refractor with its grammars as one module for pack, and the notices of the packages it was built from. */
+async function vendorCode() {
+	const code = await build(join(import.meta.dir, "code-entry.ts"), "bun", "esm");
+	const notices = await packageLicences(code.inputs);
+	writeFileSync(
+		join(skill, "vendor/refractor.js"),
+		`/*! refractor ${await versionOf("refractor")} (Prism's grammars) with the hast packages it uses, each under its own licence. Their texts:
+   kit/licenses/refractor.txt. Exports refractor. Used by pack to colour code fences, never inlined. Rebuild with: bun run vendor */\n${code.text}`,
+	);
+	writeFileSync(
+		join(skill, "kit/licenses/refractor.txt"),
+		`vendor/refractor.js bundles these ${notices.length} packages; each keeps its own licence.\n\n${notices.join(`\n\n${"-".repeat(72)}\n\n`)}`,
+	);
+	console.log(
+		`vendor/refractor.js ${(statSync(join(skill, "vendor/refractor.js")).size / 1024).toFixed(0)} KB`,
+	);
+}
+await vendorCode();

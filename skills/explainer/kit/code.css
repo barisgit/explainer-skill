@@ -1,0 +1,57 @@
+/* code: code fences coloured when you pack, from the kit's tokens in light and dark: no script ships, and only a page with a
+   fence carries this file. ```ts, tsx, js, json, sh, python, c, vhdl, css, html, diff, yaml, sql, rust, go and other common
+   languages are coloured; any other stays plain.
+   A mark after the language links code with the prose that shares its ref (kit link): ref:name="text" wraps every place the
+   fence writes that text in <span data-ref="name">.
+     ```ts ref:call="api.call"
+     const user = await api.call("user");
+     ```
+     Each <span data-ref="call">call</span> waits for the server.
+   Write several marks one after another, and quote text that holds " with ': ref:user='"user"'. There is no escape, so a mark's
+   text cannot hold both quote kinds or a newline. pack fails on a mark the code does not hold, as written. Marks in one fence
+   link only with a partner outside it. Tabs are 4 columns wide; on a phone they are 2, and a long line wraps under its own
+   start. */
+
+/* Each line (pack's span.code-line, --indent its leading whitespace in columns at the phone's tab-size of 2) is a block
+   container, so its tabs measure in the code's font, not the pre's. On a phone and on paper a wrapped line continues 2ch
+   further in than its own start. */
+.code-line {
+	display: inline-block;
+}
+@media (max-width: 40rem), print {
+	.code-line {
+		inline-size: 100%;
+		padding-inline-start: calc(var(--indent, 0) * 1ch + 2ch);
+		text-indent: calc(var(--indent, 0) * -1ch - 2ch);
+	}
+}
+
+/* Lit code keeps the light tint every lit part has, which leaves the tokens readable, and an accent ring that shows on --sunken. */
+pre [data-ref].is-lit {
+	outline: 1px solid var(--accent);
+}
+
+.tok-comment {
+	color: var(--muted);
+}
+.tok-keyword {
+	color: color-mix(in oklab, var(--c4) 60%, var(--ink));
+}
+.tok-string {
+	color: color-mix(in oklab, var(--ok) 85%, var(--ink));
+}
+.tok-number {
+	color: color-mix(in oklab, var(--c2) 70%, var(--ink));
+}
+.tok-function {
+	color: color-mix(in oklab, var(--c1) 80%, var(--ink));
+}
+.tok-type {
+	color: color-mix(in oklab, var(--warn) 85%, var(--ink));
+}
+.tok-inserted {
+	color: color-mix(in oklab, var(--ok) 85%, var(--ink));
+}
+.tok-deleted {
+	color: var(--bad);
+}

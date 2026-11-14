@@ -6,6 +6,7 @@ import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
 import { kitLabels } from "../kit.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
+import { codeFences } from "./code.ts";
 import { mathToMathml } from "./math.ts";
 import { structurePage } from "./structure.ts";
 
@@ -230,8 +231,9 @@ const isMdxMessage = (e: unknown): e is MdxMessage =>
 
 /**
  * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), TeX math
- * as MathML (math.ts), Mermaid fences and, when `page` is set (the page's own file), the page layout (structure.ts); an
- * imported .mdx file is compiled as a fragment. A syntax error throws PackError with file:line:column.
+ * as MathML (math.ts), Mermaid fences, code fences as lines and tokens (code.ts) and, when `page` is set (the page's own file),
+ * the page layout (structure.ts); an imported .mdx file is compiled as a fragment. A syntax error throws PackError with
+ * file:line:column.
  */
 export async function compileMdx(path: string, page: boolean): Promise<CompiledMdx> {
 	const file = shownPath(path);
@@ -254,7 +256,12 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 						}
 					},
 				],
-				rehypePlugins: [() => drawnFences, () => compareTables, mathToMathml(file)],
+				rehypePlugins: [
+					() => drawnFences,
+					() => compareTables,
+					mathToMathml(file),
+					codeFences(file),
+				],
 			},
 		);
 		return { js: String(compiled.value), front, title: front.title ?? h1 };

@@ -137,6 +137,7 @@ Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are pub
 - [Preact](https://preactjs.com) and preact-render-to-string (MIT): the components and their hydration; [MDX](https://mdxjs.com) (MIT) with its unified, remark and micromark packages (MIT, one ISC), used by `pack`, not shipped in pages.
 - [Temml](https://temml.org) by Ron Kok (MIT) with remark-math, micromark-extension-math and mdast-util-math (MIT): TeX to MathML in `pack`; `temml.woff2` is from the KaTeX fonts (MIT, Khan Academy).
 - [TanStack Table](https://tanstack.com/table) by Tanner Linsley (MIT), with TanStack Store (MIT): the sorting, filtering, grouping and facets of `Records`.
+- [refractor](https://github.com/wooorm/refractor) by Titus Wormer with [Prism](https://prismjs.com)'s grammars by Lea Verou and others (MIT), and the hast packages it uses (MIT): code fence colours in `pack`, not shipped in pages.
 - [Geist and Geist Mono](https://vercel.com/font) by Vercel (SIL OFL 1.1).
 
 Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data).

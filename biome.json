@@ -11,6 +11,7 @@
 			"!skills/explainer/vendor/beautiful-mermaid.js",
 			"!skills/explainer/vendor/mdx.js",
 			"!skills/explainer/vendor/math.js",
+			"!skills/explainer/vendor/refractor.js",
 			"!skills/explainer/kit/parts/math/temml.css",
 			"!skills/explainer/vendor/preact",
 			"!skills/explainer/vendor/types",

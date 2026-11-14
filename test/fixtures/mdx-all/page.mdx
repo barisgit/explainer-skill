@@ -126,11 +126,11 @@ The <span data-ref="R_lim">series resistor</span> sets the lamp's current, about
 <div class="beside">
 <div>
 
-A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model: each hour the surplus charges the battery up to its size, losing a tenth on the way, and a shortfall draws it down before the grid is asked.
+A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model: each hour the <span data-ref="surplus">surplus</span> charges the battery up to its size, losing a tenth on the way, and a shortfall draws it down before the grid is asked.
 
 </div>
 
-```ts
+```ts ref:surplus="surplus"
 for (const hour of year) {
 	const surplus = hour.produced - hour.used;
 	stored = surplus > 0

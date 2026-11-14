@@ -125,16 +125,19 @@ pre {
 	padding: 0.75rem 1rem;
 	border-radius: var(--radius);
 	overflow-x: auto;
+	tab-size: 4;
 }
 pre code {
 	background: none;
 	padding: 0;
 }
-/* On a phone a command wraps, with its indentation, instead of scrolling: the end of a long line is what a reader came for. */
-@media (max-width: 40rem) {
+/* On a phone and on paper a command wraps instead of scrolling or being cut: the end of a long line is what a reader came for.
+   A fence's lines continue under their own start (code.css). */
+@media (max-width: 40rem), print {
 	pre {
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+		tab-size: 2;
 	}
 }
 a {
@@ -3844,10 +3847,11 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
      <p>The <span data-ref="cache">cache</span> answers most reads.</p>      a prose term (made focusable)
      <tr data-ref="cache">…</tr>   <div class="chart" data-ref="cache">…</div>   a table row, a chart panel, any element
      a ```mermaid fence                                                       pack gives every diagram part the data-ref of its Mermaid id
+     ```ts ref:cache="cache.get"                                              every cache.get in the code fence (kit code)
    A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
-   too), so the parts of one diagram never link each other; the light and dark copies pack makes of an SVG file in <img> count
-   once, as do a diagram and the copy pack lays out for phones; any other element is a place of its own. A prose term and a
-   diagram part link, as do two diagrams sharing a node id.
+   too), else its pre, so the parts of one diagram or code block never link each other; the light and dark copies pack makes
+   of an SVG file in <img> count once, as do a diagram and the copy pack lays out for phones; any other element is a place of
+   its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
@@ -3877,6 +3881,10 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     if (svg) {
       const twin = svg.previousElementSibling;
       return svg.matches("svg[data-phone]") && twin instanceof SVGSVGElement ? twin : svg;
+    }
+    const pre = el.closest("pre");
+    if (pre) {
+      return pre;
     }
     const twin = el.previousElementSibling;
     return el.matches("img.dark") && twin?.matches("img.light") ? twin : el;
