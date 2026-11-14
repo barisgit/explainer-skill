@@ -36,7 +36,11 @@ export const ENGLISH = {
 	saveNote: "Save note",
 	figure: "figure",
 	page: "page",
+	answered: "{answered} of {total} answered",
 	showAnswer: "Show answer",
+	recommended: "Recommended",
+	right: "Right",
+	wrong: "Wrong",
 	off: "off",
 	recordsTree: "Tree",
 	recordsTable: "Table",
@@ -89,7 +93,11 @@ export const SLOVENIAN: typeof ENGLISH = {
 	saveNote: "Shrani opombo",
 	figure: "slika",
 	page: "stran",
+	answered: "{answered} od {total} odgovorjenih",
 	showAnswer: "Pokaži odgovor",
+	recommended: "Priporočeno",
+	right: "Pravilno",
+	wrong: "Napačno",
 	off: "izklopljeno",
 	recordsTree: "Drevo",
 	recordsTable: "Tabela",
@@ -179,6 +187,7 @@ function clearing() {
 	expect("reply button", reply.textContent === L.reply);
 	$("[data-reply] input[value=b]").click();
 	expect("reply count and clear", reply.textContent === L.reply + " (1)" && clear.textContent === L.clear);
+	expect("answered count", $(".reply-progress").textContent === L.answered.replace("{answered}", "1").replace("{total}", String(document.querySelectorAll("fieldset[data-reply]").length)));
 	clear.click();
 	expect("clear asks", clear.textContent === L.clearConfirm && $(".reply-bar [role=status]").textContent === L.clearPrompt);
 	document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));

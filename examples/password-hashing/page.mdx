@@ -154,7 +154,7 @@ The constraints leave one real decision: whether the FIPS-140 requirement applie
 
 <p class="caveat"><b>Inferred</b>OWASP does not rank these three options; they come from combining its rules. Our reading: if no customer requires FIPS-140, choose A. If only some do, C usually costs less security than B. If all do, choose B. Whichever you pick, set the memory budget from a measurement on your smallest VM, not from this page's sliders.</p>
 
-<Question name="option" legend="Which option will you take?" options={{ A: "A. Argon2id everywhere", B: "B. PBKDF2 everywhere", C: "C. Argon2id plus PBKDF2 for FIPS", Undecided: "Not yet" }} />
+<Question name="option" legend="Which option will you take?" options={{ A: "A. Argon2id everywhere", B: "B. PBKDF2 everywhere", C: "C. Argon2id plus PBKDF2 for FIPS", Undecided: "Not yet" }} note />
 
 {/* A checklist of long items reads better as toggles, one per line, than as Question's segmented buttons. */}
 

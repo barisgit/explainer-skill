@@ -331,23 +331,123 @@ output {
 		min-inline-size: 0;
 	}
 }
+/* Answer choices (a Question, a Records answer): each option a tile of its own in full ink, with a radio dot or a check box, so
+   it reads as something to answer rather than a setting; Explore's and the toolbar's .seg keep the quieter switch above. The
+   chosen tile takes --choice-mark (the accent, a self-check's --ok or --bad) as its ring and fill. A recommended option carries
+   its mark after its text as generated content, so the reply sends the bare label. Phones stack a Question's choices. */
+fieldset:is([data-reply], .self-check) > .seg {
+	--choice-mark: var(--accent);
+	gap: 0.5rem;
+	padding: 0;
+	background: none;
+	border: 0;
+}
+fieldset:is([data-reply], .self-check) > .seg span {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-block-size: 2.75rem;
+	padding: 0.5rem 0.875rem 0.5rem 0.75rem;
+	color: var(--ink);
+	font-weight: 500;
+	background: var(--surface);
+	border: 1px solid var(--rule-strong);
+	border-radius: 0.5rem;
+	transition:
+		border-color 0.15s,
+		background 0.15s;
+}
+fieldset:is([data-reply], .self-check) > .seg span::before {
+	content: "";
+	flex: none;
+	inline-size: 1rem;
+	block-size: 1rem;
+	border: 1.5px solid var(--muted);
+	border-radius: 50%;
+	background: var(--surface);
+	/* Printers drop backgrounds by default; the chosen dot is the mark, so it prints. */
+	print-color-adjust: exact;
+}
+fieldset:is([data-reply], .self-check) > .seg input[type="checkbox"] + span::before {
+	border-radius: 0.25rem;
+}
+fieldset:is([data-reply], .self-check) > .seg label:hover span {
+	border-color: var(--ink);
+}
+fieldset:is([data-reply], .self-check) > .seg input:checked + span {
+	font-weight: 600;
+	background: color-mix(in oklab, var(--choice-mark) 9%, var(--surface));
+	border-color: var(--choice-mark);
+	box-shadow: inset 0 0 0 1px var(--choice-mark);
+}
+fieldset:is([data-reply], .self-check) > .seg input:checked + span::before {
+	border-color: var(--choice-mark);
+	background: var(--choice-mark);
+	box-shadow: inset 0 0 0 0.1875rem var(--surface);
+}
+fieldset:is([data-reply], .self-check) > .seg [data-recommended]::after {
+	content: attr(data-recommended);
+	padding-inline: 0.4375rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1.25rem;
+	color: var(--muted);
+	border: 1px solid var(--rule-strong);
+	border-radius: 1rem;
+}
+@media (max-width: 40rem) {
+	fieldset:is([data-reply], .self-check):not(.answer) > .seg {
+		display: flex;
+		flex-direction: column;
+	}
+}
+/* A Question's note: under the choices, as wide as a line of text wants. By attribute, so a page's own .note stays its own. */
+fieldset[data-reply] > [data-note] {
+	display: block;
+	inline-size: 100%;
+	max-inline-size: 36rem;
+	margin-block-start: 0.625rem;
+}
 /* Self-check (a Question with an answer): once the reader chooses, the right option is ringed in --ok, a wrong choice is ringed
-   in --bad and struck through, and the explanation opens. CSS alone, so a choice kit:keep.js restores is marked as well. */
+   in --bad and struck through, the verdict says which in words, and the explanation opens. CSS alone, so a choice kit:keep.js
+   restores is marked as well; keep.js speaks the verdict through the hidden status for the reader's own choice. */
 .self-check > .explain {
 	margin-block-start: 0.75rem;
 }
-.self-check:not(:has(input:checked)) > .explain {
+[data-verdict="right"] {
+	color: var(--ok);
+}
+[data-verdict="wrong"] {
+	color: var(--bad);
+}
+.self-check:not(:has(> .seg input:checked)) > :is(.explain, p:has(> [data-verdict])),
+.self-check:has(> .seg input[data-right]:checked) > p > [data-verdict="wrong"],
+.self-check:has(> .seg input:checked:not([data-right])) > p > [data-verdict="right"] {
 	display: none;
 }
-.self-check input:checked:not([data-right]) + span {
+.self-check > p:has(> [data-verdict]) {
+	margin-block: 0.625rem 0;
+	font-weight: 600;
+}
+.self-check > [role="status"] {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+fieldset.self-check > .seg input:checked:not([data-right]) + span {
+	--choice-mark: var(--bad);
 	color: var(--bad);
 	text-decoration: line-through;
-	box-shadow: inset 0 0 0 2px var(--bad);
 }
-.self-check:has(input:checked) input[data-right] + span {
+fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
+	--choice-mark: var(--ok);
 	color: var(--ok);
 	font-weight: 600;
-	box-shadow: inset 0 0 0 2px var(--ok);
+	border-color: var(--ok);
+	box-shadow: inset 0 0 0 1px var(--ok);
 }
 /* Written answer (a Question without options): the question, its box and the model answer keep the measure of the text. */
 .written {

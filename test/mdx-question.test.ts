@@ -55,7 +55,201 @@ describe("Question", () => {
 	}, 30_000);
 });
 
+describe("Question for a decision", () => {
+	test("choices read in full ink, a recommended choice is marked on the page but sent bare, a note is kept and sent, and the bar counts answered questions", async () => {
+		const output = await packedMdx(
+			dir,
+			"decisions",
+			`import { Question } from "kit";
+
+# Decisions
+
+<Question name="store" legend="Where should sessions live?" options={{ files: "Keep the files", redis: "Redis" }} checked="files" recommended="files" note />
+
+<Question name="ttl" legend="How long should a session last?" options={["1 hour", "1 day"]} recommended="1 day" />
+
+<Question name="clients" legend="Which clients stay signed in?" options={["Web", "CLI"]} multiple />
+`,
+		);
+		const look = `(() => {
+			const span = document.querySelector("#ttl-1_20_hour + span");
+			const mark = getComputedStyle(document.querySelector("#ttl-1_20_day + span"), "::after").content;
+			return [getComputedStyle(span).color === getComputedStyle(document.body).color, mark, document.querySelector("#store-files + span").textContent];
+		})()`;
+		const progress = `document.querySelector(".reply-progress")?.checkVisibility() ? document.querySelector(".reply-progress").textContent : null`;
+		const typeNote = `const box = document.getElementById("store.note"); box.value = "Files are enough"; box.dispatchEvent(new Event("input", { bubbles: true }));`;
+		const reply = `(document.querySelector(".reply-bar .primary").click(), document.querySelector(".reply-md").textContent.split("\\n").filter((line) => /^(- |  Note)/.test(line)))`;
+		const seen = await inPage(output, async (cdp) => {
+			const shown = await cdp.evaluate(look);
+			// The mark is generated content; a screen reader hears it as part of the choice's name.
+			await cdp.send("Accessibility.enable");
+			const { nodes } = await cdp.send<{
+				nodes: { role?: { value: string }; name?: { value: string } }[];
+			}>("Accessibility.getFullAXTree");
+			const radios = nodes.filter((n) => n.role?.value === "radio").map((n) => n.name?.value);
+			const before = await cdp.evaluate(progress);
+			const after = await act(
+				cdp,
+				`document.getElementById("ttl-1_20_day").click(); ${typeNote}`,
+				progress,
+			);
+			await load(cdp);
+			return {
+				shown,
+				radios,
+				before,
+				after,
+				reloaded: await cdp.evaluate(`[document.getElementById("store.note").value, ${progress}]`),
+				lines: await cdp.evaluate(reply),
+			};
+		});
+		expect(seen.shown).toEqual([true, '"Recommended"', "Keep the files"]);
+		expect(seen.radios).toEqual([
+			"Keep the files Recommended",
+			"Redis",
+			"1 hour",
+			"1 day Recommended",
+		]);
+		expect(seen.before).toBe("0 of 3 answered");
+		expect(seen.after).toBe("2 of 3 answered");
+		expect(seen.reloaded).toEqual(["Files are enough", "2 of 3 answered"]);
+		expect(seen.lines).toEqual([
+			"- Where should sessions live? Keep the files (recommended)",
+			"  Note: Files are enough",
+			"- How long should a session last? 1 day (recommended)",
+			"- Which clients stay signed in? none (default)",
+		]);
+	}, 30_000);
+});
+
+describe("the reply bar's answered count", () => {
+	test("on a phone with long labels the answered count and every bar button stay whole inside the window, answered and while Clear asks", async () => {
+		const output = await packedMdx(
+			dir,
+			"bar-sl",
+			`---
+lang: sl
+labels:
+  reply: "Odgovor"
+  clear: "Po\u010disti odgovore in opombe"
+  clearConfirm: "Po\u010distim vse?"
+  answered: "{answered} od {total} odgovorjenih"
+---
+import { Question } from "kit";
+
+# Odlo\u010ditve
+
+<Question name="a" legend="Prva?" options={["Da", "Ne"]} />
+
+<Question name="b" legend="Druga?" options={["Da", "Ne"]} />
+`,
+		);
+		// Each part's box and, for the count, its text's own box: within the window, the text not wider than its box.
+		const fits = `(() => {
+			const inside = (r) => r.left >= 0 && r.right <= innerWidth && r.width > 0;
+			const count = document.querySelector(".reply-progress");
+			const range = document.createRange();
+			range.selectNodeContents(count);
+			const buttons = [...document.querySelectorAll(".reply-bar .btn")].filter((b) => b.checkVisibility());
+			const tops = new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().top)));
+			return [inside(count.getBoundingClientRect()), inside(range.getBoundingClientRect()), count.scrollWidth <= count.clientWidth, buttons.length, buttons.every((b) => inside(b.getBoundingClientRect()) && b.scrollWidth <= b.clientWidth), tops.size];
+		})()`;
+		const seen = await inPage(
+			output,
+			async (cdp) => {
+				const answered = await act(cdp, `document.getElementById("a-Da").click()`, fits);
+				const armed = await act(
+					cdp,
+					`document.querySelector(".reply-bar .btn:not(.primary)").click()`,
+					`[${fits}, document.querySelector(".reply-bar .is-armed") !== null]`,
+				);
+				return { answered, armed };
+			},
+			{ width: 390, height: 844, mobile: true },
+		);
+		// Clear and Reply on one row (one top), the count whole on its own.
+		expect(seen.answered).toEqual([true, true, true, 2, true, 1]);
+		expect(seen.armed).toEqual([[true, true, true, 2, true, 1], true]);
+	}, 30_000);
+
+	test("the answered count counts each question once, and shows from two questions on", async () => {
+		const page = (extra: string) =>
+			`import { Question } from "kit";\n\n# Count\n\n<Question name="pick" legend="Which one?" options={["A", "B"]} />\n${extra}`;
+		const progress = `document.querySelector(".reply-progress")?.checkVisibility() ? document.querySelector(".reply-progress").textContent : null`;
+		const one = await packedMdx(dir, "one", page(""));
+		const two = await packedMdx(
+			dir,
+			"two",
+			page(
+				'\n<fieldset data-reply><legend>Limits</legend><input type="text" id="low" aria-label="Low" /><input type="text" id="high" aria-label="High" /></fieldset>\n',
+			),
+		);
+		expect(await inPage(one, (cdp) => cdp.evaluate(progress))).toBeNull();
+		expect(await inPage(two, (cdp) => cdp.evaluate(progress))).toBe("0 of 2 answered");
+	}, 30_000);
+
+	test("props a recommendation or a note cannot use fail the pack, saying what to change", async () => {
+		const question = (props: string) =>
+			`<Question name="q" legend="Which?" options={["a", "b"]} ${props} />`;
+		expect(await packFailure("rec-missing", question('recommended="c"'))).toEqual([
+			1,
+			expect.stringContaining('recommends "c", which is not one of its option values (a, b)'),
+		]);
+		expect(await packFailure("rec-two", question('recommended={["a", "b"]}'))).toEqual([
+			1,
+			expect.stringContaining("recommends several values but takes one"),
+		]);
+		expect(await packFailure("rec-check", question('answer="a" recommended="a"'))).toEqual([
+			1,
+			expect.stringContaining("has an answer and a recommendation"),
+		]);
+		expect(await packFailure("note-check", question('answer="a" note'))).toEqual([
+			1,
+			expect.stringContaining("has an answer and a note"),
+		]);
+		expect(await packFailure("note-written", '<Question name="w" legend="Why?" note />')).toEqual([
+			1,
+			expect.stringContaining("has a note but no options"),
+		]);
+	}, 30_000);
+});
+
 describe("self-check Question", () => {
+	test("a self-check says right or wrong in words, and announces the reader's choice but not a restored one", async () => {
+		const output = await packedMdx(
+			dir,
+			"verdict",
+			`import { Question } from "kit";
+
+# Check
+
+<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">
+<label><input type="checkbox" id="aside" /> Got it</label>
+</Question>
+`,
+		);
+		const seen = `[[...document.querySelectorAll("[data-verdict]")].filter((e) => e.checkVisibility()).map((e) => e.textContent).join(), document.querySelector(".self-check [role=status]")?.textContent ?? null]`;
+		const state = await inPage(output, async (cdp) => {
+			const before = await cdp.evaluate(seen);
+			const wrong = await act(cdp, `document.getElementById("unit-kW").click()`, seen);
+			const right = await act(
+				cdp,
+				`document.getElementById("unit-kWh").click(); document.getElementById("aside").click()`,
+				seen,
+			);
+			await load(cdp);
+			return { before, wrong, right, reloaded: await cdp.evaluate(seen) };
+		});
+		expect(state).toEqual({
+			before: ["", ""],
+			wrong: ["Wrong", "Wrong"],
+			right: ["Right", "Right"],
+			reloaded: ["Right", ""],
+		});
+	}, 30_000);
+});
+
+describe("self-check Question across reloads and later renders", () => {
 	test("a self-check marks the choice, opens its explanation, keeps the choice after a reload, and is not in the reply", async () => {
 		const output = await packedMdx(
 			dir,
@@ -74,7 +268,7 @@ A **kWh** is a kW for an hour.
 		expect(kitScriptsIn(output)).toEqual(["keep"]);
 		// What the reader sees of the first question: the right and the chosen option's marks, and whether the explanation shows.
 		const seen = `(() => {
-			const look = (value) => { const s = getComputedStyle(document.querySelector('[name=unit][value="' + value + '"] + span')); return s.textDecorationLine + " " + s.boxShadow.includes("0px 0px 0px 2px"); };
+			const look = (value) => { const s = getComputedStyle(document.querySelector('[name=unit][value="' + value + '"] + span')); return s.textDecorationLine + " " + (s.boxShadow !== "none"); };
 			return [look("kW"), look("kWh"), document.querySelector(".explain").checkVisibility(), document.querySelector(".reply-bar")];
 		})()`;
 		const state = await inPage(output, async (cdp) => {
@@ -234,7 +428,7 @@ describe("written-answer Question", () => {
 		]);
 		expect(
 			await packFailure("written-multiple", `<Question name="w" legend="Why?" multiple />`),
-		).toEqual([1, expect.stringContaining("has multiple or checked but no options")]);
+		).toEqual([1, expect.stringContaining("has multiple, checked or recommended but no options")]);
 	}, 30_000);
 
 	test("Show answer is the page's labels text, from the page and from a client component", async () => {

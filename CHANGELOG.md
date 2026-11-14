@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `Question` choices are tiles in full ink with a radio dot or check box, so they read as answers rather than settings (Explore and toolbar switches keep the quiet look); phones stack them, and `Records` reply choices get a 44 px tap height there. Mark your recommendation with `recommended="value"` instead of writing it into the label: the choice shows the mark and the reply sends the bare option, adding "(recommended)" when the reader picked it. `note` adds a field under the choices that is kept and sent under the answer, as `Records` reply notes are. With two or more questions the reply bar shows "3 of 16 answered" (on a row of its own above the buttons when they leave too little room) (a choice counts once the reader makes or confirms it). A self-check now says Right or Wrong in words and to screen readers (#136, #79, #151).
+
 - Code fences are coloured when the page packs (TypeScript, TSX, JavaScript, JSON, shell, Python, C, VHDL, CSS, HTML, diff, YAML, SQL, Rust, Go and other common languages; any other stays plain), in light and dark with no script. Mark code to light with the prose that shares its ref by writing `ref:name="text"` after the fence's language (```` ```ts ref:call="api.call" ````): every `api.call` in the fence carries `data-ref="call"` and lights with a partner outside the fence (marks in one fence do not link each other). Tabs indent 4 columns, 2 on phones, and a line wrapped on a phone or on paper continues under its own start instead of at the left edge (`kit code`; #154, #166).
 
 - Treat saved answers in a `file://` page as browser-local convenience, not a durable record; use reply's “Copy reply” to save important answers outside the page (#148).

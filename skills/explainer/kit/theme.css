@@ -122,11 +122,26 @@ body:has(> .reply-bar) {
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: flex-end;
-	gap: 0.5rem;
+	gap: 0.25rem 0.75rem;
 	min-block-size: var(--reply-bar);
 	padding: 0.5rem var(--gutter);
 	background: var(--bg);
 	border-block-end: 1px solid var(--rule);
+}
+/* How many questions the reader answered, on one line beside the buttons; where the buttons leave too little room (a phone,
+   longer labels) it takes a row of its own above them, so neither the count nor a button is cut or split. */
+.reply-progress {
+	white-space: nowrap;
+	font-size: 0.8125rem;
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.reply-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.5rem;
 }
 .reply-hint {
 	box-shadow: 0 10px 24px -10px var(--lift);

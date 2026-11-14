@@ -246,8 +246,15 @@
 	min-block-size: 0;
 	font-size: 0.875rem;
 }
+/* Compact rows for a pointer; a finger gets the full 44px choice. */
+@media (max-width: 40rem) {
+	.records .answer .seg span {
+		min-block-size: 2.75rem;
+	}
+}
 .records .answer .note {
 	flex: 1 1 12rem;
+	margin-block-start: 0;
 	min-inline-size: 0;
 	max-inline-size: 28rem;
 	min-block-size: 2rem;

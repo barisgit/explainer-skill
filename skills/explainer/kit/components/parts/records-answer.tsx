@@ -59,16 +59,46 @@ export function Answer({
 				))}
 			</div>
 			{reply.note && (
-				<input
-					type="text"
-					class="note"
+				<NoteField
 					id={noteId}
-					value={textBefore(kept, noteId)}
-					data-note=""
-					aria-label={`${noteText}: ${label}`}
+					label={`${noteText}: ${label}`}
 					placeholder={noteText}
+					value={textBefore(kept, noteId)}
 				/>
 			)}
 		</fieldset>
+	);
+}
+
+/**
+ * The note on an answer: a text field marked `data-note`, which kit reply.js sends under its host's answer and keep.js keeps by
+ * `id`. Question's `note` draws the same field.
+ */
+export function NoteField({
+	id,
+	label,
+	placeholder,
+	value,
+	describedBy,
+}: {
+	id: string;
+	label: string;
+	placeholder: string;
+	/** What the reader wrote before this copy was drawn; none at pack time. */
+	value?: string | undefined;
+	/** The id of the question the note is on, when the label does not name it. */
+	describedBy?: string;
+}) {
+	return (
+		<input
+			type="text"
+			class="note"
+			id={id}
+			value={value}
+			data-note=""
+			aria-label={label}
+			aria-describedby={describedBy}
+			placeholder={placeholder}
+		/>
 	);
 }

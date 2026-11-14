@@ -7,7 +7,8 @@
    value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept. Once a Question's answer is saved, a Clear answers button at the end of the page puts the answers back
+   <details> are not kept. A self-check Question says Right or Wrong to a screen reader when the reader chooses (not on a restore).
+   Once a Question's answer is saved, a Clear answers button at the end of the page puts the answers back
    to their defaults, again with events, and drops their saved copy; a first press only asks, a second within 4 s clears. Other
    controls stay kept without a button. With reply (kit reply) the reader's notes are kept too, and on a page that asks for
    replies (reply: true, a data-reply control, or a note) a Clear in the reply bar takes its place and clears every control.
@@ -459,6 +460,31 @@
 			},
 		};
 	}
+
+	/**
+	 * Says a self-check's verdict for the reader's own choice: its status region gets the word the theme now shows, emptied first
+	 * so a second wrong choice is said again. A restored or cleared choice empties it instead, so a reload stays silent.
+	 */
+	function sayVerdict(e: Event) {
+		const input = e.target;
+		// Only the Question's own choices: a control in its explanation leaves the verdict alone.
+		const own =
+			input instanceof HTMLInputElement && input.matches(".self-check > .seg > label > input");
+		const check = own ? input.closest(".self-check") : null;
+		const status = check?.querySelector(":scope > [role=status]");
+		if (!(input instanceof HTMLInputElement && status)) {
+			return;
+		}
+		status.textContent = "";
+		const verdict = input.checked && input.hasAttribute("data-right") ? "right" : "wrong";
+		const word = check?.querySelector(`:scope > p > [data-verdict=${verdict}]`)?.textContent;
+		if (!applying && input.checked && word) {
+			requestAnimationFrame(() => {
+				status.textContent = word;
+			});
+		}
+	}
+	document.addEventListener("change", sayVerdict);
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
 	const later = () => setTimeout(() => onChange());

@@ -48,6 +48,8 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 		[".chip.verdict", false],
 		[".plot.tall", true],
 		[".plot.tall.verdict", false],
+		// A Question's note field is styled by its data-note, so a page's own .note is its own.
+		[".note", false],
 	])("an intended restyle needs a page-owned class on the subject: %s", async (selector, warns) => {
 		const input = dir.write(
 			"restyle.html",

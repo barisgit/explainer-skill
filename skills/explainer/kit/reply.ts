@@ -14,6 +14,8 @@
    data-note inside a data-reply element is the note on that element's other control and goes with it, under it in the reply.
    The reply lists the answers, each with its note under it; a control the reader never touched keeps its default, marked
    "(default)", and every one with nothing chosen and no note is left out of the list and named in one line, "Not answered: a; b".
+   An option whose label holds an element with data-recommended is the page's recommendation: an answer that is it is marked
+   "(recommended)". With two or more questions (fieldset hosts) the bar says how many the reader answered.
    Notes come from selected text and clicks on [data-ref] parts
    (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
    is-annotatable (a faint underline), also those rendered later. An aria-label names a note target explicitly; otherwise a tree
@@ -22,7 +24,7 @@
    cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
-   quote | part, text }], answers: [{ label, value, note, touched }] }.
+   quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
    Read the current Markdown without copying or sending with window.ReplyNotes.markdown() or check --do reply.
    Keeping (kit keep): the reader's answers and notes are kept across reloads. On a page with reply: true (pack marks its <main>
    data-asks-reply), a data-reply control or a note, the bar holds keep's Clear button as "Clear answers and notes" while anything
@@ -34,7 +36,8 @@
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
-   note in the dialog figure "figure" ("figure “name”") and page "page" (a note outside any figure or headed section). A key left out
+   note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
+   "{answered} of {total} answered" (the bar's count). A key left out
    stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
@@ -63,6 +66,7 @@
 		saveNote: "Save note",
 		figure: "figure",
 		page: "page",
+		answered: "{answered} of {total} answered",
 	};
 	/** The page's text for `key`, else the English one. Read at each use, so kitLabels may be set after this script. */
 	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
@@ -100,13 +104,19 @@
 	const { ownText } = keep;
 	/** Controls answering together; never empty. */
 	type Group = [ReplyControl, ...ReplyControl[]];
-	/** One answer as the reply lists it: `value` is null when nothing is chosen, `note` the text of the host's data-note field. */
+	/**
+	 * One answer as the reply lists it: `value` is null when nothing is chosen, `note` the text of the host's data-note field,
+	 * `recommended` whether the choice is the one the page marks (data-recommended), left out where it marks none.
+	 */
 	interface Answer {
 		label: string;
 		value: string | null;
 		note: string;
 		touched: boolean;
+		recommended?: boolean;
 	}
+	/** An answer and its host: a fieldset host is one question, which the bar counts once; a panel's settings are not counted. */
+	type Entry = Answer & { host: HTMLElement };
 	const optionText = (c: ReplyControl) => (c.labels?.[0] ? ownText(c.labels[0]) : c.value);
 
 	function unitLabel(c: ReplyControl) {
@@ -177,7 +187,18 @@
 		return rest.length ? [rest, field] : [controls, undefined];
 	}
 
-	function answers(): Answer[] {
+	/** Whether `c` is an option the page recommends. */
+	const isRecommended = (c: ReplyControl) =>
+		Boolean(c.labels?.[0]?.querySelector("[data-recommended]"));
+
+	/** Whether a group's choice is exactly the recommended options; undefined when it has none. */
+	function recommendation(cs: Group): { recommended?: boolean } {
+		return cs.some(isRecommended)
+			? { recommended: cs.every((c) => checked(c) === isRecommended(c)) }
+			: {};
+	}
+
+	function answers(): Entry[] {
 		return [...document.querySelectorAll<HTMLElement>("[data-reply]")].flatMap((host) => {
 			const own = controlOf(host);
 			const [controls, noteField] = splitNote(
@@ -201,6 +222,8 @@
 					value: groupValue(cs),
 					note: note?.value.trim() ?? "",
 					touched: cs.some(keep.touched) || (note !== undefined && keep.touched(note)),
+					...recommendation(cs),
+					host,
 				};
 			});
 		});
@@ -237,11 +260,16 @@
 	const noteLine = (n: ReplyNote) =>
 		`- On ${n.quote ? `"${n.quote}"` : `part "${n.part}"`} (${n.where}): ${n.text.trim().split("\n").join("\n  ")}`;
 	// A legend that is already a question reads badly with a colon after it: "Which fix?: Second barista".
-	const answerLine = (a: Answer) =>
-		[
-			`- ${a.label}${/[?:]$/.test(a.label) ? "" : ":"} ${a.value ?? "no answer"}${a.value != null && !a.touched ? " (default)" : ""}`,
+	const answerLine = (a: Answer) => {
+		const marks = [
+			a.value != null && a.recommended ? "recommended" : "",
+			a.value != null && !a.touched ? "default" : "",
+		].filter(Boolean);
+		return [
+			`- ${a.label}${/[?:]$/.test(a.label) ? "" : ":"} ${a.value ?? "no answer"}${marks.length ? ` (${marks.join(", ")})` : ""}`,
 			...(a.note ? [`  Note: ${a.note.split("\n").join("\n  ")}`] : []),
 		].join("\n");
+	};
 	/** The answers section's lines: what the reader answered or noted, then one line naming every item left without either. */
 	function answerLines(given: Answer[]) {
 		const [done, left] = [
@@ -300,7 +328,7 @@
 				part,
 				text: text.trim(),
 			})),
-			answers: answers(),
+			answers: answers().map(({ host, ...answer }) => answer),
 		};
 		document.dispatchEvent(new CustomEvent("reply", { detail }));
 		if (parent !== window) {
@@ -324,8 +352,11 @@
 		{ label: () => kitText("clear"), prompt: () => kitText("clearPrompt") },
 		clearAll,
 	);
+	const progress = h("span", { class: "reply-progress" });
+	// The buttons wrap as one group, so a count that does not fit beside them takes a row of its own rather than splitting them.
+	const actions = h("div", { class: "reply-actions" }, clear.status, clear.button, button);
 	const bar = document.body.appendChild(
-		h("div", { class: "reply-ui reply-bar" }, clear.status, clear.button, button),
+		h("div", { class: "reply-ui reply-bar" }, progress, actions),
 	);
 	// The page keeps the strip's height free at its top (theme.css); a hidden strip keeps the room it last took, so showing it again does not move the page.
 	new ResizeObserver(() => {
@@ -351,7 +382,21 @@
 		const inBar =
 			asked || filledNotes().length > 0 || document.querySelector("[data-asks-reply]") !== null;
 		const kept = keep.update(inBar);
-		const count = filledNotes().length + answers().filter((a) => a.touched).length;
+		const given = answers();
+		const count = filledNotes().length + given.filter((a) => a.touched).length;
+		// Answered: chosen or noted by the reader, so a default left alone is not counted until the reader picks it.
+		const questions = new Set<HTMLElement>(
+			given.map((a) => a.host).filter((host) => host instanceof HTMLFieldSetElement),
+		);
+		const answered = new Set(
+			given
+				.filter((a) => questions.has(a.host) && a.touched && (a.value !== null || a.note))
+				.map((a) => a.host),
+		);
+		progress.hidden = questions.size < 2;
+		progress.textContent = kitText("answered")
+			.replace("{answered}", String(answered.size))
+			.replace("{total}", String(questions.size));
 		button.hidden = !count && !asked;
 		clear.show(inBar && kept);
 		bar.hidden = button.hidden && !(inBar && kept);
