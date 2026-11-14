@@ -18,7 +18,7 @@ const KEYS: Record<string, [number, string]> = {
 	End: [35, "End"],
 	Backspace: [8, "Backspace"],
 };
-/** The `--do` step kinds, each written `<kind>:<arg>`; `reload` is the one step without an argument. */
+/** The `--do` step kinds, each written `<kind>:<arg>`; `reload` and `reply` take no argument. */
 const KINDS = ["click", "drag", "key", "hover", "focus", "type", "set", "shot"] as const;
 type StepKind = (typeof KINDS)[number];
 /** Dot-all, so the text of a type: step may span lines. */
@@ -74,12 +74,12 @@ function parseStep(step: string): ParsedStep | undefined {
 
 /** Returns why a `--do` step is malformed, or "" when it parses. */
 export function stepError(step: string): string {
-	if (step === RELOAD) {
+	if (step === RELOAD || step === "reply") {
 		return "";
 	}
 	const parsed = parseStep(step);
 	if (!parsed) {
-		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, ${DRAG_FORM}, hover:<css | x,y>, focus:<css>, key:<Key>, ${VALUE_FORMS.type}, ${VALUE_FORMS.set}, shot:<css>[@all|@index] or reload`;
+		return `step "${step}" must be click:<css>[@all|@index], click:<x,y>, ${DRAG_FORM}, hover:<css | x,y>, focus:<css>, key:<Key>, ${VALUE_FORMS.type}, ${VALUE_FORMS.set}, shot:<css>[@all|@index] or reload or reply`;
 	}
 	const { kind, arg, value } = parsed;
 	if (kind === "drag" && !parseDrag(arg)) {
@@ -147,6 +147,8 @@ export interface StepResult {
 	problem?: string;
 	note?: string;
 	pngs?: string[];
+	/** Exact reply Markdown at this step, read without copying or delivering. */
+	reply?: string;
 }
 
 /**
@@ -478,8 +480,22 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 	return missing && !result.problem ? { ...result, problem: `${step}: ${missing}` } : result;
 }
 
+/** Reads the kit's own builder without opening the dialog, copying or delivering a reply. */
+async function replyStep(cdp: Cdp): Promise<StepResult> {
+	const reply = await cdp.evaluate<string | null>("window.ReplyNotes?.markdown?.() ?? null");
+	return reply === null
+		? {
+				problem:
+					"reply: reply text is unavailable; pack the page with the current kit and a Question or reply: true",
+			}
+		: { reply };
+}
+
 /** Runs one step other than reload, without waiting for the page afterwards. */
 async function act(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
+	if (step === "reply") {
+		return replyStep(cdp);
+	}
 	const parsed = parseStep(step);
 	if (!parsed) {
 		return { problem: stepError(step) };

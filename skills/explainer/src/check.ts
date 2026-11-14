@@ -67,10 +67,18 @@ export interface ViewReport {
 	uncaptured: string[];
 	templates: string[];
 }
+/** One explicit reply action, preserving its order and screen even when the Markdown repeats. */
+export interface ReplyCapture {
+	step: number;
+	theme: string;
+	viewport: string;
+	markdown: string;
+}
 export interface CheckResult {
 	shots: Shot[];
 	views: ViewReport;
 	stepNotes: string[];
+	replies: ReplyCapture[];
 }
 
 /**
@@ -136,6 +144,7 @@ interface Run {
 	/** The drill-down hashes to capture, set once by the first overview pass (light, desktop) and reused for every other screen. */
 	viewHashes: string[];
 	stepNotes: Set<string>;
+	replies: ReplyCapture[];
 	/** Where the run is now ("at dark narrow, view #fix/none", or STARTING), for an error that stops it. */
 	where: string;
 }
@@ -227,6 +236,14 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 		}
 		if (result.note) {
 			run.stepNotes.add(`${result.note} [${screen.theme} ${screen.name}]`);
+		}
+		if (result.reply !== undefined) {
+			run.replies.push({
+				step: i + 1,
+				theme: screen.theme,
+				viewport: screen.name,
+				markdown: result.reply,
+			});
 		}
 		elements.push(...(result.pngs ?? []).map((png) => ({ step, png })));
 	}
@@ -414,11 +431,17 @@ export async function check(
 					views: { found: [], captured: [], uncaptured: [], templates: [] },
 					viewHashes: [],
 					stepNotes: new Set(),
+					replies: [],
 					where: STARTING,
 				};
 				current = run;
 				await shootNamingWhere(run, themes, limit.signal);
-				return { shots: run.shots, views: run.views, stepNotes: [...run.stepNotes] };
+				return {
+					shots: run.shots,
+					views: run.views,
+					stepNotes: [...run.stepNotes],
+					replies: run.replies,
+				};
 			}, limit.signal),
 		);
 		return { ...result, shots: inOutDir(result.shots, outDir) };

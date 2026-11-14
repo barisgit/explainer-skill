@@ -176,7 +176,11 @@ declare var Views: {
 	setLocal(el: Element, text: string): void;
 };
 declare var Keep: KeepApi;
-declare var ReplyNotes: (options: ReplyNotesOptions) => void;
+declare var ReplyNotes: {
+	(options: ReplyNotesOptions): void;
+	/** Current reply Markdown, available once reply.js has initialized; no clipboard or host delivery. */
+	markdown?: () => string;
+};
 declare var ViewsNav: (options: {
 	views: HTMLElement[];
 	canonical: (hash: string) => string;

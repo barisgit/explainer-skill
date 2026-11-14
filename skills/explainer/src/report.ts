@@ -1,4 +1,4 @@
-import type { Shot, ViewReport } from "./check.ts";
+import type { ReplyCapture, Shot, ViewReport } from "./check.ts";
 import { OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { SWEEP_WARNING } from "./page-probes.ts";
 
@@ -113,12 +113,18 @@ export function report(
 	shots: Shot[],
 	views: ViewReport,
 	stepNotes: string[],
+	replies: ReplyCapture[] = [],
 ): string {
 	return [
 		`Screenshots: ${outDir}`,
 		"",
 		...firstScreens(shots),
 		...pages(shots, stepNotes),
+		...replies.flatMap((r) => [
+			"",
+			`Reply (--do step ${r.step}, ${r.theme} ${r.viewport}):`,
+			r.markdown,
+		]),
 		...warnings(shots),
 		...viewsSection(views),
 		"Open the PNGs (first-screen ones first) and look for clipped text, empty regions, weak contrast, broken layout.",
