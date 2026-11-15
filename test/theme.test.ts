@@ -155,20 +155,23 @@ test("a masthead paragraph that starts with a bold label is the next action, set
 	expect(style).toEqual({ masthead: ["lede", "next", "meta"], mono: false, ink: true, size: true });
 }, 30_000);
 
-test("a .beside figure stays in view while its text scrolls at .wide's width on a desktop, and stacks after the text on a phone and in print (#159)", async () => {
+test("a .beside figure stays in view while its text scrolls, from the column's start to .wide's end on a desktop, and stacks after the text on a phone and in print (#159, #179)", async () => {
 	const text =
 		"<p>Prose that explains the figure beside it, long enough to scroll past it.</p>".repeat(40);
 	const page = (
 		checks: Record<string, string>,
-	) => `${HEAD}<div class="wide" id="wide">Wide</div><div class="beside"><div id="text">${text}</div>
+	) => `${HEAD}<p id="prose">The column.</p><div class="wide" id="wide">Wide</div><div class="beside"><div id="text">${text}</div>
 <figure class="fig" id="figure"><svg viewBox="0 0 360 200"><rect width="360" height="200" /></svg></figure></div>
+<div class="beside"><div>${text}</div><figure class="fig" id="narrow"><div class="mermaid">flowchart TD
+	a["A"] --> b["B"]</div></figure></div>
 ${text}</main><script>
 const box = (id) => document.getElementById(id).getBoundingClientRect();
 const scrolled = (y) => { scrollTo({ top: y, behavior: "instant" }); return box("figure"); };
 const mid = () => { const t = box("text"); return scrollY + t.top + t.height / 2; };
 ${pageContract(checks)}</script></body></html>`;
 	const screen = page({
-		"side by side at .wide's edges on a desktop": `innerWidth < 900 || (box("figure").left > box("text").right && Math.abs(box("text").left - box("wide").left) < 1 && Math.abs(box("figure").right - box("wide").right) < 1)`,
+		"side by side from the column's start to .wide's end on a desktop": `innerWidth < 900 || (box("figure").left > box("text").right && Math.abs(box("text").left - box("prose").left) < 1 && Math.abs(box("figure").right - box("wide").right) < 1)`,
+		"a narrow drawing starts beside its text, not centred in its share": `innerWidth < 900 || document.querySelector("#narrow svg").getBoundingClientRect().left - box("narrow").left < 20`,
 		"the desktop figure stays in view halfway down the text": `innerWidth < 900 || (() => { const f = scrolled(mid()); return f.top >= 0 && f.bottom <= innerHeight; })()`,
 		"the phone figure follows the text": `innerWidth >= 900 || box("figure").top >= box("text").bottom`,
 		"the figure scrolls away with the end of its text": `(() => { const end = scrollY + box("text").bottom; return scrolled(end + innerHeight).bottom < 0; })()`,

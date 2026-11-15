@@ -377,10 +377,11 @@ h3,
 	border-block-end: 1px solid var(--rule);
 }
 /* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
-   Two children: the text, then the figure. From 56rem they stand side by side at .wide's width, the text two fifths, and the
-   figure stays in view while longer text scrolls past it, scrolling inside when it is taller than the window. Stacked on
-   phones: a figure pinned above the text there hid most of a flowchart or code block in its share of the screen. It follows
-   the .fig rules so its margin reset and scrolling win over the figure's own. */
+   Two children: the text, then the figure. From 56rem they stand side by side, the text two fifths from the column's start like
+   the prose around it, the figure out to .wide's end, and the figure stays in view while longer text scrolls past it, scrolling
+   inside when it is taller than the window. A diagram narrower than its share starts beside the text rather than centred away
+   from it. Stacked on phones: a figure pinned above the text there hid most of a flowchart or code block in its share of the
+   screen. It follows the .fig rules so its margin reset and scrolling win over the figure's own. */
 .beside {
 	display: grid;
 	gap: 1rem 2.5rem;
@@ -395,10 +396,13 @@ h3,
 	margin-block-start: 0;
 }
 @media screen and (min-width: 56rem) {
-	/* .wide's margins: those beside the contents rail (--wide-reach, kit:views.js), else the reach to 88rem within the gutters. */
+	/* .wide's end margin: beside the contents rail --wide-reach (kit:views.js), else the reach to 88rem within the gutters. */
 	.beside {
 		grid-template-columns: minmax(min(100%, 20rem), 2fr) minmax(0, 3fr);
-		margin-inline: calc(-1 * var(--wide-reach, (min(44rem, 50vw - var(--gutter)) - 50%)));
+		margin-inline-end: calc(-1 * var(--wide-reach, (min(44rem, 50vw - var(--gutter)) - 50%)));
+	}
+	.beside :is(.mermaid, .schematic) {
+		text-align: start;
 	}
 	/* Pinned below the Reply bar when the page has one (theme.css), which content passes under. */
 	.beside > :nth-child(2) {
@@ -2464,7 +2468,8 @@ details > :last-child:not(summary) {
    smaller with the heading in its own column.
    Text linked to a figure, diagram or code (data-ref) sits beside it, so both ends of a link share the screen:
      <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
-   From 56rem the two stand side by side at .wide's width and the figure stays in view while the text scrolls; stacked on phones.
+   From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
+   view while the text scrolls; stacked on phones.
    Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
    <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
    class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"

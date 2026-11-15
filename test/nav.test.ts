@@ -225,7 +225,8 @@ for (const direction of ["ltr", "rtl"]) {
 	test(`.wide beside the rail grows equally to both sides of the column, clear of the rail, with its Expand all (${direction})`, async () => {
 		const page = `${HEAD.replace("<html>", `<html dir="${direction}">`)}<main class="page"><div data-overview><h1>Records</h1>
 <section><h2>People</h2><p id="prose">${"Words in the reading column. ".repeat(20)}</p><a href="#p/a">A</a></section>
-<section id="records"><h2>Items</h2><div class="wide" id="wide"><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div><a href="#i/1">One</a></section></div>
+<section id="records"><h2>Items</h2><div class="wide" id="wide"><details><summary>A</summary><p>a</p></details><details><summary>B</summary><p>b</p></details></div><a href="#i/1">One</a>
+<div class="beside"><div id="beside-text"><p>Text linked to the figure.</p></div><figure class="fig" id="beside-figure"><svg viewBox="0 0 360 200"></svg></figure></div></section></div>
 <section class="view" data-view="p"><a class="back" href="#">Home</a><h1>Person</h1></section>
 <section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section></main>
 <script src="kit:views.js"></script>
@@ -239,7 +240,10 @@ const railShown = () => (rtl ? rail().left > column().right : rail().right < col
 const growth = () => [column().left - box("wide").left, box("wide").right - column().right];
 const railGap = () => Math.max(box("wide").left - rail().right, rail().left - box("wide").right);
 const end = (el) => (rtl ? -el.getBoundingClientRect().left : el.getBoundingClientRect().right);
+const start = (el) => (rtl ? -el.getBoundingClientRect().right : el.getBoundingClientRect().left);
+const one = (id) => document.getElementById(id);
 ${pageContract({
+	".beside's text starts with the column and its figure ends with .wide": `Math.abs(start(one("beside-text")) - start(one("records"))) < 1 && Math.abs(end(one("beside-figure")) - end(one("wide"))) < 1`,
 	"the rail shows beside the column on a wide screen": `innerWidth < 1024 || railShown()`,
 	".wide grows as far to one side of the column as to the other": `Math.abs(growth()[0] - growth()[1]) < 1`,
 	"where the page box has a margin, .wide grows into it": `innerWidth < 1440 || growth()[0] > 39`,
