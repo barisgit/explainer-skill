@@ -115,11 +115,17 @@ img,
 svg {
 	max-inline-size: 100%;
 }
+/* Code keeps to the type roles in its own face: in a line it takes the size of the text around it, and a block of code is set
+   at the label's size, as a figure's text is. */
 code,
 pre,
-kbd {
+kbd,
+samp {
 	font-family: var(--mono);
-	font-size: 0.875em;
+	font-size: 1em;
+}
+pre {
+	font-size: var(--size-label);
 }
 code {
 	background: var(--sunken);
@@ -876,7 +882,8 @@ legend {
 	cursor: pointer;
 	min-block-size: 2.25rem;
 }
-/* A toggle is a square box: empty when off, filled (in the series' --swatch, else ink) inside a ring of the tone under it when on. */
+/* A toggle is a square box: empty when off; when on, filled (in the series' --swatch, else ink) inside a ring of the tone under it,
+   its edge in ink, so the box keeps 3:1 whatever the series colour. */
 .toggle input {
 	appearance: none;
 	margin: 0;
@@ -896,7 +903,7 @@ legend {
 	border-color: var(--ink);
 }
 .toggle input:checked {
-	border-color: var(--swatch, var(--ink));
+	border-color: var(--ink);
 	background: var(--swatch, var(--ink));
 	box-shadow: inset 0 0 0 2px var(--under);
 }
@@ -2470,6 +2477,7 @@ details > :last-child:not(summary) {
 svg :is(.is-lit, .is-now, [data-kit-state][data-state~="now"]) {
 	color: var(--accent);
 }
+/* The shapes of a lit part take the accent stroke, but not its hit area (a schematic part's .hit) or a shape drawn unstroked. */
 svg
 	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"]):is(
 		path,
@@ -2479,10 +2487,10 @@ svg
 		line,
 		polyline,
 		polygon
-	),
+	):not(.hit, [stroke="none"]),
 svg
 	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"])
-	:is(path, rect, circle, ellipse, line, polyline, polygon) {
+	:is(path, rect, circle, ellipse, line, polyline, polygon):not(.hit, [stroke="none"]) {
 	stroke: var(--accent);
 }
 svg.has-lit [data-ref]:not(.is-lit) {
