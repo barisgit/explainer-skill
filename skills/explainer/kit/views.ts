@@ -20,8 +20,8 @@
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
    its sections, beside the column on wide screens and a Contents disclosure on phones. A section is listed by its heading, or by
    data-nav="Price" on the section or its h2 (the section wins) when a short name finds it faster; the crumbs and previous/next keep the
-   link texts. Any page, views or not, gets the rail when four or more of its sections carry data-nav; with fewer it has none
-   (unless it has two view names). Names in the navigation wrap and are never cut off. A section with two or more <details>
+   link texts. Any other page gets the rail only when it asks: <main data-contents>, which contents: true in the frontmatter
+   writes. Names in the navigation wrap and are never cut off. A section with two or more <details>
    gets Expand all, which opens them at every level, at the end of the section's .toolbar when one comes before them. A
    <details class="answer"> (a question's model answer) is not counted or opened: the reader opens each answer after writing
    their own.

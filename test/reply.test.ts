@@ -505,7 +505,7 @@ test("the reply bar never covers content: at the top nothing is under it, and sc
 }, 60_000);
 
 test("a reply bar that long kitLabels wrap onto two rows still covers nothing at the top, and focus clears it", async () => {
-	const labels = `var kitLabels = { reply: "Antworten", clear: "Antworten und Notizen löschen" };`;
+	const labels = `var kitLabels = { reply: "Antworten senden", clear: "Alle Antworten und Notizen dieser Seite löschen" };`;
 	const contract = `${labels}
 ${SETTLED}
 var contract = settled.then(async () => {
@@ -516,7 +516,8 @@ var contract = settled.then(async () => {
 	const top = at(0) && coversNothing();
 	at(late.getBoundingClientRect().top + scrollY - box().bottom + 4);
 	late.focus();
-	return [top ? "" : "the wrapped bar covers content at the top", late.getBoundingClientRect().top >= box().bottom ? "" : "a control focused under the wrapped bar stays under it"].filter(Boolean);
+	// Scroll offsets are whole pixels and the control's top is not, so it may end up to a pixel short of the bar's edge.
+	return [innerWidth > 500 || box().height > 70 ? "" : "the labels do not wrap the bar on a phone", top ? "" : "the wrapped bar covers content at the top", late.getBoundingClientRect().top > box().bottom - 1 ? "" : "a control focused under the wrapped bar stays under it"].filter(Boolean);
 });`;
 	expect(await packAndRun(dir, "bar-long", BAR_PAGE(true, contract))).toEqual([]);
 }, 60_000);

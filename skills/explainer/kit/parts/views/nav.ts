@@ -13,7 +13,7 @@
                Forward and reload keep them; a link opened fresh starts a new trail.
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
-     .toc      on a page with two or more view names, or with four or more overview sections named by data-nav, a contents
+     .toc      on a page with two or more view names, or whose <main> asks for it (data-contents, from contents: true), a contents
                rail: the overview, its sections by their data-nav or else their h2 (ids added when missing), and under the section
                that first links to a view name, each trail step's siblings (only the step itself past 12). The current section
                follows scrolling; 07-nav.css places the rail. */
@@ -36,8 +36,6 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	/** The location hash the trail was saved for: a fragment navigation copies the state into its new entry, where it is not yet its own. */
 	const AT_KEY = "viewTrailAt";
 	const RAIL_LIST_MAX = 12;
-	/** Sections named by data-nav that give a page a rail without two view names; src/mdx/kit-scripts.ts brings views.js at as many. */
-	const RAIL_NAMED_MIN = 4;
 	/** The navigation this part builds: its links are never the page's own. */
 	const KIT_NAV = ".trail, .toc";
 	const overview = document.querySelector<HTMLElement>("[data-overview]");
@@ -341,12 +339,9 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 		});
 	}
 
-	/** Whether the page gets a rail: two or more view names, or enough sections the author named for it. */
-	function wantsRail(overview: HTMLElement) {
-		const named = headedSections(overview).filter(
-			({ section, heading }) => clean(section.dataset.nav) || clean(heading.dataset.nav),
-		);
-		return names.size > 1 || named.length >= RAIL_NAMED_MIN;
+	/** Whether the page gets a rail: two or more view names, or a page that asks for one (contents: true). */
+	function wantsRail(page: HTMLElement) {
+		return names.size > 1 || page.hasAttribute("data-contents");
 	}
 
 	/** The rail, first in `page`: the overview link, then one entry per overview section with an h2. */
@@ -442,7 +437,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	}
 
 	const page = overview?.parentElement;
-	const railHost = page && overview && wantsRail(overview) ? { page, overview } : null;
+	const railHost = page && overview && wantsRail(page) ? { page, overview } : null;
 	// Set now, before the first paint: the page takes its rail-side width at once.
 	document.documentElement.classList.toggle("has-toc", Boolean(railHost));
 	let toc: Rail | null = null;

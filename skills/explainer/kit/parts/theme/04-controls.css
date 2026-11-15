@@ -1,13 +1,14 @@
 /* theme part: control row, fields, segmented choice, toggle, inputs, buttons, playback, tabs. */
-/* Controls: a row at the top of a panel. Field captions keep the case you write. */
+/* One control style: square-ish, a 1px edge in --rule-strong (3:1 on every tone), the chosen or pressed state filled in ink, text
+   at the label's size. Links and focus rings keep the accent. */
+/* Controls: a row right above the figure it acts on. Field captions keep the case you write. */
 .controls {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.75rem 1.5rem;
 	align-items: center;
-	padding-block: 0.875rem;
-	border-block-end: 1px solid var(--rule);
-	font-size: 0.875rem;
+	padding-block: 0.5rem 0.75rem;
+	font-size: var(--size-label);
 }
 /* A phone is about 20rem wide inside the panel: tighter gaps keep a row of short toggles (four bits) in one row, in order. */
 @media (max-width: 40rem) {
@@ -20,7 +21,6 @@
 }
 .controls:has(+ .controls) {
 	padding-block-end: 0.25rem;
-	border-block-end: 0;
 }
 /* Explore's readout is a block, so it can hold a paragraph or a div; it keeps the spacing of a figure's own paragraph. */
 .fig > [data-readout] {
@@ -30,7 +30,7 @@
    Controls (pack marks it, data-under), where the controls are in sight; printed, the controls are not, so every figure says it. */
 .controls-state {
 	padding-block: 0.5rem 0;
-	font-size: 0.8125rem;
+	font-size: var(--size-label);
 	color: var(--muted);
 }
 .controls-state a {
@@ -56,7 +56,7 @@
 	gap: 0.25rem 0.625rem;
 }
 .field > span:first-child {
-	font-size: 0.8125rem;
+	font-size: var(--size-label);
 	font-weight: 500;
 	color: var(--muted);
 }
@@ -85,19 +85,19 @@ legend {
 	padding: 0;
 	font-weight: 600;
 }
-/* Segmented choice: a sunken track; the chosen option is a raised tile in bold ink. */
+/* Segmented choice: a row of cells sharing their edges; the chosen one is filled in ink. The cells overlap by their border, so a
+   wrapped row stays one grid, and the chosen or hovered cell rises over its neighbours' edges. */
 .seg {
 	display: inline-flex;
 	flex-wrap: wrap;
-	gap: 2px;
-	padding: 2px;
-	background: var(--sunken);
-	border: 1px solid var(--rule);
-	border-radius: 0.5rem;
+	padding: 0 1px 1px 0;
 }
 .seg label {
 	position: relative;
 	display: block;
+}
+.seg label:is(:hover, :has(input:checked)) {
+	z-index: 1;
 }
 .seg input {
 	position: absolute;
@@ -108,34 +108,28 @@ legend {
 }
 .seg span {
 	display: block;
-	padding: 0.3125rem 0.75rem;
-	min-block-size: 2rem;
+	margin: 0 -1px -1px 0;
+	padding: 0.375rem 0.75rem;
+	min-block-size: 2.25rem;
 	line-height: 1.375rem;
-	border-radius: 0.375rem;
-	color: var(--muted);
+	border: 1px solid var(--rule-strong);
+	border-radius: var(--radius);
+	color: var(--ink);
 	transition:
 		background 0.15s,
-		color 0.15s;
-}
-/* In a .toolbar (below), the switch is as tall as the inputs beside it. */
-.toolbar .seg span {
-	min-block-size: 0;
-	padding-block: 0.25rem;
+		border-color 0.15s;
 }
 .seg label:hover span {
-	color: var(--ink);
+	border-color: var(--ink);
 }
 .seg input:checked + span {
-	background: var(--surface);
-	color: var(--ink);
-	font-weight: 600;
-	box-shadow:
-		0 0 0 1px var(--rule-strong),
-		0 1px 3px var(--lift);
+	background: var(--ink);
+	border-color: var(--ink);
+	color: var(--bg);
 }
 .seg input:focus-visible + span {
 	outline: 2px solid var(--accent);
-	outline-offset: 1px;
+	outline-offset: 2px;
 }
 .toggle {
 	display: inline-flex;
@@ -144,32 +138,29 @@ legend {
 	cursor: pointer;
 	min-block-size: 2.25rem;
 }
+/* A toggle is a square box: empty when off, filled (in the series' --swatch, else ink) inside a ring of the tone under it when on. */
 .toggle input {
 	appearance: none;
 	margin: 0;
-	inline-size: 2.125rem;
-	block-size: 1.25rem;
-	border-radius: 1rem;
-	background: color-mix(in oklab, var(--muted) 75%, var(--surface));
-	position: relative;
+	inline-size: 1.125rem;
+	block-size: 1.125rem;
+	border: 1.5px solid var(--rule-strong);
+	border-radius: var(--radius);
+	background: transparent;
 	cursor: pointer;
-	transition: background 0.15s;
+	transition:
+		background 0.15s,
+		border-color 0.15s;
 	flex: none;
+	print-color-adjust: exact;
 }
-.toggle input::after {
-	content: "";
-	position: absolute;
-	inset: 0.1875rem auto 0.1875rem 0.1875rem;
-	aspect-ratio: 1;
-	border-radius: 50%;
-	background: var(--surface);
-	transition: transform 0.2s var(--ease);
+.toggle:hover input:not(:disabled) {
+	border-color: var(--ink);
 }
 .toggle input:checked {
-	background: var(--swatch, var(--accent));
-}
-.toggle input:checked::after {
-	transform: translateX(0.875rem);
+	border-color: var(--swatch, var(--ink));
+	background: var(--swatch, var(--ink));
+	box-shadow: inset 0 0 0 2px var(--under);
 }
 .toggle input:disabled {
 	opacity: 0.4;
@@ -187,7 +178,7 @@ textarea {
 	padding: 0.3125rem 0.5rem;
 	min-block-size: 2.25rem;
 	border: 1px solid var(--rule-strong);
-	border-radius: 0.375rem;
+	border-radius: var(--radius);
 	background: var(--surface);
 }
 /* A free-response field: the width of its column, taller only by the reader's hand. */
@@ -198,21 +189,21 @@ textarea {
 }
 /* biome-ignore lint/style/noDescendingSpecificity: the .field-scoped slider rule above outranks this default by specificity, so their order does not matter */
 input[type="range"] {
-	accent-color: var(--accent);
+	accent-color: var(--ink);
 	inline-size: min(14rem, 60vw);
 }
 /* biome-ignore lint/style/noDescendingSpecificity: the .field-scoped readout rule above sets only min-inline-size, a property this default leaves alone */
 output {
-	font: 500 0.8125rem var(--mono);
+	font: 500 var(--size-label) var(--font);
 	font-variant-numeric: tabular-nums;
 }
 .btn {
 	min-block-size: 2.25rem;
 	padding: 0.375rem 0.875rem;
-	background: var(--surface);
+	background: transparent;
 	border: 1px solid var(--rule-strong);
-	border-radius: 0.375rem;
-	font-size: 0.875rem;
+	border-radius: var(--radius);
+	font-size: var(--size-label);
 	font-weight: 500;
 	cursor: pointer;
 	transition:
@@ -227,14 +218,12 @@ output {
 	cursor: default;
 }
 .btn.primary {
-	background: var(--accent);
-	border-color: var(--accent);
-	color: var(--accent-ink);
-	font-weight: 600;
+	background: var(--ink);
+	border-color: var(--ink);
+	color: var(--bg);
 }
 .btn.primary:hover:not(:disabled) {
-	background: color-mix(in oklab, var(--accent) 88%, var(--ink));
-	border-color: transparent;
+	background: color-mix(in oklab, var(--ink) 85%, var(--bg));
 }
 .reset {
 	margin-inline-start: auto;
@@ -254,7 +243,8 @@ output {
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.5rem 0.75rem;
-	padding-block: 0.875rem;
+	padding-block: 0.5rem 0.75rem;
+	font-size: var(--size-label);
 }
 .player input[type="range"] {
 	flex: 1 1 8rem;
@@ -273,6 +263,7 @@ output {
 	border-block-end: 2px solid transparent;
 	padding: 0.625rem 0.75rem 0.5rem;
 	color: var(--muted);
+	font-size: var(--size-label);
 	cursor: pointer;
 	white-space: nowrap;
 }
@@ -282,7 +273,7 @@ output {
 [role="tab"][aria-selected="true"] {
 	color: var(--ink);
 	font-weight: 600;
-	border-block-end-color: var(--accent);
+	border-block-end-color: var(--ink);
 }
 [role="tabpanel"] {
 	padding-block: 1rem;
@@ -298,7 +289,7 @@ output {
 	align-items: center;
 	gap: 0.5rem 0.75rem;
 	margin-block: 1.25rem 0.75rem;
-	font-size: 0.875rem;
+	font-size: var(--size-label);
 }
 .toolbar > input[type="search"] {
 	flex: 1 1 10rem;
@@ -331,28 +322,26 @@ output {
 		min-inline-size: 0;
 	}
 }
-/* Answer choices (a Question, a Records answer): each option a tile of its own in full ink, with a radio dot or a check box, so
-   it reads as something to answer rather than a setting; Explore's and the toolbar's .seg keep the quieter switch above. The
-   chosen tile takes --choice-mark (the accent, a self-check's --ok or --bad) as its ring and fill. A recommended option carries
-   its mark after its text as generated content, so the reply sends the bare label. Phones stack a Question's choices. */
+/* Answer choices (a Question, a Records answer): each option a row of its own in text, with a radio dot or a check box, so it
+   reads as something to answer rather than a setting. The chosen row takes --choice-mark (ink, a self-check's --ok or --bad) as
+   its edge, dot and tint. A recommended option carries its mark after its text as generated content, so the reply sends the bare
+   label. Phones stack a Question's choices. */
 fieldset:is([data-reply], .self-check) > .seg {
-	--choice-mark: var(--accent);
+	--choice-mark: var(--ink);
 	gap: 0.5rem;
 	padding: 0;
-	background: none;
-	border: 0;
 }
 fieldset:is([data-reply], .self-check) > .seg span {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+	margin: 0;
 	min-block-size: 2.75rem;
 	padding: 0.5rem 0.875rem 0.5rem 0.75rem;
 	color: var(--ink);
 	font-weight: 500;
-	background: var(--surface);
+	background: none;
 	border: 1px solid var(--rule-strong);
-	border-radius: 0.5rem;
 	transition:
 		border-color 0.15s,
 		background 0.15s;
@@ -362,38 +351,39 @@ fieldset:is([data-reply], .self-check) > .seg span::before {
 	flex: none;
 	inline-size: 1rem;
 	block-size: 1rem;
-	border: 1.5px solid var(--muted);
+	border: 1.5px solid var(--ink);
 	border-radius: 50%;
-	background: var(--surface);
+	background: var(--under);
 	/* Printers drop backgrounds by default; the chosen dot is the mark, so it prints. */
 	print-color-adjust: exact;
 }
 fieldset:is([data-reply], .self-check) > .seg input[type="checkbox"] + span::before {
-	border-radius: 0.25rem;
+	border-radius: var(--radius);
 }
 fieldset:is([data-reply], .self-check) > .seg label:hover span {
 	border-color: var(--ink);
 }
 fieldset:is([data-reply], .self-check) > .seg input:checked + span {
 	font-weight: 600;
-	background: color-mix(in oklab, var(--choice-mark) 9%, var(--surface));
+	color: var(--ink);
+	background: color-mix(in oklab, var(--choice-mark) 9%, var(--under));
 	border-color: var(--choice-mark);
 	box-shadow: inset 0 0 0 1px var(--choice-mark);
 }
 fieldset:is([data-reply], .self-check) > .seg input:checked + span::before {
 	border-color: var(--choice-mark);
 	background: var(--choice-mark);
-	box-shadow: inset 0 0 0 0.1875rem var(--surface);
+	box-shadow: inset 0 0 0 0.1875rem var(--under);
 }
 fieldset:is([data-reply], .self-check) > .seg [data-recommended]::after {
 	content: attr(data-recommended);
-	padding-inline: 0.4375rem;
-	font-size: 0.75rem;
-	font-weight: 600;
+	padding-inline: 0.375rem;
+	font-size: var(--size-label);
+	font-weight: 500;
 	line-height: 1.25rem;
 	color: var(--muted);
 	border: 1px solid var(--rule-strong);
-	border-radius: 1rem;
+	border-radius: var(--radius);
 }
 @media (max-width: 40rem) {
 	fieldset:is([data-reply], .self-check):not(.answer) > .seg {

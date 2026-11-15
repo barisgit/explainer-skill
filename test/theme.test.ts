@@ -83,7 +83,7 @@ test("ranking rows disclose by click, Enter and Space, with room for titles (#35
 }, 30_000);
 
 for (const panel of ["explicit", "automatic"]) {
-	test(`a ${panel} panel keeps its sections local, clips its contents and lets a row stick (#53)`, async () => {
+	test(`a ${panel} panel keeps its sections local, clips its contents without a frame and lets a row stick (#53)`, async () => {
 		const page = `${HEAD}<section id="outer"><h2>Panel</h2>
 <div class="fig ${panel === "explicit" ? "panel" : ""}" id="panel">
 <div id="sticky" style="position:sticky;top:0;background:var(--surface)">Sticky row</div>
@@ -95,11 +95,12 @@ const panel = document.getElementById("panel");
 const style = (id) => getComputedStyle(document.getElementById(id));
 const local = (id) => ["marginTop", "marginBottom", "paddingTop", "borderTopWidth"].every((key) => style(id)[key] === "0px");
 ${pageContract({
-	"page sections retain their rhythm": `parseFloat(style("outer").marginTop) >= 56 && style("outer").borderTopWidth === "1px"`,
+	"page sections are set apart by space alone": `parseFloat(style("outer").marginTop) >= 56 && style("outer").borderTopWidth === "0px"`,
 	"direct panel sections have no page rhythm": `local("direct")`,
 	"nested panel sections have no page rhythm": `local("nested")`,
-	"wide contents stay clipped": `document.documentElement.scrollWidth === document.documentElement.clientWidth && document.elementFromPoint(panel.getBoundingClientRect().right + 2, document.getElementById("wide").getBoundingClientRect().top + 10)?.id !== "wide"`,
-	"the rounded corner clips its children": `style("panel").borderTopLeftRadius !== "0px" && document.elementFromPoint(panel.getBoundingClientRect().left + 2, panel.getBoundingClientRect().top + 2)?.id !== "sticky"`,
+	// Clipped 0.375rem out (overflow-clip-margin), so the focus ring of a control at the figure's edge shows.
+	"wide contents stay clipped": `document.documentElement.scrollWidth === document.documentElement.clientWidth && document.elementFromPoint(panel.getBoundingClientRect().right + 8, document.getElementById("wide").getBoundingClientRect().top + 10)?.id !== "wide"`,
+	"the figure has no frame or fill": `style("panel").borderTopWidth === "0px" && style("panel").backgroundColor === "rgba(0, 0, 0, 0)"`,
 	"scroll the page into the panel": `(scrollTo(0, panel.getBoundingClientRect().top + scrollY + 200), scrollY > 0)`,
 	"the row sticks to the viewport": `Math.abs(document.getElementById("sticky").getBoundingClientRect().top) <= 1`,
 })}</script></body></html>`;
@@ -138,7 +139,7 @@ ${pageContract({
 	expect(await packAndRun(dir, "pre", page)).toEqual([]);
 }, 30_000);
 
-test("a masthead paragraph that starts with a bold label is the next action, set as body text in ink rather than as meta (#141)", async () => {
+test("a masthead paragraph that starts with a bold label is the next action, set as body text in ink like the lede, the rest as labels (#141)", async () => {
 	const output = await packedMdx(
 		dir,
 		"next",
@@ -148,11 +149,26 @@ test("a masthead paragraph that starts with a bold label is the next action, set
 		cdp.evaluate(`(() => {
 			const masthead = [...document.querySelectorAll(".masthead > p")].map((p) => p.className);
 			const next = getComputedStyle(document.querySelector(".masthead .next"));
+			const lede = getComputedStyle(document.querySelector(".masthead .lede"));
+			const meta = getComputedStyle(document.querySelector(".masthead .meta"));
 			const body = getComputedStyle(document.body);
-			return { masthead, mono: next.fontFamily.includes("Mono"), ink: next.color === body.color, size: parseFloat(next.fontSize) >= parseFloat(body.fontSize) };
+			return {
+				masthead,
+				mono: [next, meta].some((p) => p.fontFamily.includes("Mono")),
+				ink: next.color === body.color && lede.color === body.color,
+				text: next.fontSize === body.fontSize && lede.fontSize === body.fontSize,
+				label: parseFloat(meta.fontSize) < parseFloat(body.fontSize),
+			};
 		})()`),
 	);
-	expect(style).toEqual({ masthead: ["lede", "next", "meta"], mono: false, ink: true, size: true });
+	// Headline, then text, then labels: the lede and the next action share the text's size, so neither adds a level (#190).
+	expect(style).toEqual({
+		masthead: ["lede", "next", "meta"],
+		mono: false,
+		ink: true,
+		text: true,
+		label: true,
+	});
 }, 30_000);
 
 test("a .beside figure stays in view while its text scrolls, from the column's start to .wide's end on a desktop, and stacks after the text on a phone and in print (#159, #179)", async () => {

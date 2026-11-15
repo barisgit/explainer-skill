@@ -44,7 +44,8 @@
 	}
 }
 
-/* Plots (kit:plot.js) on the same .chart element: a legend row above an SVG that fills the rest, drawn at pixel size so text stays 13 px. */
+/* Plots (kit:plot.js) on the same .chart element: a legend row above an SVG that fills the rest, drawn at pixel size so text stays
+   13 px, the label's size. */
 .plot {
 	display: flex;
 	flex-direction: column;
@@ -56,7 +57,7 @@
 	margin: 0;
 	padding: 0.5rem 1rem 0;
 	list-style: none;
-	font-size: 0.8125rem;
+	font-size: var(--size-label);
 	line-height: 1.4;
 }
 .plot-legend button {
@@ -154,8 +155,7 @@
 
 /* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,
    --_node-fill, ...), set here from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no
-   frame or surface of its own: bare or in a plain figure it sits on the tone around it like a chart; a box means controls, so only
-   a panel frames it and gives it the blueprint surface (the panel rule in 02-layout.css). */
+   frame or surface of its own: it sits on the tone around it like a chart. */
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
@@ -269,7 +269,7 @@
 	display: block;
 	inline-size: 100%;
 	block-size: auto;
-	font: 500 13px var(--font);
+	font: 500 var(--size-label) var(--font);
 }
 .dg text {
 	fill: var(--ink);
@@ -279,7 +279,6 @@
 }
 .dg .cap {
 	fill: var(--muted);
-	font: 500 12px var(--mono);
 }
 .dg .node,
 .dg .lane {
@@ -323,7 +322,6 @@
 }
 .dg .elabel {
 	fill: var(--accent);
-	font: 500 12px var(--mono);
 	paint-order: stroke;
 	stroke: var(--under);
 	stroke-width: 5px;

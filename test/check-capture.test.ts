@@ -219,7 +219,11 @@ test("full-page capture omits the kit Reply bar and contents rail silently, but 
 	const page = await packedMdx(
 		dir,
 		"kit-chrome",
-		`import { Question } from "kit";
+		`---
+contents: true
+---
+
+import { Question } from "kit";
 
 # Kit chrome
 

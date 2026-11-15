@@ -7,7 +7,6 @@
 .tree {
 	margin-block: 1.25rem;
 	border-block-end: 1px solid var(--rule);
-	font-size: 0.9375rem;
 }
 /* Unset, --tree-cols is one column per number cell, up to six (--tree-n, counted below), each 5rem where the row has room and
    narrower where it has not, so a deep row on a small phone shrinks its columns rather than scrolling sideways. */
@@ -52,7 +51,7 @@
 .tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > * + * {
 	min-inline-size: 0;
 	color: var(--muted);
-	font-size: 0.875rem;
+	font-size: var(--size-label);
 	font-variant-numeric: tabular-nums;
 	text-align: end;
 	overflow-wrap: anywhere;
@@ -70,7 +69,7 @@
 	padding-block: 0 0.375rem;
 	border-block-start: 0;
 	color: var(--muted);
-	font-size: 0.875rem;
+	font-size: var(--size-label);
 	font-weight: 500;
 }
 .tree details {
@@ -116,9 +115,6 @@
 @media (max-width: 40rem) {
 	.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) {
 		row-gap: 0.125rem;
-	}
-	.tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row) > * + * {
-		font-size: 0.8125rem;
 	}
 	.tree
 		:where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3))

@@ -1,5 +1,6 @@
-/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, panels, controls, charts, diagrams, views, trees.
+/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
+   Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions).
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
@@ -16,14 +17,12 @@
    Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour
    before its word. A <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word
    or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
-   Figures: a .fig sits plain on the page; one with an input, select, tabs or stepper inside (or .panel) is a panel, whose children
-   are inset; .bleed .stage .chart .scroll .compare .mermaid .schematic .dg run edge to edge, .split is an edge-to-edge row of columns divided by
-   hairlines, .stats and .rank sit inset with no extra rules. .wide lets a .fig use up to 88rem on big screens, centred on the
-   column, beside the contents rail too.
-   The inset is a default (padding-inline: var(--pad) on every direct child of .fig): any padding the page puts on such a child
-   replaces it, so write padding: 1rem var(--pad) (or padding-block alone) to keep it.
-   Rhythm: .band (once, where the reader acts) spans the window in the sunken tone; .minor sections (method, sources) are set
-   smaller with the heading in its own column.
+   Figures: a .fig sits plain on the page with no fill or frame, its controls right above what they act on; .split is a row of
+   columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
+   Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
+   padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
+   Rhythm: sections are set apart by space alone; .band (once, where the reader acts) spans the window in the sunken tone; .minor
+   sections (method, sources) sit closer, with the heading in its own column.
    Text linked to a figure, diagram or code (data-ref) sits beside it, so both ends of a link share the screen:
      <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
@@ -38,7 +37,8 @@
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
    Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
-   --under is the tone under the current block (page, panel, band or .stage): give a label halo of your own stroke: var(--under).
+   --size-headline --size-display --size-text --size-label --radius;
+   --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
    Mono is for code, numbers and source lines, not for labels.
    Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
@@ -68,26 +68,40 @@
 }
 [data-live] [data-captions] > li {
 	max-inline-size: 66ch;
-	padding-inline-start: 0.75rem;
-	border-inline-start: 3px solid var(--accent);
 }
 [data-live] [data-captions] > li:not(.is-now) {
 	display: none;
 }
 
-/* Linked highlighting: parts that share a data-ref are lit together; SVG parts get a halo and dimmed neighbours, which work over any stroke and fill.
+/* Linked highlighting: parts that share a data-ref are lit together; SVG parts are drawn in the accent, their shapes outlined in it,
+   and their neighbours dimmed, which works over any stroke and fill.
    Only a term that links (is-linked, set by kit:link.js) looks like one. */
 :is(span, b, strong, em, code, mark).is-linked {
 	text-decoration: underline dotted var(--muted) 1px;
 	text-underline-offset: 0.22em;
-	border-radius: 0.25rem;
+	border-radius: var(--radius);
 	cursor: pointer;
 }
 :is(.is-lit, [data-step].is-now, [data-kit-state][data-state~="now"]):not(svg *) {
 	background: var(--accent-soft);
 }
 svg :is(.is-lit, .is-now, [data-kit-state][data-state~="now"]) {
-	filter: drop-shadow(0 0 0.25rem var(--accent));
+	color: var(--accent);
+}
+svg
+	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"]):is(
+		path,
+		rect,
+		circle,
+		ellipse,
+		line,
+		polyline,
+		polygon
+	),
+svg
+	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"])
+	:is(path, rect, circle, ellipse, line, polyline, polygon) {
+	stroke: var(--accent);
 }
 svg.has-lit [data-ref]:not(.is-lit) {
 	opacity: 0.3;
@@ -99,7 +113,7 @@ svg.has-lit [data-ref]:not(.is-lit) {
    moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button.
    --reply-bar-height is the strip's last shown height, which reply.js sets: long kitLabels can wrap it onto two rows. */
 :root:has(> body > .reply-bar) {
-	--reply-bar: 3.5rem;
+	--reply-bar: 3rem;
 }
 body:has(> .reply-bar) {
 	padding-block-start: var(--reply-bar-height, var(--reply-bar));
@@ -125,7 +139,7 @@ body:has(> .reply-bar) {
 	justify-content: flex-end;
 	gap: 0.25rem 0.75rem;
 	min-block-size: var(--reply-bar);
-	padding: 0.5rem var(--gutter);
+	padding: 0.375rem var(--gutter);
 	background: var(--bg);
 	border-block-end: 1px solid var(--rule);
 }
@@ -133,7 +147,7 @@ body:has(> .reply-bar) {
    longer labels) it takes a row of its own above them, so neither the count nor a button is cut or split. */
 .reply-progress {
 	white-space: nowrap;
-	font-size: 0.8125rem;
+	font-size: var(--size-label);
 	color: var(--muted);
 	font-variant-numeric: tabular-nums;
 }
@@ -187,7 +201,7 @@ body:has(> .reply-bar) {
 	color: var(--ink);
 	background: var(--bg);
 	border: 1px solid var(--rule-strong);
-	border-radius: 0.375rem;
+	border-radius: var(--radius);
 }
 dialog.reply-dialog {
 	inline-size: min(44rem, 100vw - 2rem);
@@ -228,7 +242,8 @@ dialog.reply-dialog[open] {
 .reply-dialog h2 {
 	margin: 0;
 	max-inline-size: none;
-	font-size: 1.125rem;
+	font-size: var(--size-text);
+	letter-spacing: 0;
 }
 .reply-note {
 	display: grid;
@@ -238,7 +253,7 @@ dialog.reply-dialog[open] {
 }
 .reply-md {
 	border-radius: 0;
-	font-size: 0.8125rem;
+	font-size: var(--size-label);
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }

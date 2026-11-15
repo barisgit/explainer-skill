@@ -1,23 +1,24 @@
-/* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures and panels, split columns. */
-/* Page shell: masthead, then sections divided by hairlines. <p class="label"> is a plain caption over a group inside a section. */
+/* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures, split columns. */
+/* Page shell: the masthead, then sections set apart by space alone. <p class="label"> is a plain caption over a group inside a
+   section. Type keeps to the three roles of 01-base.css: display, text, label. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
-	padding-block: clamp(1.75rem, 5vw, 3.5rem) 6rem;
+	padding-block: var(--page-top) 7rem;
 }
 .page :where(p, ul, ol) {
 	max-inline-size: 66ch;
 }
 .masthead {
-	margin-block-end: clamp(2rem, 5vw, 3rem);
+	margin-block-end: clamp(2rem, 5vw, 2.5rem);
 }
 h1 {
-	margin: 0 0 1.25rem;
-	max-inline-size: 24ch;
-	font-size: clamp(2rem, 5vw, 3.5rem);
-	font-weight: 700;
-	line-height: 1.04;
-	letter-spacing: -0.035em;
+	margin: 0 0 1rem;
+	max-inline-size: 22ch;
+	font-size: var(--size-headline);
+	font-weight: 650;
+	line-height: 1.08;
+	letter-spacing: -0.022em;
 	text-wrap: balance;
 }
 /* The accent phrase stays on one line from tablet width up: a break at "18-minute" splits the one highlighted fact. Keep it a few words;
@@ -32,71 +33,55 @@ h1 em {
 	}
 }
 h2 {
-	margin: 0 0 1.25rem;
+	margin: 0 0 1rem;
 	max-inline-size: 32ch;
-	font-size: clamp(1.5rem, 3.2vw, 2rem);
+	font-size: var(--size-display);
 	font-weight: 650;
 	line-height: 1.15;
-	letter-spacing: -0.025em;
+	letter-spacing: -0.02em;
 	text-wrap: balance;
 }
 h2 em {
 	font-style: normal;
 	color: var(--accent);
 }
-/* A minor section's heading is set as an h3: it labels reference, not a finding. */
+/* A heading at the text's size, in its weight: an h3, a minor section's heading (it labels reference, not a finding). */
 h3,
 .minor > h2 {
 	margin: 0;
-	font-size: 1.0625rem;
+	font-size: var(--size-text);
 	font-weight: 600;
 	line-height: 1.35;
-	letter-spacing: -0.01em;
+	letter-spacing: 0;
 	text-wrap: balance;
 }
-.lede {
+/* The masthead (and a view's head) is the headline and the lede under it, in text. The next action (a paragraph that opens with a
+   bold label) reads on from the lede in the same text, and the meta lines are labels, so neither adds a level. */
+:is(.masthead, .view-head) > p {
 	max-inline-size: 60ch;
-	margin: 0 0 1rem;
-	font-size: clamp(1.0625rem, 1.6vw, 1.1875rem);
-	line-height: 1.5;
-	color: var(--muted);
-}
-.lede b {
-	color: var(--ink);
-	font-weight: 600;
+	margin: 0 0 0.75rem;
 }
 .meta {
-	margin: 0;
-	font: 0.8125rem / 1.6 var(--mono);
+	font-size: var(--size-label);
+	line-height: 1.5;
 	color: var(--muted);
 	font-variant-numeric: tabular-nums;
 }
-/* The reader's next action under the answer (a masthead paragraph that opens with a bold label): body text in ink on the accent
-   rule the current stepper caption uses, the label in the accent, so it reads before the meta lines. */
-.masthead > .next {
-	max-inline-size: 60ch;
-	margin: 0 0 1rem;
-	padding-inline-start: 0.875rem;
-	border-inline-start: 3px solid var(--accent);
-	font-size: clamp(1.0625rem, 1.6vw, 1.1875rem);
-	font-weight: 500;
-	line-height: 1.45;
+:is(.masthead, .view-head) > .meta {
+	margin-block-end: 0.25rem;
 }
-.masthead > .next > strong:first-child {
-	color: var(--accent);
-	font-weight: 650;
+.next > strong:first-child {
+	font-weight: 600;
 }
 .label {
 	margin: 0 0 0.375rem;
-	font-size: 0.9375rem;
+	font-size: var(--size-label);
 	font-weight: 500;
 	color: var(--muted);
 }
-/* Sections inside a figure belong to its content, not the page's rhythm. */
+/* Sections are set apart by space, not rules. Sections inside a figure belong to its content, not the page's rhythm. */
 .page section:not(.view, .fig *) {
-	margin-block: clamp(3.5rem, 9vw, 6rem);
-	padding-block-start: clamp(1.5rem, 3vw, 2rem);
-	border-block-start: 1px solid var(--rule);
+	margin-block: var(--section-gap) 0;
 }
 .cols {
 	display: grid;
@@ -122,18 +107,13 @@ h3,
 	box-shadow: 0 0 0 100vmax var(--under);
 	clip-path: inset(0 -100vmax);
 }
-.page section.band,
-.page .band + section {
-	border-block-start: 0;
-}
 .page section.band {
-	padding-block: clamp(2rem, 5vw, 3.5rem);
+	padding-block: clamp(2.5rem, 6vw, 4rem);
 }
-/* Minor section (method, sources, assumptions): smaller type and, on wide screens, the heading in its own column, so it reads as
-   reference rather than as another finding. */
+/* Minor section (method, sources, assumptions): closer to what it backs and, on wide screens, its heading in a column of its own,
+   so it reads as reference rather than as another finding. */
 .page section.minor {
-	margin-block: clamp(2rem, 5vw, 3rem);
-	font-size: 0.9375rem;
+	margin-block-start: clamp(3rem, 8vh, 5rem);
 }
 .minor > h2 {
 	margin-block-end: 0.75rem;
@@ -157,30 +137,19 @@ h3,
 	}
 }
 
-/* Figure: the visual and its caption, set straight on the page and aligned with the text. A figure the reader operates (an input,
-   select, tabs or a stepper inside), or one marked .panel, becomes a panel: the box says these controls act on this. --pad is the
-   inset of its children, --under the tone they sit on. */
+/* Figure: the visual and its caption, set straight on the page and aligned with the text, with no fill or frame: its controls sit
+   right above what they act on. --pad is the inset of its children (none by default), --under the tone they sit on. A figure the
+   reader operates (an input, select, tabs or a stepper inside), or one marked .panel, keeps its sections and floats to itself and
+   clips what would run past it, short of the focus rings of controls at its edge, without trapping sticky rows in a scroller. */
 .fig {
 	--pad: 0px;
 	container-type: inline-size;
-	margin: 1.5rem 0;
+	margin: 2rem 0;
 }
 .fig:is(.panel, [data-stepper], :has(input, select, textarea, [role="tablist"], .player)) {
-	--pad: var(--inset);
-	--under: var(--surface);
-	background: var(--under);
-	border: 1px solid var(--rule);
-	border-radius: var(--radius);
-	/* Clip edge-to-edge children to the corners without trapping sticky rows in a scroll container.
-	   Keep hidden's formatting context so floats and child margins stay contained. */
 	display: flow-root;
 	overflow: clip;
-
-	/* In a panel the diagram runs edge to edge on the blueprint surface; on a plain figure it sits on the page like a chart. */
-	& > :is(.mermaid, .schematic) {
-		--under: var(--bg);
-		background: var(--blueprint);
-	}
+	overflow-clip-margin: 0.375rem;
 }
 .fig > * {
 	padding-inline: var(--pad);
@@ -192,8 +161,8 @@ h3,
 }
 .fig > :is(h2, h3) {
 	padding-block: 1rem 0.5rem;
-	font-size: 1.0625rem;
-	letter-spacing: -0.01em;
+	font-size: var(--size-text);
+	letter-spacing: 0;
 }
 .fig > p:not([class]) {
 	padding-block: 0.75rem;
@@ -202,24 +171,15 @@ h3,
 	padding-block: 1rem;
 	min-inline-size: 0;
 }
-/* Blueprint surface for diagrams; marks drawn on it sit on the page tone. */
-.stage,
-.fig-visual.stage {
-	--under: var(--bg);
-	background: var(--blueprint);
-}
+/* A stage holds a drawing on the page's own tone, with no surface of its own. */
 .fig-visual.stage {
 	padding: 1rem 0;
-	border-block: 1px solid var(--rule);
 }
 .fig > figcaption {
-	padding-block: 0.875rem 1rem;
+	padding-block: 0.75rem 0;
 	color: var(--muted);
-	font-size: 0.875rem;
-	line-height: 1.55;
-}
-.fig > figcaption:not(:last-child) {
-	border-block-end: 1px solid var(--rule);
+	font-size: var(--size-label);
+	line-height: 1.5;
 }
 /* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
    Two children: the text, then the figure. From 56rem they stand side by side, the text two fifths from the column's start like
@@ -261,9 +221,9 @@ h3,
 .src {
 	display: block;
 	margin-top: 0.25rem;
-	font: 0.75rem / 1.5 var(--mono);
+	font: var(--size-label) / 1.5 var(--mono);
 }
-/* Columns divided by hairlines, edge to edge in a panel; each column carries its own inset. One column on phones. */
+/* Columns divided by hairlines, edge to edge in a figure; each column carries its own inset. One column on phones. */
 .split {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));

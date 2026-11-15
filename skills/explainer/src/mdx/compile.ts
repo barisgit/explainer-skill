@@ -20,6 +20,8 @@ export interface Frontmatter {
 	scheme?: "light" | "dark";
 	/** Include reply.js (the reader's notes) on a page with no question. */
 	reply: boolean;
+	/** Give the page the contents rail of its sections (`<main data-contents>`), views or not. */
+	contents: boolean;
 }
 
 /** An .mdx file compiled to a JavaScript module whose default export is the page's content component. */
@@ -31,7 +33,7 @@ export interface CompiledMdx {
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KEYS = "title, lang, labels, reply, scheme";
+const KEYS = "title, lang, labels, reply, contents, scheme";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
@@ -81,7 +83,7 @@ function frontmatter(source: string, file: string): Frontmatter {
 	if (!isRecord(data)) {
 		throw fail(`write key: value lines (${KEYS})`);
 	}
-	const { title, lang = "en", labels, reply = false, scheme, ...rest } = data;
+	const { title, lang = "en", labels, reply = false, contents = false, scheme, ...rest } = data;
 	const unknown = Object.keys(rest)[0];
 	if (unknown !== undefined) {
 		throw fail(`pack does not read "${unknown}"; the keys are ${KEYS}`);
@@ -95,6 +97,9 @@ function frontmatter(source: string, file: string): Frontmatter {
 	if (typeof reply !== "boolean") {
 		throw fail("reply must be true or false");
 	}
+	if (typeof contents !== "boolean") {
+		throw fail("contents must be true or false");
+	}
 	if (scheme !== undefined && scheme !== "light" && scheme !== "dark") {
 		throw fail("scheme must be light or dark; leave it out to follow the reader's system");
 	}
@@ -102,6 +107,7 @@ function frontmatter(source: string, file: string): Frontmatter {
 	return {
 		lang,
 		reply,
+		contents,
 		...(title === undefined ? {} : { title }),
 		...(kitTexts ? { labels: kitTexts } : {}),
 		...(scheme === undefined ? {} : { scheme }),

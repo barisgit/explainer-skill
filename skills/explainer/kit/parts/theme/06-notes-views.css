@@ -5,8 +5,7 @@
 	margin: 1.25rem 0;
 	padding: 0.625rem 0.875rem;
 	background: var(--warn-soft);
-	border-radius: 0.5rem;
-	font-size: 0.9375rem;
+	border-radius: var(--radius);
 }
 .caveat b {
 	font-weight: 600;
@@ -37,7 +36,6 @@ summary {
 	min-block-size: 2.75rem;
 	list-style: none;
 	cursor: pointer;
-	font-size: 0.9375rem;
 	font-weight: 500;
 }
 summary::-webkit-details-marker {
@@ -75,7 +73,7 @@ details > :last-child:not(summary) {
    Without JS every view stays visible below the overview; print shows everything but a filled view (data-fill), which holds
    only the record open, and so shows and prints only while it is open. */
 .view {
-	margin-block-start: clamp(3.5rem, 9vw, 6rem);
+	margin-block-start: var(--section-gap);
 	padding-block-start: 1.5rem;
 	border-block-start: 1px solid var(--rule);
 }
@@ -93,7 +91,7 @@ details > :last-child:not(summary) {
 	gap: 0.5rem;
 	margin-block-end: 1.5rem;
 	min-block-size: 2.25rem;
-	font-size: 0.9375rem;
+	font-size: var(--size-label);
 	font-weight: 500;
 	text-decoration: none;
 }
@@ -110,7 +108,6 @@ details > :last-child:not(summary) {
 }
 .view-head h1 {
 	margin-block: 0 0.75rem;
-	font-size: clamp(1.875rem, 4.2vw, 2.75rem);
 }
 .js-views .view:not(.active) {
 	display: none;
@@ -154,7 +151,7 @@ details > :last-child:not(summary) {
 	.fig {
 		break-inside: avoid;
 	}
-	/* A Controls' panel holds nothing else, so it would print as an empty box. */
+	/* A Controls' figure holds nothing else, so it would print as an empty gap. */
 	.fig:has(> .controls:only-child) {
 		display: none;
 	}

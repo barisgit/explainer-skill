@@ -130,7 +130,7 @@ test("an svg file in a picture stays one data-URI image", async () => {
 	expect(html).toContain("data:image/svg+xml;base64,");
 }, 30_000);
 
-test("a Mermaid diagram is one SVG in the scheme's tokens, boxed only in a figure with controls", async () => {
+test("a Mermaid diagram is one SVG in the scheme's tokens, never boxed, also in a figure with controls", async () => {
 	const { out } = await packAndCheck(
 		"diagram",
 		{},
@@ -143,8 +143,7 @@ test("a Mermaid diagram is one SVG in the scheme's tokens, boxed only in a figur
 				const rgb = (selector, prop) => getComputedStyle(document.querySelector(selector))[prop].match(/\\d+/g).map(Number);
 				return document.querySelectorAll(".mermaid > svg").length === 3 && !same(token("surface"), [255, 255, 255]) &&
 					same(rgb("#static .node rect", "fill"), token("surface")) && same(rgb("#static .node text", "fill"), token("ink")); })()`,
-			"a static diagram, in a figure or bare, sits on the page with no frame or surface": `["#static > .mermaid", "#bare"].every((selector) => (({ borderTopWidth, backgroundImage, backgroundColor }) => borderTopWidth === "0px" && backgroundImage === "none" && backgroundColor === "rgba(0, 0, 0, 0)")(getComputedStyle(document.querySelector(selector))))`,
-			"a diagram with controls sits on the blueprint inside the panel's frame": `getComputedStyle(document.getElementById("controlled")).borderTopWidth === "1px" && getComputedStyle(document.querySelector("#controlled > .mermaid")).backgroundImage.startsWith("radial-gradient")`,
+			"a diagram, in a figure with or without controls or bare, sits on the page with no frame or surface": `["#static > .mermaid", "#bare", "#controlled", "#controlled > .mermaid"].every((selector) => (({ borderTopWidth, backgroundImage, backgroundColor }) => borderTopWidth === "0px" && backgroundImage === "none" && backgroundColor === "rgba(0, 0, 0, 0)")(getComputedStyle(document.querySelector(selector))))`,
 		},
 	);
 

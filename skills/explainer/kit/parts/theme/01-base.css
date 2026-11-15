@@ -16,13 +16,14 @@
 	color-scheme: light dark;
 	--font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 	--mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-	--bg: light-dark(#f7f4ee, #141210);
-	--surface: light-dark(#fffdfa, #1c1a17);
-	--sunken: light-dark(#efebe3, #252220);
+	--bg: light-dark(#f7f4ee, #0b0a09);
+	--surface: light-dark(#fffdfa, #141210);
+	--sunken: light-dark(#efebe3, #1c1916);
 	--ink: light-dark(#1c1915, #eee8de);
 	--muted: light-dark(#665e53, #a59c8f);
-	--rule: light-dark(#e5dfd4, #2e2a25);
-	--rule-strong: light-dark(#b8ad99, #5a534a);
+	/* --rule divides; --rule-strong draws a control's edge and an axis, at 3:1 or more on --bg, --surface and --sunken. */
+	--rule: light-dark(#e0d9cd, #302b26);
+	--rule-strong: light-dark(#8f8574, #706759);
 	--accent: light-dark(#b93a05, #ff8a3d);
 	--accent-ink: light-dark(#fff, #1b1208);
 	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
@@ -39,16 +40,21 @@
 	--c4: light-dark(#cc79a7, #e08fc0);
 	--c5: light-dark(#8a6d00, #e6b422);
 	--c6: light-dark(#3394cc, #7cc6f0);
-	--grid: color-mix(in srgb, var(--rule-strong) 45%, transparent);
-	/* Blueprint surface for diagrams (.stage, a Mermaid block in a panel): a faint dot grid on the page tone. */
-	--blueprint:
-		radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 1.5px) 0 0 / 20px 20px,
-		var(--bg);
+	/* Three type roles, so a screen holds at most three levels: display (the page's headline, a section's heading), text, and
+	   label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
+	--size-headline: clamp(1.875rem, 3.3vw, 2.875rem);
+	--size-display: clamp(1.375rem, 2vw, 1.75rem);
+	--size-text: 1.0625rem;
+	--size-label: 0.8125rem;
 	--lift: light-dark(rgb(40 28 10 / 0.12), rgb(0 0 0 / 0.45));
 	--gutter: clamp(1rem, 4vw, 2rem);
 	--inset: clamp(1rem, 2.5vw, 1.25rem);
-	--radius: 0.625rem;
-	/* The tone under the current block: --bg on the page and on the blueprint, --surface in a panel, --sunken in a band. Halos and split cells use it. */
+	/* Above the masthead, and above the contents rail beside it. */
+	--page-top: clamp(2rem, 6vw, 4rem);
+	/* Between sections: enough that a section stands as a screen of its own. */
+	--section-gap: clamp(4.5rem, 14vh, 8rem);
+	--radius: 0.125rem;
+	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */
 	--under: var(--bg);
 	--ease: cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -75,7 +81,7 @@ body {
 	margin: 0;
 	background: var(--bg);
 	color: var(--ink);
-	font: 1rem / 1.6 var(--font);
+	font: var(--size-text) / 1.55 var(--font);
 	text-wrap: pretty;
 	font-synthesis: none;
 	-webkit-font-smoothing: antialiased;
@@ -111,7 +117,7 @@ kbd {
 code {
 	background: var(--sunken);
 	padding: 0.1em 0.35em;
-	border-radius: 0.25rem;
+	border-radius: var(--radius);
 }
 pre {
 	background: var(--sunken);

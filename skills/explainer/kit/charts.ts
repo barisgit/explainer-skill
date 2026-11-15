@@ -54,7 +54,7 @@
 		}
 	});
 
-	/** The ECharts theme for a chart on `el`, whose --under (the tone under it) changes by block: page, panel, band. */
+	/** The ECharts theme for a chart on `el`, whose --under (the tone under it) changes by block: page, band, popover. */
 	const theme = (el: HTMLElement) =>
 		tokenTheme({
 			under: resolve(getComputedStyle(el).getPropertyValue("--under")),

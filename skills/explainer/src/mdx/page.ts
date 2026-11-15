@@ -206,13 +206,14 @@ const islandData = (islands: Island[], modules: string[]): IslandData[] =>
 
 /**
  * The kit scripts the page needs: for the markup its HTML holds, the markup its client code (`scan`, bundle.ts's clientScan) can
- * write later, and reply: true.
+ * write later, reply: true and contents: true.
  */
 async function kitScripts(html: string, scan: string, front: Frontmatter): Promise<Set<KitScript>> {
 	return new Set([
 		...(await scriptsInHtml(html)),
 		...scriptsInCode(scan),
 		...(front.reply ? (["keep.js", "reply.js"] as const) : []),
+		...(front.contents ? (["views.js"] as const) : []),
 	]);
 }
 
@@ -221,7 +222,7 @@ async function kitScripts(html: string, scan: string, front: Frontmatter): Promi
  * with Preact, its Mermaid blocks drawn by `drawDiagrams` (so diagram parts count when the kit scripts are chosen), then written
  * into the page shell with kit:math.css when it holds math, kit:code.css when it or its client code holds a code fence, the stylesheets its modules import, the islands' props and client
  * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one and `<main
- * data-asks-reply>` for reply: true, which keeps reply.js's bar on a page with no reply question. Every error the author can fix is a PackError;
+ * data-asks-reply>` for reply: true, which keeps reply.js's bar on a page with no reply question, and `data-contents` for contents: true, which gives it views.js's contents rail. Every error the author can fix is a PackError;
  * `records` are the filled Views' records drawn at pack time, which pack checks the refs their controls name against;
  * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
  */
@@ -269,7 +270,7 @@ export async function mdxPage(
 		(file) => `<link rel="stylesheet" href="${escapeHtml(relative(dir, file))}">`,
 	);
 	const scheme = page.front.scheme ? ` data-scheme="${page.front.scheme}"` : "";
-	const asks = page.front.reply ? " data-asks-reply" : "";
+	const asks = `${page.front.reply ? " data-asks-reply" : ""}${page.front.contents ? " data-contents" : ""}`;
 	const shell = [
 		"<!doctype html>",
 		`<html lang="${escapeHtml(page.front.lang)}"${scheme}>`,
