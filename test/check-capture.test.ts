@@ -6,7 +6,7 @@ import { withPage } from "../skills/explainer/src/chrome.ts";
 import { fullPageScreenshot } from "../skills/explainer/src/full-page.ts";
 import { report } from "../skills/explainer/src/report.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
-import { runCli, scratch } from "./support.ts";
+import { packedMdx, runCli, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -214,6 +214,40 @@ test.each([false, true])(
 	},
 	30_000,
 );
+
+test("full-page capture omits the kit Reply bar and contents rail silently, but reports author overlays", async () => {
+	const page = await packedMdx(
+		dir,
+		"kit-chrome",
+		`import { Question } from "kit";
+
+# Kit chrome
+
+<Question name="answer" label="Choose" options={["Yes", "No"]} />
+
+${[1, 2, 3, 4].map((n) => `<h2 data-nav="Section ${n}">Section ${n}</h2>\n\nParagraph ${n}.`).join("\n\n")}
+
+<div id="author-fixed" className="reply-ui" style={{ position: "fixed", bottom: 0, right: 0 }}>Author overlay</div>`,
+	);
+	await withPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		await cdp.send("Emulation.setDeviceMetricsOverride", {
+			width: 1440,
+			height: 900,
+			deviceScaleFactor: 1,
+			mobile: false,
+		});
+		await cdp.load(`file://${page}`);
+		expect(
+			await cdp.evaluate(
+				`['div.reply-ui.reply-bar', 'nav.toc'].map(selector => getComputedStyle(document.querySelector(selector)).position)`,
+			),
+		).toEqual(["fixed", "fixed"]);
+		expect((await fullPageScreenshot(cdp, 1440)).omitted).toEqual(["#author-fixed"]);
+		await cdp.evaluate(`document.getElementById('author-fixed').remove()`);
+		expect((await fullPageScreenshot(cdp, 1440)).omitted).toEqual([]);
+	});
+}, 30_000);
 
 test("restoring an omitted overlay does not restart its important opacity transition", async () => {
 	await withPage(async (cdp) => {
