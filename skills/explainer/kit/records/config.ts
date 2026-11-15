@@ -121,6 +121,9 @@ export interface ReplyConfig {
 /** How wide the block is: `"wide"` as `.wide` (up to 88rem), `"full"` nearly the window's width, beside the contents rail too. */
 export type BlockWidth = "wide" | "full";
 
+/** How wide a block is drawn: the config's width, or `"column"` (the reading column) for a block left unset that fits it. */
+export type DrawnWidth = BlockWidth | "column";
+
 /** The config of one records block. */
 export interface RecordsConfig {
 	/**
@@ -178,6 +181,9 @@ export interface RecordsConfig {
 	refField?: string;
 	/** An answer the reader gives on every record, in its row of the tree and table and on its card. */
 	reply?: ReplyConfig;
-	/** The block's width; `"wide"` when left out. */
+	/**
+	 * The block's width. Left out, a block that offers no table and whose tree fits the reading column stays in the column, and
+	 * any other block is `"wide"`.
+	 */
 	width?: BlockWidth;
 }

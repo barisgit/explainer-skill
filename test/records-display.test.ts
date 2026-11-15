@@ -39,7 +39,9 @@ test("pack prerenders the default tree with its controls hidden, and a block wit
 	// Every coloured marker sits beside its own word (a phase's title, a facet's value), so no legend repeats them.
 	expect(plan).toMatch(/<i class="swatch" style="--swatch: var\(--c1\)"><\/i>Phase 1/);
 	expect(plan.includes('class="legend"')).toBe(false);
-	const owners = /<div class="records wide" id="owners"[^>]*>/.exec(html)?.[0] ?? "";
+	// A tree with nothing to choose and room in the column stays in it (#188).
+	const owners = /<div class="records" id="owners"[^>]*>/.exec(html)?.[0] ?? "";
+	expect(owners).not.toBe("");
 	expect(owners).not.toContain("data-records");
 	expect(html).toMatch(/<summary data-ref="JV">[\s\S]*?<\/summary><p>/);
 });
@@ -305,6 +307,39 @@ test("a tree column with an incomplete sum makes room for + ?, so the widest sum
 	expect(lines).toEqual([1, 1]);
 });
 
+test("a tree that fits the column stays on it; a block that offers a table, or asks for width wide, takes the wide measure (#188)", async () => {
+	const block = (id: string, extra: string) =>
+		`<Records id="${id}" idField="id" fields={{ id: { label: "Item", kind: "text" }, part: { label: "Part", kind: "text" }, eur: { label: "Price", kind: "currency", currency: "EUR", sum: true } }} columns={["id", "eur"]} groupBy={["part"]} data={[{ id: "Battery", part: "Hardware", eur: 2600 }, { id: "Electrician", part: "Installation", eur: 540 }]} ${extra} />`;
+	const output = await packedMdx(
+		dir,
+		"tree-width",
+		`import { Records } from "kit";
+
+# Widths
+
+## The quote
+
+${"Words in the reading column. ".repeat(20)}
+
+${block("fits", "")}
+
+${block("table", 'views={["tree", "table"]}')}
+
+${block("asked", 'width="wide"')}
+`,
+	);
+	const widths = await inPage(output, (cdp) =>
+		cdp.evaluate<{ fits: number; table: number; asked: number }>(`(() => {
+			const column = document.querySelector("[data-overview] > section").getBoundingClientRect();
+			const growth = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width - column.width);
+			return { fits: growth("fits"), table: growth("table"), asked: growth("asked") };
+		})()`),
+	);
+	expect(widths.fits).toBe(0);
+	expect(widths.table).toBeGreaterThan(0);
+	expect(widths.asked).toBeGreaterThan(0);
+});
+
 test("an incomplete sum shows its known part plus ?, or unknown, in every view, in words for screen readers", async () => {
 	const gaps = `{ idField: "id", fields: { id: { label: "Id", kind: "text" }, team: { label: "Team", kind: "text" }, hours: { label: "Hours", kind: "number", sum: true } }, columns: ["id", "hours"], groupBy: ["team"], data: [{ id: "a", team: "mixed", hours: 8 }, { id: "b", team: "mixed", hours: null }, { id: "c", team: "none" }] }`;
 	const output = await packedMdx(
@@ -330,7 +365,7 @@ export const gaps = ${gaps};
 			"g",
 		);
 	const shown = (id: string, words: string) => {
-		const block = (html.split(`id="${id}"`)[1] ?? "").split('class="records wide"')[0] ?? "";
+		const block = (html.split(`id="${id}"`)[1] ?? "").split('class="records')[0] ?? "";
 		return [...block.matchAll(marked(words))].map((m) => m[1]?.replace(/\u00a0/g, " "));
 	};
 	// The mixed group or lane, the one with no value, and the total of the tree and the table (the table shows no groups).

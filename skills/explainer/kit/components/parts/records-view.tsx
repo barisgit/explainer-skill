@@ -16,6 +16,7 @@ import type {
 	TableView,
 	TreeView,
 } from "../../records/index.ts";
+import { TREE_COLUMN_REM } from "../../records/index.ts";
 import type { AnswerMemory } from "./answer-memory.ts";
 import { Answer } from "./records-answer.tsx";
 
@@ -45,25 +46,19 @@ interface Context {
 	tags: ReadonlySet<string>;
 }
 
-/** Each column's width in the tree by kind, as minmax(0, x): it gives way on a phone rather than scrolling. */
-const WIDTHS: Record<Column["kind"], string> = {
-	text: "10rem",
-	number: "4.5rem",
-	currency: "6rem",
-	date: "7rem",
-	category: "9.5rem",
-};
-
 /** The room " + ?" takes after an incomplete sum, so the sum stays on one line. */
 const UNKNOWN_PART = "1.75rem";
 
-/** The widths of `columns`, with room for " + ?" in those listed in `incomplete`. */
+/**
+ * The widths of `columns`, each its kind's (TREE_COLUMN_REM) as minmax(0, x), so it gives way on a phone rather than scrolling,
+ * with room for " + ?" in those listed in `incomplete`.
+ */
 const widths = (columns: readonly Column[], incomplete: ReadonlySet<string>) =>
 	columns
 		.map((c) =>
 			incomplete.has(c.field)
-				? `minmax(0, calc(${WIDTHS[c.kind]} + ${UNKNOWN_PART}))`
-				: `minmax(0, ${WIDTHS[c.kind]})`,
+				? `minmax(0, calc(${TREE_COLUMN_REM[c.kind]}rem + ${UNKNOWN_PART}))`
+				: `minmax(0, ${TREE_COLUMN_REM[c.kind]}rem)`,
 		)
 		.join(" ");
 
@@ -534,7 +529,7 @@ function FacetGroup({ facet, actions }: { facet: Facet; actions: RecordsActions 
 }
 
 /**
- * The block: `div.records.wide` holding the controls (with `actions`) and the view shown. It draws no legend: every coloured
+ * The block: `div.records` (`.wide` unless it is drawn in the column) holding the controls (with `actions`) and the view shown. It draws no legend: every coloured
  * marker sits beside its own word (a group's or lane's title, a facet's or a cell's value).
  * `live` shows the controls, which the island turns on once it runs, so a page read without script shows no dead ones; `root`
  * is the block's element.
@@ -566,7 +561,7 @@ export function RecordsBlock({
 	return (
 		<div
 			ref={root ?? null}
-			class="records wide"
+			class={vm.width === "column" ? "records" : "records wide"}
 			id={vm.id}
 			data-records={actions ? "" : undefined}
 			data-width={vm.width === "full" ? "full" : undefined}

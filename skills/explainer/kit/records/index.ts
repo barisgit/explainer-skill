@@ -22,6 +22,7 @@ export { VIEW_KINDS } from "./config.ts";
 export { LABELS as RECORDS_LABELS, type RecordsLabel } from "./labels.ts";
 export type { RecordsState, SortState } from "./state.ts";
 export { RecordsConfigError } from "./validate.ts";
+export { TREE_COLUMN_REM } from "./view.ts";
 export type * from "./view-model.ts";
 
 export interface RecordsOptions {

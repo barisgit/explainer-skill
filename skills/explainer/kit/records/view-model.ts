@@ -4,7 +4,7 @@
  * it leads to (`next`, `toggle`, `clear`), so a renderer only hands that back. Ids are stable across edits of other records: a
  * group's id comes from its values, an item's from its id field.
  */
-import type { BlockWidth, FieldKind, Value, ViewKind } from "./config.ts";
+import type { DrawnWidth, FieldKind, Value, ViewKind } from "./config.ts";
 import type { RecordsState } from "./state.ts";
 
 /** One cell of a row, a group or a total. An empty cell has text "" and keeps its column. */
@@ -218,5 +218,5 @@ export interface RecordsView {
 	 * their answer in the page, out of sight, so the reply covers every record whatever the reader is looking at.
 	 */
 	unlisted: readonly ItemRow[];
-	width: BlockWidth;
+	width: DrawnWidth;
 }

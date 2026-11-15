@@ -1,5 +1,5 @@
 /** Builds the view model of one state from a block's model: the parts every view shares, then the body of the view shown. */
-import type { ViewKind } from "./config.ts";
+import type { DrawnWidth, FieldKind, ViewKind } from "./config.ts";
 import { type Item, type Narrowing, type Sum, valueText } from "./engine.ts";
 import { slug } from "./ids.ts";
 import type { Model, TreeNode } from "./model.ts";
@@ -162,6 +162,50 @@ const allOpen = (rows: readonly (GroupRow | ItemRow)[]): boolean =>
 	rows.every((row) =>
 		row.kind === "group" ? row.open && allOpen(row.children) : !row.detail || row.open,
 	);
+
+/** Each tree column's width by kind, in rem; the renderer sizes the columns with them (records-view.tsx). */
+export const TREE_COLUMN_REM: Readonly<Record<FieldKind, number>> = {
+	text: 10,
+	number: 4.5,
+	currency: 6,
+	date: 7,
+	category: 9.5,
+};
+
+/**
+ * The tree's room besides its number columns, in rem, as 08-tree.css lays it out: the chevron's column and the gap after it, a
+ * label of about 16rem, a gap before each number column, and one level's indent per group level.
+ */
+const TREE_LABEL_REM = 0.8125 + 0.5 + 16;
+const TREE_GAP_REM = 0.5;
+const TREE_INDENT_REM = 1.3125;
+/** The reading column's width, in rem (.page in 02-layout.css). */
+const COLUMN_REM = 66;
+
+/**
+ * How wide the block is drawn: as the config says, else in the reading column when it offers no table (whose cells grow with
+ * their text) and its tree fits there (#188), else wide.
+ */
+function drawnWidth(model: Model): DrawnWidth {
+	const { width, groupBy, columns } = model.config;
+	if (width) {
+		return width;
+	}
+	if (model.rules.views.includes("table")) {
+		return "wide";
+	}
+	const shown = columns.filter((f) => !groupBy.includes(f)).map((f) => column(model, f));
+	const lead = Math.max(
+		1,
+		shown.findIndex((c) => c.kind !== "text"),
+	);
+	const numbers = shown.findIndex((c) => c.kind !== "text") < 0 ? [] : shown.slice(lead);
+	const needed =
+		TREE_LABEL_REM +
+		groupBy.length * TREE_INDENT_REM +
+		numbers.reduce((sum, c) => sum + TREE_GAP_REM + TREE_COLUMN_REM[c.kind], 0);
+	return needed <= COLUMN_REM ? "column" : "wide";
+}
 
 function treeView(
 	model: Model,
@@ -347,6 +391,6 @@ export function buildView(model: Model, raw: RecordsState, texts: ViewTexts): Re
 					.filter((item) => !shown.has(item.id))
 					.map((item) => itemRow(model, state, item, body.columns, false))
 			: [],
-		width: model.config.width ?? "wide",
+		width: drawnWidth(model),
 	};
 }

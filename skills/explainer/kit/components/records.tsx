@@ -21,8 +21,9 @@
                a record the reader leaves alone is listed under "Not answered". No choice starts chosen, so a skipped row shows
      open      true opens every group and every record's detail at load; a number opens that many group levels (1 is the outermost).
                The hash writes only what the reader changed from there. Use it when the reader must see every item, as with reply
-     width     "wide" (default) or "full": the block spans the window from gutter to gutter (beside a contents rail, from the
-               rail to the gutter), a phone's column as ever
+     width     "wide" or "full": "full" spans the window from gutter to gutter (beside a contents rail, from the rail to the
+               gutter), a phone's column as ever. Unset, a block that offers no table and whose tree fits the reading column stays in
+               it, and any other is "wide"
    A field with sum: true adds subtotals to groups and lanes, and a total. Records without a value are not zero: the sum shows
    what is known plus ? (8 h + ?), or ? when none has one. The view, sort, search, filters and open folds go in the URL hash,
    so a link opens what the reader saw, and a link of your own applies a state: <a href="#plan?f.owner=JV">JV's work</a>.
@@ -42,7 +43,7 @@ import { RecordsBlock } from "./parts/records-view.tsx";
 export type RecordsProps = RecordsConfig;
 
 /**
- * Renders `div.records.wide`: the default view at pack time, as static markup when the block has nothing to choose, else inside
+ * Renders `div.records` (`.wide` unless it fits the column): the default view at pack time, as static markup when the block has nothing to choose, else inside
  * the client island that adds the controls and keeps the state in the URL hash. A bad config fails the pack with every problem.
  */
 export function Records(props: RecordsProps) {
