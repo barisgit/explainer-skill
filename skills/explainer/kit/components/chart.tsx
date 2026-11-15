@@ -35,7 +35,9 @@
    within a copy's width range, or whose geometry pack cannot certify, also stays live-only, even when positioned explicitly.
    A horizontal scrolling legend can keep one row across widths.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
-   scheme changing remounts the chart: zoom and legend state reset. Reduced motion turns animation off.
+   scheme changing remounts the chart: zoom and legend state reset. Nothing animates on arrival; an update
+   (a new option, set) tweens from what is on show, matching series by id, else by position. Reduced motion turns animation off.
+   Axes carry their labels and a quiet baseline, without gridlines or ticks: turn one on in the option (splitLine: { show: true }).
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
    or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */
 "use client";

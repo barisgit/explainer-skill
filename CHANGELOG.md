@@ -17,6 +17,7 @@ Linked parts now share a screen: `.beside` keeps a figure, diagram or code in vi
 - `Question` choices are rows in ink with a radio dot or check box, so they read as answers rather than settings (Explore and toolbar switches are segmented rows); phones stack them. A self-check now says Right or Wrong in words and to screen readers (#136, #79, #151).
 - `check` fails on a link to an in-page target that does not exist (ids, named anchors and kit view routes count) and warns about a relative file missing beside the checked HTML: distribute those files with it. External links are never fetched (#150, #155).
 - `pack` fails on a Chart series type the kit does not bundle in an option it can see, naming the type and what to use instead; `kit Chart` lists the bundled series and components.
+- Charts carry no chrome by default: no gridlines or axis ticks, and a quiet baseline on category and time axes; axis labels stay. Turn one back on in the option (`yAxis: { splitLine: { show: true } }`), which keeps the theme's colours (#190).
 
 ### What you write differently
 
@@ -48,6 +49,7 @@ Linked parts now share a screen: `.beside` keeps a figure, diagram or code in vi
 
 - A single unpositioned horizontal legend gets room below an ordinary grid chart on mount, resize and option updates, from ECharts' rendered box (inherited text styles and responsive options included) in live charts and pack's three copies alike. Explicit vertical grid bounds or legend placement win. A Chart whose legend wraps differently across a drawn copy's widths, positioned or not, is left to the script, as Plot already was, and so is uncertifiable legend geometry or text with glyphs outside pack's Geist metrics. Electricity's world chart keeps its drawing with a single-row scrolling legend.
 - Swapping chart series with `set(patch, ["series"])` closes any open tooltip first, so the next hover no longer throws in ECharts.
+- A Chart that a stepper or an Explore changes moves from the state on show instead of drawing its series in again from nothing: series without an `id` keep theirs by position across `set(patch, ["series"])`. Nothing animates on arrival, even a chart with no drawing in front of it; updates still tween, and reduced motion turns them off (#189).
 - Steppers print every part at full opacity and every caption, whichever step is open on screen.
 - Sections inside figures no longer get the page's section gaps. A figure with controls still clips its contents, short of its controls' focus rings, without stopping sticky rows from following the page scroll.
 - The contents rail starts below the Reply bar, so the bar no longer covers its first entries and neither overlaps the other at any width (#187).

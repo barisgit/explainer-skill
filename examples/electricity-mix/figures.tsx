@@ -213,7 +213,7 @@ const moveOf = (m: Move, unit: Unit) => (unit === "twh" ? m.dT : diff(m.sa, m.sb
 /** The axes of a horizontal bar chart of changes, one category per row, the values as labels on the bars. */
 export const BAR_AXES = {
 	grid: { top: 16, left: 8, right: 8, bottom: 8 },
-	xAxis: { type: "value", axisLabel: { show: false }, splitLine: { show: false } },
+	xAxis: { type: "value", axisLabel: { show: false } },
 	yAxis: {
 		type: "category",
 		inverse: true,

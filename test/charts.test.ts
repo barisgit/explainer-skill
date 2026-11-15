@@ -1,7 +1,16 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, statSync } from "node:fs";
 import { runStep } from "../skills/explainer/src/steps.ts";
-import { inPage, packAndRun, packedMdx, packHtml, packMdx, scratch, until } from "./support.ts";
+import {
+	act,
+	inPage,
+	packAndRun,
+	packedMdx,
+	packHtml,
+	packMdx,
+	scratch,
+	until,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -385,4 +394,68 @@ test("a page with a Chart carries ECharts compressed, and the live chart takes t
 		})`),
 	);
 	expect(state).toEqual({ live: true, drawn: 0 });
+}, 30_000);
+
+/** A client component that steps a Chart through a day, its series a different length per step, as the mdx-all Day does. */
+const STEPPED_CHART = `"use client";
+import { Chart, Stepper } from "kit";
+import { useState } from "preact/hooks";
+
+const DATA = [3, 5, 8, 6, 4, 2];
+const ENDS = [2, 4, 6];
+
+export function Stepped() {
+	const [step, setStep] = useState(ENDS.length);
+	const shown = DATA.slice(0, ENDS[step - 1]);
+	return (
+		<Stepper label="Stepped" onStep={setStep} captions={ENDS.map((end) => \`To \${end}\`)}>
+			<Chart label="Stepped" option={{ xAxis: { type: "category", data: DATA.map(String) }, yAxis: {}, series: [{ name: "Charge", type: "line", data: shown }, { type: "bar", data: shown }] }} />
+		</Stepper>
+	);
+}
+`;
+
+test("a step updates the chart's series in place, so ECharts tweens from the shown state instead of drawing them in again", async () => {
+	const output = await packedMdx(
+		dir,
+		"stepped",
+		`import { Stepped } from "./stepped.tsx";\n\n# Stepped\n\n<Stepped />\n`,
+		{ "stepped.tsx": STEPPED_CHART },
+	);
+	await inPage(output, async (cdp) => {
+		const series = `echarts.getInstanceByDom(document.querySelector(".chart")).getModel().getSeries().map((s) => s.uid + ":" + s.getData().count())`;
+		const before = await cdp.evaluate<string[]>(series);
+		const after = await act<string[]>(
+			cdp,
+			`document.querySelector('[data-go="-1"]').click()`,
+			series,
+		);
+		expect(before.map((s) => s.split(":")[1])).toEqual(["6", "6"]);
+		expect(after).toEqual(before.map((s) => s.replace(/:6$/, ":4")));
+	});
+}, 30_000);
+
+test("a chart arrives drawn: no entrance animation, even where motion is allowed", async () => {
+	const output = await packedMdx(
+		dir,
+		"arrival",
+		`import { Chart } from "kit";\n\n# Arrival\n\n<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />\n`,
+	);
+	// A chart made after load has no drawing in front of it, as one in a client component or a hidden view may not.
+	await inPage(output, async (cdp) => {
+		await cdp.send("Emulation.setEmulatedMedia", {
+			features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+		});
+		const animating = await cdp.evaluate<boolean>(
+			`new Promise((done) => {
+				const el = document.createElement("div");
+				el.className = "chart";
+				document.querySelector("main").append(el);
+				Charts.make(el, { xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "line", data: [1, 2] }, { type: "bar", data: [2, 1] }] },
+					(chart) => done(!chart.getZr().animation.isFinished()));
+			})`,
+			true,
+		);
+		expect(animating).toBe(false);
+	});
 }, 30_000);

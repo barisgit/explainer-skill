@@ -298,12 +298,14 @@ window.ChartsOption = ({ color, lang }) => {
 		const surface = token("surface");
 		const accent = token("accent");
 		const accentSoft = token("accent-soft");
+		// No chrome: the labels say where values are, gridlines and ticks are off, and an axis line (on by ECharts' default only
+		// for category and time axes, as the baseline marks start from) is quiet. What an option turns back on keeps these colours.
 		const axis = {
-			axisLine: { lineStyle: { color: ruleStrong } },
-			axisTick: { lineStyle: { color: ruleStrong } },
+			axisLine: { lineStyle: { color: rule } },
+			axisTick: { show: false, lineStyle: { color: rule } },
 			axisLabel: { color: muted },
 			nameTextStyle: { color: muted },
-			splitLine: { lineStyle: { color: rule } },
+			splitLine: { show: false, lineStyle: { color: rule } },
 		};
 		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a halo in the tone under the chart.
 		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
@@ -313,7 +315,8 @@ window.ChartsOption = ({ color, lang }) => {
 			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
 			backgroundColor: "transparent",
 			animation,
-			animationDuration: 700,
+			// Nothing animates on arrival (pack's drawing is already there); an update tweens from the state on show.
+			animationDuration: 0,
 			animationDurationUpdate: 500,
 			animationEasing: "cubicOut",
 			textStyle: { fontFamily: font, color: ink },
