@@ -396,7 +396,9 @@ test("a page with a Chart carries ECharts compressed, and the live chart takes t
 	expect(state).toEqual({ live: true, drawn: 0 });
 }, 30_000);
 
-/** A client component that steps a Chart through a day, its series a different length per step, as the mdx-all Day does. */
+/**
+ * A client component that steps a Chart through a day, its series a different length per step, as the mdx-all Day does.
+ */
 const STEPPED_CHART = `"use client";
 import { Chart, Stepper } from "kit";
 import { useState } from "preact/hooks";
@@ -415,7 +417,7 @@ export function Stepped() {
 }
 `;
 
-test("a step updates the chart's series in place, so ECharts tweens from the shown state instead of drawing them in again", async () => {
+test("a step keeps the chart's series views, so ECharts tweens from the shown state instead of drawing them in again", async () => {
 	const output = await packedMdx(
 		dir,
 		"stepped",
@@ -423,39 +425,168 @@ test("a step updates the chart's series in place, so ECharts tweens from the sho
 		{ "stepped.tsx": STEPPED_CHART },
 	);
 	await inPage(output, async (cdp) => {
-		const series = `echarts.getInstanceByDom(document.querySelector(".chart")).getModel().getSeries().map((s) => s.uid + ":" + s.getData().count())`;
-		const before = await cdp.evaluate<string[]>(series);
+		// A series view is kept, and its marks tween, while the series keeps the id ECharts gave it; a new view draws in from nothing.
+		const views = `(() => { const chart = echarts.getInstanceByDom(document.querySelector(".chart")); return chart.getModel().getSeries().map((s) => chart.getViewOfSeriesModel(s).group.id + ":" + s.getData().count()); })()`;
+		const before = await cdp.evaluate<string[]>(views);
 		const after = await act<string[]>(
 			cdp,
 			`document.querySelector('[data-go="-1"]').click()`,
-			series,
+			views,
 		);
 		expect(before.map((s) => s.split(":")[1])).toEqual(["6", "6"]);
 		expect(after).toEqual(before.map((s) => s.replace(/:6$/, ":4")));
 	});
 }, 30_000);
 
-test("a chart arrives drawn: no entrance animation, even where motion is allowed", async () => {
-	const output = await packedMdx(
-		dir,
-		"arrival",
-		`import { Chart } from "kit";\n\n# Arrival\n\n<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />\n`,
+/** A page with a Chart, so it carries the charts runtime. */
+const WITH_CHART = `import { Chart } from "kit";\n\n# Charts\n\n<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />\n`;
+
+/**
+ * Page functions: `made`, a Charts.make handle on a new element once its chart has mounted, and `quiet`, which runs `fn` without
+ * the one error ECharts logs for any baseOption (it sets baseOption.timeline, a component the kit does not bundle).
+ */
+const MADE = `const quiet = async (fn) => {
+	const error = console.error;
+	console.error = (...args) => String(args[0]).includes("Component timeline is used but not imported") || error(...args);
+	try { return await fn(); } finally { console.error = error; }
+};
+const made = (option) => new Promise((done) => {
+	const el = document.createElement("div");
+	el.className = "chart";
+	document.querySelector("main").append(el);
+	const handle = Charts.make(el, option, () => done(handle));
+});`;
+
+test("a replaced series list draws what a fresh mount of the saved option draws", async () => {
+	const output = await packedMdx(dir, "replaced", WITH_CHART);
+	const result = await inPage(output, (cdp) =>
+		cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const axes = { xAxis: { type: "category", data: ["a", "b"] }, yAxis: {} };
+			const cases = [
+				[{ ...axes, series: [{ type: "line", name: "A", areaStyle: {}, stack: "s", data: [1, 2] }] },
+					{ series: [{ type: "line", data: [3, 4] }] }],
+				[{ ...axes, dataset: { source: [["x", "Sales", "Cost"], ["a", 1, 2], ["b", 3, 4]] }, series: [{ type: "bar" }, { type: "bar" }] },
+					{ dataset: { source: [["x", "Profit", "Tax"], ["a", 5, 6], ["b", 7, 8]] }, series: [{ type: "bar" }, { type: "bar" }] }],
+			];
+			const failures = [];
+			for (const [initial, patch] of cases) {
+				const live = await made(structuredClone(initial));
+				live.set(structuredClone(patch), ["series"]);
+				const fresh = await made({ ...structuredClone(initial), ...structuredClone(patch) });
+				const shown = live.chart.getOption();
+				const mounted = fresh.chart.getOption();
+				for (const key of new Set([...Object.keys(shown), ...Object.keys(mounted)])) {
+					const [a, b] = [JSON.stringify(shown[key]), JSON.stringify(mounted[key])];
+					if (a !== b) {
+						failures.push(key + ": " + a + " but a mount draws " + b);
+					}
+				}
+			}
+			// A step of a baseOption chart keeps its series views as a root option's does.
+			const base = (data) => ({ baseOption: { ...axes, series: [{ type: "line", data }, { type: "bar", data }] } });
+			const views = (handle) => handle.chart.getModel().getSeries().map((s) => handle.chart.getViewOfSeriesModel(s).group.id);
+			await quiet(async () => {
+				const stepped = await made(base([1, 2]));
+				const before = views(stepped);
+				stepped.set(base([3]), ["series"]);
+				if (views(stepped).join() !== before.join()) {
+					failures.push("baseOption views " + before + " became " + views(stepped));
+				}
+			});
+			return failures;
+		})()`,
+			true,
+		),
 	);
+	expect(result).toEqual([]);
+}, 30_000);
+
+test("a replaced series list keeps what the reader toggled and zoomed", async () => {
+	const output = await packedMdx(dir, "reader-state", WITH_CHART);
+	const result = await inPage(output, (cdp) =>
+		cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const series = (data) => [{ name: "A", type: "bar", data }, { name: "B", type: "bar", data }];
+			const handle = await made({ legend: {}, dataZoom: [{ type: "inside" }], xAxis: { type: "category", data: ["a", "b", "c", "d"] }, yAxis: {}, series: series([1, 2, 3, 4]) });
+			handle.chart.dispatchAction({ type: "legendUnSelect", name: "A" });
+			handle.chart.dispatchAction({ type: "dataZoom", start: 25, end: 75 });
+			handle.set({ series: series([4, 3, 2, 1]) }, ["series"]);
+			const shown = handle.chart.getOption();
+			return { selected: shown.legend[0].selected, zoom: [shown.dataZoom[0].start, shown.dataZoom[0].end] };
+		})()`,
+			true,
+		),
+	);
+	expect(result).toEqual({ selected: { A: false, B: true }, zoom: [25, 75] });
+}, 30_000);
+
+test("a set without replace targets series as ECharts does: by id, name, else position", async () => {
+	const output = await packedMdx(dir, "partial", WITH_CHART);
+	const result = await inPage(output, (cdp) =>
+		cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const pie = await made({ series: [{ id: "authored", type: "pie", data: [1, 2] }] });
+			pie.set({ series: [{ data: [3, 4] }] });
+			const axes = { xAxis: { type: "category", data: ["a", "b"] }, yAxis: {} };
+			const pair = await made({ ...axes, series: [{ name: "A", type: "bar", data: [1, 2] }, { name: "B", type: "bar", data: [3, 4] }] });
+			pair.set({ series: [{ name: "B", data: [5, 6] }] });
+			// An author id that looks like a position is the author's own, not a clash.
+			const named = await made({ ...axes, series: [{ type: "bar", data: [1, 2] }, { id: "kit-series-0", type: "bar", data: [3, 4] }] });
+			const data = (handle) => handle.chart.getOption().series.map((s) => (s.name ?? "") + "=" + s.data.map((d) => d.value ?? d).join(","));
+			return [data(pie), data(pair), data(named).length];
+		})()`,
+			true,
+		),
+	);
+	expect(result).toEqual([["=3,4"], ["A=1,2", "B=5,6"], 2]);
+}, 30_000);
+
+test("a chart arrives drawn: no entrance animation, even where motion is allowed, and its own animation setting stays", async () => {
+	const drawn = await packedMdx(
+		dir,
+		"arrival-drawn",
+		`import { Chart } from "kit";\n\n# Arrival\n\n<Chart label="Base" option={{ baseOption: { animation: true, animationDuration: 1000, xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "line", data: [1] }] } }} />\n\n<Chart label="Root" option={{ animation: true, xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "line", data: [1] }] }} />\n`,
+	);
+	// pack's drawings are still: no entrance keyframes, whatever the option asks for.
+	expect(readFileSync(drawn, "utf8")).not.toContain("@keyframes");
+	const output = await packedMdx(dir, "arrival", WITH_CHART);
 	// A chart made after load has no drawing in front of it, as one in a client component or a hidden view may not.
-	await inPage(output, async (cdp) => {
+	const result = await inPage(output, async (cdp) => {
 		await cdp.send("Emulation.setEmulatedMedia", {
 			features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
 		});
-		const animating = await cdp.evaluate<boolean>(
-			`new Promise((done) => {
-				const el = document.createElement("div");
-				el.className = "chart";
-				document.querySelector("main").append(el);
-				Charts.make(el, { xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "line", data: [1, 2] }, { type: "bar", data: [2, 1] }] },
-					(chart) => done(!chart.getZr().animation.isFinished()));
-			})`,
+		return cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const axes = { xAxis: { type: "category", data: ["a", "b"] }, yAxis: {} };
+			const series = [{ type: "line", data: [1, 2] }, { type: "bar", data: [2, 1] }];
+			const options = [
+				{ ...axes, series },
+				{ baseOption: { ...axes, series, animation: true, animationDuration: 1000 } },
+				{ baseOption: { ...axes, series, animation: false } },
+			];
+			const found = [];
+			await quiet(async () => {
+				for (const option of options) {
+					const el = document.createElement("div");
+					el.className = "chart";
+					document.querySelector("main").append(el);
+					found.push(await new Promise((done) => Charts.make(el, option, (chart) =>
+						done({ arriving: !chart.getZr().animation.isFinished(), animation: chart.getOption().animation }))));
+				}
+			});
+			return found;
+		})()`,
 			true,
 		);
-		expect(animating).toBe(false);
 	});
+	expect(result).toEqual([
+		{ arriving: false, animation: true },
+		{ arriving: false, animation: true },
+		{ arriving: false, animation: false },
+	]);
 }, 30_000);

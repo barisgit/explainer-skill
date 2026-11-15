@@ -37,6 +37,8 @@
 		theme: tokenTheme,
 		layout,
 		measureText,
+		still,
+		settings,
 	} = window.ChartsOption({
 		color: resolve,
 		lang: () => document.documentElement.lang || "en",
@@ -112,18 +114,34 @@
 	const idOf = (item: unknown) => (isObject(item) ? item.id : undefined);
 
 	/**
-	 * The option with an id on every series that has none, from its position. ECharts' replaceMerge keeps only series it matches
-	 * by id and makes the rest anew, which draws them in from nothing; with these ids a replaced list updates the series at each
-	 * position, so a step tweens from the state on show. An author's ids still decide what is kept.
+	 * What the reader set on the live chart, which the saved option does not hold: legend toggles and zoom windows. A window is
+	 * kept in percent, as ECharts keeps the reader's, so it follows data that grows; an option's startValue/endValue still wins.
 	 */
-	function withSeriesIds(option: ChartOption): ChartOption {
-		const { series } = option;
-		const ided = (item: unknown, index: number) =>
-			isObject(item) && item.id == null ? { ...item, id: `kit-series-${index}` } : item;
-		if (Array.isArray(series)) {
-			return { ...option, series: series.map(ided) };
+	const READER_STATE: Record<string, string[]> = {
+		legend: ["selected"],
+		dataZoom: ["start", "end"],
+	};
+
+	/**
+	 * Writes what the reader set on the live chart into the saved option, component by position, so a redraw of the saved option
+	 * keeps it. Only components the saved option declares (in its baseOption when it has one) take it.
+	 */
+	function keepReaderState(option: ChartOption, chart: ECharts) {
+		const live: ChartOption = chart.getOption();
+		const target = settings(option);
+		for (const [key, props] of Object.entries(READER_STATE)) {
+			const shown = live[key];
+			const saved = target[key];
+			if (!(Array.isArray(shown) && (Array.isArray(saved) || isObject(saved)))) {
+				continue;
+			}
+			const states = shown.map((item: unknown) =>
+				isObject(item) ? Object.fromEntries(props.map((prop) => [prop, item[prop]])) : {},
+			);
+			target[key] = Array.isArray(saved)
+				? merge(saved, states, true)
+				: merge(saved, states[0] ?? {});
 		}
-		return isObject(series) ? { ...option, series: ided(series, 0) } : option;
 	}
 
 	// Remount callbacks of the live charts. One shared check, because the scheme can change by media query or by the page itself.
@@ -159,16 +177,13 @@
 		let live = true;
 		const mount = () => {
 			// Nothing animates on arrival: the first draw takes the place of pack's drawing, or of this chart before the scheme
-			// changed, as it stands. ECharts pops a line's symbols in on its first frame whatever the duration, so animation is off
-			// for that frame and on for the updates after it.
+			// changed, as it stands, and only the updates after it animate.
 			chart?.dispose();
 			const look = theme(el);
 			chart = echarts.init(el, look);
 			layout(chart);
-			chart.setOption(withSeriesIds(resolveOption({ ...option, animation: false })));
-			chart.setOption({
-				animation: Boolean("animation" in option ? option.animation : look.animation),
-			});
+			chart.setOption(resolveOption(still(option)));
+			chart.setOption({ animation: Boolean(settings(option).animation ?? look.animation) });
 			el.querySelector(":scope > .chart-drawn")?.remove();
 			setup?.(chart);
 		};
@@ -207,15 +222,20 @@
 				return chart;
 			},
 			set(patch, replace = []) {
-				mergeOption(option, patch, replace);
-				// An open axis tooltip retains data from series replaceMerge can remove.
-				if (replace.length) {
-					chart?.dispatchAction({ type: "hideTip" });
+				if (!(replace.length && chart)) {
+					mergeOption(option, patch, replace);
+					chart?.setOption(resolveOption(patch));
+					return;
 				}
-				chart?.setOption(
-					withSeriesIds(resolveOption(patch)),
-					replace.length ? { replaceMerge: replace } : undefined,
-				);
+				// A replaced list redraws the saved option whole (notMerge): replaceMerge would merge a new item into the old one
+				// of its id, keeping what the new one leaves out, or make a new view that draws in from nothing. notMerge makes the
+				// components afresh, as a mount does, and ECharts keeps the view of each id (given, else from name and position),
+				// so marks tween from the state on show. What the reader toggled or zoomed is written into the option first.
+				keepReaderState(option, chart);
+				mergeOption(option, patch, replace);
+				// An open axis tooltip retains data from series the redraw can remove.
+				chart.dispatchAction({ type: "hideTip" });
+				chart.setOption(resolveOption(option), { notMerge: true });
 			},
 		};
 	}

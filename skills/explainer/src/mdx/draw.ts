@@ -32,6 +32,7 @@ interface ChartsOption {
 	theme(place: { under: string; font: string; animation: boolean }): Option;
 	layout(chart: unknown): void;
 	measureText(base: typeof measureText): typeof measureText;
+	still(option: Option): Option;
 }
 type ChartsOptionPart = (env: {
 	color: (expression: string) => string;
@@ -192,7 +193,7 @@ function chartSvg(
 	const chart = renderer.init(null, theme, { renderer: "svg", ssr: true, width, height });
 	try {
 		charts.layout(chart);
-		quietly(() => chart.setOption(option));
+		quietly(() => chart.setOption(charts.still(option)));
 		const legends = legendHeights(chart);
 		if (!legends) {
 			return undefined;

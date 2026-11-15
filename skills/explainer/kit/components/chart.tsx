@@ -20,7 +20,8 @@
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; pack evaluates each drawn width.
    Imperative API: Charts.make(el, option, setup?) returns {chart,set,dispose}; chart is null until width, fonts and ECharts
-     are ready. set(patch, replace?) merges saved/live components by id or position; replace names whole component lists.
+     are ready. set(patch, replace?) merges saved/live components by id or position; replace names whole component lists,
+     and then the chart is redrawn from the saved option, keeping legend toggles and zoom.
      setup runs on each mount. Scheme remounts reset zoom/legend state; dispose removes chart and observers.
      Charts.color(token) is a CSS var, not RGB.
    pack rejects other series types in options it sees (including baseOption and media). Options computed only in client code
@@ -35,8 +36,8 @@
    within a copy's width range, or whose geometry pack cannot certify, also stays live-only, even when positioned explicitly.
    A horizontal scrolling legend can keep one row across widths.
    A Chart in a hidden view mounts when it is first shown; one your component stops rendering is disposed. The page's colour
-   scheme changing remounts the chart: zoom and legend state reset. Nothing animates on arrival; an update
-   (a new option, set) tweens from what is on show, matching series by id, else by position. Reduced motion turns animation off.
+   scheme changing remounts the chart: zoom and legend state reset. Nothing animates on arrival; a new option
+   tweens from what is on show, matching series by id, else by name, else by position. Reduced motion turns animation off.
    Axes carry their labels and a quiet baseline, without gridlines or ticks: turn one on in the option (splitLine: { show: true }).
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
    or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */

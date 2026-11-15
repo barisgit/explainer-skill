@@ -97,6 +97,19 @@ window.ChartsOption = ({ color, lang }) => {
 		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveOption(v, k)]));
 	}
 
+	/** Where ECharts reads an option's root settings, such as animation: its baseOption when it has one, which hides the root's. */
+	const settings = (option: ChartOption): ChartOption =>
+		isObject(option.baseOption) ? option.baseOption : option;
+
+	/**
+	 * The option drawn still. Nothing animates on arrival, and ECharts animates a first frame whatever the duration (a line's
+	 * symbols pop in), so a chart's first draw, live or packed, has animation off where the option would set it.
+	 */
+	const still = (option: ChartOption): ChartOption =>
+		isObject(option.baseOption)
+			? { ...option, baseOption: { ...option.baseOption, animation: false } }
+			: { ...option, animation: false };
+
 	type TextMeasure = (text: string, font?: string) => { width: number };
 	/**
 	 * zrender uses this square-glyph width as line height. Native fallback fonts vary by platform, so use
@@ -367,5 +380,5 @@ window.ChartsOption = ({ color, lang }) => {
 		};
 	}
 
-	return { resolveOption, theme, layout, measureText };
+	return { resolveOption, theme, layout, measureText, still, settings };
 };

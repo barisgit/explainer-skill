@@ -2943,6 +2943,8 @@ window.ChartsOption = ({ color, lang }) => {
     }
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveOption(v, k)]));
   }
+  const settings = (option) => isObject(option.baseOption) ? option.baseOption : option;
+  const still = (option) => isObject(option.baseOption) ? { ...option, baseOption: { ...option.baseOption, animation: false } } : { ...option, animation: false };
   const measureText = (base) => (text, font) => text === "国" ? { width: Number(/(\d+(?:\.\d+)?)px/.exec(font ?? "")?.[1] ?? 12) } : base(text, font);
   function authoredLayout(option) {
     const component = (value, keys) => {
@@ -3135,7 +3137,7 @@ window.ChartsOption = ({ color, lang }) => {
       markLine: { lineStyle: { color: muted }, label: { color: muted } }
     };
   }
-  return { resolveOption, theme, layout, measureText };
+  return { resolveOption, theme, layout, measureText, still, settings };
 };
 
 /* charts: Chart runtime; see kit Chart for the imperative API. */
@@ -3167,7 +3169,9 @@ window.ChartsOption = ({ color, lang }) => {
     resolveOption,
     theme: tokenTheme,
     layout,
-    measureText
+    measureText,
+    still,
+    settings
   } = window.ChartsOption({
     color: resolve,
     lang: () => document.documentElement.lang || "en"
@@ -3222,13 +3226,22 @@ window.ChartsOption = ({ color, lang }) => {
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
   const idOf = (item) => isObject(item) ? item.id : undefined;
-  function withSeriesIds(option) {
-    const { series } = option;
-    const ided = (item, index) => isObject(item) && item.id == null ? { ...item, id: `kit-series-${index}` } : item;
-    if (Array.isArray(series)) {
-      return { ...option, series: series.map(ided) };
+  const READER_STATE = {
+    legend: ["selected"],
+    dataZoom: ["start", "end"]
+  };
+  function keepReaderState(option, chart) {
+    const live = chart.getOption();
+    const target = settings(option);
+    for (const [key, props] of Object.entries(READER_STATE)) {
+      const shown = live[key];
+      const saved = target[key];
+      if (!(Array.isArray(shown) && (Array.isArray(saved) || isObject(saved)))) {
+        continue;
+      }
+      const states = shown.map((item) => isObject(item) ? Object.fromEntries(props.map((prop) => [prop, item[prop]])) : {});
+      target[key] = Array.isArray(saved) ? merge(saved, states, true) : merge(saved, states[0] ?? {});
     }
-    return isObject(series) ? { ...option, series: ided(series, 0) } : option;
   }
   const remounts = new Set;
   let scheme = color("ink");
@@ -3258,10 +3271,8 @@ window.ChartsOption = ({ color, lang }) => {
       const look = theme(el);
       chart = echarts.init(el, look);
       layout(chart);
-      chart.setOption(withSeriesIds(resolveOption({ ...option, animation: false })));
-      chart.setOption({
-        animation: Boolean("animation" in option ? option.animation : look.animation)
-      });
+      chart.setOption(resolveOption(still(option)));
+      chart.setOption({ animation: Boolean(settings(option).animation ?? look.animation) });
       el.querySelector(":scope > .chart-drawn")?.remove();
       setup?.(chart);
     };
@@ -3299,11 +3310,15 @@ window.ChartsOption = ({ color, lang }) => {
         return chart;
       },
       set(patch, replace = []) {
-        mergeOption(option, patch, replace);
-        if (replace.length) {
-          chart?.dispatchAction({ type: "hideTip" });
+        if (!(replace.length && chart)) {
+          mergeOption(option, patch, replace);
+          chart?.setOption(resolveOption(patch));
+          return;
         }
-        chart?.setOption(withSeriesIds(resolveOption(patch)), replace.length ? { replaceMerge: replace } : undefined);
+        keepReaderState(option, chart);
+        mergeOption(option, patch, replace);
+        chart.dispatchAction({ type: "hideTip" });
+        chart.setOption(resolveOption(option), { notMerge: true });
       }
     };
   }

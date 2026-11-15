@@ -208,6 +208,10 @@ declare var ChartsOption: (env: {
 	measureText(
 		base: (text: string, font?: string) => { width: number },
 	): (text: string, font?: string) => { width: number };
+	/** The option with animation off where ECharts reads it (its baseOption, else the root): a first draw never animates. */
+	still(option: ChartOption): ChartOption;
+	/** Where ECharts reads an option's root settings and components: its baseOption when it has one, else the option. */
+	settings(option: ChartOption): ChartOption;
 };
 declare var PlotDraw: (env: {
 	/** The language numbers are written in. */
