@@ -182,8 +182,8 @@ export interface RecordsConfig {
 	/** An answer the reader gives on every record, in its row of the tree and table and on its card. */
 	reply?: ReplyConfig;
 	/**
-	 * The block's width. Left out, a block that offers no table and whose tree fits the reading column stays in the column, and
-	 * any other block is `"wide"`.
+	 * The block's width. Left out, a block that offers only the tree, when that tree fits the reading column, stays in the
+	 * column, and any other block is `"wide"`.
 	 */
 	width?: BlockWidth;
 }

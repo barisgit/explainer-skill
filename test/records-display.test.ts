@@ -307,9 +307,12 @@ test("a tree column with an incomplete sum makes room for + ?, so the widest sum
 	expect(lines).toEqual([1, 1]);
 });
 
-test("a tree that fits the column stays on it; a block that offers a table, or asks for width wide, takes the wide measure (#188)", async () => {
+test("a tree that fits the column stays on it; a block that offers a table or a board, whose tree is too wide, or that asks for width wide takes the wide measure (#188)", async () => {
 	const block = (id: string, extra: string) =>
-		`<Records id="${id}" idField="id" fields={{ id: { label: "Item", kind: "text" }, part: { label: "Part", kind: "text" }, eur: { label: "Price", kind: "currency", currency: "EUR", sum: true } }} columns={["id", "eur"]} groupBy={["part"]} data={[{ id: "Battery", part: "Hardware", eur: 2600 }, { id: "Electrician", part: "Installation", eur: 540 }]} ${extra} />`;
+		`<Records id="${id}" idField="id" fields={{ id: { label: "Item", kind: "text" }, part: { label: "Part", kind: "text" }, eur: { label: "Price", kind: "currency", currency: "EUR", sum: true } }} columns={["id", "eur"]} groupBy={["part"]} data={[{ id: "Battery", part: "Hardware", eur: 2600 }, { id: "Electrician", part: "Installation", eur: 540 }, { id: "Permit", part: "Paperwork", eur: 90 }, { id: "Monitoring", part: "Software", eur: 120 }]} ${extra} />`;
+	// Eight money columns: the label, indent and 8 x 6.5rem pass the column's 66rem.
+	const months = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"];
+	const tooWide = `<Records id="too-wide" idField="id" fields={{ id: { label: "Item", kind: "text" }, part: { label: "Part", kind: "text" }, ${months.map((m) => `${m}: { label: "${m}", kind: "currency", currency: "EUR", sum: true }`).join(", ")} }} columns={${JSON.stringify(["id", ...months])}} groupBy={["part"]} data={[{ id: "Battery", part: "Hardware", ${months.map((m) => `${m}: 100`).join(", ")} }]} />`;
 	const output = await packedMdx(
 		dir,
 		"tree-width",
@@ -326,18 +329,33 @@ ${block("fits", "")}
 ${block("table", 'views={["tree", "table"]}')}
 
 ${block("asked", 'width="wide"')}
+
+${block("board", 'views={["board"]}')}
+
+${block("tree-board", 'views={["tree", "board"]}')}
+
+${tooWide}
 `,
 	);
 	const widths = await inPage(output, (cdp) =>
-		cdp.evaluate<{ fits: number; table: number; asked: number }>(`(() => {
+		cdp.evaluate<Record<string, number>>(`(() => {
 			const column = document.querySelector("[data-overview] > section").getBoundingClientRect();
 			const growth = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width - column.width);
-			return { fits: growth("fits"), table: growth("table"), asked: growth("asked") };
+			const lanes = [...document.querySelectorAll("#board .lane")].map((lane) => Math.round(lane.getBoundingClientRect().top));
+			return Object.fromEntries(["fits", "table", "asked", "board", "tree-board", "too-wide"].map((id) => [id, growth(id)]).concat([["laneRows", new Set(lanes).size]]));
 		})()`),
 	);
-	expect(widths.fits).toBe(0);
-	expect(widths.table).toBeGreaterThan(0);
-	expect(widths.asked).toBeGreaterThan(0);
+	const { laneRows, ...growth } = widths;
+	// Only the tree that fits keeps the column; at 1440 the wide board holds its four lanes in one row.
+	expect(Object.fromEntries(Object.entries(growth).map(([id, px]) => [id, px > 0]))).toEqual({
+		fits: false,
+		table: true,
+		asked: true,
+		board: true,
+		"tree-board": true,
+		"too-wide": true,
+	});
+	expect(laneRows).toBe(1);
 });
 
 test("an incomplete sum shows its known part plus ?, or unknown, in every view, in words for screen readers", async () => {

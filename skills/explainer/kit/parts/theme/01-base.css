@@ -108,11 +108,17 @@ img,
 svg {
 	max-inline-size: 100%;
 }
+/* Code keeps to the type roles in its own face: in a line it takes the size of the text around it, and a block of code is set
+   at the label's size, as a figure's text is. */
 code,
 pre,
-kbd {
+kbd,
+samp {
 	font-family: var(--mono);
-	font-size: 0.875em;
+	font-size: 1em;
+}
+pre {
+	font-size: var(--size-label);
 }
 code {
 	background: var(--sunken);

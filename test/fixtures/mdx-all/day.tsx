@@ -37,8 +37,9 @@ export function Day() {
 	const bought = shown.reduce((sum, x) => sum + x.bought, 0);
 	const option = useMemo(
 		() => ({
-			grid: { top: 40, left: 8, right: 16, bottom: 8 },
-			legend: { top: 8, left: 8 },
+			// The plot spans the column, as the stepper row under it does.
+			grid: { top: 40, left: 0, right: 0, bottom: 8 },
+			legend: { top: 8, left: 0 },
 			xAxis: { type: "category", data: HOURS.map((h) => `${h}:00`) },
 			yAxis: { type: "value", max: 10, axisLabel: { formatter: "{value} kWh" } },
 			series: [

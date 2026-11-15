@@ -88,6 +88,7 @@
 svg :is(.is-lit, .is-now, [data-kit-state][data-state~="now"]) {
 	color: var(--accent);
 }
+/* The shapes of a lit part take the accent stroke, but not its hit area (a schematic part's .hit) or a shape drawn unstroked. */
 svg
 	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"]):is(
 		path,
@@ -97,10 +98,10 @@ svg
 		line,
 		polyline,
 		polygon
-	),
+	):not(.hit, [stroke="none"]),
 svg
 	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"])
-	:is(path, rect, circle, ellipse, line, polyline, polygon) {
+	:is(path, rect, circle, ellipse, line, polyline, polygon):not(.hit, [stroke="none"]) {
 	stroke: var(--accent);
 }
 svg.has-lit [data-ref]:not(.is-lit) {

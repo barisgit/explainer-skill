@@ -109,6 +109,74 @@ ${pageContract({
 	}, 30_000);
 }
 
+/** Page functions: the WCAG contrast of two computed rgb() colours, and an element's computed colour by id. */
+const CONTRAST = `const luminance = (rgb) => rgb.match(/[\\d.]+/g).slice(0, 3).map(Number).map((c) => c / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const colour = (id, property) => getComputedStyle(document.getElementById(id))[property];`;
+
+test("a checked series toggle keeps an edge at 3:1 on every tone in both schemes, whatever its swatch", async () => {
+	const page = `${HEAD}<label class="toggle" style="--swatch: var(--c4)"><input type="checkbox" id="on" checked><span>Series</span></label>
+<label class="toggle" style="--swatch: var(--c4)"><input type="checkbox" id="off"><span>Series</span></label>
+<div id="bg" style="background: var(--bg)">.</div><div id="surface" style="background: var(--surface)">.</div><div id="sunken" style="background: var(--sunken)">.</div></main>
+<script>${CONTRAST}
+const least = (id) => Math.min(...["bg", "surface", "sunken"].map((tone) => contrast(colour(id, "borderTopColor"), colour(tone, "backgroundColor"))));
+const inScheme = (scheme, check) => { document.documentElement.dataset.scheme = scheme; return check(); };
+${pageContract({
+	"light: the checked box's edge": `inScheme("light", () => least("on") >= 3)`,
+	"light: the empty box's edge": `inScheme("light", () => least("off") >= 3)`,
+	"dark: the checked box's edge": `inScheme("dark", () => least("on") >= 3)`,
+	"dark: the empty box's edge": `inScheme("dark", () => least("off") >= 3)`,
+	"the checked box still shows its series colour": `colour("on", "backgroundColor") !== colour("off", "backgroundColor")`,
+})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "toggle-contrast", page, { widths: [DESKTOP] })).toEqual([]);
+}, 30_000);
+
+test("text keeps to the text and label sizes: code takes the size of the text around it, and a code block is a label", async () => {
+	const output = await packedMdx(
+		dir,
+		"code-sizes",
+		`# Sizes
+
+Prose with \`inline\` code.
+
+\`\`\`ts
+const answer = 42;
+\`\`\`
+
+<figure className="fig"><figcaption>A caption with <code>code</code> in it.</figcaption></figure>
+
+<pre id="hand">hand-written</pre>
+`,
+	);
+	const sizes = await inPage(output, (cdp) =>
+		cdp.evaluate<Record<string, string | boolean>>(`(() => {
+			const size = (selector) => getComputedStyle(document.querySelector(selector)).fontSize;
+			const text = size("body");
+			const label = size("figcaption");
+			const own = [...document.querySelectorAll("main *:not(h1, h2, h1 *, h2 *)")]
+				.filter((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+				.map((el) => getComputedStyle(el).fontSize);
+			return {
+				levels: [...new Set(own)].sort().join(" ") === [text, label].sort().join(" "),
+				inline: size("p > code") === text,
+				caption: size("figcaption > code") === label,
+				fence: size("pre > code") === label,
+				hand: size("#hand") === label,
+				mono: getComputedStyle(document.querySelector("pre > code")).fontFamily.includes("Mono"),
+			};
+		})()`),
+	);
+	expect(sizes).toEqual({
+		levels: true,
+		inline: true,
+		caption: true,
+		fence: true,
+		hand: true,
+		mono: true,
+	});
+}, 30_000);
+
 test("a page's textarea is drawn like the kit's text inputs", async () => {
 	const page = `${HEAD}<input type="text" id="line" aria-label="Line"><textarea id="free" aria-label="Free"></textarea></main>
 <script>

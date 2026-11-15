@@ -221,7 +221,7 @@ test("pack fails a block with its number and the problem's line, and names what 
 const circuitPage = (checks: Record<string, string>) =>
 	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main>
-<p>The <span id="part" data-ref="R_C">collector resistor</span> and the <span id="net" data-ref="vcc">supply</span>.</p>
+<p>The <span id="part" data-ref="R_C">collector resistor</span>, the <span id="transistor" data-ref="Q1">transistor</span> and the <span id="net" data-ref="vcc">supply</span>.</p>
 <pre class="schematic">${commonEmitter}</pre></main><script src="kit:link.js"></script><script>${pageContract(checks)}</script></body></html>`;
 
 test("a part's name and a net's name in the prose light the part and the wires touching it, and dim the rest", async () => {
@@ -233,6 +233,17 @@ test("a part's name and a net's name in the prose light the part and the wires t
 				&& lit.some((el) => el.matches("path.wire"))
 				&& document.querySelector("svg").classList.contains("has-lit")
 				&& getComputedStyle(document.querySelector("svg g[data-ref=Q1]")).opacity === "0.3";
+		})()`,
+		"a lit part draws its symbol in the accent, not a frame round its hit area": `(() => {
+			const part = document.querySelector("svg g[data-ref=R_C]");
+			return part.classList.contains("is-lit")
+				&& getComputedStyle(part.querySelector(":scope > g > path")).stroke === getComputedStyle(part).color
+				&& getComputedStyle(part.querySelector(":scope > rect.hit")).stroke === "none";
+		})()`,
+		"a lit part's filled marks stay unstroked": `(() => {
+			document.querySelector("#transistor").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+			const marks = [...document.querySelectorAll("svg g[data-ref=Q1].is-lit [stroke=none]")];
+			return marks.length > 0 && marks.every((mark) => getComputedStyle(mark).stroke === "none");
 		})()`,
 		"hovering the net lights every wire and dot on it, not the other nets": `(() => {
 			document.querySelector("#net").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));

@@ -183,15 +183,15 @@ const TREE_INDENT_REM = 1.3125;
 const COLUMN_REM = 66;
 
 /**
- * How wide the block is drawn: as the config says, else in the reading column when it offers no table (whose cells grow with
- * their text) and its tree fits there (#188), else wide.
+ * How wide the block is drawn: as the config says, else in the reading column when it offers only the tree and that tree fits
+ * there (#188), else wide: a table's cells grow with their text and a board's lanes stand side by side.
  */
 function drawnWidth(model: Model): DrawnWidth {
 	const { width, groupBy, columns } = model.config;
 	if (width) {
 		return width;
 	}
-	if (model.rules.views.includes("table")) {
+	if (model.rules.views.some((view) => view !== "tree")) {
 		return "wide";
 	}
 	const shown = columns.filter((f) => !groupBy.includes(f)).map((f) => column(model, f));
