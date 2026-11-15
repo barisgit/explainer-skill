@@ -3193,13 +3193,13 @@ window.ChartsOption = ({ color, lang }) => {
   });
   function merge(target, patch, topLevel = false) {
     if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
+      const at = places(target, patch);
       patch.forEach((item, index) => {
-        const id = idOf(item);
-        const at = id == null ? index : target.findIndex((t) => idOf(t) === id);
-        if (at < 0 || at >= target.length) {
+        const place = at[index];
+        if (place === undefined) {
           target.push(item);
         } else {
-          target[at] = merge(target[at], item);
+          target[place] = merge(target[place], item);
         }
       });
       return target;
@@ -3225,22 +3225,56 @@ window.ChartsOption = ({ color, lang }) => {
   function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
-  const idOf = (item) => isObject(item) ? item.id : undefined;
+  const keyOf = (item, key) => isObject(item) && item[key] != null ? String(item[key]) : undefined;
+  function places(target, patch) {
+    const taken = new Set;
+    const take = (find) => {
+      const index = target.findIndex((saved, i) => !taken.has(i) && find(saved, i));
+      if (index >= 0) {
+        taken.add(index);
+      }
+      return index >= 0 ? index : undefined;
+    };
+    const at = patch.map((item) => {
+      const id = keyOf(item, "id");
+      return id === undefined ? undefined : take((saved) => keyOf(saved, "id") === id);
+    });
+    patch.forEach((item, index) => {
+      const name = keyOf(item, "name");
+      if (at[index] === undefined && keyOf(item, "id") === undefined && name !== undefined) {
+        at[index] = take((saved) => keyOf(saved, "name") === name);
+      }
+    });
+    patch.forEach((item, index) => {
+      if (at[index] === undefined && keyOf(item, "id") === undefined) {
+        at[index] = take(() => true);
+      }
+    });
+    return at;
+  }
+  const modelOf = (chart, mainType, index) => chart.getModel().getComponent(mainType, index);
   const READER_STATE = {
-    legend: ["selected"],
-    dataZoom: ["start", "end"]
+    legend: ({ selected, scrollDataIndex }) => ({ selected, scrollDataIndex }),
+    dataZoom: ({ start, end, startValue, endValue }, model) => ({
+      rangeMode: model?.getRangePropMode?.(),
+      start,
+      end,
+      startValue,
+      endValue
+    }),
+    visualMap: ({ range, min, max }) => Array.isArray(range) && (range[0] !== min || range[1] !== max) ? { range } : {}
   };
   function keepReaderState(option, chart) {
     const live = chart.getOption();
     const target = settings(option);
-    for (const [key, props] of Object.entries(READER_STATE)) {
+    for (const [key, read] of Object.entries(READER_STATE)) {
       const shown = live[key];
       const saved = target[key];
       if (!(Array.isArray(shown) && (Array.isArray(saved) || isObject(saved)))) {
         continue;
       }
-      const states = shown.map((item) => isObject(item) ? Object.fromEntries(props.map((prop) => [prop, item[prop]])) : {});
-      target[key] = Array.isArray(saved) ? merge(saved, states, true) : merge(saved, states[0] ?? {});
+      const states = shown.map((item, index) => isObject(item) ? Object.fromEntries(Object.entries(read(item, modelOf(chart, key, index))).filter(([, v]) => v !== undefined)) : {});
+      target[key] = Array.isArray(saved) ? saved.map((item, index) => merge(item, states[index] ?? {})) : merge(saved, states[0] ?? {});
     }
   }
   const remounts = new Set;

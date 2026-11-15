@@ -66,19 +66,19 @@
 
 	/**
 	 * Merges a patch into the saved option the way ECharts' setOption merges: objects recursively;
-	 * top-level component arrays (series, xAxis, ...) element by element, matched by id, else by
-	 * position; nested arrays such as data replaced. Remounts replay the saved option, so it must
-	 * match what the live chart shows.
+	 * top-level component arrays (series, xAxis, ...) element by element (see places); nested arrays
+	 * such as data replaced. Redraws and remounts replay the saved option, so it must match what the
+	 * live chart shows.
 	 */
 	function merge(target: unknown, patch: unknown, topLevel = false): unknown {
 		if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
+			const at = places(target, patch);
 			patch.forEach((item, index) => {
-				const id = idOf(item);
-				const at = id == null ? index : target.findIndex((t) => idOf(t) === id);
-				if (at < 0 || at >= target.length) {
+				const place = at[index];
+				if (place === undefined) {
 					target.push(item);
 				} else {
-					target[at] = merge(target[at], item);
+					target[place] = merge(target[place], item);
 				}
 			});
 			return target;
@@ -111,35 +111,94 @@
 		return value !== null && typeof value === "object" && !Array.isArray(value);
 	}
 
-	const idOf = (item: unknown) => (isObject(item) ? item.id : undefined);
+	/** An item's id or name as ECharts compares them: numbers equal to their text. */
+	const keyOf = (item: unknown, key: "id" | "name") =>
+		isObject(item) && item[key] != null ? String(item[key]) : undefined;
 
 	/**
-	 * What the reader set on the live chart, which the saved option does not hold: legend toggles and zoom windows. A window is
-	 * kept in percent, as ECharts keeps the reader's, so it follows data that grows; an option's startValue/endValue still wins.
+	 * Where each patch item lands in the saved list, as ECharts' normal merge maps them: by id, then an id-less item by name,
+	 * then an id-less item into the first place still free. An item with an id no place has is added (undefined).
 	 */
-	const READER_STATE: Record<string, string[]> = {
-		legend: ["selected"],
-		dataZoom: ["start", "end"],
+	function places(target: unknown[], patch: unknown[]): (number | undefined)[] {
+		const taken = new Set<number>();
+		const take = (find: (saved: unknown, index: number) => boolean) => {
+			const index = target.findIndex((saved, i) => !taken.has(i) && find(saved, i));
+			if (index >= 0) {
+				taken.add(index);
+			}
+			return index >= 0 ? index : undefined;
+		};
+		const at = patch.map((item) => {
+			const id = keyOf(item, "id");
+			return id === undefined ? undefined : take((saved) => keyOf(saved, "id") === id);
+		});
+		patch.forEach((item, index) => {
+			const name = keyOf(item, "name");
+			if (at[index] === undefined && keyOf(item, "id") === undefined && name !== undefined) {
+				at[index] = take((saved) => keyOf(saved, "name") === name);
+			}
+		});
+		patch.forEach((item, index) => {
+			if (at[index] === undefined && keyOf(item, "id") === undefined) {
+				at[index] = take(() => true);
+			}
+		});
+		return at;
+	}
+
+	/** The live model of a component; ECharts declares no public type for it. */
+	type LiveModel = { getRangePropMode?(): unknown } | undefined;
+	const modelOf = (chart: ECharts, mainType: string, index: number): LiveModel =>
+		(chart as unknown as { getModel(): { getComponent(type: string, i: number): LiveModel } })
+			.getModel()
+			.getComponent(mainType, index);
+
+	/**
+	 * What the reader set on a live component that the saved option does not hold, by main type. A zoom window keeps the range
+	 * mode in effect (an untouched startValue/endValue stays in values; a reader's zoom is in percent), and a continuous
+	 * visualMap's range only once it is narrower than min to max, so an untouched one follows a new extent.
+	 */
+	const READER_STATE: Record<
+		string,
+		(shown: Record<string, unknown>, model: LiveModel) => ChartOption
+	> = {
+		legend: ({ selected, scrollDataIndex }) => ({ selected, scrollDataIndex }),
+		dataZoom: ({ start, end, startValue, endValue }, model) => ({
+			rangeMode: model?.getRangePropMode?.(),
+			start,
+			end,
+			startValue,
+			endValue,
+		}),
+		visualMap: ({ range, min, max }) =>
+			Array.isArray(range) && (range[0] !== min || range[1] !== max) ? { range } : {},
 	};
 
 	/**
 	 * Writes what the reader set on the live chart into the saved option, component by position, so a redraw of the saved option
-	 * keeps it. Only components the saved option declares (in its baseOption when it has one) take it.
+	 * keeps it; the patch merged after it wins. Only components the saved option declares (in its baseOption when it has one)
+	 * take it.
 	 */
 	function keepReaderState(option: ChartOption, chart: ECharts) {
 		const live: ChartOption = chart.getOption();
 		const target = settings(option);
-		for (const [key, props] of Object.entries(READER_STATE)) {
+		for (const [key, read] of Object.entries(READER_STATE)) {
 			const shown = live[key];
 			const saved = target[key];
 			if (!(Array.isArray(shown) && (Array.isArray(saved) || isObject(saved)))) {
 				continue;
 			}
-			const states = shown.map((item: unknown) =>
-				isObject(item) ? Object.fromEntries(props.map((prop) => [prop, item[prop]])) : {},
+			const states = shown.map((item: unknown, index) =>
+				isObject(item)
+					? Object.fromEntries(
+							Object.entries(read(item, modelOf(chart, key, index))).filter(
+								([, v]) => v !== undefined,
+							),
+						)
+					: {},
 			);
 			target[key] = Array.isArray(saved)
-				? merge(saved, states, true)
+				? saved.map((item, index) => merge(item, states[index] ?? {}))
 				: merge(saved, states[0] ?? {});
 		}
 	}

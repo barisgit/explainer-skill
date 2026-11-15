@@ -523,6 +523,73 @@ test("a replaced series list keeps what the reader toggled and zoomed", async ()
 	expect(result).toEqual({ selected: { A: false, B: true }, zoom: [25, 75] });
 }, 30_000);
 
+test("the saved option takes an update as ECharts does, so a later redraw replays what was shown", async () => {
+	const output = await packedMdx(dir, "saved-merge", WITH_CHART);
+	const result = await inPage(output, (cdp) =>
+		cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const handle = await made({ legend: {}, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ name: "A", type: "bar", data: [1, 2] }, { name: "B", type: "bar", data: [3, 4] }] });
+			const data = () => handle.chart.getOption().series.map((s) => s.name + "=" + s.data.join(","));
+			handle.set({ series: [{ name: "B", data: [5, 6] }] });
+			const merged = data();
+			handle.set({ legend: { show: false } }, ["legend"]);
+			return [merged, data()];
+		})()`,
+			true,
+		),
+	);
+	expect(result).toEqual([
+		["A=1,2", "B=5,6"],
+		["A=1,2", "B=5,6"],
+	]);
+}, 30_000);
+
+test("a redraw keeps an untouched value zoom in values, a reader's zoom in percent, a visualMap range and a legend's scroll", async () => {
+	const output = await packedMdx(dir, "reader-modes", WITH_CHART);
+	const result = await inPage(output, (cdp) =>
+		cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const categories = (n) => Array.from({ length: n }, (_, i) => "c" + i);
+			const grow = (n) => ({ xAxis: { data: categories(n) }, series: [{ type: "bar", data: categories(n).map((_, i) => i) }] });
+			const zoomed = (dataZoom) => made({ dataZoom: [dataZoom], xAxis: { type: "category", data: categories(20) }, yAxis: {}, series: grow(20).series });
+			const zoomOf = (handle) => { const z = handle.chart.getOption().dataZoom[0]; return [z.startValue, z.endValue, z.start, z.end]; };
+			const untouched = await zoomed({ type: "inside", startValue: 2, endValue: 10 });
+			untouched.set(grow(40), ["series"]);
+			const read = await zoomed({ type: "inside", startValue: 2, endValue: 10 });
+			read.chart.dispatchAction({ type: "dataZoom", start: 25, end: 75 });
+			read.set(grow(40), ["series"]);
+
+			const names = Array.from({ length: 30 }, (_, i) => "Series " + i);
+			const series = (k) => names.map((name) => ({ name, type: "scatter", data: [[k, k]] }));
+			const mapped = await made({ legend: { type: "scroll" }, visualMap: [{ type: "continuous", min: 0, max: 100, dimension: 1 }, { type: "continuous", min: 0, max: 100, dimension: 0 }],
+				xAxis: {}, yAxis: {}, series: series(1) });
+			mapped.chart.dispatchAction({ type: "selectDataRange", visualMapIndex: 0, selected: [20, 60] });
+			mapped.chart.dispatchAction({ type: "legendScroll", scrollDataIndex: 12 });
+			mapped.set({ visualMap: [{}, { max: 200 }], series: series(2) }, ["series"]);
+			const shown = mapped.chart.getOption();
+			const kept = { ranges: shown.visualMap.map((v) => v.range), scroll: shown.legend[0].scrollDataIndex };
+			mapped.set({ visualMap: [{ range: [10, 30] }], series: series(3) }, ["series"]);
+			return { untouched: zoomOf(untouched).slice(0, 2), read: zoomOf(read).slice(2), kept, authored: mapped.chart.getOption().visualMap[0].range };
+		})()`,
+			true,
+		),
+	);
+	expect(result).toEqual({
+		untouched: [2, 10],
+		read: [25, 75],
+		kept: {
+			ranges: [
+				[20, 60],
+				[0, 200],
+			],
+			scroll: 12,
+		},
+		authored: [10, 30],
+	});
+}, 30_000);
+
 test("a set without replace targets series as ECharts does: by id, name, else position", async () => {
 	const output = await packedMdx(dir, "partial", WITH_CHART);
 	const result = await inPage(output, (cdp) =>
