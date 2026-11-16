@@ -12,6 +12,11 @@ export interface RenderOptions {
 	transparent?: boolean;
 	/** Lay a flowchart or state diagram out across its written direction (TD as LR, LR as TB; subgraph overrides stay). Default false. */
 	transpose?: boolean;
+	/**
+	 * Number tags by flowchart or state node id, each drawn in a ring (`<g class="tag" data-id>`) before its node's label, inside
+	 * the node, which is sized for both. Ids no node has are ignored.
+	 */
+	tags?: Record<string, string>;
 }
 
 /** Thrown by every parser for input it does not consume: `unread` is the part left over, `line` the statement it is in. */

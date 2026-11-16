@@ -675,6 +675,28 @@ h3,
 		display: none;
 	}
 }
+/* Number tags: a fence's tag:inv=2 rings 2 before node inv's label; text that mentions it (<span data-ref="inv">2</span>, which
+   pack marks data-tag) is the same ring at the label size, and lighting either lights both in the accent. */
+[data-tag][data-ref]:not(svg *) {
+	display: inline-block;
+	box-sizing: border-box;
+	min-width: 1.25rem;
+	height: 1.25rem;
+	padding: 0 0.3125rem;
+	border: 1px solid var(--ink);
+	border-radius: 0.625rem;
+	font-size: var(--size-label);
+	font-weight: 500;
+	line-height: calc(1.25rem - 2px);
+	text-align: center;
+	text-decoration: none;
+	font-variant-numeric: tabular-nums;
+	text-indent: 0;
+}
+[data-tag][data-ref].is-lit:not(svg *) {
+	border-color: var(--accent);
+}
+
 /* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's tokens;
    a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at the label size (13 px); at
    least the width that keeps its smallest text at 10 px, below which the block scrolls sideways; on paper fitted to the column. */
@@ -4406,6 +4428,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
      <p>The <span data-ref="cache">cache</span> answers most reads.</p>      a prose term (made focusable)
      <tr data-ref="cache">…</tr>   <div class="chart" data-ref="cache">…</div>   a table row, a chart panel, any element
      a ```mermaid fence                                                       pack gives every diagram part the data-ref of its Mermaid id
+     ```mermaid tag:inv=2 and <span data-ref="inv">2</span>                     a number tag on node inv, and a mention pack draws as the same tag
      ```ts ref:cache="cache.get"                                              every cache.get in the code fence (kit code)
    A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
    too), else its pre, so the parts of one diagram or code block never link each other; the light and dark copies pack makes
@@ -4469,7 +4492,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     syncFocus(el);
   }
   function syncFocus(el) {
-    const wanted = el.matches(".is-linked, .is-annotatable") && !el.matches(NATIVE) && !el.closest("svg");
+    const wanted = el.matches(".is-linked, .is-annotatable") && !el.matches(NATIVE) && (!el.closest("svg") || el.matches("[data-tag]"));
     if (wanted && !el.hasAttribute("tabindex")) {
       el.tabIndex = 0;
       el.dataset.kitFocusable = "";

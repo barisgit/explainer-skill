@@ -161,7 +161,8 @@ const DRAWN_FENCES = ["mermaid", "schematic"];
 
 /**
  * ```mermaid and ```schematic fences (`<pre><code class="language-mermaid">`) become `<pre class="mermaid">` (or `schematic`) with
- * the source as their text, which pack draws as one SVG in the HTML pass.
+ * the source as their text, which pack draws as one SVG in the HTML pass. A mermaid fence's meta (its number tags) goes along as
+ * data-meta.
  */
 function drawnFences(tree: HastRoot) {
 	for (const pre of elementsOf(tree)) {
@@ -174,7 +175,8 @@ function drawnFences(tree: HastRoot) {
 			(name) => Array.isArray(className) && className.includes(`language-${name}`),
 		);
 		if (language) {
-			pre.properties = { className: [language] };
+			const meta = language === "mermaid" ? code.data?.meta : undefined;
+			pre.properties = { className: [language], ...(meta ? { dataMeta: meta } : {}) };
 			pre.children = code.children;
 		}
 	}

@@ -3,6 +3,7 @@
      <p>The <span data-ref="cache">cache</span> answers most reads.</p>      a prose term (made focusable)
      <tr data-ref="cache">…</tr>   <div class="chart" data-ref="cache">…</div>   a table row, a chart panel, any element
      a ```mermaid fence                                                       pack gives every diagram part the data-ref of its Mermaid id
+     ```mermaid tag:inv=2 and <span data-ref="inv">2</span>                     a number tag on node inv, and a mention pack draws as the same tag
      ```ts ref:cache="cache.get"                                              every cache.get in the code fence (kit code)
    A ref links only when its elements sit in two places or more. An element's place is its outermost SVG (HTML in a foreignObject
    too), else its pre, so the parts of one diagram or code block never link each other; the light and dark copies pack makes
@@ -89,12 +90,14 @@
 	 * Makes a part keyboard-reachable while it is linked or a kit:reply.js note target (is-annotatable), and undoes only what the
 	 * kit set (data-kit-focusable, while the tabindex is still its 0), so a tabindex the author or a page script wrote stays.
 	 * reply.js keeps the same rule, which cannot be shared: each kit file is a script of its own. Reading both classes makes the
-	 * result the same whichever script runs first. Diagram parts are not made reachable: a diagram has dozens, and prose links to
-	 * the same refs.
+	 * result the same whichever script runs first. Diagram parts are not made reachable, a diagram has dozens and prose links to
+	 * the same refs, but a number tag (data-tag) is: the reader looks it up.
 	 */
 	function syncFocus(el: Part) {
 		const wanted =
-			el.matches(".is-linked, .is-annotatable") && !el.matches(NATIVE) && !el.closest("svg");
+			el.matches(".is-linked, .is-annotatable") &&
+			!el.matches(NATIVE) &&
+			(!el.closest("svg") || el.matches("[data-tag]"));
 		if (wanted && !el.hasAttribute("tabindex")) {
 			el.tabIndex = 0;
 			el.dataset.kitFocusable = "";

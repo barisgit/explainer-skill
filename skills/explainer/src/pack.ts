@@ -13,6 +13,7 @@ import { PackError } from "./pack-error.ts";
 import { type PlacedRecord, writeRefStates } from "./ref-states.ts";
 import { renderSchematic } from "./schematic/index.ts";
 import { themeSvgImages } from "./svg-theme.ts";
+import { markTagMentions } from "./tags.ts";
 
 const IMPORT_FIX = 'import that stylesheet from the page instead (import "./other.css")';
 
@@ -64,13 +65,14 @@ const STEPPED = `a diagram steps through its parts' refs, not data-steps: drop t
  * Replaces the source of every `pre.mermaid` (or `div.mermaid`) block with its rendered diagram in a `div`: an SVG whose
  * colours follow the page's tokens (theme.css maps them), so light and dark need no second copy, then the phone copy when
  * renderMermaid makes one. The source is the block's text, decoded, as Mermaid reads it in a browser: a ```mermaid fence
- * becomes such a block with its source escaped, so a `<br>` in a label breaks the line. Syntax errors, unsupported types and data-steps or data-step on a block (a diagram steps through refs)
- * are returned as problems. `diagramRefs` collects every part id.
+ * becomes such a block with its source escaped, so a `<br>` in a label breaks the line, and its meta as data-meta. Syntax errors, unsupported types and data-steps or data-step on a block (a diagram steps through refs)
+ * are returned as problems. `diagramRefs` collects every part id, `diagramTags` every number tag by node id.
  */
 function renderMermaidBlocks(
 	html: string,
 	problems: string[],
 	diagramRefs: Set<string>,
+	diagramTags: Map<string, string>,
 ): Promise<string> {
 	let blocks = 0;
 	let source: string[] = [];
@@ -83,14 +85,19 @@ function renderMermaidBlocks(
 				}
 				const parts: string[] = [];
 				source = parts;
+				const meta = unescapeHtml(el.getAttribute("data-meta") ?? "");
+				el.removeAttribute("data-meta");
 				el.tagName = "div";
 				el.onEndTag((end) => {
-					const diagram = renderMermaid(unescapeHtml(parts.join("")), n - 1);
+					const diagram = renderMermaid(unescapeHtml(parts.join("")), n - 1, meta);
 					if (diagram instanceof Error) {
 						return void problems.push(`mermaid block ${n}: ${diagram.message}`);
 					}
 					for (const id of diagram.refs) {
 						diagramRefs.add(id);
+					}
+					for (const [id, tag] of diagram.tags) {
+						diagramTags.set(id, tag);
 					}
 					end.before(diagram.svg + (diagram.phone ?? ""), { html: true });
 				});
@@ -305,7 +312,8 @@ export async function pack(mdxPath: string): Promise<{ html: string; warnings: s
  * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render,
  * then, once those are fixed, every ref a Stepper or Explore names that no element carries (ref-states.ts, which also writes the
  * starting states) and every id the finished page has on more than one element.
- * `warnings` lists links that go nowhere and page classes the kit styles too (see classCollisions).
+ * `warnings` lists mentions that say another number than their part's tag (tags.ts), links that go nowhere and page classes the
+ * kit styles too (see classCollisions).
  */
 export async function packPage(
 	baseDir: string,
@@ -315,13 +323,15 @@ export async function packPage(
 ): Promise<{ html: string; warnings: string[] }> {
 	const problems: string[] = [];
 	const diagramRefs = new Set<string>();
-	const { html: source, records } = await render(async (html) =>
+	const diagramTags = new Map<string, string>();
+	const { html: rendered, records } = await render(async (html) =>
 		renderSchematicBlocks(
-			await renderMermaidBlocks(html, problems, diagramRefs),
+			await renderMermaidBlocks(html, problems, diagramRefs, diagramTags),
 			problems,
 			diagramRefs,
 		),
 	);
+	const { html: source, warnings: tagWarnings } = await markTagMentions(rendered, diagramTags);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
 	const states = await writeRefStates(await themeSvgImages(inlined), records);
 	const html = states.html;
@@ -338,6 +348,7 @@ export async function packPage(
 		throw new PackError(unaddressed.map((p) => `- ${p}`).join("\n"));
 	}
 	const warnings = [
+		...tagWarnings,
 		...(await literalLinkWarnings(html)),
 		...loneRefs(source, diagramRefs, states.named).map(
 			(ref) => `data-ref="${ref}" is the only element with that ref, so it links to nothing`,

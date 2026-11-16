@@ -1,0 +1,171 @@
+import { afterAll, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
+import { packAndRun, packMdx, pageContract, scratch } from "./support.ts";
+
+const dir = scratch();
+afterAll(dir.cleanup);
+
+/** The system the battery page draws: wide enough that phones get a top-down copy. */
+const SYSTEM = `flowchart LR
+	roof["roof panels, 6 kW"] --> inv["hybrid inverter"]
+	inv --> house["house"]
+	house <--> meter["two-way meter"]
+	meter <--> grid["grid"]
+	inv <--> bat["5 kWh battery"]`;
+const TAGS = "tag:roof=1 tag:inv=2 tag:bat=3 tag:meter=4";
+
+/** An ordered path with a measured value on each stage and on its first edge, its stages tagged too. */
+const PATH = `flowchart LR
+	file["page file"] -->|418 KB inlined| atob["atob<br>11 ms"]
+	atob --> inflate["inflate<br>3 ms"]
+	inflate --> run["parse and run<br>17 ms"]`;
+const PATH_TAGS = "tag:file=1 tag:atob=2 tag:inflate=3 tag:run=4";
+
+/** Every copy of `source` rendered with the fence meta `meta`, failing the test when it does not render. */
+function copies(source: string, meta: string): string[] {
+	const diagram = renderMermaid(source, 0, meta);
+	if (diagram instanceof Error) {
+		throw diagram;
+	}
+	return [diagram.svg, diagram.phone ?? ""];
+}
+
+/** The message `source` with `meta` fails with, or "rendered". */
+function failure(source: string, meta: string): string {
+	const diagram = renderMermaid(source, 0, meta);
+	return diagram instanceof Error ? diagram.message : "rendered";
+}
+
+test("tag:id=n in a flowchart fence's meta draws n as a tag inside that node, in the wide and the phone copy", () => {
+	const [wide = "", phone = ""] = copies(SYSTEM, TAGS);
+
+	expect(phone).not.toBe("");
+	for (const copy of [wide, phone]) {
+		const tags = [
+			...copy.matchAll(/<g class="tag" data-id="(\w+)" data-ref="\1" data-tag>[\s\S]*?<\/g>/g),
+		];
+		expect(tags.map((m) => m[1]).sort()).toEqual(["bat", "inv", "meter", "roof"]);
+		const inv = /<g class="node" data-id="inv"[\s\S]*?\n<\/g>/.exec(copy)?.[0] ?? "";
+		expect(inv).toMatch(
+			/<g class="tag"[^>]*>\s*<rect [^>]*\/>\s*<text [^>]*font-size="13"[^>]*>2<\/text>/,
+		);
+		expect(/<g class="node" data-id="house"[\s\S]*?\n<\/g>/.exec(copy)?.[0]).not.toContain(
+			'class="tag"',
+		);
+	}
+});
+
+test("a tagged path keeps its values: a stage's second line and an edge's label", () => {
+	for (const copy of copies(PATH, PATH_TAGS).filter(Boolean)) {
+		const atob = /<g class="node" data-id="atob"[\s\S]*?\n<\/g>/.exec(copy)?.[0] ?? "";
+		expect(atob).toMatch(/>2<\/text>/);
+		expect(atob).toMatch(/>atob<\/tspan><tspan[^>]*>11 ms</);
+		expect(copy).toMatch(/<g class="edge-label"[^>]*>[\s\S]*?>418 KB inlined</);
+	}
+});
+
+test("a node's tag widens its box by the tag, leaving the label's room as it was", () => {
+	const width = (svg: string, id: string) =>
+		Number(new RegExp(`data-id="${id}"[^>]*>\\s*<rect [^>]* width="([\\d.]+)"`).exec(svg)?.[1]);
+	const [plain = ""] = copies(SYSTEM, "");
+	const [tagged = ""] = copies(SYSTEM, "tag:inv=2");
+
+	expect(width(tagged, "inv") - width(plain, "inv")).toBeGreaterThanOrEqual(20);
+	expect(width(tagged, "house")).toBe(width(plain, "house"));
+});
+
+test.each([
+	{
+		name: "a tag for no node",
+		source: SYSTEM,
+		meta: "tag:battery=3",
+		message: 'tag:battery names no node; use the id written before its label, as a in a["label"]',
+	},
+	{
+		name: "a tag that is not a number",
+		source: SYSTEM,
+		meta: "tag:inv=A",
+		message: "tag:inv=A is not a number; a tag is 1 to 3 digits, as in tag:inv=2",
+	},
+	{
+		name: "one number on two nodes",
+		source: SYSTEM,
+		meta: "tag:inv=2 tag:bat=2",
+		message: "tag 2 is on inv and bat; give each part its own number",
+	},
+	{
+		name: "anything else in the meta",
+		source: SYSTEM,
+		meta: "title",
+		message: 'pack does not read "title" after mermaid; tag nodes with tag:id=number',
+	},
+	{
+		name: "a tag on a sequence diagram",
+		source: "sequenceDiagram\n  A->>B: hi",
+		meta: "tag:A=1",
+		message:
+			"tags are drawn on flowchart and state diagram nodes; name the parts in the messages instead",
+	},
+])("$name fails with what to write instead", ({ source, meta, message }) => {
+	expect(failure(source, meta)).toBe(message);
+});
+
+test("a mention whose text is its part's tag is drawn as that tag; another number warns, a word stays a term", async () => {
+	const { result, output } = await packMdx(
+		dir,
+		"mentions",
+		`# System\n\nThe inverter <span data-ref="inv">2</span> charges the battery <span data-ref="bat">5</span>, and the <span data-ref="house">house</span> uses it.\n\n\`\`\`mermaid ${TAGS}\n${SYSTEM}\n\`\`\`\n`,
+	);
+
+	expect(result.code).toBe(0);
+	expect(result.stdout).toContain('data-ref="bat" says 5, but its drawing tags it 3');
+	const html = readFileSync(output, "utf8");
+	expect(html).toContain('<span data-ref="inv" data-tag="">2</span>');
+	expect(html).toContain('<span data-ref="bat">5</span>');
+	expect(html).toContain('<span data-ref="house">house</span>');
+});
+
+test("a tag and its mention light each other on hover and focus, read at the 13 px label size, and the tag sits beside its label", async () => {
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main>
+<p>The new <span id="mention" data-ref="inv">2</span> replaces the old one.</p>
+<pre class="mermaid" data-meta="${TAGS}">${SYSTEM}</pre>
+<pre class="mermaid" data-meta="${PATH_TAGS}">${PATH}</pre>
+</main><script src="kit:link.js"></script><script>${pageContract({
+		"the shown tag is focusable, an untagged node is not": `(() => {
+			const svg = [...document.querySelectorAll(".mermaid > svg")].find((s) => getComputedStyle(s).display !== "none");
+			return svg.querySelector('[data-tag][data-ref="inv"]').tabIndex === 0 && svg.querySelector('.node[data-ref="house"]').tabIndex < 0;
+		})()`,
+		"focusing the tag lights its mention and node": `(() => {
+			const svg = [...document.querySelectorAll(".mermaid > svg")].find((s) => getComputedStyle(s).display !== "none");
+			svg.querySelector('[data-tag][data-ref="inv"]').focus();
+			const lit = document.querySelector("#mention").classList.contains("is-lit") && svg.querySelector('.node[data-ref="inv"]').classList.contains("is-lit");
+			document.activeElement.blur();
+			return lit;
+		})()`,
+		"hovering the mention lights the tag": `(() => {
+			const mention = document.querySelector("#mention");
+			mention.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+			const lit = document.querySelector('svg [data-tag][data-ref="inv"]').classList.contains("is-lit");
+			document.querySelector("main").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+			return lit;
+		})()`,
+		"the mention is a ring at the label size": `(() => {
+			const style = getComputedStyle(document.querySelector("#mention"));
+			return style.fontSize === "13px" && style.borderTopWidth === "1px" && parseFloat(style.borderTopLeftRadius) >= 9;
+		})()`,
+		"each shown tag is 13 px text in a ring inside its node, before its label": `[...document.querySelectorAll(".mermaid > svg")]
+			.filter((svg) => getComputedStyle(svg).display !== "none")
+			.every((svg) => [...svg.querySelectorAll("[data-tag]")].every((tag) => {
+				const node = tag.closest(".node");
+				const [ring, label] = [tag.querySelector("rect").getBBox(), node.querySelector(":scope > text").getBBox()];
+				const box = node.querySelector(":scope > rect").getBBox();
+				const px = parseFloat(getComputedStyle(tag.querySelector("text")).fontSize) * svg.getScreenCTM().a;
+				return px > 12.8 && px < 13.001 && ring.x >= box.x && ring.y >= box.y && ring.y + ring.height <= box.y + box.height
+					&& ring.x + ring.width < label.x && label.x + label.width <= box.x + box.width;
+			}))`,
+	})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "tags", page)).toEqual([]);
+}, 30_000);

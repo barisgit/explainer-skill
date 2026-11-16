@@ -3,12 +3,14 @@ import { renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.
 /**
  * A rendered diagram: its SVG, which follows light and dark through the kit's tokens; for a wide flowchart or state diagram the
  * copy phones show instead (svg[data-phone], placed right after it: see phoneLayout), which also prints in the SVG's place when
- * it carries data-print (see printAttr); and the data-ref ids of its parts, which both copies carry.
+ * it carries data-print (see printAttr); the data-ref ids of its parts, which both copies carry; and the number tags its fence's
+ * meta put on nodes, by node id.
  */
 export interface Diagram {
 	svg: string;
 	phone?: string | undefined;
 	refs: string[];
+	tags: Map<string, string>;
 }
 
 /**
@@ -172,14 +174,16 @@ function firstMisrender(family: Family, statements: string[]): string | undefine
 
 /**
  * data-ref on nodes, groups, classes, entities and participants (their id), edges and their labels (the edge id the parser
- * gives both: the author's `e1@`, else `L_<from>_<to>_<n>`), lifelines (their participant) and messages (m1, m2, ...).
+ * gives both: the author's `e1@`, else `L_<from>_<to>_<n>`), lifelines (their participant) and messages (m1, m2, ...). A node's
+ * number tag carries its node's ref and data-tag, which kit:link.js makes focusable.
  */
 function annotateParts(svg: string): string {
 	let message = 0;
 	return svg
 		.replace(
-			/<(?:g|polyline) class="(?:node|subgraph|class-node|entity|actor|edge|edge-label)" data-id="([^"]*)"/g,
-			(tag, id: string) => `${tag} data-ref="${id}"`,
+			/<(?:g|polyline) class="(?:node|subgraph|class-node|entity|actor|edge|edge-label|(tag))" data-id="([^"]*)"/g,
+			(tag, isTag: string | undefined, id: string) =>
+				`${tag} data-ref="${id}"${isTag ? " data-tag" : ""}`,
 		)
 		.replace(
 			/<line class="lifeline" data-actor="([^"]*)"/g,
@@ -301,10 +305,52 @@ function phoneLayout(
  */
 const printAttr = (svg: string) => (readableWidth(svg) > PRINT_COLUMN_PX ? "data-print " : "");
 
-/** Renders one source; `n` keeps its ids apart from the page's other diagrams. Throws with a message for the author. */
-function renderOne(source: string, n: number): Diagram {
+/** One `tag:id=number` of a fence's meta, the number quoted or not. */
+const TAG = /^tag:([^\s=]+)=(?:"([^"]*)"|'([^']*)'|(\S*))$/;
+
+/**
+ * The number tags a fence's meta puts on nodes, by node id. Throws, saying what to write, for anything else in the meta, a tag
+ * that is not 1 to 3 digits, one number on two nodes, and tags on a diagram that has no nodes to carry them.
+ */
+function tagsOf(meta: string, family: Family): Map<string, string> {
+	const tags = new Map<string, string>();
+	for (const word of meta.split(/\s+/).filter(Boolean)) {
+		const [, id = "", ...values] = TAG.exec(word) ?? [];
+		const tag = values.find((value) => value !== undefined) ?? "";
+		if (!id) {
+			throw new Error(`pack does not read "${word}" after mermaid; tag nodes with tag:id=number`);
+		}
+		if (!/^\d{1,3}$/.test(tag)) {
+			throw new Error(`${word} is not a number; a tag is 1 to 3 digits, as in tag:${id}=2`);
+		}
+		const other = [...tags].find(([, number]) => number === tag)?.[0];
+		if (other) {
+			throw new Error(`tag ${tag} is on ${other} and ${id}; give each part its own number`);
+		}
+		tags.set(id, tag);
+	}
+	if (tags.size && !flows(family)) {
+		throw new Error(
+			"tags are drawn on flowchart and state diagram nodes; name the parts in the messages instead",
+		);
+	}
+	return tags;
+}
+
+/** The first tagged id no node of the drawn `svg` carries, as its message. */
+function untagged(svg: string, tags: Map<string, string>): string | undefined {
+	const id = [...tags.keys()].find((key) => !svg.includes(`<g class="tag" data-id="${key}"`));
+	return id && `tag:${id} names no node; use the id written before its label, as a in a["label"]`;
+}
+
+/**
+ * Renders one source with its fence's meta; `n` keeps its ids apart from the page's other diagrams. Throws with a message for
+ * the author.
+ */
+function renderOne(source: string, n: number, meta: string): Diagram {
 	const body = stripPreamble(source);
 	const family = familyOf(body);
+	const tags = tagsOf(meta, family);
 	const statements = splitStatements(body);
 	const problem = firstMisrender(family, statements.split("\n").slice(1));
 	if (problem) {
@@ -314,8 +360,18 @@ function renderOne(source: string, n: number): Diagram {
 	// Elsewhere ";" can be message or label text.
 	const text = flows(family) ? statements : body;
 	const draw = (transpose: boolean) =>
-		renderMermaidSVG(text, { transparent: true, padding: 12, font: "Geist", transpose });
+		renderMermaidSVG(text, {
+			transparent: true,
+			padding: 12,
+			font: "Geist",
+			transpose,
+			tags: Object.fromEntries(tags),
+		});
 	const raw = draw(false);
+	const unknown = untagged(raw, tags);
+	if (unknown) {
+		throw new Error(unknown);
+	}
 	const across = phoneLayout(family, raw, draw);
 
 	const svg = annotateParts(inline(raw, `mm${n}`));
@@ -328,7 +384,7 @@ function renderOne(source: string, n: number): Diagram {
 	const refs = [svg, phone ?? ""].flatMap((copy) =>
 		[...copy.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""),
 	);
-	return { svg, phone, refs: [...new Set(refs)] };
+	return { svg, phone, refs: [...new Set(refs)], tags };
 }
 
 /**
@@ -336,11 +392,12 @@ function renderOne(source: string, n: number): Diagram {
  * browser: beautiful-mermaid parses and lays it out (ELK) in this process, estimating text widths. `n`, the block's place on
  * the page, keeps its ids apart from the other diagrams. A source that fails, or whose type is not supported, returns an Error
  * whose message tells the author what to write instead. Every part carries the data-ref of its Mermaid id (see annotateParts),
- * and colours come from the kit's tokens (theme.css).
+ * and colours come from the kit's tokens (theme.css). `meta`, the fence's text after `mermaid`, may tag nodes with numbers:
+ * `tag:inv=2` draws 2 in a ring before node inv's label.
  */
-export function renderMermaid(source: string, n = 0): Diagram | Error {
+export function renderMermaid(source: string, n = 0, meta = ""): Diagram | Error {
 	try {
-		return renderOne(source, n);
+		return renderOne(source, n, meta);
 	} catch (e) {
 		if (e instanceof UnreadInputError) {
 			return new Error(unreadMessage(e));

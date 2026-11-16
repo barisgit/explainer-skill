@@ -54,19 +54,19 @@ Illustrative numbers, not a real quote
 <div class="beside">
 <div>
 
-- The <span data-ref="panels">panels</span> stay as they are.
-- The <span data-ref="inverter">hybrid inverter</span> replaces the string inverter and decides where each kWh goes.
-- The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.
-- The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.
+- <span data-ref="panels">1</span> The <span data-ref="panels">panels</span> stay as they are.
+- <span data-ref="inverter">2</span> The <span data-ref="inverter">hybrid inverter</span> replaces the string inverter and decides where each kWh goes.
+- <span data-ref="battery">3</span> The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.
+- <span data-ref="grid">4</span> The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.
 
 </div>
 <figure class="fig">
 
-```mermaid
+```mermaid tag:panels=1 tag:inverter=2 tag:battery=3 tag:grid=4
 flowchart TD
 	panels["Roof panels, 6 kW"] --> inverter["Hybrid inverter"]
 	inverter --> house["House"]
-	inverter -->|"surplus"| battery["Battery"]
+	inverter -->|"surplus, 2.1 kWh"| battery["Battery"]
 	battery -->|"evening"| inverter
 	grid["Grid"] -->|"shortfall"| house
 ```
