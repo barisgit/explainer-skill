@@ -230,6 +230,12 @@
 	max-width: var(--mermaid-max);
 	min-width: var(--mermaid-min);
 }
+/* An edge label's box masks the line under it, so a dimmed label dims by colour, its text mixed toward the tone as the other
+   parts fade to 30%: a faded mask would let the line strike through the text. */
+.mermaid > svg.has-lit .edge-label[data-ref]:not(.is-lit) {
+	--_text-sec: color-mix(in srgb, var(--muted) 30%, var(--bg));
+	opacity: 1;
+}
 .mermaid > svg .activation {
 	fill: var(--bg);
 }

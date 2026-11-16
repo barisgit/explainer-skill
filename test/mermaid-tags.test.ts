@@ -210,3 +210,30 @@ test("a tag and its mention light each other on hover and focus, read at the 13 
 
 	expect(await packAndRun(dir, "tags", page)).toEqual([]);
 }, 30_000);
+
+test.each(["light", "dark"])(
+	"in %s, a dimmed edge label keeps its mask opaque while its text dims, in the wide and the phone copy",
+	async (scheme) => {
+		const page = `<!doctype html><html data-scheme="${scheme}"><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main>
+<p>The <span id="mention" data-ref="inv">2</span> charges the battery.</p>
+<pre class="mermaid" data-meta="${TAGS}">${SYSTEM.replace("inv <--> bat", "inv <-->|surplus, 2.1 kWh| bat")}</pre>
+</main><script src="kit:link.js"></script><script>${pageContract({
+			"hovering the mention dims each edge label's text but not its mask": `(() => {
+				const fill = (g) => getComputedStyle(g.querySelector("text")).fill;
+				const before = [...document.querySelectorAll(".edge-label")].map(fill);
+				document.querySelector("#mention").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+				const svg = [...document.querySelectorAll(".mermaid > svg")].find((s) => getComputedStyle(s).display !== "none");
+				const seen = (el) => { let o = 1; for (let e = el; e && e !== svg.parentElement; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+				const labels = [...svg.querySelectorAll(".edge-label")];
+				return svg.classList.contains("has-lit") && (innerWidth < 640) === svg.hasAttribute("data-phone") && labels.length > 0
+					&& labels.every((g) => !g.classList.contains("is-lit") && seen(g.querySelector("rect")) === 1
+						&& !/rgba\\(.*, 0(\\.\\d+)?\\)$/.test(getComputedStyle(g.querySelector("rect")).fill) && seen(g.querySelector("text")) === 1
+						&& fill(g) !== before[[...document.querySelectorAll(".edge-label")].indexOf(g)]);
+			})()`,
+		})}</script></body></html>`;
+
+		expect(await packAndRun(dir, `dimmed-${scheme}`, page)).toEqual([]);
+	},
+	30_000,
+);
