@@ -15,6 +15,19 @@ index 6239e30019b1bc36d0722921db4ecc84f9b277a6..a12da8e660e58d3239a211d57e841274
 +}
 +
 +export { type AsciiRenderOptions, DEFAULTS, type DiagramColors, type MermaidGraph, type PositionedGraph, type RenderOptions, THEMES, type ThemeName, fromShikiTheme, parseMermaid, renderMermaid, renderMermaidASCII, renderMermaidAscii, renderMermaidSVG, renderMermaidSVGAsync, renderMermaidSync, UnreadInputError };
+diff --git a/src/class/layout.ts b/src/class/layout.ts
+index 5930a4b7de705a2dc0d6efcf8ff59d0fc0499461..8fed7fdad34814d69f4d7fe41c83bbfe33dd218b 100644
+--- a/src/class/layout.ts
++++ b/src/class/layout.ts
+@@ -24,7 +24,7 @@ export const CLS = {
+   sectionPadY: 8,
+   emptySectionHeight: 8,
+   minWidth: 120,
+-  memberFontSize: 11,
++  memberFontSize: FONT_SIZES.nodeLabel,
+   memberFontWeight: 400,
+   nodeSpacing: 40,
+   layerSpacing: 60,
 diff --git a/src/class/parser.ts b/src/class/parser.ts
 index 527da535f7467aeaba67a129f187f401e94fb295..80c329c94953bea50b05361286a8ebbfe7e8bec6 100644
 --- a/src/class/parser.ts
@@ -101,6 +114,31 @@ index a5c9d320c18aec84fad3c7dd8b783a47705efc25..2059895274ac8126396210c2df22b27f
    annotationWeight: 500,
  } as const
  
+diff --git a/src/er/layout.ts b/src/er/layout.ts
+index 36d7775e14fc2204348640529a446092b61da630..21a05eace5f715541ed583463eab4415dcda5d14 100644
+--- a/src/er/layout.ts
++++ b/src/er/layout.ts
+@@ -20,7 +20,7 @@ const ER = {
+   headerHeight: 34,
+   rowHeight: 22,
+   minWidth: 140,
+-  attrFontSize: 11,
++  attrFontSize: FONT_SIZES.nodeLabel,
+   attrFontWeight: 400,
+   nodeSpacing: 70,
+   layerSpacing: 90,
+@@ -39,8 +39,9 @@ function buildErElkGraph(
+     const headerTextW = estimateTextWidth(entity.label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
+     let maxAttrW = 0
+     for (const attr of entity.attributes) {
+-      const attrText = `${attr.type}  ${attr.name}${attr.keys.length > 0 ? '  ' + attr.keys.join(',') : ''}`
+-      const w = estimateMonoTextWidth(attrText, ER.attrFontSize)
++      // As renderAttribute draws a row: the key badge (proportional, with its padding and gap), then type and name in mono.
++      const badgeW = attr.keys.length > 0 ? estimateTextWidth(attr.keys.join(','), FONT_SIZES.nodeLabel, 600) + 8 + 6 : 0
++      const w = badgeW + estimateMonoTextWidth(`${attr.type}  ${attr.name}`, ER.attrFontSize)
+       if (w > maxAttrW) maxAttrW = w
+     }
+     const width = Math.max(ER.minWidth, headerTextW + ER.boxPadX * 2, maxAttrW + ER.boxPadX * 2)
 diff --git a/src/er/parser.ts b/src/er/parser.ts
 index a4edaa8a57dfa5835675b8ecf1c794897f225076..d02e7185cfa94a999ba669c28a71a6a0a18656e7 100644
 --- a/src/er/parser.ts
@@ -1028,6 +1066,44 @@ index 1485041e9cb01e1a15045cb162fb64bc5167b25e..72ff643bc871fa8d54d2ba19e51362e6
      `  ${content.replace(/\n/g, '\n  ')}\n` +
      `</g>`
    )
+diff --git a/src/sequence/layout.ts b/src/sequence/layout.ts
+index f49d8e6b18fefb36b85ec3f1168fc10f036a5d52..c289aee282702ab3c44c8ed85902734b98238572 100644
+--- a/src/sequence/layout.ts
++++ b/src/sequence/layout.ts
+@@ -67,13 +67,29 @@ export function layoutSequenceDiagram(
+   })
+ 
+   // Build actor center X positions with minimum gap
++  // gaps[i] is the distance from actor i - 1 to actor i. A message's label is drawn centred between its two lifelines, so the
++  // gaps it spans must hold it: spans are widened shortest first, the deficit shared evenly.
++  const gaps = diagram.actors.map((_, i) =>
++    i > 0 ? Math.max(SEQ.actorGap, (actorWidths[i - 1]! + actorWidths[i]!) / 2 + 40) : 0
++  )
++  const ids = diagram.actors.map(a => a.id)
++  const spans = diagram.messages
++    .map(m => {
++      const [lo = 0, hi = 0] = [ids.indexOf(m.from), ids.indexOf(m.to)].sort((a, b) => a - b)
++      const labelW = Math.max(0, ...m.label.split(/<br\s*\/?>/i).map(line => estimateTextWidth(line, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)))
++      return { lo, hi, need: m.label ? labelW + 16 : 0 }
++    })
++    .filter(s => s.hi > s.lo)
++    .sort((a, b) => a.hi - a.lo - (b.hi - b.lo))
++  for (const { lo, hi, need } of spans) {
++    let have = 0
++    for (let i = lo + 1; i <= hi; i++) have += gaps[i]!
++    if (have < need) for (let i = lo + 1; i <= hi; i++) gaps[i]! += (need - have) / (hi - lo)
++  }
+   const actorCenterX: number[] = []
+   let currentX = SEQ.padding + actorWidths[0]! / 2
+   for (let i = 0; i < diagram.actors.length; i++) {
+-    if (i > 0) {
+-      const minGap = Math.max(SEQ.actorGap, (actorWidths[i - 1]! + actorWidths[i]!) / 2 + 40)
+-      currentX += minGap
+-    }
++    currentX += gaps[i]!
+     actorCenterX.push(currentX)
+   }
+ 
 diff --git a/src/sequence/parser.ts b/src/sequence/parser.ts
 index f6df0c6a84afc1c09881536fa6dae69c3d13ecf3..38cadb6b938d34ca6e81e666924b0671e5cfa360 100644
 --- a/src/sequence/parser.ts

@@ -294,3 +294,19 @@ test("on a phone the drawing keeps 10 px text and scrolls sideways; on paper it 
 		),
 	).toEqual([]);
 }, 60_000);
+
+test("a small drawing with a value subscript keeps 10 px text at every width, the 13 px name cap never shrinking it below", async () => {
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main><pre class="schematic">R1 nc nc R_{load} @0,0</pre></main><script>${pageContract(
+		{
+			"the smallest text, a value's subscript, is at least 10 px drawn": `(() => {
+			const svg = document.querySelector(".schematic svg");
+			const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+			const sizes = [...svg.querySelectorAll("text, tspan[font-size]")].map((t) => parseFloat(getComputedStyle(t).fontSize) * scale);
+			return Math.min(...sizes) >= 9.99;
+		})()`,
+		},
+	)}</script></body></html>`;
+
+	expect(await packAndRun(dir, "subscript", page)).toEqual([]);
+}, 30_000);

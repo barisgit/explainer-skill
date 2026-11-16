@@ -192,6 +192,9 @@
 	max-width: var(--mermaid-max);
 	min-width: var(--mermaid-min);
 }
+.mermaid > svg .activation {
+	fill: var(--bg);
+}
 .mermaid > svg .mono {
 	font-family: var(--mono);
 }

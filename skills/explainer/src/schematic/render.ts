@@ -142,7 +142,7 @@ export function refsOf(scene: Scene): string[] {
 }
 
 /**
- * The SVG, as wide as its column up to SCALE times its drawn width (names at the label size), and at least the width that keeps its smallest
+ * The SVG, as wide as its column up to SCALE times its drawn width (names at the label size, unless that would put its smallest text under READABLE_PX), and at least the width that keeps its smallest
  * text at READABLE_PX, below which its block scrolls sideways (theme.css reads both from --schematic-max and --schematic-min).
  */
 export function renderSvg(
@@ -154,8 +154,8 @@ export function renderSvg(
 	const box = sheetBox(scene, labels);
 	const w = box.x1 - box.x0;
 	const h = box.y1 - box.y0;
-	const most = Math.floor(w * SCALE);
-	const least = Math.min(most, Math.ceil((w * READABLE_PX) / smallestText(scene, labels)));
+	const least = Math.ceil((w * READABLE_PX) / smallestText(scene, labels));
+	const most = Math.max(Math.floor(w * SCALE), least);
 	const byPart = new Map(labels.map((l) => [l.part, l]));
 	return [
 		`<svg viewBox="${num(box.x0)} ${num(box.y0)} ${num(w)} ${num(h)}" width="100%"`,

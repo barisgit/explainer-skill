@@ -549,3 +549,96 @@ test("on a phone an LR flowchart wider than the column is drawn top-down at 13 p
 		expect(px.every((size) => size > 12.8 && size < 13.001)).toBe(true);
 	}
 }, 30_000);
+
+const LONG_MEMBERS = `classDiagram
+  class A {
+    +getAccountBalanceFromLedger() Money
+    +balance Money
+  }
+  class B {
+    +name string
+  }
+  A <|-- B`;
+
+const LONG_ATTRIBUTES = `erDiagram
+  CUSTOMER {
+    string customer_identifier PK
+    int age
+    string email_address_on_file PK,FK
+  }
+  ORDER {
+    int id PK
+  }
+  CUSTOMER ||--o{ ORDER : places`;
+
+test("a class box and an entity hold their rows' text, whose parts do not touch, as drawn in the browser", async () => {
+	const page = diagramPage(
+		`<pre class="mermaid" id="cls">${LONG_MEMBERS}</pre>\n<pre class="mermaid" id="er">${LONG_ATTRIBUTES}</pre>`,
+		{
+			"every class member sits inside its box": `[...document.querySelectorAll("#cls .class-node")].every((node) => {
+				const box = node.querySelector("rect").getBoundingClientRect();
+				return [...node.querySelectorAll("text")].every((t) => {
+					const r = t.getBoundingClientRect();
+					return r.left >= box.left - 0.5 && r.right <= box.right + 0.5;
+				});
+			})`,
+			"every entity row sits inside its box": `[...document.querySelectorAll("#er .entity")].every((node) => {
+				const box = node.querySelector("rect").getBoundingClientRect();
+				return [...node.querySelectorAll("text")].every((t) => {
+					const r = t.getBoundingClientRect();
+					return r.left >= box.left - 0.5 && r.right <= box.right + 0.5;
+				});
+			})`,
+			"in an entity row the key badge, the type and the name are apart": `[...document.querySelectorAll("#er .entity")].every((node) => {
+				const y = (el) => Math.round(el.getBoundingClientRect().top / 4);
+				const rows = Map.groupBy([...node.querySelectorAll("text.mono, rect[fill*=key-badge]")], y);
+				return [...rows.values()].every((row) => {
+					const sorted = row.map((el) => el.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+					return sorted.every((r, i) => i === 0 || r.left >= sorted[i - 1].right + 1);
+				});
+			})`,
+		},
+	);
+
+	expect(await packAndRun(dir, "boxes", page)).toEqual([]);
+}, 30_000);
+
+test("an activation bar hides the lifeline behind it, a nested one too", async () => {
+	const page = diagramPage(
+		`<pre class="mermaid" id="seq">sequenceDiagram\n  A->>+B: call\n  A->>+B: again\n  B->>+C: nested\n  C-->>-B: back\n  B-->>-A: ret\n  B-->>-A: done</pre>`,
+		{
+			"each bar is filled with the tone under the diagram, over its lifeline": `(() => {
+				const bars = [...document.querySelectorAll("#seq .activation")];
+				const probe = document.createElement("i");
+				probe.style.background = "var(--under)";
+				document.querySelector("#seq").append(probe);
+				const tone = getComputedStyle(probe).backgroundColor;
+				return bars.length >= 3 && bars.every((bar) => {
+					const life = document.querySelector("#seq .lifeline[data-actor=" + bar.dataset.actor + "]");
+					const x = parseFloat(life.getAttribute("x1"));
+					return getComputedStyle(bar).fill === tone && +bar.getAttribute("x") < x && +bar.getAttribute("x") + +bar.getAttribute("width") > x;
+				});
+			})()`,
+		},
+	);
+
+	expect(await packAndRun(dir, "activation", page)).toEqual([]);
+}, 30_000);
+
+test("a sequence message's label fits between its two lifelines, whatever it spans", async () => {
+	const page = diagramPage(
+		`<pre class="mermaid" id="seq">sequenceDiagram\n  A->>B: Return the configuration for the selected project\n  B->>C: short\n  A->>C: A label spanning two gaps, longer than either one\n  C->>A: one<br>two lines</pre>`,
+		{
+			"every label lies between the lifelines of its message": `(() => {
+				const x = (id) => document.querySelector("#seq .lifeline[data-actor=" + id + "]").getBoundingClientRect().left;
+				return [...document.querySelectorAll("#seq .message")].every((m) => {
+					const [a, b] = [x(m.dataset.from), x(m.dataset.to)].sort((p, q) => p - q);
+					const r = m.querySelector("text").getBoundingClientRect();
+					return r.left >= a && r.right <= b;
+				});
+			})()`,
+		},
+	);
+
+	expect(await packAndRun(dir, "labels", page)).toEqual([]);
+}, 30_000);

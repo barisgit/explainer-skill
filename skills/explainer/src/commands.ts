@@ -47,7 +47,7 @@ Use the ids from prose and replies:
   <Stepper captions={[...]} refs={["m1", "m2 call"]}>  a step shows and lights the parts it names (kit Stepper); an Explore frame's states set their data-state (kit Explore)
 Keep ids short and meaningful: they are what you type here.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
-Text is 13 px, the label size, on boxes with no fill, never drawn larger. Phones: a flowchart or state diagram wider than the column also gets a copy laid out across its direction, shown instead, so its text stays 13 px; other diagrams shrink no further than readable text and then scroll sideways. Print fits each diagram to the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
+Text is 13 px, the label size, on boxes with no fill, never drawn larger. Phones: a flowchart or state diagram wider than the column also gets a copy laid out across its direction, shown instead, when that is narrower (text shrinks less, to 13 px where it fits); other diagrams shrink no further than readable text and then scroll sideways. Print fits each diagram to the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {
