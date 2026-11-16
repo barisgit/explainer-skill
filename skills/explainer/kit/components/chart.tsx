@@ -41,6 +41,9 @@
    option or on a series still does); a new option tweens from what is on show, matching series by id, else by name, else
    by position. Reduced motion turns animation off.
    Axes carry their labels and a quiet baseline, without gridlines or ticks: turn one on in the option (splitLine: { show: true }).
+   Two or more named lines with no legend carry their names at their ends (endLabel), with room on the grid's right; where two
+   end less than a line apart at the chart's size, a legend names them instead. Any legend, textStyle, dataZoom or dataset, your
+   own endLabel or labelLayout, a grid top, bottom or height, a grid right in percent, an axis min or max, a reversed x axis or a polar or second axis keeps the chart as written.
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
    or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */
 "use client";

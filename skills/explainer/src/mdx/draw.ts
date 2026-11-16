@@ -33,6 +33,11 @@ interface ChartsOption {
 	layout(chart: unknown): void;
 	measureText(base: typeof measureText): typeof measureText;
 	still(option: Option): Option;
+	endNames(
+		option: Option,
+		width: (text: string) => number,
+	): { named: Option; legend: Option } | undefined;
+	crowded(chart: unknown): boolean;
 }
 type ChartsOptionPart = (env: {
 	color: (expression: string) => string;
@@ -48,7 +53,7 @@ interface PlotDraw {
 		width: (s: unknown) => number,
 		shown: boolean[],
 	): string;
-	legendMarkup(option: Option): string;
+	legendMarkup(option: Option, textWidth: (s: unknown) => number, H: number): string;
 	switchedOn(series: unknown[], off: Set<string | undefined>): boolean[];
 }
 type PlotDrawPart = (env: { lang: () => string }) => PlotDraw;
@@ -180,20 +185,28 @@ function quietly<T>(draw: () => T): T {
 	}
 }
 
-/** One chart's SVG at a size, as ECharts draws it without animation. */
+/**
+ * One chart's SVG at a size, as ECharts draws it without animation, with the option it drew: `fallback` (resolved) in place of
+ * `option` where its names at the line ends crowd, as kit/charts.ts draws a live chart.
+ */
 function chartSvg(
 	option: Option,
 	theme: Option,
 	width: number,
 	height: number,
 	charts: ChartsOption,
-): { svg: string; legends: number[] } | undefined {
+	fallback?: Option,
+): { svg: string; legends: number[]; option: Option } | undefined {
 	const renderer = loadEcharts();
 	renderer.setPlatformAPI({ measureText: charts.measureText(measureText) });
 	const chart = renderer.init(null, theme, { renderer: "svg", ssr: true, width, height });
 	try {
 		charts.layout(chart);
 		quietly(() => chart.setOption(charts.still(option)));
+		const drawn = fallback && charts.crowded(chart) ? fallback : option;
+		if (drawn !== option) {
+			quietly(() => chart.setOption(charts.still(drawn), { notMerge: true }));
+		}
 		const legends = legendHeights(chart);
 		if (!legends) {
 			return undefined;
@@ -203,7 +216,7 @@ function chartSvg(
 		const known = [...svg.matchAll(/<text\b[^>]*>([^<]*)<\/text>/g)].every((match) =>
 			[...unescapeHtml(match[1] ?? "")].every((char) => geistAdvance(char, 400) !== undefined),
 		);
-		return known ? { svg, legends } : undefined;
+		return known ? { svg, legends, option: drawn } : undefined;
 	} finally {
 		// A live instance keeps an animation timer, which would keep pack from exiting.
 		chart.dispose();
@@ -286,20 +299,25 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const { color, paintOf } = standIns(colours);
 		const charts = chartsOption({ color, lang: () => lang });
 		const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
-		const resolved = charts.resolveOption(option);
+		// Names at the line ends are measured as ECharts measures a label: 12 px. They crowd or not by a copy's height alone.
+		const ends = charts.endNames(option, (text) => measureText(text, "12px").width);
+		const resolved = charts.resolveOption(ends ? ends.named : option);
+		const fallback = ends && charts.resolveOption(ends.legend);
 		const copies = COPIES.map((copy, i) => {
 			const height = heights[i] as number;
-			const drawing = chartSvg(resolved, theme, copy.width, height, charts);
+			const drawing = chartSvg(resolved, theme, copy.width, height, charts, fallback);
 			if (!drawing) {
 				return undefined;
 			}
-			const widths = legendWidths(resolved, height, copy.shown, copy.fit === "");
+			const widths = legendWidths(drawing.option, height, copy.shown, copy.fit === "");
 			// With no legend or media transitions, there is no width-sensitive legend geometry to certify.
 			const stable =
 				(drawing.legends.length === 0 && widths.length === 2) ||
 				widths.every((width) => {
 					const sample =
-						width === copy.width ? drawing : chartSvg(resolved, theme, width, height, charts);
+						width === copy.width
+							? drawing
+							: chartSvg(resolved, theme, width, height, charts, fallback);
 					return (
 						sample !== undefined &&
 						JSON.stringify(sample.legends) === JSON.stringify(drawing.legends)
@@ -322,13 +340,20 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			if (!heights) {
 				return "";
 			}
+			const width = (s: unknown) => textWidth(String(s), PLOT_FONT, 500);
+			// Names at the line ends take the legend's place where they fit the area's height with no legend, so the copies can
+			// differ; one legend is drawn for all of them, so a plot whose copies differ is left to plot.js.
+			const legends = new Set(
+				heights.map((height) => plots.legendMarkup(option, width, height - LEGEND.top)),
+			);
+			const [markup = ""] = legends;
+			if (legends.size > 1) {
+				return "";
+			}
 			// Every series starts switched on; plot.js marks its buttons so as it draws.
-			const legend = plots
-				.legendMarkup(option)
-				.replace(/<button /g, '<button aria-pressed="true" ');
+			const legend = markup.replace(/<button /g, '<button aria-pressed="true" ');
 			const items = legendItems(legend);
 			const shown = plots.switchedOn(option.series ?? [], new Set());
-			const width = (s: unknown) => textWidth(String(s), PLOT_FONT, 500);
 			const copies = COPIES.map((copy, i) => {
 				// The legend wraps by the element's width, which a copy is shown over a range of, for labels set lighter or heavier
 				// than measured: the area is the same height only where the rows are the same across all of it.

@@ -113,31 +113,33 @@
 .plot .name {
 	fill: var(--muted);
 }
-.plot .value {
+/* A value on a mark, and a line's name at its end. */
+.plot :is(.value, .end) {
 	fill: var(--ink);
-	font-weight: 600;
 	paint-order: stroke;
 	stroke: var(--under);
 	stroke-width: 3px;
 	stroke-linejoin: round;
 }
+.plot .value {
+	font-weight: 600;
+}
 .plot .value.inside {
 	fill: var(--surface);
 	stroke: none;
 }
-.plot svg :is(.grid, .zero, .axis, .guide) {
+/* The baseline: as quiet as a Chart's axis line. */
+.plot svg .axis {
 	fill: none;
-}
-.plot svg .grid {
 	stroke: var(--rule);
 }
-.plot svg :is(.zero, .axis) {
-	stroke: var(--rule-strong);
-}
-.plot svg .guide {
-	stroke: var(--accent);
+/* A name moved off its line's end is tied to it by a leader in the line's colour and dash. */
+.plot svg .leader {
+	stroke: var(--c);
 	stroke-width: 1.5;
-	stroke-dasharray: 2 4;
+}
+.plot svg .leader.dash {
+	stroke-dasharray: 3 3;
 }
 .plot svg :is(.line, .stem) {
 	fill: none;

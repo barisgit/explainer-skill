@@ -657,3 +657,117 @@ test("a chart arrives drawn: no entrance animation, even where motion is allowed
 		{ arriving: false, animation: false },
 	]);
 }, 30_000);
+
+test("names at the line ends follow updates: a legend or one named line takes them away, a second named line brings them", async () => {
+	const page = PAGE.replace(
+		/var contract =[\s\S]*<\/script>/,
+		`const line = (name, data) => ({ name, type: "line", data });
+		const ends = (chart) => chart.getOption().series.filter((s) => s.endLabel?.show).length;
+		var contract = new Promise((done) => {
+			const handle = Charts.make(document.getElementById("c"), {
+				xAxis: { type: "category", data: ["a", "b"] }, yAxis: {},
+				series: [line("One", [1, 2]), line("Two", [2, 1])],
+			}, (chart) => {
+				const found = [];
+				const expectEnds = (label, n) => { if (ends(chart) !== n) found.push(label + ": " + ends(chart) + " end labels, not " + n); };
+				expectEnds("two named lines", 2);
+				handle.set({ legend: {} });
+				expectEnds("a legend set by a later patch", 0);
+				handle.set({}, ["legend"]);
+				expectEnds("the legend replaced by none", 2);
+				handle.set({ series: [line("One", [1, 2])] }, ["series"]);
+				expectEnds("one named line", 0);
+				handle.set({ series: [line("One", [1, 2]), line("Two", [2, 1])] });
+				expectEnds("a second named line merged in", 2);
+				done(found);
+			});
+		});
+		</script></body></html>`,
+	);
+	expect(await packAndRun(dir, "end-labels", page)).toEqual([]);
+}, 30_000);
+
+test("names that would end less than a line apart give way to the legend, decided again when the chart's height changes", async () => {
+	const page = PAGE.replace(
+		'<div class="chart" id="c">',
+		'<div class="chart" id="c" style="height:160px">',
+	).replace(
+		/var contract =[\s\S]*<\/script>/,
+		`const line = (name, data) => ({ name, type: "line", data });
+		const named = (chart) => chart.getOption().series.filter((s) => s.endLabel?.show).length;
+		const legends = (chart) => (chart.getOption().legend ?? []).length;
+		const el = document.getElementById("c");
+		var contract = new Promise((done) => {
+			// Ends 1 apart on an axis of 0 to 10: about 8 px in a 160 px chart, over 40 px in a 600 px one.
+			Charts.make(el, {
+				xAxis: { type: "category", data: ["a", "b"] }, yAxis: {},
+				series: [line("One", [0, 5]), line("Two", [10, 6])],
+			}, (chart) => {
+				const found = [];
+				if (named(chart) !== 0 || legends(chart) !== 1) found.push("crowded: " + named(chart) + " end labels, " + legends(chart) + " legends");
+				el.style.height = "600px";
+				setTimeout(() => {
+					if (named(chart) !== 2 || legends(chart) !== 0) found.push("taller: " + named(chart) + " end labels, " + legends(chart) + " legends");
+					done(found);
+				}, 300);
+			});
+		});
+		</script></body></html>`,
+	);
+	expect(await packAndRun(dir, "crowded-ends", page)).toEqual([]);
+}, 30_000);
+
+test("a patch that brings a second named line keeps the reader's zoom and visualMap range", async () => {
+	const page = PAGE.replace(
+		/var contract =[\s\S]*<\/script>/,
+		`const line = (name, data) => ({ name, type: "line", data });
+		const axes = { xAxis: { type: "category", data: ["a", "b", "c", "d", "e"] }, yAxis: {} };
+		var contract = Promise.all([
+			new Promise((done) => {
+				const handle = Charts.make(document.getElementById("c"), { ...axes, dataZoom: [{ type: "inside", start: 0, end: 100 }], series: [line("One", [1, 2, 3, 4, 5])] }, (chart) => {
+					chart.dispatchAction({ type: "dataZoom", start: 20, end: 40 });
+					handle.set({ series: [line("One", [1, 2, 3, 4, 5]), line("Two", [5, 4, 3, 2, 1])] });
+					const { start, end } = chart.getOption().dataZoom[0];
+					done(start === 20 && end === 40 ? [] : ["zoom after a second line: " + start + " to " + end]);
+				});
+			}),
+			new Promise((done) => {
+				const el = document.createElement("div");
+				el.className = "chart";
+				document.querySelector("main").append(el);
+				const handle = Charts.make(el, { ...axes, visualMap: { type: "continuous", min: 0, max: 10, range: [0, 10], dimension: 1 }, series: [line("One", [1, 2, 3, 4, 5])] }, (chart) => {
+					chart.dispatchAction({ type: "selectDataRange", selected: [2, 5] });
+					handle.set({ series: [line("One", [1, 2, 3, 4, 5]), line("Two", [5, 4, 3, 2, 1])] });
+					const ends = chart.getOption().series.filter((s) => s.endLabel?.show).length;
+					const range = chart.getOption().visualMap[0].range;
+					done(ends === 2 && String(range) === "2,5" ? [] : ["visualMap after a second line: " + ends + " end labels, range " + range]);
+				});
+			}),
+		]).then((found) => found.flat());
+		</script></body></html>`,
+	);
+	expect(await packAndRun(dir, "ends-keep-state", page)).toEqual([]);
+}, 30_000);
+
+test("a series the reader hid in the legend that stands in for crowded names stays hidden across a redraw", async () => {
+	const page = PAGE.replace(
+		'<div class="chart" id="c">',
+		'<div class="chart" id="c" style="height:160px">',
+	).replace(
+		/var contract =[\s\S]*<\/script>/,
+		`const line = (name, data) => ({ name, type: "line", data });
+		var contract = new Promise((done) => {
+			const handle = Charts.make(document.getElementById("c"), {
+				xAxis: { type: "category", data: ["a", "b"] }, yAxis: {},
+				series: [line("One", [0, 5]), line("Two", [10, 5.5])],
+			}, (chart) => {
+				chart.dispatchAction({ type: "legendUnSelect", name: "One" });
+				handle.set({ series: [line("One", [0, 5]), line("Two", [10, 5.4])] });
+				const selected = chart.getOption().legend?.[0]?.selected ?? {};
+				done(selected.One === false ? [] : ["One after a redraw: " + JSON.stringify(selected)]);
+			});
+		});
+		</script></body></html>`,
+	);
+	expect(await packAndRun(dir, "fallback-hidden", page)).toEqual([]);
+}, 30_000);

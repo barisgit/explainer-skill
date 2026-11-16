@@ -212,6 +212,16 @@ declare var ChartsOption: (env: {
 	still(option: ChartOption): ChartOption;
 	/** Where ECharts reads an option's root settings and components: its baseOption when it has one, else the option. */
 	settings(option: ChartOption): ChartOption;
+	/**
+	 * For an option whose named lines carry their names at their ends: the option so, and the option with a legend for a size
+	 * where the names crowd; else undefined. width measures a 12 px label.
+	 */
+	endNames(
+		option: ChartOption,
+		width: (text: string) => number,
+	): { named: ChartOption; legend: ChartOption } | undefined;
+	/** Whether two of a drawn chart's end labels sit less than a line apart, on a live or SSR ECharts instance. */
+	crowded(chart: unknown): boolean;
 };
 declare var PlotDraw: (env: {
 	/** The language numbers are written in. */
@@ -225,8 +235,11 @@ declare var PlotDraw: (env: {
 		textWidth: (s: unknown) => number,
 		shown: boolean[],
 	): string;
-	/** The legend's buttons, or "" when it shows none; button i switches series i. */
-	legendMarkup(option: PlotOption): string;
+	/**
+	 * The legend's buttons, or "" when it shows none (names at the line ends of an H px high area with no legend take its place);
+	 * button i switches series i; textWidth measures a label in px.
+	 */
+	legendMarkup(option: PlotOption, textWidth: (s: unknown) => number, H: number): string;
 	/** Per series: whether it is switched on, given the names switched off. */
 	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
 };

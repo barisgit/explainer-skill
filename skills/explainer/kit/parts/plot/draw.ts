@@ -1,12 +1,19 @@
 /* plot draw: what kit:plot.js draws, not referenced from pages: pack joins it in front of plot.js, and runs it itself to draw each
    plot into the page (src/mdx/draw.ts). PlotDraw({ lang }) gives render(option, W, H, textWidth, shown), the SVG content,
-   legendMarkup(option), the legend's buttons, and switchedOn(series, off), which series the legend leaves on; numbers are
+   legendMarkup(option, textWidth, H), the legend's buttons (none when names sit at the line ends of an H px high area), and switchedOn(series, off), which series the legend leaves on; numbers are
    written in lang(), and textWidth measures a label at the plot's 13 px. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotDraw = ({ lang }) => {
 	const FONT = 13; // px, as theme.css sets it for .plot text
 	const PAD = 16;
-	const TICK = 5;
+	const GAP = 5; // px between the plot and its tick labels
+	const END_GAP = 6; // px between a line's end and its name
+	const LEADER = 10; // px more for a name moved off its line's end, which a leader ties to it
+	// Names at the line ends fit when, in the narrowest figure the kit lays out (288 px), they leave the plot 55% of it, and when
+	// they stack a line of text apart down the plot; else the legend names them.
+	const NARROWEST = 288;
+	const NAMES_SHARE = 0.45;
+	const END_STEP = FONT + 3; // px between the names' lines
 
 	type TextWidth = (s: unknown) => number;
 	/** What every axis has; a numeric axis also has its range, a category axis its names. at() and band are set by place(). */
@@ -43,6 +50,13 @@ window.PlotDraw = ({ lang }) => {
 		ya: Axis;
 		shown: boolean[];
 	}
+	interface EndName {
+		name: string;
+		at: { x: number; y: number };
+		y: number;
+		style: string;
+		dash: boolean;
+	}
 	interface PointCtx extends Ctx {
 		xa: NumericAxis;
 		ya: NumericAxis;
@@ -75,7 +89,7 @@ window.PlotDraw = ({ lang }) => {
 	/** ` name="value"`, or nothing for an empty value. */
 	const attr = (name: string, value: string) => (value ? ` ${name}="${value}"` : "");
 	const svgLine = (cls: string, x1: number, x2: number, y1: number, y2: number, style = "") =>
-		`<line class="${cls}"${attr("style", style)} x1="${px(x1)}" x2="${px(x2)}" y1="${px(y1)}" y2="${px(y2)}"/>`;
+		`<line class="${cls}" x1="${px(x1)}" x2="${px(x2)}" y1="${px(y1)}" y2="${px(y2)}"${attr("style", style)}/>`;
 	/** Text centred vertically on y. */
 	const svgText = (cls: string, x: number, y: number, anchor: Anchor, s: unknown) =>
 		`<text${attr("class", cls)} x="${px(x)}" y="${px(y)}" dy="0.35em" text-anchor="${anchor}">${esc(s)}</text>`;
@@ -130,6 +144,35 @@ window.PlotDraw = ({ lang }) => {
 	}
 	const isTexts = (label: PlotSeries["label"]): label is readonly string[] => Array.isArray(label);
 	const seriesColor = (s: PlotSeries, i: number) => s.color ?? `var(--c${(i % 6) + 1})`;
+	/** px a name at a line's end takes on the right of the plot, with its gap, a leader's room and a margin. */
+	const endRoom = (name: string, textWidth: TextWidth) => END_GAP + LEADER + textWidth(name) + 4;
+	/** px from the top of a W x H drawing to the plot's bottom edge, under which sit the x labels and the x axis's name. */
+	const bottomAt = (H: number, xName: unknown) => Math.floor(H - GAP - FONT - 8 - (xName ? 22 : 0));
+	/**
+	 * Whether the series carry their names at their line ends in place of a legend, in a drawing H px high (the plot's area with no
+	 * legend): two or more have a name, every named one is a line, each name fits the narrowest figure's share (NAMES_SHARE), all
+	 * stack a line apart above the plot's bottom edge, and the author left the legend unset (legend: true keeps the legend, false
+	 * shows neither). The width never decides it, so one legend serves a copy over all the widths it is shown at.
+	 */
+	function namesAtEnds(option: PlotOption, textWidth: TextWidth, H: number) {
+		const named = (option.series ?? []).filter((s) => s.name);
+		return (
+			option.legend === undefined &&
+			!option.categories &&
+			named.length > 1 &&
+			(named.length - 1) * END_STEP <= bottomAt(H, option.x?.name) - FONT / 2 &&
+			named.every(
+				(s) =>
+					(s.type ?? "line") === "line" &&
+					endRoom(String(s.name), textWidth) <= NARROWEST * NAMES_SHARE,
+			)
+		);
+	}
+	/** The series whose names sit at their line ends, with their index. */
+	const endNamed = (option: PlotOption, textWidth: TextWidth, H: number) =>
+		namesAtEnds(option, textWidth, H)
+			? (option.series ?? []).flatMap((s, i) => (s.name ? [{ s, i, name: s.name }] : []))
+			: [];
 
 	/** 1, 2, 5 times a power of ten giving about `count` steps over `span`. */
 	function niceStep(span: number, count: number) {
@@ -239,7 +282,8 @@ window.PlotDraw = ({ lang }) => {
 	/** Layout shared by the bars of a plot: which axis holds the categories, the bar thickness, running stack ends. */
 	function barLayout(series: PlotSeries[], option: PlotOption, { cat, val, W, L, B }: BarCtx) {
 		const horizontal = Boolean(option.horizontal);
-		const thick = Math.min(cat.band * 0.62, 56);
+		// Horizontal bars take 45% of their row, as the approved layouts draw them; columns 62% of theirs.
+		const thick = Math.min(cat.band * (horizontal ? 0.45 : 0.62), 56);
 		const each = option.stack ? thick : thick / series.length;
 		// Where a label past a bar's end may still go: the panel's right edge, the plot's left edge, the top edge, the axis.
 		const bounds: [number, number] = horizontal ? [L, W - 4] : [B, 0]; // [for a negative value, for a positive one]
@@ -371,37 +415,32 @@ window.PlotDraw = ({ lang }) => {
 		return Math.ceil(size / gap);
 	}
 
-	/** Gridline, tick mark and label (none when thinned out) of one tick; category axes have labels only. */
-	function tickMarks(axis: Axis, t: number, i: number, every: number, { L, R, T, B }: Frame) {
+	/** The label of one tick, or none when thinned out. */
+	function tickLabel(axis: Axis, t: number, i: number, every: number, { L, B }: Frame) {
 		const p = axis.at(t);
-		const v = axis.vertical;
-		const grid = t === 0 && !axis.names && axis.lo < 0 ? "zero" : "grid";
-		const marks = axis.names
-			? ""
-			: v
-				? svgLine(grid, L, R, p, p) + svgLine("axis", L - TICK, L, p, p)
-				: svgLine(grid, p, p, T, B) + svgLine("axis", p, p, B, B + TICK);
 		const text = i % every === 0 ? axis.labels[i] : undefined;
 		if (text === undefined) {
-			return marks;
+			return "";
 		}
-		return (
-			marks +
-			(v
-				? svgText("", L - TICK - 4, p, "end", text)
-				: svgText("", p, B + TICK + 3 + FONT / 2, "middle", text))
-		);
+		return axis.vertical
+			? svgText("", L - GAP - 4, p, "end", text)
+			: svgText("", p, B + GAP + 3 + FONT / 2, "middle", text);
 	}
 
-	/** Gridlines, axis lines, ticks, tick labels and axis names. */
+	/**
+	 * Tick labels, axis names and one quiet baseline, without gridlines or tick marks, as Chart draws its axes: the baseline runs
+	 * along the category axis (across the plot for lines and stems) at value 0, or the edge nearest 0.
+	 */
 	function drawAxes(ctx: Ctx) {
 		const { xa, ya, L, R, T, B, H, textWidth } = ctx;
 		let out = "";
 		for (const axis of [xa, ya]) {
 			const every = labelEvery(axis, textWidth);
-			out += axis.ticks.map((t, i) => tickMarks(axis, t, i, every, ctx)).join("");
+			out += axis.ticks.map((t, i) => tickLabel(axis, t, i, every, ctx)).join("");
 		}
-		out += svgLine("axis", L, R, B, B) + svgLine("axis", L, L, T, B);
+		out += ya.names
+			? svgLine("axis", xa.at(0), xa.at(0), T, B)
+			: svgLine("axis", L, R, ya.at(0), ya.at(0));
 		out += xa.name ? svgText("name", R, H - FONT / 2 - 2, "end", xa.name) : "";
 		out += ya.name ? svgText("name", PAD, FONT / 2 + 3, "start", ya.name) : "";
 		return out;
@@ -448,16 +487,21 @@ window.PlotDraw = ({ lang }) => {
 		};
 	}
 
-	/** The plot rectangle inside W x H: room left for the value labels and axis names, right and left for half a label. */
-	function plotBox(xa: Axis, ya: Axis, W: number, H: number, textWidth: TextWidth) {
+	/**
+	 * The plot rectangle inside W x H: room left for the value labels and axis names, right and left for half a label, and on the
+	 * right for the names at the line ends (`ends`).
+	 */
+	function plotBox(xa: Axis, ya: Axis, W: number, H: number, textWidth: TextWidth, ends: string[]) {
 		const yLabelWidth = Math.max(0, ...ya.labels.map(textWidth));
 		const firstHalf = textWidth(xa.labels[0] ?? "") / 2;
 		const lastHalf = textWidth(xa.labels.at(-1) ?? "") / 2;
 		return {
-			L: Math.ceil(Math.max(PAD + yLabelWidth + TICK + 4, firstHalf + 4)),
-			R: Math.floor(W - Math.max(PAD, lastHalf + 4)),
+			L: Math.ceil(Math.max(PAD + yLabelWidth + GAP + 4, firstHalf + 4)),
+			R: Math.floor(
+				W - Math.max(PAD, lastHalf + 4, ...ends.map((name) => endRoom(name, textWidth))),
+			),
 			T: ya.name ? FONT + 15 : 10,
-			B: Math.floor(H - TICK - FONT - 8 - (xa.name ? 22 : 0)),
+			B: bottomAt(H, xa.name),
 		};
 	}
 
@@ -466,6 +510,42 @@ window.PlotDraw = ({ lang }) => {
 		return series
 			.map((s, i) => (ctx.shown[i] ? (s.type === "stem" ? stemMark : lineMark)(s, i, ctx) : ""))
 			.join("");
+	}
+
+	/**
+	 * Each named line's name just past its last point. Names closer than a line of text apart are spread apart, in order from the
+	 * top, and kept inside the plot's height; a name moved off its line's end sits a leader further right, the leader drawn from
+	 * the end in its line's colour and dash.
+	 */
+	function endMarks(option: PlotOption, { X, Y, B, H, shown, textWidth }: PointCtx) {
+		const ends = endNamed(option, textWidth, H).flatMap(({ s, i, name }) => {
+			const last = s.data.filter(finite).at(-1);
+			if (!(last && shown[i])) {
+				return [];
+			}
+			const at = { x: X(last[0]), y: Y(last[1]) };
+			return [{ name, at, y: at.y, style: `--c:${seriesColor(s, i)}`, dash: Boolean(s.dash) }];
+		});
+		ends.sort((a, b) => a.y - b.y);
+		for (const [k, end] of ends.entries()) {
+			end.y = Math.max(end.y, (ends[k - 1]?.y ?? FONT / 2 - END_STEP) + END_STEP);
+		}
+		for (let k = ends.length - 1; k >= 0; k--) {
+			const end = ends[k] as (typeof ends)[number];
+			end.y = Math.min(end.y, (ends[k + 1]?.y ?? B + END_STEP) - END_STEP);
+		}
+		return ends.map(endMark).join("");
+	}
+	/** A name at its line's end, or a leader's length further right with the leader when it was moved. */
+	function endMark({ name, at, y, style, dash }: EndName) {
+		if (Math.abs(y - at.y) < 0.5) {
+			return svgText("end", at.x + END_GAP, y, "start", name);
+		}
+		const x = at.x + END_GAP + LEADER;
+		return (
+			svgLine(dash ? "leader dash" : "leader", at.x + 2, x - 3, at.y, y, style) +
+			svgText("end", x, y, "start", name)
+		);
 	}
 
 	/** SVG markup for the option at W x H pixels; `shown[i]` says whether series i is switched on in the legend. */
@@ -481,7 +561,14 @@ window.PlotDraw = ({ lang }) => {
 			? barAxes(option, option.categories, W, H)
 			: plotAxes(option, W, H);
 		const { xa, ya } = axes;
-		const box = plotBox(xa, ya, W, H, textWidth);
+		const box = plotBox(
+			xa,
+			ya,
+			W,
+			H,
+			textWidth,
+			endNamed(option, textWidth, H).map((end) => end.name),
+		);
 		const { L, R, T, B } = box;
 		if (R - L < 40 || B - T < 40) {
 			return "";
@@ -490,17 +577,20 @@ window.PlotDraw = ({ lang }) => {
 		place(ya, ya.names ? T : B, ya.names ? B : T);
 		const ctx = { xa, ya, ...box, W, H, textWidth, shown };
 
-		const marks =
-			"cat" in axes
-				? barMarks(series, option, { ...ctx, cat: axes.cat, val: axes.val })
-				: pointMarks(series, { ...ctx, xa: axes.xa, ya: axes.ya, X: axes.xa.at, Y: axes.ya.at });
-		return drawAxes(ctx) + marks;
+		if ("cat" in axes) {
+			return drawAxes(ctx) + barMarks(series, option, { ...ctx, cat: axes.cat, val: axes.val });
+		}
+		const points = { ...ctx, xa: axes.xa, ya: axes.ya, X: axes.xa.at, Y: axes.ya.at };
+		return drawAxes(ctx) + pointMarks(series, points) + endMarks(option, points);
 	}
 
-	/** Legend buttons for the named series, or "" when the legend is off or has fewer than two entries. */
-	function legendMarkup(option: PlotOption) {
+	/**
+	 * Legend buttons for the named series, or "" when the legend is off, has fewer than two entries or the names sit at the line
+	 * ends of a drawing H px high, the plot's area with no legend.
+	 */
+	function legendMarkup(option: PlotOption, textWidth: TextWidth, H: number) {
 		const named = (option.series ?? []).map((s, i) => [s, i] as const).filter(([s]) => s.name);
-		if (option.legend === false || named.length < 2) {
+		if (option.legend === false || named.length < 2 || namesAtEnds(option, textWidth, H)) {
 			return "";
 		}
 		return named

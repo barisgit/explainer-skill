@@ -39,6 +39,8 @@
 		measureText,
 		still,
 		settings,
+		endNames,
+		crowded,
 	} = window.ChartsOption({
 		color: resolve,
 		lang: () => document.documentElement.lang || "en",
@@ -55,6 +57,38 @@
 			});
 		}
 	});
+
+	/** The option with its lines' names at their ends, and with a legend in their place, when the kit names them so; see endNames. */
+	const ends = (option: ChartOption) =>
+		endNames(option, (text) => {
+			if (!pixel) {
+				return 0;
+			}
+			pixel.font = `12px ${getComputedStyle(document.body).fontFamily}`;
+			return pixel.measureText(text).width;
+		});
+
+	/**
+	 * Draws the saved option on the chart (`prepare` resolves it for setOption), with its names at the line ends unless they
+	 * crowd at the chart's size, when the legend names them, with the series the reader hid in it (`selected`) still hidden; pack
+	 * draws each copy by the same rule (src/mdx/draw.ts). Returns whether that legend shows.
+	 */
+	function show(
+		chart: ECharts,
+		option: ChartOption,
+		prepare: (option: ChartOption) => ChartOption,
+		selected: unknown,
+		how?: { notMerge: true },
+	) {
+		const both = ends(option);
+		chart.setOption(prepare(both ? both.named : option), how);
+		if (!(both && crowded(chart))) {
+			return false;
+		}
+		const legend = { ...both.legend, legend: selected ? { selected } : {} };
+		chart.setOption(prepare(legend), { notMerge: true });
+		return true;
+	}
 
 	/** The ECharts theme for a chart on `el`, whose --under (the tone under it) changes by block: page, band, popover. */
 	const theme = (el: HTMLElement) =>
@@ -109,6 +143,24 @@
 
 	function isObject(value: unknown): value is Record<string, unknown> {
 		return value !== null && typeof value === "object" && !Array.isArray(value);
+	}
+
+	/** A copy of the objects in `value`, which merge changes in place; arrays inside them it replaces, so they stay shared. */
+	const copyObjects = (value: unknown): unknown =>
+		isObject(value)
+			? Object.fromEntries(Object.entries(value).map(([key, v]) => [key, copyObjects(v)]))
+			: value;
+
+	/** The saved option as mergeOption would leave it, without changing it. */
+	function merged(option: ChartOption, patch: ChartOption, replace: string[]) {
+		const copy: ChartOption = Object.fromEntries(
+			Object.entries(option).map(([key, v]) => [
+				key,
+				Array.isArray(v) ? v.map(copyObjects) : copyObjects(v),
+			]),
+		);
+		mergeOption(copy, patch, replace);
+		return copy;
 	}
 
 	/** An item's id or name as ECharts compares them: numbers equal to their text. */
@@ -234,17 +286,47 @@
 		let chart: ECharts | null = null;
 		// False once disposed: a font load still pending must not mount it again.
 		let live = true;
+		// The height names at the line ends were last fitted at: they crowd or not by the plot's height alone.
+		let drawnHeight = 0;
+		// Whether the legend that stands in for crowded names shows, and which series the reader switched in it: the saved option
+		// has no legend to keep them in. With no legend, nothing could switch a series back on, so they are forgotten.
+		let standIn = false;
+		let selected: unknown;
+		const keepStandIn = (on: ECharts) => {
+			const [shown] = standIn
+				? ((on.getOption() as { legend?: { selected?: unknown }[] }).legend ?? [])
+				: [];
+			selected = shown?.selected;
+		};
 		const mount = () => {
 			// Nothing animates on arrival: the first draw takes the place of pack's drawing, or of this chart before the scheme
 			// changed, as it stands, and only the updates after it animate.
-			chart?.dispose();
+			if (chart) {
+				keepStandIn(chart);
+				chart.dispose();
+			}
 			const look = theme(el);
 			chart = echarts.init(el, look);
 			layout(chart);
-			chart.setOption(resolveOption(still(option)));
+			standIn = show(chart, option, (o) => resolveOption(still(o)), selected);
+			drawnHeight = el.clientHeight;
 			chart.setOption({ animation: Boolean(settings(option).animation ?? look.animation) });
 			el.querySelector(":scope > .chart-drawn")?.remove();
 			setup?.(chart);
+		};
+		/**
+		 * Draws the saved option afresh (notMerge), after writing what the reader toggled or zoomed into it: notMerge makes the
+		 * components anew, as a mount does, and ECharts keeps the view of each id (given, else from name and position), so marks
+		 * tween from the state on show.
+		 */
+		const redraw = (on: ECharts, patch?: () => void) => {
+			keepReaderState(option, on);
+			keepStandIn(on);
+			patch?.();
+			// An open axis tooltip retains data from series the redraw can remove.
+			on.dispatchAction({ type: "hideTip" });
+			standIn = show(on, option, resolveOption, selected, { notMerge: true });
+			drawnHeight = el.clientHeight;
 		};
 		// Canvas text needs the web font loaded before the first draw, and ECharts to exist.
 		const fontReady = Promise.all([
@@ -257,6 +339,9 @@
 			}
 			if (chart) {
 				chart.resize();
+				if (el.clientHeight !== drawnHeight && ends(option)) {
+					redraw(chart);
+				}
 			} else {
 				void fontReady.then(() => live && !chart && el.clientWidth && mount());
 			}
@@ -281,20 +366,15 @@
 				return chart;
 			},
 			set(patch, replace = []) {
-				if (!(replace.length && chart)) {
-					mergeOption(option, patch, replace);
-					chart?.setOption(resolveOption(patch));
+				// A replaced list redraws the saved option whole: replaceMerge would merge a new item into the old one of its id,
+				// keeping what the new one leaves out, or make a new view that draws in from nothing. So do names at the line ends
+				// before or after the patch, which a merge can neither take away nor decide by the chart's size.
+				if (chart && (replace.length || ends(option) || ends(merged(option, patch, replace)))) {
+					redraw(chart, () => mergeOption(option, patch, replace));
 					return;
 				}
-				// A replaced list redraws the saved option whole (notMerge): replaceMerge would merge a new item into the old one
-				// of its id, keeping what the new one leaves out, or make a new view that draws in from nothing. notMerge makes the
-				// components afresh, as a mount does, and ECharts keeps the view of each id (given, else from name and position),
-				// so marks tween from the state on show. What the reader toggled or zoomed is written into the option first.
-				keepReaderState(option, chart);
 				mergeOption(option, patch, replace);
-				// An open axis tooltip retains data from series the redraw can remove.
-				chart.dispatchAction({ type: "hideTip" });
-				chart.setOption(resolveOption(option), { notMerge: true });
+				chart?.setOption(resolveOption(patch));
 			},
 		};
 	}

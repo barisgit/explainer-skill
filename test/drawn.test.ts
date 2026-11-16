@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { runKitPart } from "../skills/explainer/src/kit.ts";
 import { pageDrawer } from "../skills/explainer/src/mdx/draw.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import { withTestPage } from "./browser.ts";
@@ -15,7 +16,7 @@ const PAGE = `import { Chart, Plot } from "kit";
 
 <Chart id="bars" label="Load by day" option={{ legend: {}, tooltip: { trigger: "axis" }, xAxis: { type: "category", data: ["Mon", "Tue"] }, yAxis: {}, series: [{ name: "Load", type: "bar", data: [1, 2], itemStyle: { color: "var(--c3)" } }] }} />
 
-<Plot id="lines" label="Two lines" option={{ series: [{ name: "Rising", data: [[0, 0], [1, 2]] }, { name: "Flat", data: [[0, 1], [1, 1]] }] }} />
+<Plot id="lines" label="Two lines" option={{ legend: true, series: [{ name: "Rising", data: [[0, 0], [1, 2]] }, { name: "Flat", data: [[0, 1], [1, 1]] }] }} />
 `;
 
 const output = await packedMdx(dir, "drawn", PAGE);
@@ -138,9 +139,9 @@ describe("a Chart and a Plot drawn at pack time", () => {
 const OPTION = `{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series: [{ type: "bar", data: [1, 3] }] }`;
 const CHART = (extra: string) =>
 	`{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, ${extra} }`;
-/** A Plot whose legend has four names: it takes one row from half a column up, and two on a phone. */
+/** A Plot with a legend of the names: four take one row from half a column up, and two on a phone. */
 const LEGEND_PLOT = (names: string[]) =>
-	`{ series: [${names.map((name, i) => `{ name: "${name}", data: [[0, ${i}], [1, ${i + 1}]] }`).join(", ")}] }`;
+	`{ legend: true, series: [${names.map((name, i) => `{ name: "${name}", data: [[0, ${i}], [1, ${i + 1}]] }`).join(", ")}] }`;
 
 test("only stable dataset and styled legends keep their drawings", async () => {
 	const names = ["Northwest region", "Northeast region", "Southwest region", "Southeast region"];
@@ -569,3 +570,199 @@ test("SSR legend rows and plot bounds match the live chart's text metrics", asyn
 	}
 	expect(live[1]?.advance).toBeCloseTo(60, 2);
 }, 30_000);
+
+test("a horizontal bar plot is as tall as its bars need, up to the theme's 26rem, unless a height or tall is given", async () => {
+	const bars = (n: number) =>
+		`{ categories: ${JSON.stringify(Array.from({ length: n }, (_, i) => `Bar ${i + 1}`))}, horizontal: true, series: [{ type: "bar", data: ${JSON.stringify(Array.from({ length: n }, (_, i) => i + 1))} }] }`;
+	const path = await packedMdx(
+		dir,
+		"bar-rows",
+		`import { Plot } from "kit";
+
+# Bar rows
+
+<Plot id="three" label="Three" option={${bars(3)}} />
+
+<Plot id="five" label="Five" option={${bars(5)}} />
+
+<Plot id="six" label="Six" option={${bars(6)}} />
+
+<Plot id="twenty" label="Twenty" option={${bars(20)}} />
+
+<Plot id="given" height="200px" label="Given" option={${bars(3)}} />
+
+<Plot id="tall" class="tall" label="Tall" option={${bars(3)}} />
+
+<Plot id="legend" label="Legend" option={{ categories: ["a", "b"], horizontal: true, series: [{ name: "First series", type: "bar", data: [1, 2] }, { name: "Second series", type: "bar", data: [2, 1] }] }} />
+
+<Plot id="upright" label="Upright" option={{ categories: ["a", "b", "c"], series: [{ type: "bar", data: [1, 2, 3] }] }} />
+`,
+	);
+	const figures = drawnFigures(path);
+	// Three rows of 4.5rem (72 px) between 10 px above and 26 px of value labels below, under the empty legend's 8 px.
+	expect(viewBoxes(figures.get("three"))).toEqual(["1054x252", "527x252", "356x252"]);
+	// Five rows are 25.25rem; six would pass the theme's 26rem, and so would twenty: their rows share it.
+	expect(viewBoxes(figures.get("five"))).toEqual(["1054x396", "527x396", "356x396"]);
+	expect(viewBoxes(figures.get("six"))).toEqual(["1054x408", "527x408", "356x408"]);
+	expect(viewBoxes(figures.get("twenty"))).toEqual(["1054x408", "527x408", "356x408"]);
+	expect(viewBoxes(figures.get("given"))).toEqual(["1054x192", "527x192", "356x192"]);
+	expect(viewBoxes(figures.get("tall"))).toEqual(["1054x536", "527x536", "356x344"]);
+	expect(viewBoxes(figures.get("upright"))).toEqual(["1054x408", "527x408", "356x280"]);
+	// A legend wraps into rows by the width, which one height cannot follow: the plot keeps the theme's height.
+	expect(figures.get("legend")).toContain('viewBox="0 0 1054 ');
+	expect(readFileSync(path, "utf8")).toMatch(/<div class="chart plot" id="legend" role="img"/);
+	// The height takes the height prop's path, which the box gate sees, and no custom property sizes a figure.
+	const html = readFileSync(path, "utf8");
+	expect(html).toMatch(/<div class="chart plot" id="three" style="block-size:16.25rem"/);
+	expect(html).not.toContain("--plot-height");
+	await expectFitted(path, 8);
+}, 60_000);
+
+test("no custom property sizes a figure out of pack's sight: a bar plot's height takes the height prop's path", async () => {
+	const path = await packedMdx(
+		dir,
+		"bar-rule",
+		`import { Chart, Plot } from "kit";
+import "./bar-rule.css";
+
+# Bar rule
+
+<Plot id="three" label="Three" option={{ categories: ["a", "b", "c"], horizontal: true, series: [{ type: "bar", data: [1, 2, 3] }] }} />
+
+<Plot id="line" label="Line" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+
+<Chart id="chart" label="Chart" option={${OPTION}} />
+`,
+		{ "bar-rule.css": ":is(#three, #line, #chart) { --plot-height: 200px; }" },
+	);
+	const figures = drawnFigures(path);
+	expect(viewBoxes(figures.get("three"))).toEqual(["1054x252", "527x252", "356x252"]);
+	expect(viewBoxes(figures.get("line"))).toEqual(["1054x408", "527x408", "356x280"]);
+	const heights = await inPage(path, (cdp) =>
+		cdp.evaluate<number[]>(
+			`["three", "line", "chart"].map((id) => document.getElementById(id).getBoundingClientRect().height)`,
+		),
+	);
+	expect(heights).toEqual([260, 416, 416]);
+}, 30_000);
+
+/** kit/parts/charts/option.ts as pack runs it, with colours passed through and labels 7 px a character. */
+const chartsOption = (
+	runKitPart("charts/option.ts", "ChartsOption") as (env: {
+		color: (c: string) => string;
+		lang: () => string;
+	}) => { endNames(option: object, width: (text: string) => number): object | undefined }
+)({ color: (c) => c, lang: () => "en" });
+const TWO_LINES = {
+	xAxis: { type: "category", data: ["a", "b"] },
+	yAxis: {},
+	series: [
+		{ name: "One", type: "line", data: [0, 1] },
+		{ name: "Two", type: "line", data: [1, 0] },
+	],
+};
+
+test("names at the line ends only where the kit knows their text and nothing lays labels out", () => {
+	const ends = (option: object) => chartsOption.endNames(option, (t) => t.length * 7) !== undefined;
+	expect(ends(TWO_LINES)).toBe(true);
+	const series = (extra: object) => TWO_LINES.series.map((s) => ({ ...s, ...extra }));
+	// An authored labelLayout, as an object or a function, would move or keep the names where the kit cannot see.
+	expect(ends({ ...TWO_LINES, series: series({ labelLayout: { hideOverlap: true } }) })).toBe(
+		false,
+	);
+	expect(ends({ ...TWO_LINES, series: series({ labelLayout: () => ({}) }) })).toBe(false);
+	// Room is measured at ECharts' 12 px label: a text style of the author's sizes the names otherwise.
+	expect(ends({ ...TWO_LINES, textStyle: { fontSize: 32 } })).toBe(false);
+	// Vertical grid bounds of the author's leave a legend no room, so the names could not give way to one.
+	expect(ends({ ...TWO_LINES, grid: { bottom: 8 } })).toBe(false);
+	expect(ends({ ...TWO_LINES, grid: { right: 24 } })).toBe(true);
+	// An axis min or max can clip a line, which puts its name where the line meets the edge rather than at its last point.
+	expect(ends({ ...TWO_LINES, xAxis: { ...TWO_LINES.xAxis, max: 0.5 } })).toBe(false);
+	expect(ends({ ...TWO_LINES, yAxis: { min: 0.2 } })).toBe(false);
+	// Zoom moves the ends as the reader zooms.
+	expect(ends({ ...TWO_LINES, dataZoom: [{ type: "inside" }] })).toBe(false);
+	// A reversed x axis puts the ends on the left.
+	expect(ends({ ...TWO_LINES, xAxis: { ...TWO_LINES.xAxis, inverse: true } })).toBe(false);
+});
+
+/** Page expression: the series names in chart #id as drawn (scripts off) or live, by text, as boxes relative to the element. */
+const DRAWN_ENDS = (id: string) => `(() => {
+	const svg = [...document.querySelectorAll("#${id} .chart-drawn > svg")].find((s) => s.getBoundingClientRect().width > 0);
+	const at = document.getElementById("${id}").getBoundingClientRect();
+	return Object.fromEntries([...svg.querySelectorAll("text")].filter((t) => /rising|flat/i.test(t.textContent)).map((t) => {
+		const r = t.getBoundingClientRect();
+		return [t.textContent, [r.left - at.left, r.top - at.top, r.width, r.height].map(Math.round)];
+	}));
+})()`;
+const LIVE_ENDS = (id: string) => `(() => {
+	const chart = echarts.getInstanceByDom(document.getElementById("${id}"));
+	return Object.fromEntries(chart.getZr().storage.getDisplayList().filter((el) => /rising|flat/i.test(el.style?.text ?? "")).map((el) => {
+		const r = el.getBoundingRect().clone();
+		r.applyTransform(el.getComputedTransform());
+		return [el.style.text, [r.x, r.y, r.width, r.height].map(Math.round)];
+	}));
+})()`;
+
+test("a Chart's several named lines with no legend carry their names at their ends, inside it and drawn as live", async () => {
+	const lines = `series: [{ name: "Rising", type: "line", data: [0, 1, 3] }, { name: "Also rising", type: "line", data: [1, 1.5, 2] }, { name: "Flat", type: "line", data: [0, 0, 0] }]`;
+	const drawer = pageDrawer("en", []);
+	const place = { classes: ["chart"], id: undefined, height: undefined };
+	const axes = `xAxis: { type: "category", data: ["a", "b", "c"] }, yAxis: {}`;
+	// Lines that end at one value: their names would sit on each other, so the legend names them.
+	const crowd = `series: [{ name: "Rising", type: "line", data: [0, 1, 2] }, { name: "Also rising", type: "line", data: [1, 1.5, 2] }, { name: "Flat", type: "line", data: [2, 2, 2] }]`;
+	const option = (extra: string) => new Function(`return { ${axes}, ${lines}${extra} }`)();
+	// A legend the author shows or hides, or an end label of their own, keeps the chart as they wrote it.
+	expect(drawer.chart(option(""), place)).toContain(">Also rising</text>");
+	expect(drawer.chart(option(", legend: { show: false }"), place)).not.toContain(
+		">Also rising</text>",
+	);
+	const path = await packedMdx(
+		dir,
+		"end-labels",
+		`import { Chart } from "kit";
+
+# End labels
+
+<Chart id="ends" label="Ends" option={{ ${axes}, ${lines} }} />
+
+<Chart id="crowd" label="Crowd" option={{ ${axes}, ${crowd} }} />
+`,
+	);
+	const drawn = await withTestPage(async (cdp) => {
+		await Promise.all(["Page", "Runtime"].map((domain) => cdp.send(`${domain}.enable`)));
+		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		await cdp.send("Emulation.setDeviceMetricsOverride", { ...WIDTHS[0], deviceScaleFactor: 1 });
+		await cdp.load(`file://${path}`);
+		return cdp.evaluate<{ ends: Record<string, number[]>; crowd: Record<string, number[]> }>(
+			`document.fonts.ready.then(() => ({ ends: ${DRAWN_ENDS("ends")}, crowd: ${DRAWN_ENDS("crowd")} }))`,
+			true,
+		);
+	});
+	const lives = await inPage(path, (cdp) =>
+		cdp.evaluate<{ ends: Record<string, number[]>; crowd: Record<string, number[]> }>(
+			`({ ends: ${LIVE_ENDS("ends")}, crowd: ${LIVE_ENDS("crowd")} })`,
+		),
+	);
+	expect(Object.keys(drawn.ends).sort()).toEqual(["Also rising", "Flat", "Rising"]);
+	// The crowded chart's names are a legend's row, in its drawing as live.
+	const crowded = Object.values(lives.crowd);
+	expect(crowded).toHaveLength(3);
+	expect(new Set(crowded.map(([, y]) => y)).size).toBe(1);
+	for (const [name, box] of Object.entries(lives.crowd)) {
+		expect(Math.abs((drawn.crowd[name]?.[1] ?? -99) - (box[1] ?? 0))).toBeLessThanOrEqual(4);
+	}
+	const live = lives.ends;
+	// ECharts' own text boxes (a 12 px line); the DOM's add the font's whole ascent and descent.
+	const boxes = Object.values(live);
+	for (const [i, [x = 0, y = 0, w = 0, h = 0]] of boxes.entries()) {
+		expect(x + w).toBeLessThanOrEqual(1054);
+		for (const [ox = 0, oy = 0, ow = 0, oh = 0] of boxes.slice(i + 1)) {
+			expect(x + w <= ox || ox + ow <= x || y + h <= oy || oy + oh <= y).toBe(true);
+		}
+	}
+	for (const [name, box] of Object.entries(live)) {
+		for (const [k, v] of box.entries()) {
+			expect(Math.abs((drawn.ends[name]?.[k] ?? -99) - v)).toBeLessThanOrEqual(2);
+		}
+	}
+}, 60_000);
