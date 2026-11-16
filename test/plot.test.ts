@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { runKitPart } from "../skills/explainer/src/kit.ts";
+import { draw, lines, plotDraw, plotDrawAt, rects, texts, width } from "./plot-draw.ts";
 import {
 	act,
 	inPage,
@@ -99,41 +99,6 @@ ${pageContract({
 test("label: false draws bars and stems without value text instead of throwing", async () => {
 	expect(await packAndRun(dir, "unlabelled", UNLABELLED_PAGE)).toEqual([]);
 }, 60_000);
-
-/** plot.js's drawing code as pack runs it (kit/parts/plot/draw.ts), measuring every character 7 px wide. */
-const plotDraw = (
-	runKitPart("plot/draw.ts", "PlotDraw") as (env: { lang: () => string }) => {
-		render(
-			option: object,
-			W: number,
-			H: number,
-			width: (s: unknown) => number,
-			shown: boolean[],
-		): string;
-		legendMarkup(option: object, textWidth: (s: unknown) => number, H: number): string;
-	}
-)({ lang: () => "en" });
-const width = (s: unknown) => String(s).length * 7;
-const draw = (option: { series: object[] }, W = 600, H = 300) =>
-	plotDraw.render(
-		option,
-		W,
-		H,
-		width,
-		option.series.map(() => true),
-	);
-/** The lines a drawing has, by class, as [x1, x2, y1, y2]. */
-const lines = (svg: string, cls: string) =>
-	[
-		...svg.matchAll(
-			new RegExp(`<line class="${cls}" x1="([^"]+)" x2="([^"]+)" y1="([^"]+)" y2="([^"]+)"`, "g"),
-		),
-	].map((m) => m.slice(1).map(Number));
-/** The texts of a class with their x and y. */
-const texts = (svg: string, cls: string) =>
-	[
-		...svg.matchAll(new RegExp(`<text class="${cls}" x="([^"]+)" y="([^"]+)"[^>]*>([^<]*)<`, "g")),
-	].map(([, x, y, text]) => ({ x: Number(x), y: Number(y), text }));
 
 test("a plot's axes carry labels and one quiet baseline at zero, with no gridlines or ticks", () => {
 	const wave = draw({
@@ -278,11 +243,12 @@ test("a name moved off its line's end is tied to it by a leader; one that stays 
 	expect(leader?.[2]).not.toBe(leader?.[3]);
 });
 
-test("horizontal bars are about 45% of their row, as the approved layouts draw them", () => {
+test("horizontal bars are 25 px in 56 px rows (#190)", () => {
+	// 10 px above the rows and 26 below them: three rows of 56 px.
 	const svg = plotDraw.render(
 		{ categories: ["A", "B", "C"], horizontal: true, series: [{ type: "bar", data: [1, 2, 3] }] },
 		600,
-		252,
+		204,
 		width,
 		[true],
 	);
@@ -291,9 +257,224 @@ test("horizontal bars are about 45% of their row, as the approved layouts draw t
 	);
 	expect(heights).toHaveLength(3);
 	for (const h of heights) {
-		expect(h).toBeCloseTo(72 * 0.45, 0);
+		expect(h).toBeCloseTo(25, 0);
 	}
 });
+
+test("a plot's text takes the label size it is given, not a number of its own (#190)", () => {
+	const option = {
+		categories: ["A", "B"],
+		horizontal: true,
+		series: [{ type: "bar", data: [1, 2] }],
+	};
+	// The rows end above the value labels, a label's line and 13 px of gap from the bottom.
+	for (const size of [13, 16]) {
+		const [down] = lines(plotDrawAt(size).render(option, 600, 200, width, [true]), "axis");
+		expect(down?.[3]).toBe(Math.floor(200 - 5 - size - 8));
+	}
+});
+
+/** Each dash pattern of the lines drawn, "" for a solid one. */
+const dashes = (svg: string) =>
+	[...svg.matchAll(/<path class="line"([^>]*)>/g)].map(
+		(m) => /stroke-dasharray="([^"]+)"/.exec(m[1] ?? "")?.[1] ?? "",
+	);
+
+test("default lines tell their slots apart by dash as well as lightness; an author's colour or dash keeps its own line (#190)", () => {
+	const flat = (y: number) => [
+		[0, y],
+		[1, y],
+	];
+	const svg = draw({
+		series: [
+			...[0, 1, 2, 3, 4, 5].map((i) => ({ data: flat(i) })),
+			{ data: flat(6), color: "var(--accent)" },
+			{ data: flat(7), dash: false },
+			{ data: flat(8), dash: true },
+		],
+	});
+	const drawn = dashes(svg);
+	expect(drawn[0]).toBe("");
+	expect(new Set(drawn.slice(0, 6)).size).toBe(6);
+	expect(drawn.slice(6)).toEqual(["", "", "6 4"]);
+	expect(svg).toContain('style="--c:var(--c2)');
+});
+
+/** The segments of a path of M x y L x y pairs. */
+const segments = (d: string) =>
+	[...d.matchAll(/M([\d.-]+) ([\d.-]+)L([\d.-]+) ([\d.-]+)/g)].map((m) => m.slice(1).map(Number));
+
+test("a bar takes one of the accent's three states, per series or per bar: solid, hollow or hatch (#190)", () => {
+	const option = {
+		categories: ["A", "B", "C"],
+		horizontal: true,
+		series: [
+			{ type: "bar", data: [10, 62, 165], fill: ["accent", "hollow", "hatch"], label: true },
+		],
+	};
+	const svg = plotDraw.render(option, 600, 204, width, [true]);
+	expect(rects(svg, "bar")).toHaveLength(1);
+	expect(svg).toMatch(/<rect class="bar" style="--c:var\(--accent\)"/);
+	// Hollow: the tint inside an accent outline, drawn inside the bar's box; hatch: a grey outline round lines at 45 degrees.
+	expect(rects(svg, "bar hollow")).toHaveLength(1);
+	const [hatch] = rects(svg, "bar hatch");
+	const [x = 0, y = 0, w = 0, h = 0] = hatch ?? [];
+	const d = /<path class="hatching" d="([^"]+)"/.exec(svg)?.[1] ?? "";
+	const cuts = segments(d);
+	expect(cuts.length).toBeGreaterThan(5);
+	const along = cuts.map(([x1 = 0, y1 = 0, x2 = 0, y2 = 0]) => {
+		// "/" lines: x + y is the same at both ends, and both ends lie on the bar.
+		expect(x1 + y1).toBeCloseTo(x2 + y2, 0);
+		for (const [px, py] of [
+			[x1, y1],
+			[x2, y2],
+		] as const) {
+			expect(px).toBeGreaterThanOrEqual(x - 0.6);
+			expect(px).toBeLessThanOrEqual(x + w + 0.6);
+			expect(py).toBeGreaterThanOrEqual(y - 0.6);
+			expect(py).toBeLessThanOrEqual(y + h + 0.6);
+		}
+		return x1 + y1;
+	});
+	// 6 px apart across the lines: 6 * sqrt(2) along x + y.
+	for (const [i, c] of along.slice(1).entries()) {
+		expect(c - (along[i] ?? 0)).toBeCloseTo(6 * Math.SQRT2, 0);
+	}
+	// The value on the hatched bar, which has no room past its end, reads as one outside it: ink on a halo, not on the bar.
+	expect(svg).toContain('class="value" ');
+	expect(svg).not.toContain("value inside");
+	// One state for the whole series.
+	const hollow = plotDraw.render(
+		{ categories: ["A", "B"], series: [{ type: "bar", data: [1, 2], fill: "hollow" }] },
+		600,
+		300,
+		width,
+		[true],
+	);
+	expect(rects(hollow, "bar hollow")).toHaveLength(2);
+});
+
+test("a category may carry a muted second line under its name (#190)", () => {
+	const note = "4,200 EUR / 410 EUR a year";
+	const svg = plotDraw.render(
+		{
+			categories: [{ name: "first 5 kWh", note }, { name: "second 5 kWh" }, "third"],
+			horizontal: true,
+			series: [{ type: "bar", data: [10, 62, 165] }],
+		},
+		600,
+		204,
+		width,
+		[true],
+	);
+	const names = texts(svg, "cat");
+	const [under] = texts(svg, "note");
+	expect(names.map((t) => t.text)).toEqual(["first 5 kWh", "second 5 kWh", "third"]);
+	expect(under?.text).toBe(note);
+	expect(under?.x).toBe(names[0]?.x);
+	expect((under?.y ?? 0) - (names[0]?.y ?? 0)).toBeCloseTo(17, 0);
+	// The rows start past the longer of the two lines.
+	const [bar] = rects(svg, "bar");
+	expect(bar?.[0] ?? 0).toBeGreaterThanOrEqual(width(note));
+});
+
+test("a bar series' legend swatch shows its state when every bar shares it, and the series' colour when they differ (#190)", () => {
+	const legend = (fill: string[]) =>
+		plotDraw.legendMarkup(
+			{
+				categories: ["a", "b"],
+				series: [
+					{ name: "Estimated", type: "bar", data: [1, 2], fill },
+					{ name: "Measured", type: "bar", data: [2, 1] },
+				],
+			},
+			width,
+			300,
+		);
+	expect(legend(["hatch", "hatch"])).toContain('<i class="bar hatch"');
+	expect(legend(["accent", "accent"])).toContain('<i class="bar" style="--c:var(--accent)');
+	const mixed = legend(["accent", "hatch"]);
+	expect(mixed).toContain('<i class="bar" style="--c:var(--c1)');
+	expect(mixed).not.toMatch(/class="bar (hatch|hollow)"/);
+});
+
+test("stacked segments are drawn as one group, which the theme parts by a line in the tone under the plot (#190)", () => {
+	const svg = plotDraw.render(
+		{
+			categories: ["a", "b"],
+			stack: true,
+			series: [
+				{ type: "bar", data: [1, 2] },
+				{ type: "bar", data: [2, 1] },
+			],
+		},
+		600,
+		300,
+		width,
+		[true, true],
+	);
+	expect(svg).toMatch(/<g class="stack">(<rect class="bar"[^>]*>.*?<\/rect>){4}<\/g>/);
+	// Side by side, bars do not touch, and take no line.
+	expect(
+		plotDraw.render(
+			{
+				categories: ["a"],
+				series: [
+					{ type: "bar", data: [1] },
+					{ type: "bar", data: [2] },
+				],
+			},
+			600,
+			300,
+			width,
+			[true, true],
+		),
+	).not.toContain('class="stack"');
+});
+
+test("live, a narrow bar plot grows by its marker label's lines and keeps its 56 px row; stacked segments part in the tone under them (#190)", async () => {
+	const output = await packedMdx(
+		dir,
+		"marked-bars",
+		`import { Plot } from "kit";
+
+# Marked bars
+
+<div style={{ width: "288px" }}>
+<Plot id="battery" label="Battery" option={{ categories: ["Battery"], horizontal: true, series: [{ type: "bar", data: [20] }], marks: [{ x: 16, label: "16 years: cells rated for 6,000 cycles" }] }} />
+</div>
+
+<Plot id="stacked" label="Stacked" option={{ categories: ["a", "b"], stack: true, series: [{ type: "bar", data: [1, 2] }, { type: "bar", data: [2, 1] }] }} />
+`,
+	);
+	const state = await inPage(output, (cdp) =>
+		cdp.evaluate<{
+			height: number;
+			bar: number;
+			lines: number;
+			stroke: string[];
+			under: string;
+		}>(`(() => {
+			const el = document.getElementById("battery");
+			const seg = getComputedStyle(document.querySelector("#stacked svg .stack .bar"));
+			const probe = document.createElement("i");
+			probe.style.color = "var(--under)";
+			document.getElementById("stacked").append(probe);
+			return {
+				height: el.getBoundingClientRect().height,
+				bar: el.querySelector("svg rect.bar").getBoundingClientRect().height,
+				lines: el.querySelectorAll("svg text.mark-label").length,
+				stroke: [seg.stroke, seg.strokeWidth],
+				under: getComputedStyle(probe).color,
+			};
+		})()`),
+	);
+	expect(state.lines).toBeGreaterThan(1);
+	expect(state.bar).toBeCloseTo(25, 0);
+	// The legend's 8 px, 10 above the row and 26 below it, and the label's lines.
+	expect(state.height).toBeCloseTo(8 + 56 + 36 + state.lines * 17, 0);
+	expect(state.stroke).toEqual([state.under, "1px"]);
+}, 30_000);
 
 test("names at the line ends that a short figure cannot stack give way to the legend", () => {
 	const ten = {
@@ -361,10 +542,10 @@ test("a bar plot's height follows the option it shows, a patch merged in, with r
 	);
 	const state = `(() => { const el = document.getElementById("bars"); return [el.getBoundingClientRect().height, el.querySelectorAll("svg .bar").length > 0]; })()`;
 	await inPage(output, async (cdp) => {
-		// Two rows of 72 px, 44 px around them, 22 px for the x name and 18 px for the y name.
-		expect(await cdp.evaluate<(number | boolean)[]>(state)).toEqual([228, true]);
+		// Two rows of 56 px, 44 px around them, 22 px for the x name and 18 px for the y name.
+		expect(await cdp.evaluate<(number | boolean)[]>(state)).toEqual([196, true]);
 		expect(
 			await act<(number | boolean)[]>(cdp, `document.getElementById("patch").click()`, state),
-		).toEqual([156, true]);
+		).toEqual([140, true]);
 	});
 }, 30_000);

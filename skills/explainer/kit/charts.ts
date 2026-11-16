@@ -9,6 +9,20 @@
 	probe.hidden = true;
 	document.documentElement.append(probe);
 
+	// The chart whose text is being sized: its element inherits the label and text sizes, which a band or page may set.
+	let sizing: HTMLElement = document.documentElement;
+	/** px: a size token (--size-label, --size-text) as `el` inherits it, read from a probe placed in it for the moment. */
+	function tokenSize(token: string, el: HTMLElement = sizing) {
+		const sizer = document.createElement("i");
+		sizer.hidden = true;
+		sizer.style.fontSize = `var(${token})`;
+		el.append(sizer);
+		const px = parseFloat(getComputedStyle(sizer).fontSize);
+		sizer.remove();
+		return px;
+	}
+	const labelSize = (el?: HTMLElement) => tokenSize("--size-label", el);
+
 	/** Resolves `var(--name)` to the colour for the current scheme (light-dark() included). */
 	function color(name: string) {
 		probe.style.color = `var(--${name})`;
@@ -41,9 +55,14 @@
 		settings,
 		endNames,
 		crowded,
+		defaults,
+		styling,
+		markSides,
 	} = window.ChartsOption({
 		color: resolve,
 		lang: () => document.documentElement.lang || "en",
+		size: () => labelSize(),
+		text: () => tokenSize("--size-text"),
 	});
 
 	// Install before consumers await ECharts: zrender caches its font metrics globally on first use.
@@ -58,20 +77,24 @@
 		}
 	});
 
-	/** The option with its lines' names at their ends, and with a legend in their place, when the kit names them so; see endNames. */
+	/**
+	 * The option with its lines' names at their ends, and with a legend in their place, when the kit names them so; see endNames.
+	 * Names are measured at the label size of the chart being drawn (`sizing`).
+	 */
 	const ends = (option: ChartOption) =>
 		endNames(option, (text) => {
 			if (!pixel) {
 				return 0;
 			}
-			pixel.font = `12px ${getComputedStyle(document.body).fontFamily}`;
+			pixel.font = `${labelSize()}px ${getComputedStyle(document.body).fontFamily}`;
 			return pixel.measureText(text).width;
 		});
 
 	/**
-	 * Draws the saved option on the chart (`prepare` resolves it for setOption), with its names at the line ends unless they
-	 * crowd at the chart's size, when the legend names them, with the series the reader hid in it (`selected`) still hidden; pack
-	 * draws each copy by the same rule (src/mdx/draw.ts). Returns whether that legend shows.
+	 * Draws the saved option on the chart (`prepare` resolves it for setOption) with the kit's defaults, its marker labels on
+	 * the side with room (drawn again once the axes say where that is), and its names at the line ends unless they crowd at the
+	 * chart's size, when the legend names them, with the series the reader hid in it (`selected`) still hidden; pack draws each
+	 * copy by the same rule (src/mdx/draw.ts). Returns whether that legend shows.
 	 */
 	function show(
 		chart: ECharts,
@@ -80,8 +103,17 @@
 		selected: unknown,
 		how?: { notMerge: true },
 	) {
-		const both = ends(option);
-		chart.setOption(prepare(both ? both.named : option), how);
+		const draw = (sides?: ReturnType<typeof markSides>) => {
+			const kept = defaults(option, sides);
+			const named = ends(kept);
+			chart.setOption(prepare(named ? named.named : kept), how);
+			return named;
+		};
+		let both = draw();
+		const sides = markSides(chart);
+		if (sides.size) {
+			both = draw(sides);
+		}
 		if (!(both && crowded(chart))) {
 			return false;
 		}
@@ -305,6 +337,7 @@
 				keepStandIn(chart);
 				chart.dispose();
 			}
+			sizing = el;
 			const look = theme(el);
 			chart = echarts.init(el, look);
 			layout(chart);
@@ -325,12 +358,15 @@
 			patch?.();
 			// An open axis tooltip retains data from series the redraw can remove.
 			on.dispatchAction({ type: "hideTip" });
+			sizing = el;
 			standIn = show(on, option, resolveOption, selected, { notMerge: true });
 			drawnHeight = el.clientHeight;
 		};
 		// Canvas text needs the web font loaded before the first draw, and ECharts to exist.
 		const fontReady = Promise.all([
-			document.fonts.load(`500 12px ${getComputedStyle(document.body).fontFamily}`).catch(() => []),
+			document.fonts
+				.load(`500 ${labelSize(el)}px ${getComputedStyle(document.body).fontFamily}`)
+				.catch(() => []),
 			window.echartsReady,
 		]);
 		const resizer = new ResizeObserver(() => {
@@ -339,6 +375,7 @@
 			}
 			if (chart) {
 				chart.resize();
+				sizing = el;
 				if (el.clientHeight !== drawnHeight && ends(option)) {
 					redraw(chart);
 				}
@@ -368,8 +405,14 @@
 			set(patch, replace = []) {
 				// A replaced list redraws the saved option whole: replaceMerge would merge a new item into the old one of its id,
 				// keeping what the new one leaves out, or make a new view that draws in from nothing. So do names at the line ends
-				// before or after the patch, which a merge can neither take away nor decide by the chart's size.
-				if (chart && (replace.length || ends(option) || ends(merged(option, patch, replace)))) {
+				// before or after the patch, which a merge can neither take away nor decide by the chart's size, and so does a change
+				// to what the kit generates (a dash a colour drops, a line added, a marker), which a merge would keep or miss.
+				sizing = el;
+				const next = merged(option, patch, replace);
+				if (
+					chart &&
+					(replace.length || ends(option) || ends(next) || styling(option) !== styling(next))
+				) {
 					redraw(chart, () => mergeOption(option, patch, replace));
 					return;
 				}

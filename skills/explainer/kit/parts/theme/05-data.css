@@ -81,6 +81,15 @@
 	border-radius: 2px;
 	background: var(--swatch, currentColor);
 }
+/* The accent's hollow and hatch states as a marker, beside a solid one (--swatch: var(--accent)). */
+.chip > i.hollow {
+	background: var(--hollow);
+	box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.chip > i.hatch {
+	background: var(--hatch-fill);
+	box-shadow: inset 0 0 0 1px var(--hatch);
+}
 .legend {
 	display: flex;
 	flex-wrap: wrap;

@@ -147,11 +147,17 @@ test("only stable dataset and styled legends keep their drawings", async () => {
 	const names = ["Northwest region", "Northeast region", "Southwest region", "Southeast region"];
 	const series = names.map((name) => ({ name, type: "bar", data: [1, 3] }));
 	const option = { legend: {}, xAxis: { type: "category", data: ["a", "b"] }, yAxis: {}, series };
+	// Names short enough for one row at every width, so only the thick stroke can keep the drawing out.
+	const lines = {
+		...option,
+		series: ["One", "Two", "Three", "Four"].map((name) => ({ name, type: "line", data: [1, 3] })),
+	};
 	const dataset = {
 		...option,
 		dataset: {
 			source: [
-				["Category", "First", "Second", "Third", "Fourth"],
+				// Short enough to keep one row at the label size down to the narrowest phone.
+				["Category", "One", "Two", "Three", "Four"],
 				["a", 1, 2, 3, 4],
 			],
 		},
@@ -168,7 +174,8 @@ test("only stable dataset and styled legends keep their drawings", async () => {
 <Chart id="wraps" label="Wraps" option={${JSON.stringify(option)}} />
 <Chart id="dataset" label="Dataset" option={${JSON.stringify(dataset)}} />
 <Chart id="dataset-wraps" label="Dataset wraps" option={${JSON.stringify({ ...dataset, legend: { textStyle: { fontSize: 36 } } })}} />
-<Chart id="stroke" label="Thick legend lines" option={${JSON.stringify({ ...option, series: ["First", "Second", "Third", "Fourth"].map((name) => ({ name, type: "line", data: [1, 3] })), legend: { lineStyle: { width: 40 } } })}} />
+<Chart id="stroke" label="Thick legend lines" option={${JSON.stringify({ ...lines, legend: { lineStyle: { width: 40 } } })}} />
+<Chart id="thin" label="Legend lines" option={${JSON.stringify(lines)}} />
 <Chart id="hidden" label="Hidden legend" option={${JSON.stringify({ ...option, legend: { show: false } })}} />
 `,
 		),
@@ -176,8 +183,9 @@ test("only stable dataset and styled legends keep their drawings", async () => {
 	for (const id of ["wraps", "dataset-wraps", "stroke"]) {
 		expect(figures.get(id), id).toBeUndefined();
 	}
-	expect(figures.get("dataset")).toContain("First");
+	expect(figures.get("dataset")).toContain("Three");
 	expect(figures.get("hidden")).toContain("chart-drawn");
+	expect(figures.get("thin")).toContain("chart-drawn");
 }, 30_000);
 
 test("documented numeric formats retain their drawings, including locale spaces and euros", () => {
@@ -447,6 +455,52 @@ import "./rootfont.css";
 	}, 60_000);
 });
 
+test("draw nothing where a page sets the label size figures' text is drawn at (#190)", async () => {
+	const figures = drawnFigures(
+		await packedMdx(
+			dir,
+			"labelsize",
+			`import { Chart, Plot } from "kit";
+import "./labelsize.css";
+
+# Label size
+
+<Chart id="chart" label="Chart" option={${OPTION}} />
+
+<Plot id="plot" label="Plot" option={{ series: [{ data: [[0, 0], [1, 1]] }] }} />
+`,
+			{ "labelsize.css": ".band { --size-label: 0.875rem; }\n" },
+		),
+	);
+	expect(figures.get("chart")).toBeUndefined();
+	expect(figures.get("plot")).toBeUndefined();
+}, 30_000);
+
+test("draw nothing where a page sets the lines a plot keeps for its marker labels, or a chart's title size (#190)", async () => {
+	const figures = drawnFigures(
+		await packedMdx(
+			dir,
+			"marklines",
+			`import { Chart, Plot } from "kit";
+import "./marklines.css";
+
+# Mark lines
+
+<Plot id="plot" label="Plot" option={{ categories: ["a"], horizontal: true, series: [{ type: "bar", data: [1] }], marks: [{ x: 0.5, label: "Half" }] }} />
+
+<Chart id="titled" label="Titled" option={{ title: { text: "Title" }, ...${OPTION} }} />
+
+<Chart id="plain" label="Plain" option={${OPTION}} />
+`,
+			{ "marklines.css": ".a { --plot-mark-lines: 3; }\n.b { --size-text: 1.25rem; }\n" },
+		),
+	);
+	expect(figures.get("plot")).toBeUndefined();
+	expect(figures.get("titled")).toBeUndefined();
+	// A chart with no title has no text at the text size.
+	expect(figures.get("plain")).toContain("chart-drawn");
+}, 30_000);
+
 /** Opens the page with scripts off at each width, and expects its `count` drawn copies showing to fit their elements at the drawn size. */
 async function expectFitted(path: string, count: number): Promise<void> {
 	// With scripts off, the copy showing fills its element at its drawn size, so its text is as large as the live chart's.
@@ -473,7 +527,10 @@ async function expectFitted(path: string, count: number): Promise<void> {
  * and undefined for a figure it left undrawn.
  */
 function drawnFigures(path: string): Map<string, string | undefined> {
-	const parts = readFileSync(path, "utf8")
+	// The page's figures end with its main element: what follows is its scripts.
+	const html = readFileSync(path, "utf8");
+	const parts = html
+		.slice(0, html.indexOf("</main>"))
 		.split(/(?=<div class="chart[ "])/)
 		.slice(1);
 	return new Map(
@@ -571,9 +628,11 @@ test("SSR legend rows and plot bounds match the live chart's text metrics", asyn
 	expect(live[1]?.advance).toBeCloseTo(60, 2);
 }, 30_000);
 
-test("a horizontal bar plot is as tall as its bars need, up to the theme's 26rem, unless a height or tall is given", async () => {
+test("a horizontal bar plot is as tall as its bars need, up to the tall 34rem, unless a height or tall is given (#190)", async () => {
 	const bars = (n: number) =>
 		`{ categories: ${JSON.stringify(Array.from({ length: n }, (_, i) => `Bar ${i + 1}`))}, horizontal: true, series: [{ type: "bar", data: ${JSON.stringify(Array.from({ length: n }, (_, i) => i + 1))} }] }`;
+	const marked = (label: string) =>
+		`{ categories: ["a", "b", "c"], horizontal: true, series: [{ type: "bar", data: [1, 2, 3] }], marks: [{ x: 1.5, label: ${JSON.stringify(label)} }] }`;
 	const path = await packedMdx(
 		dir,
 		"bar-rows",
@@ -585,7 +644,7 @@ test("a horizontal bar plot is as tall as its bars need, up to the theme's 26rem
 
 <Plot id="five" label="Five" option={${bars(5)}} />
 
-<Plot id="six" label="Six" option={${bars(6)}} />
+<Plot id="nine" label="Nine" option={${bars(9)}} />
 
 <Plot id="twenty" label="Twenty" option={${bars(20)}} />
 
@@ -596,15 +655,19 @@ test("a horizontal bar plot is as tall as its bars need, up to the theme's 26rem
 <Plot id="legend" label="Legend" option={{ categories: ["a", "b"], horizontal: true, series: [{ name: "First series", type: "bar", data: [1, 2] }, { name: "Second series", type: "bar", data: [2, 1] }] }} />
 
 <Plot id="upright" label="Upright" option={{ categories: ["a", "b", "c"], series: [{ type: "bar", data: [1, 2, 3] }] }} />
+
+<Plot id="marked" label="Marked" option={${marked("Payback")}} />
+
+<Plot id="wraps" label="Wraps" option={${marked("16 years: cells rated for 6,000 cycles")}} />
 `,
 	);
 	const figures = drawnFigures(path);
-	// Three rows of 4.5rem (72 px) between 10 px above and 26 px of value labels below, under the empty legend's 8 px.
-	expect(viewBoxes(figures.get("three"))).toEqual(["1054x252", "527x252", "356x252"]);
-	// Five rows are 25.25rem; six would pass the theme's 26rem, and so would twenty: their rows share it.
-	expect(viewBoxes(figures.get("five"))).toEqual(["1054x396", "527x396", "356x396"]);
-	expect(viewBoxes(figures.get("six"))).toEqual(["1054x408", "527x408", "356x408"]);
-	expect(viewBoxes(figures.get("twenty"))).toEqual(["1054x408", "527x408", "356x408"]);
+	// Three rows of 3.5rem (56 px) between 10 px above and 26 px of value labels below, under the empty legend's 8 px.
+	expect(viewBoxes(figures.get("three"))).toEqual(["1054x204", "527x204", "356x204"]);
+	// Five rows are 20.25rem; nine would pass the tall 34rem, and so would twenty: their rows share it.
+	expect(viewBoxes(figures.get("five"))).toEqual(["1054x316", "527x316", "356x316"]);
+	expect(viewBoxes(figures.get("nine"))).toEqual(["1054x536", "527x536", "356x536"]);
+	expect(viewBoxes(figures.get("twenty"))).toEqual(["1054x536", "527x536", "356x536"]);
 	expect(viewBoxes(figures.get("given"))).toEqual(["1054x192", "527x192", "356x192"]);
 	expect(viewBoxes(figures.get("tall"))).toEqual(["1054x536", "527x536", "356x344"]);
 	expect(viewBoxes(figures.get("upright"))).toEqual(["1054x408", "527x408", "356x280"]);
@@ -613,9 +676,16 @@ test("a horizontal bar plot is as tall as its bars need, up to the theme's 26rem
 	expect(readFileSync(path, "utf8")).toMatch(/<div class="chart plot" id="legend" role="img"/);
 	// The height takes the height prop's path, which the box gate sees, and no custom property sizes a figure.
 	const html = readFileSync(path, "utf8");
-	expect(html).toMatch(/<div class="chart plot" id="three" style="block-size:16.25rem"/);
+	expect(html).toMatch(/<div class="chart plot" id="three" style="block-size:13.25rem;?"/);
 	expect(html).not.toContain("--plot-height");
-	await expectFitted(path, 8);
+	// A marker's label takes a line of its own above the rows, which the height counts as plot.js lays it out at the width.
+	expect(viewBoxes(figures.get("marked"))).toEqual(["1054x221", "527x221", "356x221"]);
+	expect(html).toMatch(
+		/<div class="chart plot" id="marked" style="block-size:calc\(13.25rem \+ var\(--plot-mark-lines, 1\) \* \(var\(--size-label\) \+ 4px\)\);?"/,
+	);
+	// A label that wraps into more lines on a phone than on a desktop has no one height to draw at: plot.js draws it.
+	expect(figures.get("wraps")).toBeUndefined();
+	await expectFitted(path, 9);
 }, 60_000);
 
 test("no custom property sizes a figure out of pack's sight: a bar plot's height takes the height prop's path", async () => {
@@ -636,14 +706,14 @@ import "./bar-rule.css";
 		{ "bar-rule.css": ":is(#three, #line, #chart) { --plot-height: 200px; }" },
 	);
 	const figures = drawnFigures(path);
-	expect(viewBoxes(figures.get("three"))).toEqual(["1054x252", "527x252", "356x252"]);
+	expect(viewBoxes(figures.get("three"))).toEqual(["1054x204", "527x204", "356x204"]);
 	expect(viewBoxes(figures.get("line"))).toEqual(["1054x408", "527x408", "356x280"]);
 	const heights = await inPage(path, (cdp) =>
 		cdp.evaluate<number[]>(
 			`["three", "line", "chart"].map((id) => document.getElementById(id).getBoundingClientRect().height)`,
 		),
 	);
-	expect(heights).toEqual([260, 416, 416]);
+	expect(heights).toEqual([212, 416, 416]);
 }, 30_000);
 
 /** kit/parts/charts/option.ts as pack runs it, with colours passed through and labels 7 px a character. */

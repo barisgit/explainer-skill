@@ -44,20 +44,40 @@ interface AxisSpec {
 /** A line or stem point, or a bar value. */
 type PlotPoint = readonly [number, number];
 
+/**
+ * A bar's state, from the page's one accent: "accent" solid, "hollow" its tint inside an accent outline, "hatch" grey lines at
+ * 45 degrees, 6 px apart, inside a grey outline.
+ */
+type PlotFill = "accent" | "hollow" | "hatch";
+
 interface PlotSeries {
 	name?: string;
 	type?: "line" | "stem" | "bar";
 	data: readonly (number | PlotPoint)[];
 	color?: string;
 	width?: number;
+	/** true dashes the line, false keeps it solid; unset, a line in the palette takes its slot's dash. */
 	dash?: boolean;
+	/** Bars: one state for the series, or one per bar (null or "" for the series' colour). */
+	fill?: PlotFill | readonly (PlotFill | "" | null)[];
 	/** true prints the value; a format, one text per point or bar, or a function: stem (x, y, i), bar (v, i). */
 	label?: boolean | NumberFormat | readonly string[] | ((...args: number[]) => string);
 }
 
+/** A category's name, or its name with a muted second line under it. */
+type PlotCategory = string | { name: string; note?: string };
+
+/** A reference marker: a dashed line at x (down the plot) or y (across it), with its label on top. */
+interface PlotMark {
+	x?: number;
+	y?: number;
+	label?: string;
+}
+
 interface PlotOption {
 	series?: PlotSeries[];
-	categories?: string[];
+	categories?: PlotCategory[];
+	marks?: PlotMark[];
 	horizontal?: boolean;
 	stack?: boolean;
 	x?: AxisSpec;
@@ -199,6 +219,10 @@ declare var ChartsOption: (env: {
 	color: (expression: string) => string;
 	/** The language numbers are written in. */
 	lang: () => string;
+	/** px: the size every text of a chart is set at, the theme's --size-label. */
+	size: () => number;
+	/** px: the size a chart's title is set at, the theme's --size-text. */
+	text: () => number;
 }) => {
 	resolveOption<T>(option: T): T;
 	theme(place: { under: string; font: string; animation: boolean }): ChartOption;
@@ -214,7 +238,7 @@ declare var ChartsOption: (env: {
 	settings(option: ChartOption): ChartOption;
 	/**
 	 * For an option whose named lines carry their names at their ends: the option so, and the option with a legend for a size
-	 * where the names crowd; else undefined. width measures a 12 px label.
+	 * where the names crowd; else undefined. width measures a label at the label size.
 	 */
 	endNames(
 		option: ChartOption,
@@ -222,10 +246,27 @@ declare var ChartsOption: (env: {
 	): { named: ChartOption; legend: ChartOption } | undefined;
 	/** Whether two of a drawn chart's end labels sit less than a line apart, on a live or SSR ECharts instance. */
 	crowded(chart: unknown): boolean;
+	/**
+	 * The option with the kit's defaults by series place: line dashes per palette slot, a line between stacked bars, marker
+	 * labels on top, left of the markers `sides` names by series index (as markSides read them from the chart drawn).
+	 */
+	defaults(option: ChartOption, sides?: ReadonlyMap<number, ReadonlySet<number>>): ChartOption;
+	/** What defaults generates for the option, as text to compare: a change redraws the chart rather than patching it. */
+	styling(option: ChartOption): string;
+	/** Which vertical markers of a drawn chart stand past the middle of their axis, by series index; see defaults. */
+	markSides(chart: unknown): ReadonlyMap<number, ReadonlySet<number>>;
+};
+/** See ChartsOption's defaults (kit/parts/charts/defaults.ts). */
+declare var ChartsDefaults: {
+	defaults(option: ChartOption, sides?: ReadonlyMap<number, ReadonlySet<number>>): ChartOption;
+	styling(option: ChartOption): string;
+	place(chart: unknown): ReadonlyMap<number, ReadonlySet<number>>;
 };
 declare var PlotDraw: (env: {
 	/** The language numbers are written in. */
 	lang: () => string;
+	/** px: the size text is set at, the theme's --size-label. */
+	size: () => number;
 }) => {
 	/** The SVG content for the option at W x H pixels, with series i drawn when shown[i]; textWidth measures a label in px. */
 	render(
@@ -242,7 +283,80 @@ declare var PlotDraw: (env: {
 	legendMarkup(option: PlotOption, textWidth: (s: unknown) => number, H: number): string;
 	/** Per series: whether it is switched on, given the names switched off. */
 	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
+	/** How many lines the markers' labels take on top of the plot at W x H, which push it down (render lays them out the same). */
+	markLines(option: PlotOption, W: number, H: number, textWidth: (s: unknown) => number): number;
 };
+
+/** A mark's value text from its value, its index in the series and, for a stem, its x. */
+type PlotLabeller = (value: number, i: number, x: number) => string;
+declare var PlotFormat: (env: { lang: () => string }) => {
+	/** An axis's number text by its format: a function, a JSON NumberFormat, or unset (in full). */
+	formatter(format: AxisSpec["format"]): (v: number) => string;
+	/** A series' values' texts by its label, `format` writing them for label: true; undefined for no labels. */
+	labeller(
+		label: PlotSeries["label"],
+		format: (v: number) => string,
+		stem: boolean,
+	): PlotLabeller | undefined;
+};
+/** How plot.js's parts write an SVG line and text (kit/parts/plot/draw.ts). */
+interface PlotSvg {
+	svgLine: (cls: string, x1: number, x2: number, y1: number, y2: number, style?: string) => string;
+	svgText: (
+		cls: string,
+		x: number,
+		y: number,
+		anchor: "start" | "middle" | "end",
+		s: unknown,
+		style?: string,
+	) => string;
+}
+/** A line's name at its end: the line's last point, colour and dash ("" for none), which a leader to a moved name takes. */
+interface PlotEndName {
+	name: string;
+	at: { x: number; y: number };
+	colour: string;
+	dash: string;
+}
+declare var PlotEnds: (env: PlotSvg & { size: () => number }) => {
+	/** Whether the names go at the line ends, above a plot whose bottom edge is `bottom` px down. */
+	fit(option: PlotOption, textWidth: (s: unknown) => number, bottom: number): boolean;
+	/** px a name takes right of the plot. */
+	room(name: string, textWidth: (s: unknown) => number): number;
+	/** The names drawn, spread apart above B. */
+	marks(named: readonly PlotEndName[], B: number): string;
+};
+declare var PlotMarks: (env: PlotSvg) => {
+	/** A bar at [x, y, w, h] in a state; open when a value on it reads as one outside it. */
+	bar(
+		state: PlotFill | undefined,
+		colour: string,
+		box: readonly [number, number, number, number],
+		title: string,
+	): { markup: string; open: boolean };
+	/** The markers' lines and labels; top is where labels on top start. */
+	markers(
+		marks: readonly PlotMark[],
+		frame: PlotMarkFrame,
+		top: number,
+	): { lines: string; labels: string };
+	/** How many lines the tallest label on top takes. */
+	rows(marks: readonly PlotMark[], frame: PlotMarkFrame): number;
+	/** A series' legend swatch: its type, colour, dash (an SVG dash array, "" solid) and its bars' state. */
+	swatch(type: string, colour: string, dash: string, state: PlotFill | undefined): string;
+};
+/** What PlotMarks needs of a plot: its axes' mapping (a numeric axis's), its box, the drawing's width and a label's line height. */
+interface PlotMarkFrame {
+	X?: ((v: number) => number) | undefined;
+	Y?: ((v: number) => number) | undefined;
+	L: number;
+	R: number;
+	T: number;
+	B: number;
+	W: number;
+	line: number;
+	textWidth: (s: unknown) => number;
+}
 
 // An image or font a page's module imports is its data: URL, which pack embeds: import icon from "./icon.svg" (src/data-uri.ts).
 declare module "*.png" {

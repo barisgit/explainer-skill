@@ -132,6 +132,43 @@ ${pageContract({
 	expect(await packAndRun(dir, "toggle-contrast", page, { widths: [DESKTOP] })).toEqual([]);
 }, 30_000);
 
+test("series colours are muted inks told apart by lightness, each 3:1 on the page, and chips mark the accent's three states (#190)", async () => {
+	const swatches = [1, 2, 3, 4, 5, 6]
+		.map((i) => `<i id="c${i}" style="background: var(--c${i})">.</i>`)
+		.join("");
+	const page = `${HEAD}${swatches}<div id="bg" style="background: var(--bg)">.</div>
+<p class="legend"><span class="chip" style="--swatch: var(--accent)"><i id="solid"></i>Done</span><span class="chip"><i id="hollow" class="hollow"></i>Planned</span><span class="chip"><i id="hatch" class="hatch"></i>Estimated</span></p></main>
+<script>${CONTRAST}
+const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+// A computed colour as rgb(), whatever space the browser writes it in (color-mix gives oklab).
+const rgb = (css) => { pixel.clearRect(0, 0, 1, 1); pixel.fillStyle = css; pixel.fillRect(0, 0, 1, 1); return "rgb(" + [...pixel.getImageData(0, 0, 1, 1).data.slice(0, 3)].join(", ") + ")"; };
+const series = () => [1, 2, 3, 4, 5, 6].map((i) => rgb(colour("c" + i, "backgroundColor")));
+const inScheme = (scheme, check) => { document.documentElement.dataset.scheme = scheme; return check(); };
+const onPage = () => series().every((c) => contrast(c, rgb(colour("bg", "backgroundColor"))) >= 3);
+// No more hue than the ink's and the page's own warmth.
+const spread = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return Math.max(r, g, b) - Math.min(r, g, b); };
+const grey = () => series().every((c) => spread(c) <= Math.max(spread(rgb(getComputedStyle(document.body).color)), spread(rgb(colour("bg", "backgroundColor")))));
+const apart = () => series().every((c, i, all) => all.every((d, j) => i === j || contrast(c, d) >= 1.2));
+// Neighbours in order, the last beside the first as in a pie, differ most: they touch in stacks and pies.
+const neighbours = () => series().every((c, i, all) => contrast(c, all[(i + 1) % all.length]) >= 1.6);
+const marker = (id) => getComputedStyle(document.getElementById(id));
+${pageContract({
+	"light: every series colour is 3:1 on the page": `inScheme("light", onPage)`,
+	"light: series colours are as grey as the ink and page": `inScheme("light", grey)`,
+	"light: no two series colours are close in lightness": `inScheme("light", apart)`,
+	"light: neighbouring series colours are well apart": `inScheme("light", neighbours)`,
+	"dark: every series colour is 3:1 on the page": `inScheme("dark", onPage)`,
+	"dark: series colours are as grey as the ink and page": `inScheme("dark", grey)`,
+	"dark: no two series colours are close in lightness": `inScheme("dark", apart)`,
+	"dark: neighbouring series colours are well apart": `inScheme("dark", neighbours)`,
+	"a solid marker is the accent": `rgb(marker("solid").backgroundColor) === rgb(getComputedStyle(document.body).getPropertyValue("--accent"))`,
+	"a hollow marker is the accent's tint in an accent outline": `marker("hollow").boxShadow.includes("inset") && rgb(marker("hollow").backgroundColor) !== rgb(marker("solid").backgroundColor)`,
+	"a hatch marker is stripes in a grey outline": `marker("hatch").backgroundImage.startsWith("repeating-linear-gradient") && marker("hatch").boxShadow.includes("inset")`,
+})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "series-greys", page, { widths: [DESKTOP] })).toEqual([]);
+}, 30_000);
+
 test("text keeps to the text and label sizes: code takes the size of the text around it, and a code block is a label", async () => {
 	const output = await packedMdx(
 		dir,

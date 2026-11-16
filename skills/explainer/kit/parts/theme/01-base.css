@@ -33,13 +33,21 @@
 	--warn: light-dark(#8a5a00, #e8b94a);
 	--warn-soft: color-mix(in oklab, var(--warn) 11%, var(--surface));
 	--info: light-dark(#35609c, #8fb2e8);
-	/* Categorical series colours (Okabe-Ito derived); use in this order. */
-	--c1: light-dark(#0072b2, #4aa3df);
-	--c2: light-dark(#d55e00, #ef7d3b);
-	--c3: light-dark(#009e73, #2fc095);
-	--c4: light-dark(#cc79a7, #e08fc0);
-	--c5: light-dark(#8a6d00, #e6b422);
-	--c6: light-dark(#3394cc, #7cc6f0);
+	/* Series colours: muted inks, so colour shows only where the author puts the accent (var(--accent) on the finding). Each is
+	   --ink mixed into --bg, from 44% (3:1 on --bg, as an axis) to 84%, in the order that keeps neighbours furthest apart in
+	   lightness, the last beside the first as in a pie; lines also take a dash per slot (Chart and Plot), and touching fills a
+	   line in the tone under them, so several stay apart without hue, in both schemes and in print. */
+	--c1: color-mix(in oklab, var(--ink) 60%, var(--bg));
+	--c2: color-mix(in oklab, var(--ink) 84%, var(--bg));
+	--c3: color-mix(in oklab, var(--ink) 44%, var(--bg));
+	--c4: color-mix(in oklab, var(--ink) 68%, var(--bg));
+	--c5: color-mix(in oklab, var(--ink) 52%, var(--bg));
+	--c6: color-mix(in oklab, var(--ink) 76%, var(--bg));
+	/* The accent's three states, for marks: solid (--accent); hollow, its tint (--hollow) inside an accent outline; hatch, grey
+	   lines (--hatch) at 45 degrees every 6 px, which --hatch-fill draws as a background. */
+	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
+	--hatch: color-mix(in oklab, var(--ink) 60%, var(--bg));
+	--hatch-fill: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 6px);
 	/* Three type roles, so a screen holds at most three levels: display (the page's headline, a section's heading), text, and
 	   label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
 	--size-headline: clamp(1.875rem, 3.3vw, 2.875rem);

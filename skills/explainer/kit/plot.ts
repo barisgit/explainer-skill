@@ -2,13 +2,17 @@
    Plot.make(el, option) -> { set(patch), dispose() }
      el      element with a height (.chart), which stays the element's: a bar plot made here gets no height by its bars, unlike
              the Plot component's. Plot fills it with a legend and an SVG drawn at its pixel size and redrawn on resize,
-             so text stays 13 px from phone to desktop, in place of what pack drew in it. Colours are CSS tokens: light and dark switch with no redraw.
-     option  { series, categories, horizontal, stack, x, y, legend }
-       series  [{ name, type, data, color, width, dash, label }]
-         type "line"   data [[x, y], ...]; width in px (default 2), dash: true for dashed
+             so text stays at the label size (--size-label, 13 px) from phone to desktop, in place of what pack drew in it.
+             Colours are CSS tokens: light and dark switch with no redraw.
+     option  { series, categories, horizontal, stack, x, y, marks, legend }
+       series  [{ name, type, data, color, width, dash, fill, label }]
+         type "line"   data [[x, y], ...]; width in px (default 2); dash: true dashed, false solid, unset by its slot (below)
          type "stem"   data [[x, y], ...]: a drop line from 0 with a dot, for spectra and samples
          type "bar"    data [v, ...], one per category
-         color  any CSS colour, default var(--c1)..var(--c6) in turn; "var(--accent)" and color-mix(...) work
+         color  any CSS colour, default var(--c1)..var(--c6) in turn: muted inks, a line in each also dashed its own way.
+                Put "var(--accent)" on the series the page is about; color-mix(...) works too
+         fill   a bar's state, from the accent: "accent" solid, "hollow" (tint in an accent outline), "hatch" (grey lines at 45
+                degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour)
          name   two or more named lines carry their names at their ends, a moved name tied to its line by a leader, when the names
                 are short (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
                 on and off, a series without a name toggling with the named one before it
@@ -16,6 +20,8 @@
                 or a function: stem (x, y, i) => text, bar (v, i) => text
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
+                   { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
+       marks  [{ x: 16, label: "Payback" }]: a dashed reference line at x (or y), its label on top beside it, wrapped inside the plot
        x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
@@ -25,13 +31,15 @@
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A bar label sits past the bar's end, or inside the end when the panel has no room past it. A label on a stacked segment is left out
    when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
-   Values outside min and max sit on the edge. A vertical marker is a two-point dashed line series.
+   Values outside min and max sit on the edge.
    Axes carry their labels and one quiet baseline at 0, without gridlines or tick marks. */
 (() => {
-	const FONT = 13; // px, as theme.css sets it for .plot text
 	const measureCtx = document.createElement("canvas").getContext("2d");
-	const { render, legendMarkup, switchedOn } = window.PlotDraw({
+	// The label size (--size-label) in px, as the plot being drawn sets it on its legend, which theme.css sizes with its text.
+	let size = 13;
+	const { render, legendMarkup, switchedOn, markLines } = window.PlotDraw({
 		lang: () => document.documentElement.lang || "en",
+		size: () => size,
 	});
 
 	const made = new WeakMap<HTMLElement, () => void>();
@@ -50,12 +58,16 @@
 		const off = new Set<string | undefined>(); // names of the series the reader switched off in the legend
 		const nameOf = (button: HTMLElement) => option.series?.[Number(button.dataset.i)]?.name;
 
-		/** A label's width at the plot's 13 px, in the element's font. */
+		/** The plot's text: 500 at the label size, in the element's font. */
+		const font = () =>
+			`500 ${parseFloat(getComputedStyle(legend).fontSize)}px ${getComputedStyle(el).fontFamily}`;
+
+		/** A label's width at the label size, in the element's font. */
 		function textWidth(s: unknown) {
 			if (!measureCtx) {
 				throw new Error("kit:plot.js needs a canvas to measure text");
 			}
-			measureCtx.font = `500 ${FONT}px ${getComputedStyle(el).fontFamily}`;
+			measureCtx.font = font();
 			return measureCtx.measureText(String(s)).width;
 		}
 
@@ -64,6 +76,7 @@
 			area.clientHeight + legend.offsetHeight - parseFloat(getComputedStyle(legend).paddingTop);
 
 		function draw() {
+			size = parseFloat(getComputedStyle(legend).fontSize);
 			const series = option.series ?? [];
 			const html = legendMarkup(option, textWidth, bareHeight());
 			if (html !== legendHtml) {
@@ -77,10 +90,16 @@
 				button.setAttribute("aria-pressed", String(!off.has(nameOf(button))));
 			}
 			const W = area.clientWidth;
-			const H = area.clientHeight;
-			if (!W || !H) {
+			if (!W || !area.clientHeight) {
 				return; // hidden: drawn when it first gets a size
 			}
+			// The lines the markers' labels take at this width: a bar plot Plot sizes by its bars grows by them (its height is
+			// calc(... var(--plot-mark-lines) ...)), so its rows keep their size; any other plot takes them from its own height.
+			el.style.setProperty(
+				"--plot-mark-lines",
+				String(markLines(option, W, area.clientHeight, textWidth)),
+			);
+			const H = area.clientHeight;
 			svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 			svg.innerHTML = render(option, W, H, textWidth, switchedOn(series, off));
 		}
@@ -97,7 +116,7 @@
 		});
 		const resizer = new ResizeObserver(draw);
 		resizer.observe(area);
-		void document.fonts.load(`500 ${FONT}px ${getComputedStyle(el).fontFamily}`).then(draw, draw);
+		void document.fonts.load(font()).then(draw, draw);
 		const dispose = () => {
 			resizer.disconnect();
 			if (made.get(el) === dispose) {

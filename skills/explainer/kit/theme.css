@@ -5,9 +5,11 @@
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
    <html data-scheme="dark">; charts and diagrams follow it too.
-   Colour what the reader compares, each compared thing (a phase, an option, a series) in the same --c1..--c6 on every chart and
-   view; var(--muted) is for context a section is not about (the rest of a total, a baseline). The accent marks the headline phrase
-   (h1 em) and the mark a readout points at.
+   The accent has one meaning, the finding: the headline phrase (h1 em), and on a chart the series or bar the page is about
+   (color: "var(--accent)"). Series default to --c1..--c6, muted inks told apart by lightness, a line also by its dash, and best by
+   the names on them; keep each compared thing in the same one on every chart and view. A mark takes one of the accent's three
+   states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as a background),
+   for done, planned and estimated, say.
    Classes: page masthead lede next meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
@@ -16,7 +18,8 @@
    Expand all joins its end. Layout only: the page owns their state, and inputs with ids are kept across reloads: kit keep).
    Category markers: <span class="chip" style="--swatch: var(--c2)"><i></i>Firmware</span> is a square in the category's colour
    before its word. A <p class="legend"> of them over the records keys each category once, and rows repeat the marker with its word
-   or a short form of it ("FW"): colour alone does not tell the categories apart for every reader.
+   or a short form of it ("FW"): colour alone does not tell the categories apart for every reader. <i class="hollow"></i> and
+   <i class="hatch"></i> mark the accent's other two states.
    Figures: a .fig sits plain on the page with no fill or frame, its controls right above what they act on; .split is a row of
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
@@ -36,7 +39,8 @@
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
-   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --font --mono;
+   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --hollow --hatch --hatch-fill
+   --font --mono;
    --size-headline --size-display --size-text --size-label --radius;
    --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
    Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.

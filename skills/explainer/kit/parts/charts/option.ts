@@ -1,13 +1,23 @@
 /* Shared ECharts theme, layout and metrics. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ChartsOption = ({ color, lang }) => {
+window.ChartsOption = ({ color, lang, size, text }) => {
 	const COLOR_KEY = /(olor|^fill|^stroke)$/;
 	const COLOR_EXPR = /^(var|color-mix|light-dark)\(/;
 
 	const isObject = (value: unknown): value is Record<string, unknown> =>
 		value !== null && typeof value === "object" && !Array.isArray(value);
 
-	/** The Intl options of a JSON number format (NumberFormat in kit-types/globals.d.ts); plot.js writes formats the same way. */
+	/**
+	 * The Intl options of a JSON number format (NumberFormat in kit-types/globals.d.ts), built as kit/components/parts/format.ts
+	 * builds them: a plain number groups from five digits, so a year stays 2024; money always groups, so 4,200 stands beside 11,200,
+	 * and a whole amount has no cents unless `digits` asks for them; percent wins over a currency.
+	 */
+	/** A percent stays one beside a currency, as Table writes it; money groups thousands always and drops whole cents. */
+	const money = (currency: string | undefined, digits: number | undefined) => ({
+		useGrouping: currency ? ("always" as const) : ("min2" as const),
+		...(currency ? { currency } : {}),
+		...(currency && digits === undefined ? { trailingZeroDisplay: "stripIfInteger" as const } : {}),
+	});
 	const intlOptions = ({
 		digits,
 		percent,
@@ -15,8 +25,7 @@ window.ChartsOption = ({ color, lang }) => {
 		compact,
 	}: NumberFormat): Intl.NumberFormatOptions => ({
 		style: percent ? "percent" : currency ? "currency" : "decimal",
-		useGrouping: "min2", // 12 345, but a year stays 2024
-		...(currency ? { currency } : {}),
+		...money(currency, digits),
 		...(compact ? { notation: "compact" } : {}),
 		...(digits === undefined
 			? {}
@@ -110,10 +119,11 @@ window.ChartsOption = ({ color, lang }) => {
 			? { ...option, baseOption: { ...option.baseOption, animation: false } }
 			: { ...option, animation: false };
 
-	/** px: ECharts' gap between a line's end and its end label, the room kept past the label, and a label's line with its halo. */
+	/** px: ECharts' gap between a line's end and its end label, and the room kept past the label. */
 	const END_DISTANCE = 8;
 	const END_MARGIN = 8;
-	const END_LINE = 14;
+	/** px: a label's line with its halo. */
+	const endLine = () => size() + 2;
 	// What the kit cannot see the names' size or place through: a text style of the author's, zoom, and anything but one plain grid.
 	const ROOT_ONLY = [
 		"legend",
@@ -166,8 +176,7 @@ window.ChartsOption = ({ color, lang }) => {
 	 * when the option has no legend, its series are two or more named lines with no end label or label layout of their own, on
 	 * one grid with no top, bottom or height of the author's, a left-to-right x axis (not reversed) and a value or log y axis,
 	 * neither with a min or max that could clip a line, and nothing sets the names' text (a textStyle) or moves their ends
-	 * (dataZoom, a dataset, encode). The grid keeps room on its right for the longest name, measured by `width` at ECharts' 12 px
-	 * label.
+	 * (dataZoom, a dataset, encode). The grid keeps room on its right for the longest name, measured by `width` at the label size.
 	 */
 	function endNames(
 		option: ChartOption,
@@ -218,7 +227,7 @@ window.ChartsOption = ({ color, lang }) => {
 				}
 			});
 		ends.sort((a, b) => a - b);
-		return ends.some((y, i) => i > 0 && y - (ends[i - 1] as number) < END_LINE);
+		return ends.some((y, i) => i > 0 && y - (ends[i - 1] as number) < endLine());
 	}
 
 	type TextMeasure = (text: string, font?: string) => { width: number };
@@ -412,7 +421,7 @@ window.ChartsOption = ({ color, lang }) => {
 		"boxplot",
 	];
 
-	/** ECharts theme object built from the tokens, so every component starts in the page's look. */
+	/** ECharts theme object built from the tokens, so every component starts in the page's look, its text at the label size. */
 	function theme({ under, font, animation }: { under: string; font: string; animation: boolean }) {
 		const token = (name: string) => color(`var(--${name})`);
 		const ink = token("ink");
@@ -422,15 +431,19 @@ window.ChartsOption = ({ color, lang }) => {
 		const surface = token("surface");
 		const accent = token("accent");
 		const accentSoft = token("accent-soft");
+		// ECharts sets 12 px on its axis labels, legend and others itself, which the root text style does not reach.
+		const fontSize = size();
 		// No chrome: the labels say where values are, gridlines and ticks are off, and an axis line (on by ECharts' default only
 		// for category and time axes, as the baseline marks start from) is quiet. What an option turns back on keeps these colours.
 		const axis = {
 			axisLine: { lineStyle: { color: rule } },
 			axisTick: { show: false, lineStyle: { color: rule } },
-			axisLabel: { color: muted },
-			nameTextStyle: { color: muted },
+			axisLabel: { color: muted, fontSize },
+			nameTextStyle: { color: muted, fontSize },
 			splitLine: { show: false, lineStyle: { color: rule } },
 		};
+		// A value's labels are as wide as its unit makes them ("60 years"): where two would overlap, one is left out.
+		const values = { ...axis, axisLabel: { ...axis.axisLabel, hideOverlap: true } };
 		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a halo in the tone under the chart.
 		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
 		return {
@@ -444,27 +457,31 @@ window.ChartsOption = ({ color, lang }) => {
 			animationDuration: 0,
 			animationDurationUpdate: 500,
 			animationEasing: "cubicOut",
-			textStyle: { fontFamily: font, color: ink },
-			title: { textStyle: { color: ink }, subtextStyle: { color: muted } },
+			textStyle: { fontFamily: font, fontSize, color: ink },
+			// The title in the text role (the page's body size, set apart by weight), its subtext as a label.
+			title: {
+				textStyle: { color: ink, fontSize: text(), fontWeight: 600 },
+				subtextStyle: { color: muted, fontSize },
+			},
 			categoryAxis: axis,
-			valueAxis: axis,
+			valueAxis: values,
 			timeAxis: axis,
-			logAxis: axis,
+			logAxis: values,
 			legend: {
 				__kitLegendRoom: true,
-				textStyle: { color: ink },
+				textStyle: { color: ink, fontSize },
 				inactiveColor: ruleStrong,
-				pageTextStyle: { color: muted },
+				pageTextStyle: { color: muted, fontSize },
 				pageIconColor: accent,
 			},
 			tooltip: {
 				backgroundColor: surface,
 				borderColor: ruleStrong,
-				textStyle: { color: ink },
+				textStyle: { color: ink, fontSize },
 				axisPointer: {
 					lineStyle: { color: muted },
 					crossStyle: { color: muted },
-					label: { backgroundColor: ink, color: surface },
+					label: { backgroundColor: ink, color: surface, fontSize },
 				},
 			},
 			dataZoom: {
@@ -472,7 +489,7 @@ window.ChartsOption = ({ color, lang }) => {
 				borderColor: rule,
 				backgroundColor: "transparent",
 				fillerColor: accentSoft,
-				textStyle: { color: muted },
+				textStyle: { color: muted, fontSize },
 				handleStyle: { color: surface, borderColor: ruleStrong },
 				moveHandleStyle: { color: rule },
 				emphasis: { handleStyle: { borderColor: accent }, moveHandleStyle: { color: accent } },
@@ -487,10 +504,27 @@ window.ChartsOption = ({ color, lang }) => {
 				iconStyle: { borderColor: muted },
 				emphasis: { iconStyle: { borderColor: accent } },
 			},
-			visualMap: { textStyle: { color: muted } },
-			markLine: { lineStyle: { color: muted }, label: { color: muted } },
+			visualMap: { textStyle: { color: muted, fontSize } },
+			// A reference marker: a dashed ink line with no arrows, its label in ink on the halo (where: ChartsDefaults).
+			markLine: {
+				symbol: ["none", "none"],
+				lineStyle: { color: ink, type: [3, 3], width: 1 },
+				label: { ...label.label, fontWeight: 500 },
+			},
 		};
 	}
 
-	return { resolveOption, theme, layout, measureText, still, settings, endNames, crowded };
+	return {
+		resolveOption,
+		theme,
+		layout,
+		measureText,
+		still,
+		settings,
+		endNames,
+		crowded,
+		defaults: window.ChartsDefaults.defaults,
+		styling: window.ChartsDefaults.styling,
+		markSides: window.ChartsDefaults.place,
+	};
 };

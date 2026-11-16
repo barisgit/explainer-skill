@@ -45,7 +45,7 @@
 }
 
 /* Plots (kit:plot.js) on the same .chart element: a legend row above an SVG that fills the rest, drawn at pixel size so text stays
-   13 px, the label's size. */
+   at the label's size, which plot.js reads from the legend. */
 .plot {
 	display: flex;
 	flex-direction: column;
@@ -90,8 +90,13 @@
 	inline-size: 0.75rem;
 	border-radius: 2px;
 }
-.plot-legend i.dash {
-	background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 6px);
+.plot-legend i.hollow {
+	background: var(--hollow);
+	box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.plot-legend i.hatch {
+	background: var(--hatch-fill);
+	box-shadow: inset 0 0 0 1px var(--hatch);
 }
 .plot-area {
 	position: relative;
@@ -106,15 +111,19 @@
 	overflow: visible;
 }
 .plot text {
-	font: 500 13px var(--font);
+	font: 500 var(--size-label) var(--font);
 	fill: var(--muted);
 	font-variant-numeric: tabular-nums;
 }
 .plot .name {
 	fill: var(--muted);
 }
-/* A value on a mark, and a line's name at its end. */
-.plot :is(.value, .end) {
+/* A category's name over its note. */
+.plot .cat {
+	fill: var(--ink);
+}
+/* A value on a mark, a line's name at its end and a marker's label. */
+.plot :is(.value, .end, .mark-label) {
 	fill: var(--ink);
 	paint-order: stroke;
 	stroke: var(--under);
@@ -124,9 +133,16 @@
 .plot .value {
 	font-weight: 600;
 }
+/* A value inside its bar: near white on a dark bar, near black on a light one, read from the bar's colour (--c) where the
+   browser reads colours so. */
 .plot .value.inside {
 	fill: var(--surface);
 	stroke: none;
+}
+@supports (color: oklch(from red l c h)) {
+	.plot .value.inside {
+		fill: oklch(from var(--c) calc(0.2 + 0.785 * clamp(0, (0.58 - l) * 1000, 1)) 0 0);
+	}
 }
 /* The baseline: as quiet as a Chart's axis line. */
 .plot svg .axis {
@@ -138,9 +154,6 @@
 	stroke: var(--c);
 	stroke-width: 1.5;
 }
-.plot svg .leader.dash {
-	stroke-dasharray: 3 3;
-}
 .plot svg :is(.line, .stem) {
 	fill: none;
 	stroke: var(--c);
@@ -148,11 +161,36 @@
 	stroke-linejoin: round;
 	stroke-linecap: round;
 }
-.plot svg .line.dash {
-	stroke-dasharray: 6 4;
-}
 .plot svg :is(.dot, .bar) {
 	fill: var(--c);
+}
+/* Stacked segments touch, and neighbouring greys are close: a line in the tone under the plot parts them. */
+.plot svg .stack .bar:not(.hollow, .hatch) {
+	stroke: var(--under);
+	stroke-width: 1px;
+}
+/* The accent's other two states: its tint inside an accent outline, and grey lines at 45 degrees inside a grey outline. */
+.plot svg .bar.hollow {
+	fill: var(--hollow);
+	stroke: var(--accent);
+	stroke-width: 1.5;
+}
+.plot svg .bar.hatch {
+	fill: transparent;
+	stroke: var(--hatch);
+	stroke-width: 1;
+}
+.plot svg .hatching {
+	fill: none;
+	stroke: var(--hatch);
+	stroke-width: 1.5;
+	pointer-events: none;
+}
+/* A reference marker: a dashed line in ink, under the values. */
+.plot svg .mark {
+	stroke: var(--ink);
+	stroke-width: 1;
+	stroke-dasharray: 3 3;
 }
 
 /* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,

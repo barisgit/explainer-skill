@@ -2,7 +2,9 @@
  * The size a figure's element has, so what pack draws (draw.ts) has its shape: the height comes from the kit (the theme's, its
  * `tall` class, or the `height` prop), and a page's own CSS may not change the element's box. A rule that may reach the element
  * and sets its size, padding, border, `all`, `box-sizing` or an animation makes draw.ts draw nothing, as does a page rule that may set the
- * root font size the rem lengths are read against.
+ * root font size the rem lengths are read against, or one that sets the label size (`--size-label`, inherited from anywhere),
+ * which figures' text is drawn at. The lines a bar plot keeps for its markers' labels (`--plot-mark-lines`, which plot.js
+ * sets) count for a plot that grows by them, and the text size (`--size-text`) counts for a chart with a title, which is drawn at it.
  */
 import { readFileSync } from "node:fs";
 
@@ -14,6 +16,7 @@ export interface Place {
 	classes: readonly string[];
 	id: string | undefined;
 	height: string | undefined;
+	grows?: boolean;
 }
 
 /** A window size, in CSS pixels, that vw and vh are read against. */
@@ -41,6 +44,12 @@ const BOX =
 	/^(?:(?:min-|max-)?(?:height|width|block-size|inline-size)|aspect-ratio|box-sizing|all|padding|border|animation)(?:-[\w-]+)?$/;
 /** The properties that set the font size rem is read against, on the root. */
 const FONT = /^font(?:-size)?$/;
+/** The token figures' text takes its size from. */
+const LABEL = /^--size-label$/;
+/** The lines a bar plot with marker labels grows by, which plot.js sets. */
+const MARK_LINES = /^--plot-mark-lines$/;
+/** The token a chart's title takes its size from. */
+const TEXT = /^--size-text$/;
 /** At-rules whose rules hold in some windows, layers or documents; the others' contents style no element. */
 const GROUPING = /^@(?:media|supports|container|layer|scope|document|starting-style)\b/i;
 
@@ -112,7 +121,10 @@ function scan(text: string, selectors: string[] | undefined, out: Rule[]): void 
 	}
 	flat += text.slice(start);
 	const properties = flat.split(";").map((d) => d.slice(0, d.indexOf(":")).trim().toLowerCase());
-	if (selectors && properties.some((p) => BOX.test(p) || FONT.test(p))) {
+	if (
+		selectors &&
+		properties.some((p) => [BOX, FONT, LABEL, TEXT, MARK_LINES].some((re) => re.test(p)))
+	) {
 		out.push({ selectors, properties });
 	}
 }
@@ -159,10 +171,11 @@ function mayMatch(selector: string, element: Element): boolean {
 }
 
 /**
- * Whether the stylesheets at `paths` may change the box of a figure's element, or the root font size its rem lengths are read
- * against: the returned function says it for a place.
+ * Whether the stylesheets at `paths` may change the box of a figure's element, the root font size its rem lengths are read
+ * against, or the label size its text is set at: the returned function says it for a place, and for a chart's title (`titled`)
+ * whether they may change the text size too.
  */
-export function pageBoxTouch(paths: Iterable<string>): (place: Place) => boolean {
+export function pageBoxTouch(paths: Iterable<string>): (place: Place, titled?: boolean) => boolean {
 	const rules: Rule[] = [];
 	for (const path of paths) {
 		scan(readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, ""), undefined, rules);
@@ -170,9 +183,14 @@ export function pageBoxTouch(paths: Iterable<string>): (place: Place) => boolean
 	const reaches = (rule: Rule, element: Element, property: RegExp) =>
 		rule.properties.some((p) => property.test(p)) &&
 		rule.selectors.some((s) => mayMatch(s, element));
-	const rootFont = rules.some((rule) => reaches(rule, ROOT, FONT));
-	return (place) =>
-		rootFont ||
+	const sets = (token: RegExp) => rules.some((rule) => rule.properties.some((p) => token.test(p)));
+	const textResized = rules.some((rule) => reaches(rule, ROOT, FONT)) || sets(LABEL);
+	const titleResized = sets(TEXT);
+	const rowsSet = sets(MARK_LINES);
+	return (place, titled = false) =>
+		textResized ||
+		(titled && titleResized) ||
+		(place.grows === true && rowsSet) ||
 		rules.some((rule) =>
 			reaches(rule, { tag: "div", ...place, attributes: FIGURE_ATTRIBUTES }, BOX),
 		);

@@ -4,11 +4,15 @@
  * module it renders one page with; in the browser there is none, and the kit scripts draw over what pack drew.
  */
 
-/** The figure's element, by what sizes it: its classes, its id (which a page's CSS may name) and its `height` prop. */
+/**
+ * The figure's element, by what sizes it: its classes, its id (which a page's CSS may name) and its `height` prop, which for a
+ * bar plot sized by its bars (`grows`) is the height of its rows, the lines its markers' labels take added to it.
+ */
 export interface Place {
 	classes: readonly string[];
 	id: string | undefined;
 	height: string | undefined;
+	grows?: boolean;
 }
 
 /** Draws a figure as markup for the inside of its element, sized for `place` as the theme and the page's CSS size it. */
@@ -16,6 +20,8 @@ export interface Drawer {
 	validateChart(option: ChartOption): void;
 	chart(option: ChartOption, place: Place): string;
 	plot(option: PlotOption, place: Place): string;
+	/** The lines a plot's markers' labels take on top as pack draws it: the same in every copy, or the widest copy's. */
+	plotMarkLines(option: PlotOption, place: Place): number;
 }
 
 let drawer: Drawer | undefined;
@@ -45,11 +51,17 @@ export const placeOf = (
 	classes: string,
 	id: string | undefined,
 	height: string | undefined,
+	grows = false,
 ): Place => ({
 	classes: classes.split(/\s+/).filter(Boolean),
 	id,
 	height,
+	grows,
 });
+
+/** The lines a plot's markers' labels take as pack draws it (see Drawer), or 1 in the browser, where plot.js sets them. */
+export const drawnMarkLines = (option: PlotOption, place: Place): number =>
+	drawer ? drawer.plotMarkLines(option, place) : 1;
 
 /** The style attribute that gives an element the `height` prop as its block size. */
 export const heightStyle = (height: string | undefined) =>

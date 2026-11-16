@@ -1,6 +1,6 @@
-/* code: code fences coloured when you pack, from the kit's tokens in light and dark: no script ships, and only a page with a
-   fence carries this file. ```ts, tsx, js, json, sh, python, c, vhdl, css, html, diff, yaml, sql, rust, go and other common
-   languages are coloured; any other stays plain.
+/* code: code fences coloured when you pack, in light and dark: no script ships, and only a page with a fence carries this file.
+   ```ts, tsx, js, json, sh, python, c, vhdl, css, html, diff, yaml, sql, rust, go and other common languages are coloured; any
+   other stays plain.
    A mark after the language links code with the prose that shares its ref (kit link): ref:name="text" wraps every place the
    fence writes that text in <span data-ref="name">.
      ```ts ref:call="api.call"
@@ -31,20 +31,21 @@ pre [data-ref].is-lit {
 	outline: 1px solid var(--accent);
 }
 
+/* The token hues are the code's own, not the series tokens, which are muted inks. */
 .tok-comment {
 	color: var(--muted);
 }
 .tok-keyword {
-	color: color-mix(in oklab, var(--c4) 60%, var(--ink));
+	color: color-mix(in oklab, light-dark(#cc79a7, #e08fc0) 60%, var(--ink));
 }
 .tok-string {
 	color: color-mix(in oklab, var(--ok) 85%, var(--ink));
 }
 .tok-number {
-	color: color-mix(in oklab, var(--c2) 70%, var(--ink));
+	color: color-mix(in oklab, light-dark(#d55e00, #ef7d3b) 70%, var(--ink));
 }
 .tok-function {
-	color: color-mix(in oklab, var(--c1) 80%, var(--ink));
+	color: color-mix(in oklab, light-dark(#0072b2, #4aa3df) 80%, var(--ink));
 }
 .tok-type {
 	color: color-mix(in oklab, var(--warn) 85%, var(--ink));

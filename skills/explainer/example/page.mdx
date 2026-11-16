@@ -68,7 +68,7 @@ Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ ord
 
 <h2 id="fixes" data-nav="Fixes">A second barista saves 97% of the wait; every other fix saves about half</h2>
 
-<Plot label="Average wait at 90% busy for each fix" option={{ categories: fixes.map((f) => f.name), horizontal: true, series: [{ name: "Average wait", type: "bar", data: fixes.map((f) => f.wait), label: { digits: 1, unit: "min" } }], x: { format: { unit: "min" } } }} />
+<Plot label="Average wait at 90% busy for each fix" option={{ categories: fixes.map((f) => f.name), horizontal: true, series: [{ name: "Average wait", type: "bar", data: fixes.map((f) => f.wait), fill: fixes.map((f) => (f.id === "second" ? "accent" : "")), label: { digits: 1, unit: "min" } }], x: { format: { unit: "min" } } }} />
 
 {/* One record per row, computed from the model; each name opens that fix's view. */}
 

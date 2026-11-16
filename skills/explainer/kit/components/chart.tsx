@@ -2,8 +2,9 @@
    pack includes ECharts when a page uses it.
    <Chart option={{ xAxis: {...}, yAxis: {}, series: [...] }} label="What the chart shows" />
      option  ECharts options for line, bar, scatter, pie, heatmap, treemap, sankey, sunburst, radar, boxplot and custom series.
-             Colours default to --c1..--c6; write "var(--accent)" for a token. A new option re-applies: series follow its list,
-             other components merge into what the chart shows.
+             Colours default to --c1..--c6, muted inks, a line in each also dashed its own way; put "var(--accent)" on the
+             series the page is about. Text is at the label size. A new option re-applies: series follow its list, other
+             components merge into what the chart shows.
      label   the accessible name (role="img")
      class   more classes after "chart", e.g. "tall"
      height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them, e.g. "clamp(16rem, 34vw, 21rem)". Size a
@@ -12,6 +13,12 @@
    Colours: write "var(--accent)" or "color-mix(in srgb, var(--accent) 20%, transparent)" in any colour option (color, borderColor,
      fill, colorStops[].color, ...); they are resolved when the chart mounts, so they follow light/dark. A bare token is an opaque
      colour: keep palette tokens opaque, as pack mixes them (a visualMap range) like color-mix() does.
+   The accent's states, in itemStyle: solid { color: "var(--accent)" }; hollow { color: "var(--hollow)", borderColor:
+     "var(--accent)", borderWidth: 1.5 }; hatch { color: "transparent", borderColor: "var(--hatch)", borderWidth: 1, decal:
+     { symbol: "rect", symbolSize: 1, dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: -Math.PI / 4, color: "var(--hatch)" } }.
+   Markers: markLine: { data: [{ xAxis: 16, name: "Payback" }], label: { formatter: "{b}" } } is a dashed ink line with its label
+     on top beside it, whichever way the axis runs, left of the line past the axis' middle; { yAxis: 2 } runs across with its
+     label above its end. A position, align or offset of yours wins. A title is set at the text size, its subtext as a label.
    Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
      { currency: "EUR", compact: true } (written for the page's lang), or one text per data item or tick: ["Low", "", "Peak"].
    Layout: one grid with one unpositioned horizontal legend reserves bottom room from ECharts’ rendered legend box, live and
