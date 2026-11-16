@@ -288,3 +288,128 @@ test("stats whose terms change from frame to frame show each frame's own terms (
 		expect(await act(cdp, `document.getElementById("k-2").click()`, terms)).toEqual(["Mar"]);
 	});
 }, 30_000);
+
+const HOVER_PAGE = `import { Controls, Explore } from "kit";
+import { months, year } from "./model.ts";
+
+# Year
+
+<Explore id="own" label="The year by month" controls={[{ id: "mon", label: "Month", choice: months, value: "11", axis: true }]} frame={year} />
+
+## Shared
+
+<Controls id="set" controls={[{ id: "m2", label: "Month", choice: months, value: "0", axis: true }]} />
+
+<Explore id="follow" use="set" label="The year again" frame={year} />
+
+<Explore id="also" use="set" label="The year once more" frame={year} />
+`;
+
+/** Page expression: what a figure shows of its column, and the value its control holds. */
+const SHOWN = (figure: string, control: string) => `(() => {
+	const fig = document.getElementById("${figure}");
+	const legend = fig.querySelector(".plot-legend");
+	return {
+		checked: document.querySelector("input[name=${control}]:checked")?.id,
+		head: legend.querySelector(".key-head")?.textContent,
+		values: [...legend.querySelectorAll(".v")].map((v) => v.textContent),
+		frame: Math.round(Number(fig.querySelector("svg rect.picked")?.getAttribute("x"))),
+		legend: legend.getBoundingClientRect().height,
+		area: fig.querySelector(".plot-area").getBoundingClientRect().height,
+	};
+})()`;
+type Shown = {
+	checked: string;
+	head: string;
+	values: string[];
+	frame: number;
+	legend: number;
+	area: number;
+};
+
+/** The centre of a figure's ith column bar (or, with `strip`, of its ith strip label) in the viewport, scrolled to the middle. */
+const centre = (cdp: Cdp, figure: string, i: number, strip = false) =>
+	cdp.evaluate<{ x: number; y: number }>(`(() => {
+		const fig = document.getElementById("${figure}");
+		fig.scrollIntoView({ block: "center" });
+		const box = [...fig.querySelectorAll("${strip ? ".plot-strip label" : "svg rect.bar"}")][${i}].getBoundingClientRect();
+		return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+	})()`);
+
+/** Moves a mouse (or `pointerType` pen) with no button held to `point`, then waits two frames. */
+async function hover(cdp: Cdp, point: { x: number; y: number }) {
+	await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+	await cdp.evaluate(FRAMES, true);
+}
+
+test("hovering a column or its strip label previews its frame and key at once; only a click picks, and touch never previews", async () => {
+	dir.write("model.ts", MODEL);
+	const output = await packedMdx(dir, "year-hover", HOVER_PAGE);
+	await inPage(output, async (cdp) => {
+		const own = SHOWN("own", "mon");
+		const rest = await cdp.evaluate<Shown>(own);
+		expect(rest).toMatchObject({ checked: "mon-11", head: "Dec" });
+
+		// A hovered column: its name and values in the key and the frame around it, drawn at once; the pick stays.
+		await hover(cdp, await centre(cdp, "own", 3));
+		const april = await cdp.evaluate<Shown>(own);
+		expect(april).toMatchObject({
+			checked: "mon-11",
+			head: "Apr",
+			values: ["172\u00a0kWh", "88\u00a0kWh"],
+			legend: rest.legend,
+			area: rest.area,
+		});
+		expect(april.frame).toBeLessThan(rest.frame);
+		// The picked column keeps its strip mark while the frame is elsewhere.
+		expect(
+			await cdp.evaluate(
+				`document.querySelector("#own .plot-strip label:has(input:checked)").dataset.full`,
+			),
+		).toBe("Dec");
+
+		// A hovered strip label previews its column too.
+		await hover(cdp, await centre(cdp, "own", 5, true));
+		expect(await cdp.evaluate<Shown>(own)).toMatchObject({ checked: "mon-11", head: "Jun" });
+
+		// Leaving the plot shows the picked column again.
+		await hover(cdp, { x: 2, y: 2 });
+		expect(await cdp.evaluate<Shown>(own)).toEqual(rest);
+
+		// A click picks the hovered column.
+		await clickColumn(cdp, "own", 3);
+		expect(await cdp.evaluate<Shown>(own)).toMatchObject({ checked: "mon-3", head: "Apr" });
+
+		// A finger moving on a column previews nothing; its tap picks, leaving no preview behind.
+		await hover(cdp, { x: 2, y: 2 });
+		const finger = await centre(cdp, "own", 7);
+		await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [finger] });
+		await cdp.send("Input.dispatchTouchEvent", {
+			type: "touchMove",
+			touchPoints: [{ x: finger.x + 2, y: finger.y }],
+		});
+		await cdp.evaluate(FRAMES, true);
+		expect(await cdp.evaluate<Shown>(own)).toMatchObject({ checked: "mon-3", head: "Apr" });
+		await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+		await cdp.evaluate(FRAMES, true);
+		expect(await cdp.evaluate<Shown>(own)).toMatchObject({ checked: "mon-7", head: "Aug" });
+		await cdp.evaluate(`document.getElementById("mon-1").click()`);
+		await cdp.evaluate(FRAMES, true);
+		expect(await cdp.evaluate<Shown>(own)).toMatchObject({ checked: "mon-1", head: "Feb" });
+
+		// A figure following a Controls previews on its own: the shared choice and the other figure stay.
+		await hover(cdp, await centre(cdp, "follow", 4));
+		expect(await cdp.evaluate<Shown>(SHOWN("follow", "m2"))).toMatchObject({
+			checked: "m2-0",
+			head: "May",
+		});
+		// Its columns keep their names: the picked one's stays in ink while the frame is on the hovered one.
+		expect(
+			await cdp.evaluate(`document.querySelector("#follow svg text.picked")?.textContent`),
+		).toBe("Jan");
+		expect(await cdp.evaluate<Shown>(SHOWN("also", "m2"))).toMatchObject({
+			checked: "m2-0",
+			head: "Jan",
+		});
+	});
+}, 60_000);

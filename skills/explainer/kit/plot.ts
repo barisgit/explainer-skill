@@ -39,7 +39,8 @@
        pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
               each named series' value there
      picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
-             controls, one per category), is padded to line up with the categories, and its radios are described by their values
+             controls, one per category), is padded to line up with the categories, and its radios are described by their values.
+             A mouse over a category or its strip label frames it and makes the key its, at once, until it leaves; only a click picks
      set(patch)  shallow-merges the patch into the option (x and y one level deeper); series is replaced whole. The plot moves from
              what it shows to the new option over half a second (bars grow, lines morph, a line of another length read off the
              old one; series matched by name), its texts the new option's throughout; at once under reduced motion, for print,
@@ -200,13 +201,15 @@
 		}
 	}
 
-	/** Makes a click on a category of the plot's area pick it. */
+	/** Makes a click on a category of the plot's area pick it, and a mouse over one or its strip label preview it. */
 	function pickable(
 		area: HTMLElement,
 		picker: PlotPicker,
 		option: () => PlotOption,
 		textWidth: Measure,
+		preview: (i: number | undefined) => void,
 	) {
+		previewable(area, picker.strip, option, textWidth, preview);
 		area.classList.add("pick");
 		area.addEventListener("click", (event) => {
 			const i = categoryAt(event, area, option(), textWidth);
@@ -216,7 +219,66 @@
 		});
 	}
 
-	/** The category under a click on a plot's area, or undefined off them. */
+	/**
+	 * Makes a mouse or pen over a category of the plot's area, or over its label in the picker's strip, preview it
+	 * (`preview(i)`), and leaving them end the preview (`preview(undefined)`). A touch has no hover: a tap picks, as a click does.
+	 */
+	function previewable(
+		area: HTMLElement,
+		strip: HTMLElement | null | undefined,
+		option: () => PlotOption,
+		textWidth: Measure,
+		preview: (i: number | undefined) => void,
+	) {
+		const labelAt = (event: PointerEvent) => {
+			const label = event.target instanceof Element ? event.target.closest("label") : null;
+			const i = label && strip ? [...strip.querySelectorAll("label")].indexOf(label) : -1;
+			return i >= 0 ? i : undefined;
+		};
+		const watch = (target: HTMLElement, at: (event: PointerEvent) => number | undefined) => {
+			target.addEventListener("pointermove", (event) => {
+				if (event.pointerType !== "touch") {
+					preview(at(event));
+				}
+			});
+			target.addEventListener("pointerleave", () => preview(undefined));
+		};
+		watch(area, (event) => categoryAt(event, area, option(), textWidth));
+		if (strip) {
+			watch(strip, labelAt);
+		}
+	}
+
+	/**
+	 * A plot's preview of the category a mouse or pen points at: look(o) is o framed and keyed there (o itself with none), to(i)
+	 * previews category i (undefined the pick again) and redraws, end() drops it for a pick. The legend keeps its height while it
+	 * is a previewed category's key, so the plot under it never moves.
+	 */
+	function previewOf(legend: HTMLElement, redraw: () => void) {
+		let hovered: number | undefined;
+		const end = () => {
+			hovered = undefined;
+			legend.style.blockSize = "";
+		};
+		return {
+			look: (o: PlotOption) => (hovered === undefined ? o : { ...o, pick: hovered }),
+			end,
+			to(i: number | undefined) {
+				if (i === hovered) {
+					return;
+				}
+				if (i === undefined) {
+					end();
+				} else if (hovered === undefined) {
+					legend.style.blockSize = `${legend.getBoundingClientRect().height}px`;
+				}
+				hovered = i;
+				redraw();
+			},
+		};
+	}
+
+	/** The category under a pointer on a plot's area, or undefined off them. */
 	function categoryAt(
 		event: MouseEvent,
 		area: HTMLElement,
@@ -233,6 +295,14 @@
 		return i >= 0 && i < at.count ? i : undefined;
 	}
 
+	/** The option once `patch` is set on it: shallow-merged, x and y one level deeper. */
+	const patched = (option: PlotOption, patch: PlotOption): PlotOption => ({
+		...option,
+		...patch,
+		x: { ...option.x, ...patch.x },
+		y: { ...option.y, ...patch.y },
+	});
+
 	function make(el: HTMLElement, initial: PlotOption, picker?: PlotPicker) {
 		made.get(el)?.(); // a view handler that runs again replaces the plot instead of stacking observers
 		let option = initial;
@@ -247,6 +317,7 @@
 		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 		area.append(svg);
 		el.replaceChildren(legend, area);
+		const preview = previewOf(legend, () => draw());
 		const switches = legendOf(
 			legend,
 			() => option,
@@ -265,7 +336,7 @@
 		function draw() {
 			size = parseFloat(getComputedStyle(legend).fontSize);
 			// The legend (or key) is for where the plot is going.
-			switches.write(legendMarkup(option, textWidth, bareHeight()));
+			switches.write(legendMarkup(preview.look(option), textWidth, bareHeight()));
 			const W = area.clientWidth;
 			if (!W || !area.clientHeight) {
 				return; // hidden: drawn when it first gets a size
@@ -279,7 +350,7 @@
 			const H = area.clientHeight;
 			svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 			svg.innerHTML = render(
-				shown,
+				preview.look(shown),
 				W,
 				H,
 				textWidth,
@@ -292,7 +363,7 @@
 			}
 		}
 
-		picker && pickable(area, picker, () => option, textWidth);
+		picker && pickable(area, picker, () => option, textWidth, preview.to);
 
 		const show = (step: PlotOption) => {
 			shown = step;
@@ -336,13 +407,10 @@
 		return {
 			dispose,
 			set(patch: PlotOption) {
-				const next = {
-					...option,
-					...patch,
-					x: { ...option.x, ...patch.x },
-					y: { ...option.y, ...patch.y },
-				};
+				const next = patched(option, patch);
 				if (!same(next, option)) {
+					// A pick (a click, a key, a restored control) shows where it goes, not the column last pointed at.
+					next.pick !== option.pick && preview.end();
 					option = next;
 					move();
 				}

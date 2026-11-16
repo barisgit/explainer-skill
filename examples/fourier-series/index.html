@@ -4781,15 +4781,15 @@ window.PlotDraw = ({ lang, size }) => {
     const room = axis.vertical ? FONT + 6 : Math.max(...axis.labels.map(textWidth), ...(axis.notes ?? []).map(textWidth)) + 12;
     return Math.ceil(room / gap);
   }
-  const tickClass = (axis, i) => axis.names && axis.picked === i ? "picked" : axis.notes ? "cat" : "";
-  function tickLabel(axis, t, i, every, { L, B }) {
+  const tickClass = (axis, i, texts) => axis.names && pick.pickedAt(texts) === i ? "picked" : axis.notes ? "cat" : "";
+  function tickLabel(axis, t, i, every, { L, B, texts }) {
     const p = axis.at(t);
     const text = i % every === 0 ? axis.labels[i] : undefined;
     if (!text) {
       return "";
     }
     const note = axis.notes?.[i] ?? "";
-    const cls = tickClass(axis, i);
+    const cls = tickClass(axis, i, texts);
     const line = axis.notes ? lineHeight() : 0;
     const [x, y, anchor] = axis.vertical ? [L - GAP - 4, p - line / 2, "end"] : [p, B + GAP + 3 + FONT / 2, "middle"];
     return svgText(cls, x, y, anchor, text) + (note ? svgText("note", x, y + line, anchor, note) : "");
@@ -5725,7 +5725,8 @@ window.PlotTween = () => {
        pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
               each named series' value there
      picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
-             controls, one per category), is padded to line up with the categories, and its radios are described by their values
+             controls, one per category), is padded to line up with the categories, and its radios are described by their values.
+             A mouse over a category or its strip label frames it and makes the key its, at once, until it leaves; only a click picks
      set(patch)  shallow-merges the patch into the option (x and y one level deeper); series is replaced whole. The plot moves from
              what it shows to the new option over half a second (bars grow, lines morph, a line of another length read off the
              old one; series matched by name), its texts the new option's throughout; at once under reduced motion, for print,
@@ -5848,7 +5849,8 @@ window.PlotTween = () => {
       input.setAttribute("aria-description", keyText(option, i));
     }
   }
-  function pickable(area, picker, option, textWidth) {
+  function pickable(area, picker, option, textWidth, preview) {
+    previewable(area, picker.strip, option, textWidth, preview);
     area.classList.add("pick");
     area.addEventListener("click", (event) => {
       const i = categoryAt(event, area, option(), textWidth);
@@ -5856,6 +5858,48 @@ window.PlotTween = () => {
         picker.choose(i);
       }
     });
+  }
+  function previewable(area, strip, option, textWidth, preview) {
+    const labelAt = (event) => {
+      const label = event.target instanceof Element ? event.target.closest("label") : null;
+      const i = label && strip ? [...strip.querySelectorAll("label")].indexOf(label) : -1;
+      return i >= 0 ? i : undefined;
+    };
+    const watch = (target, at) => {
+      target.addEventListener("pointermove", (event) => {
+        if (event.pointerType !== "touch") {
+          preview(at(event));
+        }
+      });
+      target.addEventListener("pointerleave", () => preview(undefined));
+    };
+    watch(area, (event) => categoryAt(event, area, option(), textWidth));
+    if (strip) {
+      watch(strip, labelAt);
+    }
+  }
+  function previewOf(legend, redraw) {
+    let hovered;
+    const end = () => {
+      hovered = undefined;
+      legend.style.blockSize = "";
+    };
+    return {
+      look: (o) => hovered === undefined ? o : { ...o, pick: hovered },
+      end,
+      to(i) {
+        if (i === hovered) {
+          return;
+        }
+        if (i === undefined) {
+          end();
+        } else if (hovered === undefined) {
+          legend.style.blockSize = `${legend.getBoundingClientRect().height}px`;
+        }
+        hovered = i;
+        redraw();
+      }
+    };
   }
   function categoryAt(event, area, option, textWidth) {
     const box = area.getBoundingClientRect();
@@ -5867,6 +5911,12 @@ window.PlotTween = () => {
     const i = Math.floor((along - at.start) / (at.end - at.start) * at.count);
     return i >= 0 && i < at.count ? i : undefined;
   }
+  const patched = (option, patch) => ({
+    ...option,
+    ...patch,
+    x: { ...option.x, ...patch.x },
+    y: { ...option.y, ...patch.y }
+  });
   function make(el, initial, picker) {
     made.get(el)?.();
     let option = initial;
@@ -5879,13 +5929,14 @@ window.PlotTween = () => {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     area.append(svg);
     el.replaceChildren(legend, area);
+    const preview = previewOf(legend, () => draw());
     const switches = legendOf(legend, () => option, () => draw());
     const font = () => `500 ${parseFloat(getComputedStyle(legend).fontSize)}px ${getComputedStyle(el).fontFamily}`;
     const textWidth = (s) => measure(font(), s);
     const bareHeight = () => area.clientHeight + legend.offsetHeight - parseFloat(getComputedStyle(legend).paddingTop);
     function draw() {
       size = parseFloat(getComputedStyle(legend).fontSize);
-      switches.write(legendMarkup(option, textWidth, bareHeight()));
+      switches.write(legendMarkup(preview.look(option), textWidth, bareHeight()));
       const W = area.clientWidth;
       if (!W || !area.clientHeight) {
         return;
@@ -5893,13 +5944,13 @@ window.PlotTween = () => {
       el.style.setProperty("--plot-mark-lines", String(markLines(shown, W, area.clientHeight, textWidth)));
       const H = area.clientHeight;
       svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-      svg.innerHTML = render(shown, W, H, textWidth, switchedOn(shown.series ?? [], switches.off), option);
+      svg.innerHTML = render(preview.look(shown), W, H, textWidth, switchedOn(shown.series ?? [], switches.off), option);
       drawn = true;
       if (picker?.strip) {
         lineUp(picker.strip, option, W, H, textWidth);
       }
     }
-    picker && pickable(area, picker, () => option, textWidth);
+    picker && pickable(area, picker, () => option, textWidth, preview.to);
     const show = (step) => {
       shown = step;
       draw();
@@ -5935,13 +5986,9 @@ window.PlotTween = () => {
     return {
       dispose,
       set(patch) {
-        const next = {
-          ...option,
-          ...patch,
-          x: { ...option.x, ...patch.x },
-          y: { ...option.y, ...patch.y }
-        };
+        const next = patched(option, patch);
         if (!same(next, option)) {
+          next.pick !== option.pick && preview.end();
           option = next;
           move();
         }

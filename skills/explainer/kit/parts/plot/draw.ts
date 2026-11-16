@@ -39,7 +39,7 @@ window.PlotDraw = ({ lang, size }) => {
 		names: string[];
 		/** The categories' second lines, when one has one. */
 		notes: string[] | undefined;
-		/** The picked category's index (option.pick), whose name is in ink. */
+		/** The framed category's index (option.pick): the picked one, or the one a pointer previews. */
 		picked: number | undefined;
 	}
 	type Axis = NumericAxis | CategoryAxis;
@@ -306,22 +306,25 @@ window.PlotDraw = ({ lang, size }) => {
 		return Math.ceil(room / gap);
 	}
 
-	/** A tick label's class: the picked category's name in ink, a name over its note in ink, else none (muted). */
-	const tickClass = (axis: Axis, i: number) =>
-		axis.names && axis.picked === i ? "picked" : axis.notes ? "cat" : "";
+	/**
+	 * A tick label's class: the picked category's name in ink (the pick of `texts`, so a previewed frame elsewhere leaves it), a
+	 * name over its note in ink, else none (muted).
+	 */
+	const tickClass = (axis: Axis, i: number, texts: PlotOption) =>
+		axis.names && pick.pickedAt(texts) === i ? "picked" : axis.notes ? "cat" : "";
 
 	/**
 	 * The label of one tick, or none when thinned out. Where categories have notes, each name is in ink with its note under it,
 	 * the two centred on the band together on a vertical axis.
 	 */
-	function tickLabel(axis: Axis, t: number, i: number, every: number, { L, B }: Frame) {
+	function tickLabel(axis: Axis, t: number, i: number, every: number, { L, B, texts }: Ctx) {
 		const p = axis.at(t);
 		const text = i % every === 0 ? axis.labels[i] : undefined;
 		if (!text) {
 			return "";
 		}
 		const note = axis.notes?.[i] ?? "";
-		const cls = tickClass(axis, i);
+		const cls = tickClass(axis, i, texts);
 		const line = axis.notes ? lineHeight() : 0;
 		const [x, y, anchor] = axis.vertical
 			? [L - GAP - 4, p - line / 2, "end" as const]

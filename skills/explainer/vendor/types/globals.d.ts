@@ -224,7 +224,8 @@ declare var Charts: {
 };
 /**
  * What makes a bar plot's categories pickable (Plot.make): `choose(i)` is called for a click on category i, and `strip`, the row
- * of controls under the plot, is lined up with the categories as the plot is drawn.
+ * of controls under the plot, is lined up with the categories as the plot is drawn. A mouse over a category or its strip label
+ * previews it (frame and key) until it leaves, without calling `choose`.
  */
 interface PlotPicker {
 	choose(i: number): void;

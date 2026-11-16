@@ -6,8 +6,8 @@
        choice: ["LC", "SC"]      one of the texts, as a segmented switch ({ lc: "With carrier", ... } gives frame "lc");
                                  value is the one it starts on (default the first); axis: true makes it the plot's
                                  columns: one choice per category, a strip under them in place of their labels, the
-                                 picked column framed and the legend its key (its name and each series' value), and a
-                                 click on a column picks it
+                                 picked column framed and the legend its key (its name and each series' value); a
+                                 mouse over a column shows its frame and key until it leaves, and a click picks it
        toggle: true              a switch, off then on; value: true starts it on
      In check --do: set:#m=0.8 moves a slider; a choice is radios with ids m-0, m-1, ... (click:#m-1 picks the second); click:#m flips a toggle.
      frame     (...values) => what the figure shows, given the controls' values in order (a number, a text, true or false):
