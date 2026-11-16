@@ -37,7 +37,7 @@
        legend true shows the legend, false hides it and the names at the ends; unset, it shows for two or more named series
               unless all are lines
        pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
-              each named series' value there
+              each named series' value there, as tall as the tallest category's key
      picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
              controls, one per category), is padded to line up with the categories, and its radios are described by their values.
              A mouse over a category or its strip label frames it and makes the key its, at once, until it leaves; only a click picks
@@ -83,15 +83,21 @@
 		addEventListener(type, () => (acted = true), { capture: true, once: true });
 	}
 
-	/** Calls `finish` before printing and when the reader turns motion off; returns what stops that. */
-	function whenStill(finish: () => void) {
-		const changed = () => still.matches && finish();
-		addEventListener("beforeprint", finish);
-		still.addEventListener("change", changed);
-		return () => {
-			removeEventListener("beforeprint", finish);
-			still.removeEventListener("change", changed);
-		};
+	/** Calls `finish` before printing and when the reader turns motion off, until `signal` aborts. */
+	function whenStill(finish: () => void, signal: AbortSignal) {
+		addEventListener("beforeprint", finish, { signal });
+		still.addEventListener("change", () => still.matches && finish(), { signal });
+	}
+
+	/** Replaces what pack drew in `el` (a legend and copies of the plot at three widths) with the parts plot.js draws into. */
+	function partsIn(el: HTMLElement) {
+		el.classList.add("plot");
+		const legend = Object.assign(document.createElement("ul"), { className: "plot-legend" });
+		const area = Object.assign(document.createElement("div"), { className: "plot-area" });
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		area.append(svg);
+		el.replaceChildren(legend, area);
+		return { legend, area, svg };
 	}
 
 	/**
@@ -201,80 +207,123 @@
 		}
 	}
 
-	/** Makes a click on a category of the plot's area pick it, and a mouse over one or its strip label preview it. */
+	/**
+	 * Makes a click on a category of the plot's area pick it, and a mouse over one or its strip label preview it, until `signal`
+	 * aborts.
+	 */
 	function pickable(
 		area: HTMLElement,
 		picker: PlotPicker,
 		option: () => PlotOption,
 		textWidth: Measure,
-		preview: (i: number | undefined) => void,
+		{ preview, signal }: { preview: (i: number | undefined) => void; signal: AbortSignal },
 	) {
-		previewable(area, picker.strip, option, textWidth, preview);
+		previewable(area, picker.strip, option, textWidth, { preview, signal });
 		area.classList.add("pick");
-		area.addEventListener("click", (event) => {
-			const i = categoryAt(event, area, option(), textWidth);
-			if (i !== undefined) {
-				picker.choose(i);
-			}
-		});
+		area.addEventListener(
+			"click",
+			(event) => {
+				const i = categoryAt(event, area, option(), textWidth);
+				if (i !== undefined) {
+					picker.choose(i);
+				}
+			},
+			{ signal },
+		);
 	}
 
 	/**
 	 * Makes a mouse or pen over a category of the plot's area, or over its label in the picker's strip, preview it
-	 * (`preview(i)`), and leaving them end the preview (`preview(undefined)`). A touch has no hover: a tap picks, as a click does.
+	 * (`preview(i)`), and leaving them, the window or the tab end the preview (`preview(undefined)`), until `signal` aborts. A
+	 * touch has no hover: a tap picks, as a click does.
 	 */
 	function previewable(
 		area: HTMLElement,
 		strip: HTMLElement | null | undefined,
 		option: () => PlotOption,
 		textWidth: Measure,
-		preview: (i: number | undefined) => void,
+		{ preview, signal }: { preview: (i: number | undefined) => void; signal: AbortSignal },
 	) {
+		const end = () => preview(undefined);
 		const labelAt = (event: PointerEvent) => {
 			const label = event.target instanceof Element ? event.target.closest("label") : null;
 			const i = label && strip ? [...strip.querySelectorAll("label")].indexOf(label) : -1;
 			return i >= 0 ? i : undefined;
 		};
 		const watch = (target: HTMLElement, at: (event: PointerEvent) => number | undefined) => {
-			target.addEventListener("pointermove", (event) => {
-				if (event.pointerType !== "touch") {
-					preview(at(event));
-				}
-			});
-			target.addEventListener("pointerleave", () => preview(undefined));
+			target.addEventListener(
+				"pointermove",
+				(event) => {
+					if (event.pointerType !== "touch") {
+						preview(at(event));
+					}
+				},
+				{ signal },
+			);
+			target.addEventListener("pointerleave", end, { signal });
 		};
 		watch(area, (event) => categoryAt(event, area, option(), textWidth));
 		if (strip) {
 			watch(strip, labelAt);
 		}
+		addEventListener("blur", end, { signal });
+		document.addEventListener("visibilitychange", end, { signal });
 	}
 
 	/**
 	 * A plot's preview of the category a mouse or pen points at: look(o) is o framed and keyed there (o itself with none), to(i)
-	 * previews category i (undefined the pick again) and redraws, end() drops it for a pick. The legend keeps its height while it
-	 * is a previewed category's key, so the plot under it never moves.
+	 * previews category i (undefined the pick again) and redraws, end() drops it without redrawing.
 	 */
-	function previewOf(legend: HTMLElement, redraw: () => void) {
+	function previewOf(redraw: () => void) {
 		let hovered: number | undefined;
-		const end = () => {
-			hovered = undefined;
-			legend.style.blockSize = "";
-		};
 		return {
 			look: (o: PlotOption) => (hovered === undefined ? o : { ...o, pick: hovered }),
-			end,
-			to(i: number | undefined) {
-				if (i === hovered) {
-					return;
-				}
-				if (i === undefined) {
-					end();
-				} else if (hovered === undefined) {
-					legend.style.blockSize = `${legend.getBoundingClientRect().height}px`;
-				}
-				hovered = i;
-				redraw();
+			end: () => {
+				hovered = undefined;
 			},
+			to(i: number | undefined) {
+				if (i !== hovered) {
+					hovered = i;
+					redraw();
+				}
+			},
+		};
+	}
+
+	/**
+	 * The room a bar plot's key takes in its legend: the height of its tallest key over the categories at the legend's width, so
+	 * neither a pick nor a preview moves the plot under it or runs into it; "" for a plot with no key. Measured once per option
+	 * and width, and again while fonts load.
+	 */
+	function keyRoomOf(legend: HTMLElement, textWidth: Measure) {
+		let seen: { option: PlotOption; width: number; room: string } | undefined;
+		function tallest(option: PlotOption, width: number) {
+			if (option.pick === undefined || !option.categories) {
+				return "";
+			}
+			const ruler = legend.cloneNode(false) as HTMLElement;
+			ruler.removeAttribute("style");
+			Object.assign(ruler.style, {
+				position: "absolute",
+				visibility: "hidden",
+				inlineSize: `${width}px`,
+			});
+			legend.after(ruler);
+			const heights = option.categories.map((_, pick) => {
+				ruler.innerHTML = legendMarkup({ ...option, pick }, textWidth, 0);
+				return ruler.getBoundingClientRect().height;
+			});
+			ruler.remove();
+			return `${Math.max(...heights)}px`;
+		}
+		return (option: PlotOption) => {
+			const width = legend.getBoundingClientRect().width;
+			if (seen?.option === option && seen.width === width) {
+				return seen.room;
+			}
+			const room = tallest(option, width);
+			seen = document.fonts.status === "loaded" ? { option, width, room } : undefined;
+			return room;
 		};
 	}
 
@@ -310,14 +359,10 @@
 		let shown = initial;
 		let drawn = false;
 		const timer = { id: 0 };
-		el.classList.add("plot");
-		// What pack drew (a legend and copies of the plot at three widths) goes: the plot is drawn here at the element's size.
-		const legend = Object.assign(document.createElement("ul"), { className: "plot-legend" });
-		const area = Object.assign(document.createElement("div"), { className: "plot-area" });
-		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-		area.append(svg);
-		el.replaceChildren(legend, area);
-		const preview = previewOf(legend, () => draw());
+		// The plot is drawn at the element's size.
+		const { legend, area, svg } = partsIn(el);
+		const preview = previewOf(() => draw());
+		const listening = new AbortController();
 		const switches = legendOf(
 			legend,
 			() => option,
@@ -328,6 +373,7 @@
 		const font = () =>
 			`500 ${parseFloat(getComputedStyle(legend).fontSize)}px ${getComputedStyle(el).fontFamily}`;
 		const textWidth: Measure = (s) => measure(font(), s);
+		const room = keyRoomOf(legend, textWidth);
 
 		/** The plot area's height with no legend buttons: the legend's top padding is all that stays above it. */
 		const bareHeight = () =>
@@ -337,6 +383,7 @@
 			size = parseFloat(getComputedStyle(legend).fontSize);
 			// The legend (or key) is for where the plot is going.
 			switches.write(legendMarkup(preview.look(option), textWidth, bareHeight()));
+			legend.style.minBlockSize = room(option);
 			const W = area.clientWidth;
 			if (!W || !area.clientHeight) {
 				return; // hidden: drawn when it first gets a size
@@ -363,18 +410,21 @@
 			}
 		}
 
-		picker && pickable(area, picker, () => option, textWidth, preview.to);
+		picker &&
+			pickable(area, picker, () => option, textWidth, {
+				preview: preview.to,
+				signal: listening.signal,
+			});
 
 		const show = (step: PlotOption) => {
 			shown = step;
 			draw();
 		};
-		/** Ends a move where it goes: for print, and when the reader turns motion off. */
+		/** Ends a move and a preview where the pick is: for print, and when the reader turns motion off. */
 		function finish() {
 			cancelAnimationFrame(timer.id);
-			if (shown !== option) {
-				show(option);
-			}
+			preview.end();
+			show(option);
 		}
 
 		/**
@@ -392,12 +442,12 @@
 
 		const resizer = new ResizeObserver(draw);
 		resizer.observe(area);
-		const unwatch = whenStill(finish);
+		whenStill(finish, listening.signal);
 		void document.fonts.load(font()).then(draw, draw);
 		const dispose = () => {
 			resizer.disconnect();
+			listening.abort();
 			cancelAnimationFrame(timer.id);
-			unwatch();
 			if (made.get(el) === dispose) {
 				made.delete(el);
 			}

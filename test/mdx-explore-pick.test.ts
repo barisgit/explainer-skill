@@ -413,3 +413,103 @@ test("hovering a column or its strip label previews its frame and key at once; o
 		});
 	});
 }, 60_000);
+
+test("a preview ends on print, on leaving the window or tab, and a disposed plot's strip previews nothing", async () => {
+	dir.write("model.ts", MODEL);
+	const output = await packedMdx(dir, "year-end", HOVER_PAGE);
+	await inPage(output, async (cdp) => {
+		const own = SHOWN("own", "mon");
+		const rest = await cdp.evaluate<Shown>(own);
+		for (const end of [
+			`dispatchEvent(new Event("beforeprint"))`,
+			`dispatchEvent(new Event("blur"))`,
+			`document.dispatchEvent(new Event("visibilitychange"))`,
+		]) {
+			await hover(cdp, await centre(cdp, "own", 3));
+			expect(await cdp.evaluate<Shown>(own)).toMatchObject({ head: "Apr" });
+			await cdp.evaluate(end);
+			await cdp.evaluate(FRAMES, true);
+			expect(await cdp.evaluate<Shown>(own)).toMatchObject({ head: rest.head, frame: rest.frame });
+			await hover(cdp, { x: 2, y: 2 });
+		}
+
+		// A plot made with a strip and disposed: a mouse over the strip leaves it as it was.
+		await cdp.evaluate(`(() => {
+			const made = Object.assign(document.createElement("div"), { id: "made" });
+			const box = Object.assign(document.createElement("div"), { className: "chart" });
+			box.style.blockSize = "300px";
+			const strip = Object.assign(document.createElement("div"), { className: "plot-strip" });
+			strip.innerHTML = '<label data-full="A" data-short="A"><input type="radio" name="made"><span class="full">A</span></label><label data-full="B" data-short="B"><input type="radio" name="made"><span class="full">B</span></label>';
+			made.append(box, strip);
+			document.querySelector("main").append(made);
+			const option = { categories: ["A", "B"], pick: 0, series: [{ name: "s", type: "bar", data: [1, 2] }] };
+			Plot.make(box, option, { choose() {}, strip }).dispose();
+		})()`);
+		await hover(cdp, await centre(cdp, "made", 1, true));
+		expect(await cdp.evaluate(`document.querySelector("#made .key-head").textContent`)).toBe("A");
+	});
+}, 60_000);
+
+test("an axis choice's key keeps the room of its tallest column, so neither a preview nor a pick moves or covers the plot", async () => {
+	dir.write(
+		"long.ts",
+		`const NAMES = ["A", "A considerably longer category"];
+export const names = { a: NAMES[0], b: NAMES[1] };
+export const two = () => ({ plot: { categories: NAMES, series: [
+	{ name: "Roof generation", type: "bar", data: [120, 340] },
+	{ name: "Purchased electricity", type: "bar", data: [80, 1260] },
+] } });
+`,
+	);
+	const output = await packedMdx(
+		dir,
+		"long-key",
+		`import { Explore } from "kit";
+import { names, two } from "./long.ts";
+
+# Long
+
+<Explore id="long" label="Two columns" controls={[{ id: "c", label: "Column", choice: names, axis: true }]} frame={two} />
+`,
+	);
+	/** The plot area's box and how far the legend's items reach below its top (negative: clear of it). */
+	const room = `(() => {
+		const fig = document.getElementById("long");
+		const area = fig.querySelector(".plot-area").getBoundingClientRect();
+		const reach = Math.max(...[...fig.querySelectorAll(".plot-legend > li")].map((li) => li.getBoundingClientRect().bottom));
+		return { top: Math.round(area.top), height: Math.round(area.height), over: reach - area.top };
+	})()`;
+	type Room = { top: number; height: number; over: number };
+	await inPage(
+		output,
+		async (cdp) => {
+			await centre(cdp, "long", 0);
+			const rest = await cdp.evaluate<Room>(room);
+			expect(rest.over).toBeLessThanOrEqual(0.5);
+			await hover(cdp, await centre(cdp, "long", 1));
+			const hovered = await cdp.evaluate<Room>(room);
+			expect(hovered.over).toBeLessThanOrEqual(0.5);
+			expect([hovered.top, hovered.height]).toEqual([rest.top, rest.height]);
+			await clickColumn(cdp, "long", 1);
+			await hover(cdp, { x: 2, y: 2 });
+			const picked = await cdp.evaluate<Room>(room);
+			expect(picked.over).toBeLessThanOrEqual(0.5);
+			expect([picked.top, picked.height]).toEqual([rest.top, rest.height]);
+		},
+		{ width: 500, height: 900, mobile: false },
+	);
+}, 60_000);
+
+test("pack draws a picked plot only where its key has the room of its tallest category's, as plot.js keeps it", async () => {
+	const plot = (id: string, long: string) =>
+		`<Plot id="${id}" label="${id}" option={{ categories: ["A", "${long}"], pick: 0, series: [{ name: "Roof", type: "bar", data: [120, 340] }, { name: "Grid", type: "bar", data: [80, 1260] }] }} />`;
+	const output = await packedMdx(
+		dir,
+		"key-room",
+		`import { Plot } from "kit";\n\n# Keys\n\n${plot("short", "B")}\n\n${plot("long", "A considerably longer category")}\n`,
+	);
+	const html = await Bun.file(output).text();
+	const drawn = (id: string) => new RegExp(`id="${id}"[^>]*><ul class="plot-legend">`).test(html);
+	// The long name's key wraps into more rows than the picked one's on a phone: that figure is left to plot.js.
+	expect([drawn("short"), drawn("long")]).toEqual([true, false]);
+});

@@ -374,6 +374,26 @@ function legendRows(items: ReturnType<typeof legendItems>, width: number, weight
 	return rows;
 }
 
+/**
+ * The rows a plot's legend `items` wrap into over the widths a copy is shown at (`shown`), for labels set lighter or heavier than
+ * measured, and the rows of the tallest of `keys` (every category's key, when one is picked), whose room plot.js keeps: one
+ * number where the area is the same height across all of them.
+ */
+function legendRowsAcross(
+	items: ReturnType<typeof legendItems>,
+	keys: ReturnType<typeof legendItems>[],
+	shown: readonly number[],
+): Set<number> {
+	return new Set(
+		shown.flatMap((w) =>
+			[400, 500].flatMap((weight) => {
+				const rowsOf = (key: typeof items) => (key.length ? legendRows(key, w, weight) : 0);
+				return [rowsOf(items), Math.max(rowsOf(items), ...keys.map(rowsOf))];
+			}),
+		),
+	);
+}
+
 /** Whether a chart has a title, which is set at the text size (ChartsOption's theme) that a page's rule may change. */
 function titled(option: Option): boolean {
 	const { baseOption } = option;
@@ -495,15 +515,15 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		// Every series starts switched on; plot.js marks its buttons so as it draws.
 		const legend = markup.replace(/<button /g, '<button aria-pressed="true" ');
 		const items = legendItems(legend);
+		// A picked category's key keeps the room of the tallest category's key, as plot.js keeps it, so a pick or a preview never
+		// moves the plot: the drawing holds only where that room is the picked key's own.
+		const { pick, categories } = option;
+		const keys = (pick === undefined || !Array.isArray(categories) ? [] : categories).map((_, at) =>
+			legendItems(plots.legendMarkup({ ...option, pick: at }, width, 0)),
+		);
 		const shown = plots.switchedOn(option.series ?? [], new Set());
 		const copies = COPIES.map((copy, i) => {
-			// The legend wraps by the element's width, which a copy is shown over a range of, for labels set lighter or heavier
-			// than measured: the area is the same height only where the rows are the same across all of it.
-			const rows = new Set(
-				copy.shown.flatMap((w) =>
-					[400, 500].map((weight) => (items.length ? legendRows(items, w, weight) : 0)),
-				),
-			);
+			const rows = legendRowsAcross(items, keys, copy.shown);
 			const [one] = rows;
 			if (rows.size > 1) {
 				return undefined;
