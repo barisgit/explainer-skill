@@ -19,10 +19,12 @@
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
        marks  [{ x: 16, label: "Payback" }]: a dashed reference line at x (or y), its label on top beside it, wrapped inside the plot,
               a row higher where it would touch another's
-       x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
+       x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out): in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; numbers follow the page's lang, and format sets how:
               { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
        legend true shows the legend, false hides it; unset, it shows for two or more named series unless all are lines
+       pick   3 picks a bar plot's fourth category: its bars framed, and the legend becomes its key, each series' value there.
+              An Explore choice with axis: true sets it and lets the reader pick
      label   the accessible name (role="img")
      class   more classes after "chart plot", e.g. "tall"
      height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them. Size a plot with this, not with CSS on .chart.
@@ -30,8 +32,8 @@
              plus the lines its marker labels take; others the theme's height
    The plot fills the element at its pixel size and redraws on resize, so text stays at the label size from phone to desktop; light and dark switch
    with no redraw. pack draws it into the page first, so it shows with scripts off and in print, unless a page rule sizes its element or its
-   legend wraps into rows pack cannot count. A new
-   option redraws at once: series is replaced whole, other keys merge into the plot (x and y one level deeper).
+   legend wraps into rows pack cannot count. A new option moves the plot there from what it shows (bars grow, lines morph, the numbers
+   written already the new ones; at once under reduced motion and before the reader acts): series is replaced whole, other keys merge into the plot (x and y one level deeper).
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
    Values outside min and max sit on the edge.
@@ -39,8 +41,18 @@
    A plot a slider, choice or toggle switches is an Explore. format and label may also be functions, from your own client
    component or exported by a "use client" module: format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
+import type { RefObject } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { drawnInside, drawnMarkLines, placeOf } from "./parts/drawn.ts";
+
+/**
+ * What lets the reader pick a bar plot's category (its option's `pick`): `choose(i)` for a click on category i, and the strip of
+ * controls under the categories, which plot.js lines up with them.
+ */
+export interface PlotPick {
+	choose(i: number): void;
+	strip?: RefObject<HTMLElement>;
+}
 
 export interface PlotProps {
 	option: PlotOption;
@@ -48,6 +60,7 @@ export interface PlotProps {
 	class?: string;
 	id?: string;
 	height?: string;
+	pick?: PlotPick;
 }
 
 /** rem: a bar's row (56 px, for a 25 px bar), and the tall height (theme.css `.chart.tall`), the most bars take. */
@@ -94,8 +107,11 @@ const merged = (option: PlotOption, patch: PlotOption): PlotOption => ({
  * its size; a changed `option` is applied with set(), and unmounting stops its resize observer. plot.js replaces the element's
  * children, so in the browser the element renders none of its own.
  */
-export function Plot({ option, label, class: extra, id, height }: PlotProps) {
+export function Plot({ option, label, class: extra, id, height, pick }: PlotProps) {
 	const element = useRef<HTMLDivElement>(null);
+	// The latest pick, which the plot made once calls on each click.
+	const picking = useRef(pick);
+	picking.current = pick;
 	// This component's name shadows the kit's global Plot here, so the global is reached through window.
 	const handle = useRef<ReturnType<typeof window.Plot.make> | null>(null);
 	// What the plot shows: each new option is set on it as a patch, so it is merged into what it showed.
@@ -108,7 +124,11 @@ export function Plot({ option, label, class: extra, id, height }: PlotProps) {
 		if (handle.current) {
 			handle.current.set(option);
 		} else if (element.current) {
-			handle.current = window.Plot.make(element.current, option);
+			const picker = picking.current && {
+				choose: (i: number) => picking.current?.choose(i),
+				strip: picking.current.strip?.current ?? null,
+			};
+			handle.current = window.Plot.make(element.current, option, picker || undefined);
 		}
 	}, [option]);
 	useEffect(

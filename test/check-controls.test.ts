@@ -265,6 +265,22 @@ test("a Question over table rows is sampled by its first row not chosen", async 
 	});
 }, 30_000);
 
+test("an axis choice's strip under its plot is sampled by its first place not chosen", async () => {
+	const place = (i: number, checked = "") =>
+		`<label><input type="radio" name="mon" id="mon-${i}"${checked}><span>${i}</span></label>`;
+	const file = dir.write(
+		"strip.html",
+		`<!doctype html><figure class="fig"><div class="chart plot" role="img"></div><div class="plot-strip" role="radiogroup">${place(0, " checked")}${place(1)}</div></figure>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		const selected = await cdp.evaluate<{ name: string }[]>(CONTROLS_JS);
+		expect(selected.map((c) => c.name)).toEqual(["#mon-1"]);
+	});
+}, 30_000);
+
 test("the cap spreads samples across control kinds before filling in document order", async () => {
 	const questions = Array.from(
 		{ length: 13 },

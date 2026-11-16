@@ -39,6 +39,8 @@ interface AxisSpec {
 	step?: number;
 	name?: string;
 	format?: ((value: number) => string) | NumberFormat;
+	/** false leaves the axis's tick labels out, and the room they take. */
+	labels?: boolean;
 }
 
 /** A line or stem point, or a bar value. */
@@ -83,6 +85,8 @@ interface PlotOption {
 	x?: AxisSpec;
 	y?: AxisSpec;
 	legend?: boolean;
+	/** A bar plot's picked category, by index: framed, and the legend is its key, each series' value there. */
+	pick?: number;
 }
 
 /** Where a note sits: in a figure (its aria-label or caption), in a section (its heading), or on the page. */
@@ -194,8 +198,20 @@ declare var Charts: {
 	make(el: HTMLElement, option: ChartOption, setup?: (chart: ECharts) => void): ChartHandle;
 	color(token: string): string;
 };
+/**
+ * What makes a bar plot's categories pickable (Plot.make): `choose(i)` is called for a click on category i, and `strip`, the row
+ * of controls under the plot, is lined up with the categories as the plot is drawn.
+ */
+interface PlotPicker {
+	choose(i: number): void;
+	strip?: HTMLElement | null;
+}
 declare var Plot: {
-	make(el: HTMLElement, option: PlotOption): { set(patch: PlotOption): void; dispose(): void };
+	make(
+		el: HTMLElement,
+		option: PlotOption,
+		picker?: PlotPicker,
+	): { set(patch: PlotOption): void; dispose(): void };
 };
 declare var Steps: { refresh(el: Element, step?: number): void };
 declare var Views: {
@@ -278,19 +294,32 @@ declare var PlotDraw: (env: {
 	/** px: the size text is set at, the theme's --size-label. */
 	size: () => number;
 }) => {
-	/** The SVG content for the option at W x H pixels, with series i drawn when shown[i]; textWidth measures a label in px. */
+	/**
+	 * The SVG content for the option at W x H pixels, with series i drawn when shown[i]; textWidth measures a label in px. Value
+	 * texts (bar and stem labels, bar titles) are written from `texts`, an option of the same series, where a move draws its steps.
+	 */
 	render(
 		option: PlotOption,
 		W: number,
 		H: number,
 		textWidth: (s: unknown) => number,
 		shown: boolean[],
+		texts?: PlotOption,
 	): string;
 	/**
 	 * The legend's buttons, or "" when it shows none (names at the line ends of an H px high area with no legend take its place);
 	 * button i switches series i; textWidth measures a label in px.
 	 */
 	legendMarkup(option: PlotOption, textWidth: (s: unknown) => number, H: number): string;
+	/** Each named series' value in category i, as the key writes it: "bought 403 kWh, sold 12 kWh". */
+	keyText(option: PlotOption, i: number): string;
+	/** Where a bar plot's categories lie along their axis at W x H (px), or undefined without categories or room. */
+	bands(
+		option: PlotOption,
+		W: number,
+		H: number,
+		textWidth: (s: unknown) => number,
+	): { start: number; end: number; count: number; vertical: boolean } | undefined;
 	/** Per series: whether it is switched on, given the names switched off. */
 	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
 	/** How many lines the markers' labels take on top of the plot at W x H, which push it down (render lays them out the same). */
@@ -321,6 +350,29 @@ interface PlotSvg {
 		style?: string,
 	) => string;
 }
+/** What a bar's label needs: where the bar lies on the screen. */
+interface PlotBarGeometry {
+	horizontal: boolean;
+	start: number;
+	length: number;
+	end: number;
+	mid: number;
+	each: number;
+	dir: number;
+	bound: number;
+	/** The bar's colour, which a value inside it is written against, unless it is `open`: light, so the value reads as one outside it. */
+	colour: string;
+	open: boolean;
+}
+declare var PlotBarLabels: (env: PlotSvg & { size: () => number }) => {
+	/** A value label: inside a stacked segment when it fits, else at the end of a side-by-side bar. */
+	barLabel(
+		t: string,
+		bar: PlotBarGeometry,
+		stack: boolean,
+		textWidth: (s: unknown) => number,
+	): string;
+};
 /** A line's name at its end: the line's last point, colour and dash ("" for none), which a leader to a moved name takes. */
 interface PlotEndName {
 	name: string;
@@ -335,6 +387,43 @@ declare var PlotEnds: (env: PlotSvg & { size: () => number }) => {
 	room(name: string, textWidth: (s: unknown) => number): number;
 	/** The names drawn, spread apart above B. */
 	marks(named: readonly PlotEndName[], B: number): string;
+};
+/** Where a bar plot's picked category lies: the category axis's pick and band centres, the value axis's mapping, the bars' thickness. */
+interface PlotPickedBars {
+	cat: { picked: number | undefined; at: (i: number) => number };
+	val: { at: (v: number) => number };
+	thick: number;
+	horizontal: boolean;
+}
+declare var PlotPick: (env: {
+	esc: (s: unknown) => string;
+	formatter: ReturnType<typeof PlotFormat>["formatter"];
+	labeller: ReturnType<typeof PlotFormat>["labeller"];
+}) => {
+	/** A bar plot's picked category (option.pick), or undefined when it has none. */
+	pickedAt(option: PlotOption): number | undefined;
+	/** The frame around the picked category's bars of these series (the ones shown), from the baseline to their far end; "" for none. */
+	frame(series: readonly PlotSeries[], stack: boolean, bars: PlotPickedBars): string;
+	/** Each named series' value in category i: "bought 403 kWh, sold 12 kWh". */
+	keyText(option: PlotOption, i: number): string;
+	/** The key's items for category `at`: its name, then each named series' button (index and swatch markup) with its value. */
+	key(
+		option: PlotOption,
+		at: number,
+		named: readonly (readonly [PlotSeries, number, string])[],
+	): string;
+	/** Where a bar plot's categories lie along their axis in a layout whose marker labels take `rows` lines of `line` px on top. */
+	bands(
+		option: PlotOption,
+		layout: { box: { L: number; R: number; T: number; B: number }; rows: number },
+		line: number,
+	): { start: number; end: number; count: number; vertical: boolean } | undefined;
+};
+/** A step of a plot's tween: the option `k` of the way (0 to 1) from `from` to `to`, numbers moved where the shapes match. */
+declare var PlotTween: () => {
+	between(from: PlotOption, to: PlotOption, k: number): PlotOption;
+	/** Whether two options are the same, value for value (functions by identity). */
+	same(a: unknown, b: unknown): boolean;
 };
 declare var PlotMarks: (env: PlotSvg) => {
 	/** A bar at [x, y, w, h] in a state; open when a value on it reads as one outside it. */

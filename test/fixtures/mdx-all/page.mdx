@@ -2,7 +2,7 @@
 title: Home battery size
 ---
 import { Chart, Explore, Plot, Question, Records, Stepper, View } from "kit";
-import { euro, MONTHS, PRODUCTION, payback, quote, SIZE_ROWS, SIZES, supplier, USE } from "./data.ts";
+import { euro, MONTHS, month, PRODUCTION, payback, quote, SIZE_ROWS, SIZES, supplier, USE } from "./data.ts";
 import { Day } from "./day.tsx";
 import "./page.css";
 
@@ -25,6 +25,8 @@ Illustrative numbers, not a real quote
 <Chart label="Monthly production and use" option={{ grid: { top: 40, left: 8, right: 16, bottom: 8 }, legend: { top: 8, left: 8 }, tooltip: { trigger: "axis" }, xAxis: { type: "category", data: MONTHS }, yAxis: { type: "value", axisLabel: { formatter: "{value} kWh" } }, series: [{ name: "Produced", type: "bar", color: "var(--accent)", data: PRODUCTION }, { name: "Used", type: "line", color: "var(--ink)", data: USE }] }} />
 <figcaption>From April to September the roof makes more than the house uses; a battery only moves that surplus into the evening.</figcaption>
 </figure>
+
+<Explore label="Production and use in the month picked" controls={[{ id: "month", label: "Month", choice: MONTHS, value: "Jul", axis: true }]} frame={month} />
 
 <img class="roof" src="./house.svg" alt="The house with its south-facing panels" />
 

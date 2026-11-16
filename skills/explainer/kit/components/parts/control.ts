@@ -5,6 +5,7 @@
  */
 export type ExploreControl = { id: string; label: string } & (
 	| { range: { min: number; step: number; digits: number; texts: string[] } }
-	| { choice: string[]; values: string[] }
+	/** axis: the choice is a bar plot's categories, picked on the plot and in a strip under it. */
+	| { choice: string[]; values: string[]; axis?: true }
 	| { toggle: true }
 );

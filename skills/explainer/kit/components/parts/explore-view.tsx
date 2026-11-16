@@ -8,6 +8,7 @@ import type { ComponentChildren, JSX } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import type { ExploreControl } from "./control.ts";
 import { apply, type Json, merge } from "./frames.ts";
+import type { PickStripSpec } from "./pick-strip.tsx";
 import { usePlace } from "./place.ts";
 import {
 	anchorOf,
@@ -159,23 +160,71 @@ function Control({
 	);
 }
 
-/** The controls' row; `set` takes the control's index and the index of the value the reader chose. */
+/**
+ * The controls' row; `set` takes the control's index and the index of the value the reader chose. A control `elsewhere` (an
+ * axis choice its plot shows under its columns) is left out, and so is a row left with none.
+ */
 export function ControlRow({
 	controls,
 	values,
 	set,
+	elsewhere,
 }: {
 	controls: ExploreControl[];
 	values: number[];
 	set: (c: number, value: number) => void;
+	elsewhere?: number;
 }) {
+	if (controls.every((_, c) => c === elsewhere)) {
+		return null;
+	}
 	return (
 		<div class="controls">
-			{controls.map((control, c) => (
-				<Control control={control} value={values[c] ?? 0} set={(v) => set(c, v)} />
-			))}
+			{controls.map((control, c) =>
+				c === elsewhere ? null : (
+					<Control control={control} value={values[c] ?? 0} set={(v) => set(c, v)} />
+				),
+			)}
 		</div>
 	);
+}
+
+/** The index of the control whose choice is the plot's categories (axis: true), or -1. */
+export const axisOf = (controls: ExploreControl[]): number =>
+	controls.findIndex((control) => "choice" in control && control.axis === true);
+
+/** What lets the reader pick a plot's column: `choose(i)`, and the strip under the columns where the Explore shows its controls. */
+export interface ExplorePick {
+	choose(i: number): void;
+	strip?: PickStripSpec;
+}
+
+/**
+ * A plot whose categories an axis choice picks: the choice's value as its `pick`, and what lets the reader pick on it. Where the
+ * Explore shows its own controls the choice is a strip under the columns, which takes the place of their names.
+ */
+function picked(
+	plot: PlotOption,
+	controls: ExploreControl[],
+	values: number[],
+	choose: (c: number, value: number) => void,
+	shows: boolean,
+): { plot: PlotOption; pick?: ExplorePick } {
+	const c = axisOf(controls);
+	const control = controls[c];
+	if (!(control && "choice" in control)) {
+		return { plot };
+	}
+	const strip = shows && {
+		id: control.id,
+		label: control.label,
+		texts: control.choice,
+		values: control.values,
+	};
+	return {
+		plot: { ...plot, pick: values[c] ?? 0, ...(strip && { x: { ...plot.x, labels: false } }) },
+		pick: { choose: (i) => choose(c, i), ...(strip && { strip }) },
+	};
 }
 
 /** The frame the controls' value indices choose: a patch applied to the first frame, or the frame function's result. */
@@ -269,14 +318,15 @@ export function ExploreView({
 	figure,
 }: {
 	data: ExploreData;
-	figure?: (option: PlotOption | ChartOption) => JSX.Element;
+	figure?: (option: PlotOption | ChartOption, pick?: ExplorePick) => JSX.Element;
 }) {
 	const { controls, values, choose, shows } = useControls(data);
 	const frame = useFrame(data, controls, values);
 	// Precomputed texts are HTML pack rendered; a frame function's are text or JSX.
 	const content = (text: ComponentChildren) =>
 		"frame" in data ? { children: text } : { dangerouslySetInnerHTML: { __html: String(text) } };
-	const option = frame.plot ?? frame.chart;
+	const shown = frame.plot && picked(frame.plot, controls, values, choose, shows);
+	const option = shown?.plot ?? frame.chart;
 	return (
 		<figure class="fig" id={data.id} data-ref-states={declaration(data.stated, frame.states)}>
 			{"use" in data && (
@@ -288,7 +338,14 @@ export function ExploreView({
 					under={data.under === true}
 				/>
 			)}
-			{shows && <ControlRow controls={controls} values={values} set={choose} />}
+			{shows && (
+				<ControlRow
+					controls={controls}
+					values={values}
+					set={choose}
+					{...(shown?.pick?.strip && { elsewhere: axisOf(controls) })}
+				/>
+			)}
 			{frame.stats && (
 				<dl class="stats" aria-live="polite">
 					{Object.entries(frame.stats).map(([term, value]) => (
@@ -302,7 +359,7 @@ export function ExploreView({
 			{frame.readout !== undefined && (
 				<div data-readout="" aria-live="polite" {...content(frame.readout)} />
 			)}
-			{figure && option !== undefined && figure(option)}
+			{figure && option !== undefined && figure(option, shown?.pick)}
 			{frame.caption !== undefined && <figcaption {...content(frame.caption)} />}
 		</figure>
 	);

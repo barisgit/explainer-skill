@@ -9,7 +9,11 @@ import { numberText } from "./format.ts";
 /** One control as the page writes it. */
 export type ExploreControlProps = { id: string; label: string } & (
 	| { range: readonly [number, number, number]; value?: number; format?: NumberFormat }
-	| { choice: readonly string[] | Readonly<Record<string, string>>; value?: string }
+	| {
+			choice: readonly string[] | Readonly<Record<string, string>>;
+			value?: string;
+			axis?: boolean;
+	  }
 	| { toggle: true; value?: boolean }
 );
 
@@ -67,7 +71,10 @@ function control(
 		if (values.length < 2 || start < 0) {
 			return fail(`control "${id}": choice needs two or more values, and value one of them`);
 		}
-		return { control: { id, label, choice: texts, values }, start };
+		return {
+			control: { id, label, choice: texts, values, ...(spec.axis === true && { axis: true }) },
+			start,
+		};
 	}
 	if (spec.toggle !== true) {
 		return fail(`control "${id}" needs range, choice or toggle: true`);
@@ -81,5 +88,11 @@ export function parseControls(
 	fail: (message: string) => never,
 ): { controls: ExploreControl[]; start: number[] } {
 	const made = specs.map((spec) => control(fail, spec));
+	const axes = made.filter((m) => "axis" in m.control);
+	if (axes.length > 1) {
+		fail(
+			`controls ${axes.map((m) => `"${m.control.id}"`).join(" and ")} both have axis: true: one choice picks the plot's categories`,
+		);
+	}
 	return { controls: made.map((m) => m.control), start: made.map((m) => m.start) };
 }

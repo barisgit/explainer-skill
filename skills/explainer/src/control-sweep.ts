@@ -35,6 +35,7 @@ export const CONTROLS_JS = `(() => {
 		['[data-records]', ['.toolbar [role="radiogroup"] input[type="radio"]:not(:checked)']],
 		['[data-records] .facets fieldset', ['button[aria-pressed]']],
 		['.fig > .controls .field > .seg[role="radiogroup"]', ['input[type="radio"]:not(:checked)']],
+		['.fig > .plot-strip[role="radiogroup"]', ['input[type="radio"]:not(:checked)']],
 		['.fig > .controls label.toggle', ['input[type="checkbox"]']],
 	];
 	for (const [kind, [rootQuery, selectors]] of rules.entries()) {

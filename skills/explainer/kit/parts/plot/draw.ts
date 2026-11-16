@@ -2,7 +2,9 @@
    plot into the page (src/mdx/draw.ts). PlotDraw({ lang, size }) gives render(option, W, H, textWidth, shown), the SVG content,
    legendMarkup(option, textWidth, H), the legend's buttons (none when names sit at the line ends of an H px high area), and
    switchedOn(series, off), which series the legend leaves on; numbers are written in lang(), text is set at size() px (the
-   theme's --size-label), and textWidth measures a label at that size. Bars' states and markers are marks.ts's (PlotMarks). */
+   theme's --size-label), and textWidth measures a label at that size. Bars' states and markers are marks.ts's (PlotMarks), a
+   picked category's frame and key pick.ts's (PlotPick). bands(option, W, H, textWidth) is where a bar plot's categories lie
+   along their axis, for code that maps a click to one. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotDraw = ({ lang, size }) => {
 	// px: the label size, as theme.css sets it for .plot text (--size-label); read again at each render and legend.
@@ -35,6 +37,8 @@ window.PlotDraw = ({ lang, size }) => {
 		names: string[];
 		/** The categories' second lines, when one has one. */
 		notes: string[] | undefined;
+		/** The picked category's index (option.pick), whose name is in ink. */
+		picked: number | undefined;
 	}
 	type Axis = NumericAxis | CategoryAxis;
 	/** The plot rectangle and the measuring shared by everything drawn. */
@@ -51,6 +55,8 @@ window.PlotDraw = ({ lang, size }) => {
 		xa: Axis;
 		ya: Axis;
 		shown: boolean[];
+		/** The option whose values the texts give: the option drawn, or where a move is going. */
+		texts: PlotOption;
 	}
 	interface PointCtx extends Ctx {
 		xa: NumericAxis;
@@ -61,20 +67,6 @@ window.PlotDraw = ({ lang, size }) => {
 	interface BarCtx extends Ctx {
 		cat: CategoryAxis;
 		val: NumericAxis;
-	}
-	/** What a bar's label needs: where the bar lies on the screen. */
-	interface BarGeometry {
-		horizontal: boolean;
-		start: number;
-		length: number;
-		end: number;
-		mid: number;
-		each: number;
-		dir: number;
-		bound: number;
-		/** The bar's colour, which a value inside it is written against, unless it is `open`: light, so the value reads as one outside it. */
-		colour: string;
-		open: boolean;
 	}
 	type Anchor = "start" | "middle" | "end";
 
@@ -92,8 +84,10 @@ window.PlotDraw = ({ lang, size }) => {
 	const svgText = (cls: string, x: number, y: number, anchor: Anchor, s: unknown, style = "") =>
 		`<text${attr("class", cls)} x="${px(x)}" y="${px(y)}" dy="0.35em" text-anchor="${anchor}"${attr("style", style)}>${esc(s)}</text>`;
 	const marks = window.PlotMarks({ svgLine, svgText });
+	const { barLabel } = window.PlotBarLabels({ svgLine, svgText, size });
 	const ends = window.PlotEnds({ svgLine, svgText, size });
 	const { formatter, labeller } = window.PlotFormat({ lang });
+	const pick = window.PlotPick({ esc, formatter, labeller });
 	const seriesColor = (s: PlotSeries, i: number) => s.color ?? `var(--c${(i % 6) + 1})`;
 	/** A line's dash: the author's (dash: true or false), none for a colour of the author's, else its palette slot's. */
 	const dashOf = (s: PlotSeries, i: number) =>
@@ -101,16 +95,15 @@ window.PlotDraw = ({ lang, size }) => {
 	/** A bar's state: its own entry in the series' fill, else the series' fill; undefined is solid in the series' colour. */
 	const fillOf = (s: PlotSeries, i: number) =>
 		(Array.isArray(s.fill) ? s.fill[i] : (s.fill as PlotFill | undefined)) || undefined;
-	/** px a name at a line's end takes on the right of the plot, with its gap, a leader's room and a margin. */
 	/**
 	 * px from the top of a W x H drawing to the plot's bottom edge, under which sit the x labels (with a line more for categories'
-	 * notes) and the x axis's name.
+	 * notes) unless they are left out, and the x axis's name.
 	 */
-	const bottomAt = (H: number, xName: unknown, notes = false) =>
-		Math.floor(H - GAP - FONT - 8 - (xName ? 22 : 0) - (notes ? lineHeight() : 0));
+	const bottomAt = (H: number, xName: unknown, notes = false, labelled = true) =>
+		Math.floor(H - (labelled ? GAP + FONT + 8 : 4) - (xName ? 22 : 0) - (notes ? lineHeight() : 0));
 	/** Whether the series carry their names at their line ends in place of a legend, in a drawing H px high; see PlotEnds' fit. */
 	const namesAtEnds = (option: PlotOption, textWidth: TextWidth, H: number) =>
-		ends.fit(option, textWidth, bottomAt(H, option.x?.name));
+		ends.fit(option, textWidth, bottomAt(H, option.x?.name, false, option.x?.labels !== false));
 	/** The series whose names sit at their line ends, with their index. */
 	const endNamed = (option: PlotOption, textWidth: TextWidth, H: number) =>
 		namesAtEnds(option, textWidth, H)
@@ -156,7 +149,7 @@ window.PlotDraw = ({ lang, size }) => {
 			hi,
 			ticks,
 			format,
-			labels: ticks.map((v) => format(v)),
+			labels: ticks.map((v) => (spec.labels === false ? "" : format(v))),
 			name: spec.name,
 			vertical,
 			...unplaced,
@@ -168,14 +161,17 @@ window.PlotDraw = ({ lang, size }) => {
 		spec: AxisSpec,
 		categories: PlotCategory[],
 		vertical: boolean,
+		picked: number | undefined,
 	): CategoryAxis {
 		const names = categories.map((c) => (typeof c === "string" ? c : c.name));
 		const notes = categories.map((c) => (typeof c === "string" ? "" : (c.note ?? "")));
+		const labelled = spec.labels !== false;
 		return {
 			names,
-			notes: notes.some(Boolean) ? notes : undefined,
+			notes: labelled && notes.some(Boolean) ? notes : undefined,
+			picked,
 			ticks: names.map((_, i) => i),
-			labels: names.map(String),
+			labels: names.map((name) => (labelled ? String(name) : "")),
 			name: spec.name,
 			vertical,
 			...unplaced,
@@ -212,7 +208,8 @@ window.PlotDraw = ({ lang, size }) => {
 		return `<path class="line" style="${style}"${attr("stroke-dasharray", dashOf(s, i))} d="M${pts.join("L")}"/>`;
 	}
 
-	function stemMark(s: PlotSeries, i: number, { X, Y, ya, W, textWidth }: PointCtx) {
+	function stemMark(s: PlotSeries, i: number, { X, Y, ya, W, textWidth, texts }: PointCtx) {
+		const said = texts.series?.[i]?.data;
 		const base = Y(clamp(0, ya.lo, ya.hi));
 		const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2.5}`;
 		const format: PlotLabeller | undefined = labeller(s.label, ya.format, true);
@@ -224,11 +221,12 @@ window.PlotDraw = ({ lang, size }) => {
 				const [x, y] = p;
 				const cx = X(x);
 				const cy = Y(y);
-				const t = format?.(y, i, x);
+				const [tx, ty] = (said?.[i] ?? p) as PlotPoint;
+				const t = format?.(ty, i, tx);
 				const dot = `<circle class="dot" style="${style}" cx="${px(cx)}" cy="${px(cy)}" r="4.5"/>`;
 				const half = t ? textWidth(t) / 2 : 0;
-				const ty = cy <= base ? Math.max(cy - 14, FONT) : cy + 14;
-				const text = t ? svgText("value", clamp(cx, half + 4, W - half - 4), ty, "middle", t) : "";
+				const at = cy <= base ? Math.max(cy - 14, FONT) : cy + 14;
+				const text = t ? svgText("value", clamp(cx, half + 4, W - half - 4), at, "middle", t) : "";
 				return svgLine("stem", cx, cx, base, cy, style) + dot + text;
 			})
 			.join("");
@@ -254,47 +252,12 @@ window.PlotDraw = ({ lang, size }) => {
 		};
 	}
 
-	/** A value's class and style on its bar: written against the bar's colour, or as a value outside it on an open bar. */
-	const onBar = ({ open, colour }: BarGeometry) =>
-		open ? (["value", ""] as const) : (["value inside", `--c:${colour}`] as const);
-
-	/** Label of a stacked segment: centred when it fits, else none. */
-	function segmentLabel(t: string, bar: BarGeometry, textWidth: TextWidth) {
-		const { horizontal, start, length, mid, each } = bar;
-		const tw = textWidth(t);
-		const fits = horizontal
-			? length >= tw + 10 && each >= FONT + 2
-			: length >= FONT + 6 && each >= tw + 6;
-		const centre = start + length / 2;
-		const [cls, style] = onBar(bar);
-		return fits
-			? svgText(cls, horizontal ? centre : mid, horizontal ? mid : centre, "middle", t, style)
-			: "";
-	}
-
-	/** Label of a side-by-side bar: past its end (`dir` is the screen direction it grows), or inside the end when the panel has no room past it. */
-	function endLabel(t: string, bar: BarGeometry, textWidth: TextWidth) {
-		const { horizontal, length, end, mid, dir, bound } = bar;
-		const reach = horizontal ? textWidth(t) + 6 : FONT + 4;
-		const fitsInside = length >= reach + 6;
-		const inside = dir * (bound - end) < reach && fitsInside;
-		const at = inside ? -dir : dir;
-		const [cls, style] = inside ? onBar(bar) : (["value", ""] as const);
-		return horizontal
-			? svgText(cls, end + at * 6, mid, at > 0 ? "start" : "end", t, style)
-			: svgText(cls, mid, end + at * (FONT / 2 + 4), "middle", t, style);
-	}
-
-	/** A value label: inside a stacked segment when it fits, else at the end of a side-by-side bar. */
-	const barLabel = (t: string, bar: BarGeometry, stack: boolean, textWidth: TextWidth) =>
-		stack ? segmentLabel(t, bar, textWidth) : endLabel(t, bar, textWidth);
-
 	/** The rect (with its title) of bar series j, category i, and the geometry its label needs. */
 	function barRect(
 		s: PlotSeries,
 		j: number,
 		i: number,
-		v: number,
+		[v, said]: [number, number],
 		layout: ReturnType<typeof barLayout>,
 		option: PlotOption,
 	) {
@@ -307,9 +270,9 @@ window.PlotDraw = ({ lang, size }) => {
 		const length = Math.abs(b - a);
 		const offset = cat.at(i) - thick / 2 + (option.stack ? 0 : j * each);
 		const [x, y, w, h] = horizontal ? [start, offset, length, each] : [offset, start, each, length];
-		const title = `<title>${esc(`${cat.names[i]}${s.name ? ` · ${s.name}` : ""}: ${val.format(v)}`)}</title>`;
+		const title = `<title>${esc(`${cat.names[i]}${s.name ? ` · ${s.name}` : ""}: ${val.format(said)}`)}</title>`;
 		const shape = marks.bar(fillOf(s, i), seriesColor(s, j), [x, y, w, h], title);
-		const bar: BarGeometry = {
+		const bar: PlotBarGeometry = {
 			horizontal,
 			start,
 			length,
@@ -339,10 +302,12 @@ window.PlotDraw = ({ lang, size }) => {
 	) {
 		let rects = "";
 		let labels = "";
+		const said = ctx.texts.series?.[j]?.data;
 		for (const [i, v] of s.data.entries()) {
 			if (typeof v === "number" && Number.isFinite(v)) {
-				const { rect, bar, format } = barRect(s, j, i, v, layout, option);
-				const t = format?.(v, i, 0);
+				const shows = typeof said?.[i] === "number" ? (said[i] as number) : v;
+				const { rect, bar, format } = barRect(s, j, i, [v, shows], layout, option);
+				const t = format?.(shows, i, 0);
 				rects += rect;
 				labels += t ? barLabel(t, bar, Boolean(option.stack), ctx.textWidth) : "";
 			}
@@ -362,7 +327,13 @@ window.PlotDraw = ({ lang, size }) => {
 		const rects = bars.map((b) => b.rects).join("");
 		const labels = bars.map((b) => b.labels).join("");
 		// Stacked segments touch: theme.css parts them by a line in the tone under the plot.
-		return { rects: option.stack && rects ? `<g class="stack">${rects}</g>` : rects, labels };
+		const drawn = option.stack && rects ? `<g class="stack">${rects}</g>` : rects;
+		const picked = pick.frame(
+			series.filter((_, j) => ctx.shown[j]),
+			Boolean(option.stack),
+			layout,
+		);
+		return { rects: drawn + picked, labels };
 	}
 
 	/** Every nth tick label, so that neighbours do not touch. */
@@ -378,6 +349,10 @@ window.PlotDraw = ({ lang, size }) => {
 		return Math.ceil(room / gap);
 	}
 
+	/** A tick label's class: the picked category's name in ink, a name over its note in ink, else none (muted). */
+	const tickClass = (axis: Axis, i: number) =>
+		axis.names && axis.picked === i ? "picked" : axis.notes ? "cat" : "";
+
 	/**
 	 * The label of one tick, or none when thinned out. Where categories have notes, each name is in ink with its note under it,
 	 * the two centred on the band together on a vertical axis.
@@ -385,11 +360,11 @@ window.PlotDraw = ({ lang, size }) => {
 	function tickLabel(axis: Axis, t: number, i: number, every: number, { L, B }: Frame) {
 		const p = axis.at(t);
 		const text = i % every === 0 ? axis.labels[i] : undefined;
-		if (text === undefined) {
+		if (!text) {
 			return "";
 		}
 		const note = axis.notes?.[i] ?? "";
-		const cls = axis.notes ? "cat" : "";
+		const cls = tickClass(axis, i);
 		const line = axis.notes ? lineHeight() : 0;
 		const [x, y, anchor] = axis.vertical
 			? [L - GAP - 4, p - line / 2, "end" as const]
@@ -435,7 +410,12 @@ window.PlotDraw = ({ lang, size }) => {
 		];
 		const x = option.x ?? {};
 		const y = option.y ?? {};
-		const cat = categoryAxis(option.horizontal ? y : x, categories, Boolean(option.horizontal));
+		const cat = categoryAxis(
+			option.horizontal ? y : x,
+			categories,
+			Boolean(option.horizontal),
+			pick.pickedAt(option),
+		);
 		const val = numericAxis(
 			option.horizontal ? x : y,
 			span,
@@ -488,7 +468,7 @@ window.PlotDraw = ({ lang, size }) => {
 				W - Math.max(PAD, lastHalf + 4, ...named.map((name) => ends.room(name, textWidth))),
 			),
 			T: ya.name ? FONT + 15 : 10,
-			B: bottomAt(H, xa.name, Boolean(xa.notes)),
+			B: bottomAt(H, xa.name, Boolean(xa.notes), xa.labels.some(Boolean)),
 		};
 	}
 
@@ -551,6 +531,7 @@ window.PlotDraw = ({ lang, size }) => {
 		H: number,
 		textWidth: TextWidth,
 		shown: boolean[],
+		texts = option,
 	) {
 		const series = option.series ?? [];
 		const { axes, box, rows } = layoutOf(option, W, H, textWidth);
@@ -561,7 +542,7 @@ window.PlotDraw = ({ lang, size }) => {
 			return "";
 		}
 		place(ya, ya.names ? T : B, ya.names ? B : T);
-		const ctx = { xa, ya, L, R, T, B, W, H, textWidth, shown };
+		const ctx = { xa, ya, L, R, T, B, W, H, textWidth, shown, texts };
 		const marked = marks.markers(option.marks ?? [], markFrame(ctx), box.T - 6);
 
 		if ("cat" in axes) {
@@ -580,12 +561,24 @@ window.PlotDraw = ({ lang, size }) => {
 
 	/**
 	 * Legend buttons for the named series, or "" when the legend is off, has fewer than two entries or the names sit at the line
-	 * ends of a drawing H px high, the plot's area with no legend.
+	 * ends of a drawing H px high, the plot's area with no legend. A bar plot with a picked category has its key instead, from one
+	 * named series: the category's name, then each series' value there after its name.
 	 */
 	function legendMarkup(option: PlotOption, textWidth: TextWidth, H: number) {
 		FONT = size();
 		const named = (option.series ?? []).map((s, i) => [s, i] as const).filter(([s]) => s.name);
-		if (option.legend === false || named.length < 2 || namesAtEnds(option, textWidth, H)) {
+		const at = pick.pickedAt(option);
+		if (option.legend === false || named.length < (at === undefined ? 2 : 1)) {
+			return "";
+		}
+		if (at !== undefined) {
+			return pick.key(
+				option,
+				at,
+				named.map(([s, i]) => [s, i, swatch(s, i)] as const),
+			);
+		}
+		if (namesAtEnds(option, textWidth, H)) {
 			return "";
 		}
 		return named
@@ -619,6 +612,9 @@ window.PlotDraw = ({ lang, size }) => {
 	return {
 		render,
 		legendMarkup,
+		keyText: pick.keyText,
+		bands: (option: PlotOption, W: number, H: number, textWidth: TextWidth) =>
+			pick.bands(option, layoutOf(option, W, H, textWidth), lineHeight()),
 		switchedOn,
 		markLines: (option: PlotOption, W: number, H: number, textWidth: TextWidth) =>
 			layoutOf(option, W, H, textWidth).rows,

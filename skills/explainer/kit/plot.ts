@@ -1,5 +1,5 @@
 /* plot: small line, stem and bar plots as SVG in the page theme, no ECharts. For zoom, drill-down, heatmaps or sankey use charts.js. Needs kit:theme.css.
-   Plot.make(el, option) -> { set(patch), dispose() }
+   Plot.make(el, option, picker) -> { set(patch), dispose() }
      el      element with a height (.chart), which stays the element's: a bar plot made here gets no height by its bars, unlike
              the Plot component's. Plot fills it with a legend and an SVG drawn at its pixel size and redrawn on resize,
              so text stays at the label size (--size-label, 13 px) from phone to desktop, in place of what pack drew in it.
@@ -26,27 +26,207 @@
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
        legend true shows the legend, false hides it; unset, it shows for two or more named series unless all are lines
-     set(patch)  shallow-merges the patch into the option (x and y one level deeper) and redraws at once; series is replaced whole.
+       pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
+              each named series' value there
+       x/y labels: false  leaves that axis's tick labels out
+     picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
+             controls, one per category), is padded to line up with the categories, and its radios are described by their values
+     set(patch)  shallow-merges the patch into the option (x and y one level deeper); series is replaced whole. The plot moves from
+             what it shows to the new option over half a second (bars grow, lines morph, a line of another length read off the
+             old one; series matched by name), its texts the new option's throughout; at once under reduced motion, for print,
+             and until the reader has acted on the page, so the first drawing and a restored control never move.
      dispose()   stops redrawing on resize, for code that takes the element away
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A bar label sits past the bar's end, or inside the end when the panel has no room past it. A label on a stacked segment is left out
    when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
    Values outside min and max sit on the edge.
    Axes carry their labels and one quiet baseline at 0, without gridlines or tick marks. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const measureCtx = document.createElement("canvas").getContext("2d");
 	// The label size (--size-label) in px, as the plot being drawn sets it on its legend, which theme.css sizes with its text.
 	let size = 13;
-	const { render, legendMarkup, switchedOn, markLines } = window.PlotDraw({
+	const { render, legendMarkup, switchedOn, markLines, bands, keyText } = window.PlotDraw({
 		lang: () => document.documentElement.lang || "en",
 		size: () => size,
 	});
+	const { between, same } = window.PlotTween();
+	type Measure = (s: unknown) => number;
+	/** A label's width in a CSS font. */
+	function measure(font: string, s: unknown) {
+		if (!measureCtx) {
+			throw new Error("kit:plot.js needs a canvas to measure text");
+		}
+		measureCtx.font = font;
+		return measureCtx.measureText(String(s)).width;
+	}
+	const still = matchMedia("(prefers-reduced-motion: reduce)");
+	/** ms a change takes to move the plot, eased out, as charts.js's updates. */
+	const TWEEN = 500;
 
 	const made = new WeakMap<HTMLElement, () => void>();
+	// Whether the reader has acted on the page: before that a change (a control keep.js restores, a view opened from the address)
+	// is drawn at once, as nothing moves on arrival.
+	let acted = false;
+	for (const type of ["pointerdown", "keydown"]) {
+		addEventListener(type, () => (acted = true), { capture: true, once: true });
+	}
 
-	function make(el: HTMLElement, initial: PlotOption) {
+	/** Calls `finish` before printing and when the reader turns motion off; returns what stops that. */
+	function whenStill(finish: () => void) {
+		const changed = () => still.matches && finish();
+		addEventListener("beforeprint", finish);
+		still.addEventListener("change", changed);
+		return () => {
+			removeEventListener("beforeprint", finish);
+			still.removeEventListener("change", changed);
+		};
+	}
+
+	/**
+	 * A plot's legend: write(html) puts in its items, buttons pressed for the series switched on; pressing one switches its series
+	 * (`off` holds the names switched off) and redraws.
+	 */
+	function legendOf(legend: HTMLElement, current: () => PlotOption, redraw: () => void) {
+		let html = "";
+		const off = new Set<string | undefined>();
+		const nameOf = (button: HTMLElement) => current().series?.[Number(button.dataset.i)]?.name;
+		legend.addEventListener("click", (event) => {
+			const button = event.target instanceof Element ? event.target.closest("button") : null;
+			if (button) {
+				const name = nameOf(button);
+				if (!off.delete(name)) {
+					off.add(name);
+				}
+				redraw();
+			}
+		});
+		return {
+			off,
+			write(next: string) {
+				if (next !== html) {
+					html = next;
+					writeLegend(legend, next);
+				}
+				// With no legend, nothing could switch a series back on.
+				if (!next) {
+					off.clear();
+				}
+				for (const button of legend.querySelectorAll("button")) {
+					button.setAttribute("aria-pressed", String(!off.has(nameOf(button))));
+				}
+			},
+		};
+	}
+
+	/** Writes the legend's items, keeping its buttons, and a reader's focus on one, where the items stay the same series. */
+	function writeLegend(legend: HTMLElement, html: string) {
+		const next = document.createElement("ul");
+		next.innerHTML = html;
+		const [had, has] = [[...legend.children], [...next.children]];
+		const kind = (li: Element | undefined) =>
+			li?.querySelector<HTMLElement>("button")?.dataset.i ?? li?.className;
+		if (had.length !== has.length || had.some((li, i) => kind(li) !== kind(has[i]))) {
+			legend.replaceChildren(...has);
+			return;
+		}
+		for (const [i, li] of had.entries()) {
+			const fresh = has[i];
+			const [button, written] = [li, fresh].map((item) => item?.querySelector("button"));
+			(button ?? li).innerHTML = (written ?? fresh)?.innerHTML ?? "";
+		}
+	}
+
+	/** Shows each step from `from` to `to`, a frame at a time, eased out; `timer.id` is the frame waiting, for cancelling. */
+	function tween(
+		from: PlotOption,
+		to: PlotOption,
+		show: (option: PlotOption) => void,
+		timer: { id: number },
+	) {
+		const start = performance.now();
+		const step = (now: number) => {
+			const k = Math.min(1, (now - start) / TWEEN);
+			show(k < 1 ? between(from, to, 1 - (1 - k) ** 4) : to);
+			if (k < 1) {
+				timer.id = requestAnimationFrame(step);
+			}
+		};
+		timer.id = requestAnimationFrame(step);
+	}
+
+	/** A picker's strip under the categories at W x H: padded to their span, each radio described by its values. */
+	function lineUp(
+		strip: HTMLElement,
+		option: PlotOption,
+		W: number,
+		H: number,
+		textWidth: Measure,
+	) {
+		const at = bands(option, W, H, textWidth);
+		if (!at || at.vertical) {
+			return;
+		}
+		strip.style.paddingInline = `${at.start}px ${W - at.end}px`;
+		const band = (at.end - at.start) / at.count;
+		const labels = [...strip.querySelectorAll<HTMLElement>("[data-full]")];
+		const widest = (key: "full" | "short") =>
+			Math.max(...labels.map((label) => textWidth(label.dataset[key])));
+		// Too narrow for the texts: each by its short form, and where even those touch, every nth, its radio kept.
+		const short = widest("full") > band - 8;
+		let every = 1;
+		while (short && widest("short") > every * band - 8 && every < labels.length) {
+			every++;
+		}
+		strip.classList.toggle("short", short);
+		for (const [i, label] of labels.entries()) {
+			label.classList.toggle("thin", i % every !== 0);
+		}
+		for (const [i, input] of strip.querySelectorAll("input").entries()) {
+			input.setAttribute("aria-description", keyText(option, i));
+		}
+	}
+
+	/** Makes a click on a category of the plot's area pick it. */
+	function pickable(
+		area: HTMLElement,
+		picker: PlotPicker,
+		option: () => PlotOption,
+		textWidth: Measure,
+	) {
+		area.classList.add("pick");
+		area.addEventListener("click", (event) => {
+			const i = categoryAt(event, area, option(), textWidth);
+			if (i !== undefined) {
+				picker.choose(i);
+			}
+		});
+	}
+
+	/** The category under a click on a plot's area, or undefined off them. */
+	function categoryAt(
+		event: MouseEvent,
+		area: HTMLElement,
+		option: PlotOption,
+		textWidth: Measure,
+	) {
+		const box = area.getBoundingClientRect();
+		const at = bands(option, area.clientWidth, area.clientHeight, textWidth);
+		if (!at) {
+			return undefined;
+		}
+		const along = at.vertical ? event.clientY - box.top : event.clientX - box.left;
+		const i = Math.floor(((along - at.start) / (at.end - at.start)) * at.count);
+		return i >= 0 && i < at.count ? i : undefined;
+	}
+
+	function make(el: HTMLElement, initial: PlotOption, picker?: PlotPicker) {
 		made.get(el)?.(); // a view handler that runs again replaces the plot instead of stacking observers
 		let option = initial;
+		// What is drawn: the option, or a step of the tween towards it.
+		let shown = initial;
+		let drawn = false;
+		const timer = { id: 0 };
 		el.classList.add("plot");
 		// What pack drew (a legend and copies of the plot at three widths) goes: the plot is drawn here at the element's size.
 		const legend = Object.assign(document.createElement("ul"), { className: "plot-legend" });
@@ -54,22 +234,16 @@
 		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 		area.append(svg);
 		el.replaceChildren(legend, area);
-		let legendHtml = "";
-		const off = new Set<string | undefined>(); // names of the series the reader switched off in the legend
-		const nameOf = (button: HTMLElement) => option.series?.[Number(button.dataset.i)]?.name;
+		const switches = legendOf(
+			legend,
+			() => option,
+			() => draw(),
+		);
 
 		/** The plot's text: 500 at the label size, in the element's font. */
 		const font = () =>
 			`500 ${parseFloat(getComputedStyle(legend).fontSize)}px ${getComputedStyle(el).fontFamily}`;
-
-		/** A label's width at the label size, in the element's font. */
-		function textWidth(s: unknown) {
-			if (!measureCtx) {
-				throw new Error("kit:plot.js needs a canvas to measure text");
-			}
-			measureCtx.font = font();
-			return measureCtx.measureText(String(s)).width;
-		}
+		const textWidth: Measure = (s) => measure(font(), s);
 
 		/** The plot area's height with no legend buttons: the legend's top padding is all that stays above it. */
 		const bareHeight = () =>
@@ -77,18 +251,8 @@
 
 		function draw() {
 			size = parseFloat(getComputedStyle(legend).fontSize);
-			const series = option.series ?? [];
-			const html = legendMarkup(option, textWidth, bareHeight());
-			if (html !== legendHtml) {
-				legend.innerHTML = legendHtml = html;
-			}
-			// With no legend, nothing could switch a series back on.
-			if (!html) {
-				off.clear();
-			}
-			for (const button of legend.querySelectorAll("button")) {
-				button.setAttribute("aria-pressed", String(!off.has(nameOf(button))));
-			}
+			// The legend (or key) is for where the plot is going.
+			switches.write(legendMarkup(option, textWidth, bareHeight()));
 			const W = area.clientWidth;
 			if (!W || !area.clientHeight) {
 				return; // hidden: drawn when it first gets a size
@@ -97,28 +261,59 @@
 			// calc(... var(--plot-mark-lines) ...)), so its rows keep their size; any other plot takes them from its own height.
 			el.style.setProperty(
 				"--plot-mark-lines",
-				String(markLines(option, W, area.clientHeight, textWidth)),
+				String(markLines(shown, W, area.clientHeight, textWidth)),
 			);
 			const H = area.clientHeight;
 			svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-			svg.innerHTML = render(option, W, H, textWidth, switchedOn(series, off));
+			svg.innerHTML = render(
+				shown,
+				W,
+				H,
+				textWidth,
+				switchedOn(shown.series ?? [], switches.off),
+				option,
+			);
+			drawn = true;
+			if (picker?.strip) {
+				lineUp(picker.strip, option, W, H, textWidth);
+			}
 		}
 
-		legend.addEventListener("click", (event) => {
-			const button = event.target instanceof Element ? event.target.closest("button") : null;
-			if (button) {
-				const name = nameOf(button);
-				if (!off.delete(name)) {
-					off.add(name);
-				}
-				draw();
+		picker && pickable(area, picker, () => option, textWidth);
+
+		const show = (step: PlotOption) => {
+			shown = step;
+			draw();
+		};
+		/** Ends a move where it goes: for print, and when the reader turns motion off. */
+		function finish() {
+			cancelAnimationFrame(timer.id);
+			if (shown !== option) {
+				show(option);
 			}
-		});
+		}
+
+		/**
+		 * Moves what is drawn from what it was to the option, a step a frame; at once under reduced motion, before a drawing and
+		 * before the reader has acted on the page.
+		 */
+		function move() {
+			cancelAnimationFrame(timer.id);
+			if (still.matches || !drawn || !acted) {
+				show(option);
+			} else {
+				tween(shown, option, show, timer);
+			}
+		}
+
 		const resizer = new ResizeObserver(draw);
 		resizer.observe(area);
+		const unwatch = whenStill(finish);
 		void document.fonts.load(font()).then(draw, draw);
 		const dispose = () => {
 			resizer.disconnect();
+			cancelAnimationFrame(timer.id);
+			unwatch();
 			if (made.get(el) === dispose) {
 				made.delete(el);
 			}
@@ -128,13 +323,16 @@
 		return {
 			dispose,
 			set(patch: PlotOption) {
-				option = {
+				const next = {
 					...option,
 					...patch,
 					x: { ...option.x, ...patch.x },
 					y: { ...option.y, ...patch.y },
 				};
-				draw();
+				if (!same(next, option)) {
+					option = next;
+					move();
+				}
 			},
 		};
 	}

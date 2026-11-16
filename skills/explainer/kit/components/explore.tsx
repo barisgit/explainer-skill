@@ -4,12 +4,16 @@
      controls  one or more, each with a label and an id (its value is kept across reloads):
        range: [min, max, step]   a slider; value is where it starts (default min), format writes its readout ({ digits: 2 }, { unit: "%" })
        choice: ["LC", "SC"]      one of the texts, as a segmented switch ({ lc: "With carrier", ... } gives frame "lc");
-                                 value is the one it starts on (default the first)
+                                 value is the one it starts on (default the first); axis: true makes it the plot's
+                                 columns: one choice per category, a strip under them in place of their labels, the
+                                 picked column framed and the legend its key (its name and each series' value), and a
+                                 click on a column picks it
        toggle: true              a switch, off then on; value: true starts it on
      In check --do: set:#m=0.8 moves a slider; a choice is radios with ids m-0, m-1, ... (click:#m-1 picks the second); click:#m flips a toggle.
      frame     (...values) => what the figure shows, given the controls' values in order (a number, a text, true or false):
        plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart)
-       readout  text or JSX (blocks too) in a live line over the figure; stats { "Carrier": "67%" }, text or JSX, are figures in a row
+       readout  text or JSX (blocks too) in a live line over the figure; stats { "Carrier": "67%" }, text or JSX, are figures in a row.
+                Numbers on the figure's own marks (a bar's label, a marker, an axis choice's key) read faster than a row beside it
        caption  text or JSX under the figure
        states   a state per data-ref of the page's own parts, anywhere on it (HTML, hand-built SVG, a Mermaid node by its
                 id): states: { numpy: "imports", torch: kind === "gpu" ? "imports" : "never" }. kit:link.js writes it as
@@ -25,7 +29,8 @@
    carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
    For a client frame, pack checks all combinations up to 256; above that it checks the defaults and 255 evenly spaced
    combinations in control order, including all-minimum and all-maximum values. Untested combinations can fail for readers.
-   The starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart).
+   The starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart); a Plot then moves to each new
+   frame from where it is, as a Chart does.
    Controls: one set of controls for figures in different sections. Write <Controls id="usage" controls={[...]} /> once, where the
    reader should find it, then <Explore use="usage" label="..." frame={daily} /> after it, in any section, in place of controls.
    Every such Explore follows the same choices, takes the other props as usual (a "use client" frame, base, height, a readout or
@@ -47,6 +52,7 @@ import { type ExploreControlProps, parseControls } from "./parts/explore-control
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
 import { Explore as ExploreText } from "./parts/explore-text.tsx";
 import {
+	axisOf,
 	type ExploreControl,
 	type ExploreData,
 	type ExploreFrame,
@@ -258,6 +264,22 @@ function shownFrame([call, frame]: [string, ExploreFrame], kind: "plot" | "chart
 	return shown;
 }
 
+/** Fails unless every frame draws columns, one per value of the controls' axis choice (axis: true), when they have one. */
+function checkAxis(controls: ExploreControl[], frames: [string, ExploreFrame][]) {
+	const control = controls[axisOf(controls)];
+	if (!(control && "choice" in control)) {
+		return;
+	}
+	const count = control.choice.length;
+	for (const [call, { plot }] of frames) {
+		if (!plot?.categories || plot.horizontal || plot.categories.length !== count) {
+			fail(
+				`control "${control.id}" has axis: true, so ${call} returns a plot of columns, one category per choice: categories with ${count} names, not horizontal`,
+			);
+		}
+	}
+}
+
 /** The figure the frames draw, the same in every one. */
 function figureKind(frames: ExploreFrame[]): "plot" | "chart" | undefined {
 	const kinds = new Set(
@@ -271,17 +293,19 @@ function figureKind(frames: ExploreFrame[]): "plot" | "chart" | undefined {
 		: [...kinds][0];
 }
 
-/** A text or stats key some frame has and another lacks becomes empty there, so the live region stays in place. */
+/**
+ * A readout, caption or stats row some frame has and another lacks becomes empty there, so the live region stays in place; each
+ * frame keeps its own stats, so a term one frame alone gives shows in that frame alone.
+ */
 function fillGaps(frames: Shown[]) {
-	const terms = [...new Set(frames.flatMap((f) => Object.keys(f.stats ?? {})))];
 	for (const frame of frames) {
 		for (const key of ["readout", "caption"] as const) {
 			if (frame[key] === undefined && frames.some((f) => f[key] !== undefined)) {
 				frame[key] = "";
 			}
 		}
-		if (terms.length) {
-			frame.stats = Object.fromEntries(terms.map((term) => [term, frame.stats?.[term] ?? ""]));
+		if (frame.stats === undefined && frames.some((f) => f.stats !== undefined)) {
+			frame.stats = {};
 		}
 	}
 }
@@ -419,6 +443,7 @@ export function Explore({
 		}
 		return [call, result];
 	});
+	checkAxis(shown, merged);
 	const stated = [...new Set(merged.flatMap(([, f]) => Object.keys(f.states ?? {})))];
 	const kind = figureKind(merged.map(([, f]) => f));
 	if (kind && !label) {

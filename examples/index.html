@@ -526,10 +526,10 @@ h3,
 	block-size: 100%;
 	overflow: visible;
 }
+/* Proportional digits, as plot.js and pack measure the text they fit (a canvas takes no font-variant-numeric). */
 .plot text {
 	font: 500 var(--size-label) var(--font);
 	fill: var(--muted);
-	font-variant-numeric: tabular-nums;
 }
 .plot .name {
 	fill: var(--muted);
@@ -607,6 +607,72 @@ h3,
 	stroke: var(--ink);
 	stroke-width: 1;
 	stroke-dasharray: 3 3;
+}
+/* A picked category (option.pick): its bars framed in ink, its name in ink, and the legend as its key, the name first and each
+   value after its series' name. */
+.plot svg .picked {
+	fill: none;
+	stroke: var(--ink);
+	stroke-width: 1.5;
+	pointer-events: none;
+}
+.plot text.picked {
+	fill: var(--ink);
+}
+.plot-legend .key-head {
+	padding: 0.375rem 0;
+	font-weight: 600;
+}
+.plot-area.pick {
+	cursor: pointer;
+}
+/* The strip under a plot's columns whose places are a choice's values: plot.js pads it to the columns' span. The chosen place
+   has its text in ink under an ink edge; where a text is wider than its column, each shows its short form
+   (data-short: a number whole, a name by its shortest distinct start), every nth where those touch. */
+.plot-strip {
+	display: grid;
+	grid-auto-columns: minmax(0, 1fr);
+	grid-auto-flow: column;
+	font-size: var(--size-label);
+	font-weight: 500;
+	line-height: 1.3;
+}
+.plot-strip label {
+	position: relative;
+	display: grid;
+	place-items: center;
+	min-block-size: 2.75rem;
+	border-block-start: 1px solid var(--rule);
+	color: var(--muted);
+	cursor: pointer;
+}
+.plot-strip input {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.plot-strip label:hover,
+.plot-strip label:has(input:checked) {
+	color: var(--ink);
+}
+.plot-strip label:has(input:checked) {
+	border-block-start: 2px solid var(--ink);
+}
+.plot-strip label:has(input:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+/* A narrow strip writes each choice's short form as generated text, which a reply and keep do not read; a thin one none. */
+.plot-strip.short .full {
+	display: none;
+}
+.plot-strip.short label::after {
+	content: attr(data-short);
+}
+.plot-strip.short label.thin::after {
+	content: none;
 }
 
 /* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,

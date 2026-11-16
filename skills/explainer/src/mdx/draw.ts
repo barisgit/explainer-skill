@@ -269,17 +269,29 @@ function orNothing<T extends unknown[]>(draw: (...args: T) => string): (...args:
 	};
 }
 
-/** The buttons of a plot's legend as plot.js writes them, each with its swatch's width and its label. */
-function legendItems(legend: string): { swatch: number; label: string }[] {
-	return [...legend.matchAll(/<i class="([^"]*)"[^>]*><\/i>([^<]*)<\/button>/g)].map(
-		([, kind, escaped]) => ({
-			swatch: /\b(?:bar|stem)\b/.test(kind as string) ? LEGEND.swatch.box : LEGEND.swatch.line,
+/**
+ * The items of a plot's legend as plot.js writes them: each with its swatch's width (0 for a picked category's name heading its
+ * key) and its texts, a series' name and, in a key, its value, which the button sets a gap apart.
+ */
+function legendItems(legend: string): { swatch: number; texts: string[] }[] {
+	return [...legend.matchAll(/<li[^>]*>(.*?)<\/li>/g)].map(([, item = ""]) => {
+		const kind = /<i class="([^"]*)"/.exec(item)?.[1];
+		return {
+			swatch:
+				kind === undefined
+					? 0
+					: /\b(?:bar|stem)\b/.test(kind)
+						? LEGEND.swatch.box
+						: LEGEND.swatch.line,
 			// plot.js writes &, <, > and " as numeric references; the reader sees the characters.
-			label: (escaped as string).replace(/&#(\d+);/g, (_, code: string) =>
-				String.fromCharCode(Number(code)),
-			),
-		}),
-	);
+			texts: item
+				.split(/<[^>]*>/)
+				.filter(Boolean)
+				.map((text) =>
+					text.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code))),
+				),
+		};
+	});
 }
 
 /**
@@ -289,8 +301,14 @@ function legendItems(legend: string): { swatch: number; label: string }[] {
 function legendRows(items: ReturnType<typeof legendItems>, width: number, weight: number): number {
 	let rows = 1;
 	let used = 0;
-	for (const { swatch, label } of items) {
-		const button = swatch + LEGEND.label + textWidth(label, LABEL, weight);
+	for (const { swatch, texts } of items) {
+		const words = texts.reduce((sum, text) => sum + textWidth(text, LABEL, weight), 0);
+		// The flex gap of a button sits between its swatch and texts; a key's name is set at 600.
+		const parts = texts.length + (swatch ? 1 : 0);
+		const button =
+			swatch +
+			(parts - 1) * LEGEND.label +
+			(swatch ? words : textWidth(texts.join(""), LABEL, 600));
 		const next = used === 0 ? button : used + LEGEND.gap + button;
 		if (used > 0 && next > width - 2 * LEGEND.side) {
 			rows++;

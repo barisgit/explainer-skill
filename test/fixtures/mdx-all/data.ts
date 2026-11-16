@@ -152,3 +152,17 @@ export function supplier(hour: "morning" | "evening" | "night") {
 		),
 	};
 }
+
+/** The month the reader picks under the columns: produced and used side by side, the picked month's values in the key. */
+export function month(_name: string) {
+	return {
+		plot: {
+			categories: MONTHS,
+			series: [
+				{ name: "Produced", type: "bar", data: PRODUCTION },
+				{ name: "Used", type: "bar", data: USE },
+			],
+			y: { format: { unit: "kWh" } },
+		},
+	};
+}
