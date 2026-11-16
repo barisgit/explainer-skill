@@ -4,7 +4,10 @@
    <Question name="why" legend="Why does the queue grow at noon?">Orders arrive faster than one barista serves them.</Question>
      name      the option group, unique on the page: each input's id is name-value (first-fix-second; a character other than
                a letter, digit or - is written _hex_, so "5 kWh" is 5_20_kWh), and a reload keeps the answer by it
-     legend    the question
+     legend    the question. Leave it out under the heading that asks it: the group then takes that heading (the nearest h2 to h6
+               before it in its own section) as its name and as the reply's label, and its note field is named by it too. pack fails
+               if there is none, and for a Question drawn in the browser (inside a filled View's record, or one a client component
+               mounts after load), which needs its legend. A written answer keeps its legend
      options   value: label pairs, or a list of labels that are their own values; each value once
      rows, cols  in place of options, a comparison whose rows are the choices, taken as Table takes them; each row's first
                column is its value (text or a number), and a click on a row chooses it (not on a control, link or fold in it, and not
@@ -34,7 +37,7 @@ import { compareTable, read, type TableColumn } from "./table.tsx";
 /** What every form of Question takes. */
 interface QuestionBase {
 	name: string;
-	legend: ComponentChildren;
+	legend?: ComponentChildren;
 	multiple?: boolean;
 	checked?: string | string[];
 	/** The value (or values) the page recommends, marked on its choice. */
@@ -73,12 +76,16 @@ const kitText = (key: keyof typeof LABELS) =>
 
 /** The problem with a written answer's props, if any: the props that pick among options have nothing to pick from. */
 function writtenProblem({
+	legend,
 	multiple,
 	checked,
 	answer,
 	recommended,
 	note,
 }: QuestionBase): string | undefined {
+	if (legend === undefined) {
+		return "has no legend: a written answer's text box is named by it, so write legend";
+	}
 	if (answer !== undefined) {
 		return "has an answer but no options: a written answer has no value to check, so write the model answer inside the Question";
 	}
@@ -271,17 +278,39 @@ function Option({
 	);
 }
 
+/**
+ * What names a question: its legend, or, with none, the section heading that asks it. pack (src/mdx/question-heading.ts) finds
+ * that heading and turns the marker into the fieldset's aria-label, which the reply reads as it reads a legend.
+ */
+function Legend({
+	name,
+	legend,
+	note,
+}: {
+	name: string;
+	legend: ComponentChildren;
+	note?: boolean | undefined;
+}) {
+	return legend === undefined ? null : (
+		<legend id={note ? legendId(name) : undefined}>{legend}</legend>
+	);
+}
+
+/** The marker on a fieldset whose question is the section heading above it; its value is the Question's name, for pack's message. */
+const fromHeading = (name: string, legend: ComponentChildren) =>
+	legend === undefined ? { "data-legend-from-heading": name } : {};
+
 /** A reply question's legend id. A dot never appears in an option's id, so the legend's and the note's ids cannot meet one. */
 const legendId = (name: string) => `${idPart(name)}.legend`;
 
-/** The note field under a reply question's choices, described by its legend. */
-function Note({ name }: { name: string }) {
+/** The note field under a reply question's choices, described by its legend when it has one. */
+function Note({ name, legend }: { name: string; legend: ComponentChildren }) {
 	return (
 		<NoteField
 			id={`${idPart(name)}.note`}
 			label={kitText("note")}
 			placeholder={kitText("notePlaceholder")}
-			describedBy={legendId(name)}
+			{...(legend === undefined ? {} : { describedBy: legendId(name) })}
 		/>
 	);
 }
@@ -299,8 +328,11 @@ function Choice(props: QuestionBase & { options: Record<string, string> | string
 	const group = optionGroup(props);
 	const selfCheck = answer !== undefined;
 	return (
-		<fieldset {...(selfCheck ? { class: "self-check" } : { "data-reply": "" })}>
-			<legend id={props.note ? legendId(name) : undefined}>{legend}</legend>
+		<fieldset
+			{...(selfCheck ? { class: "self-check" } : { "data-reply": "" })}
+			{...fromHeading(name, legend)}
+		>
+			<Legend name={name} legend={legend} note={props.note} />
 			<div class="seg">
 				{pairs.map(([value, label]) => (
 					<Option key={value} group={group} value={value}>
@@ -308,7 +340,7 @@ function Choice(props: QuestionBase & { options: Record<string, string> | string
 					</Option>
 				))}
 			</div>
-			{props.note && <Note name={name} />}
+			{props.note && <Note name={name} legend={legend} />}
 			{selfCheck && <Verdict />}
 			{selfCheck && children !== undefined && <div class="explain">{children}</div>}
 		</fieldset>
@@ -339,14 +371,14 @@ function RowsChoice<Row>(
 	checkValues(props, strings);
 	const group = optionGroup(props);
 	return (
-		<fieldset data-reply="">
-			<legend id={props.note ? legendId(name) : undefined}>{legend}</legend>
+		<fieldset data-reply="" {...fromHeading(name, legend)}>
+			<Legend name={name} legend={legend} note={props.note} />
 			{compareTable({ rows, cols }, (shown, i) => (
 				<Option group={group} value={strings[i] ?? ""}>
 					{shown}
 				</Option>
 			))}
-			{props.note && <Note name={name} />}
+			{props.note && <Note name={name} legend={legend} />}
 		</fieldset>
 	);
 }

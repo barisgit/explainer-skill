@@ -258,6 +258,49 @@ describe("Question over table rows at pack", () => {
 	}, 30_000);
 });
 
+/**
+ * The pixels of the element `selector` matches (a row's input, an option's dot drawn at the start of its text when `dot`, or a
+ * whole button) that differ clearly from the background: a chosen mark is filled, so it has clearly more than an unchosen one.
+ */
+async function ink(cdp: Cdp, selector: string, dot: boolean) {
+	const clip = await cdp.evaluate<{ x: number; y: number; width: number; height: number }>(`(() => {
+		const el = document.querySelector(${JSON.stringify(selector)});
+		const r = el.getBoundingClientRect();
+		const box = ${dot} ? { x: r.left + 8, y: r.top + r.height / 2 - 12, width: 24, height: 24 } : { x: r.left - 2, y: r.top - 2, width: r.width + 4, height: r.height + 4 };
+		return { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) };
+	})()`);
+	// The page fits the window: capturing beyond it would end the forced-colours emulation.
+	const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
+		clip: { ...clip, scale: 1 },
+	});
+	return cdp.evaluate<number>(
+		`new Promise((done) => { const img = new Image(); img.onload = () => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d"); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - d[0]) + Math.abs(d[i + 1] - d[1]) + Math.abs(d[i + 2] - d[2]) > 96) n++; done(n); }; img.src = "data:image/png;base64,${data}"; })`,
+		true,
+	);
+}
+
+/** Whether, with forced colours, each chosen selector shows clearly more ink than the unchosen one beside it. */
+async function chosenShows(output: string, pairs: [string, string, boolean][]) {
+	return inPage(
+		output,
+		async (cdp) => {
+			await cdp.send("Emulation.setEmulatedMedia", {
+				features: [
+					{ name: "prefers-reduced-motion", value: "reduce" },
+					{ name: "forced-colors", value: "active" },
+				],
+			});
+			await cdp.evaluate(`${FRAMES}.then(() => ${FRAMES})`, true);
+			const shows: boolean[] = [];
+			for (const [on, off, dot] of pairs) {
+				shows.push((await ink(cdp, on, dot)) > 1.3 * (await ink(cdp, off, dot)));
+			}
+			return shows;
+		},
+		{ width: 1440, height: 1400, mobile: false },
+	);
+}
+
 describe("Question over table rows, beside other controls and in forced colours", () => {
 	test("a button, a fold, a control and text in a row's other cells stay their own: only a plain click on the row chooses it", async () => {
 		const output = await packedMdx(
@@ -297,50 +340,52 @@ describe("Question over table rows, beside other controls and in forced colours"
 			"forced",
 			`import { Question } from "kit";\n\n# Forced\n\n<Question name="one" legend="One" rows={${SIZES}} cols={${COLS}} checked="10 kWh" />\n\n<Question name="many" legend="Many" rows={${SIZES}} cols={${COLS}} multiple checked={["10 kWh"]} />\n\n<Question name="pick" legend="Pick" options={["a", "b"]} checked="b" />\n\n<Question name="picks" legend="Picks" options={["a", "b"]} multiple checked={["b"]} />\n`,
 		);
-		const pairs = await inPage(
-			output,
-			async (cdp) => {
-				await cdp.send("Emulation.setEmulatedMedia", {
-					features: [
-						{ name: "prefers-reduced-motion", value: "reduce" },
-						{ name: "forced-colors", value: "active" },
-					],
-				});
-				await cdp.evaluate(`${FRAMES}.then(() => ${FRAMES})`, true);
-				// A row's mark is its input; an option's is the dot drawn at the start of its text. A chosen mark is filled, so it
-				// has clearly more pixels unlike the background than an unchosen one.
-				const ink = async (selector: string, dot: boolean) => {
-					const clip = await cdp.evaluate<{
-						x: number;
-						y: number;
-						width: number;
-						height: number;
-					}>(`(() => {
-					const el = document.querySelector(${JSON.stringify(selector)});
-					const r = el.getBoundingClientRect();
-					const box = ${dot} ? { x: r.left + 8, y: r.top + r.height / 2 - 12, width: 24, height: 24 } : { x: r.left - 2, y: r.top - 2, width: r.width + 4, height: r.height + 4 };
-					return { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) };
-				})()`);
-					// The page fits the window: capturing beyond it would end the forced-colours emulation.
-					const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
-						clip: { ...clip, scale: 1 },
-					});
-					return cdp.evaluate<number>(
-						`new Promise((done) => { const img = new Image(); img.onload = () => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d"); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - d[0]) + Math.abs(d[i + 1] - d[1]) + Math.abs(d[i + 2] - d[2]) > 96) n++; done(n); }; img.src = "data:image/png;base64,${data}"; })`,
-						true,
-					);
-				};
-				const differ = async (on: string, off: string, dot = false) =>
-					(await ink(on, dot)) > 1.3 * (await ink(off, dot));
-				return [
-					await differ("#one-10_20_kWh", "#one-15_20_kWh"),
-					await differ("#many-10_20_kWh", "#many-15_20_kWh"),
-					await differ("#pick-b + span", "#pick-a + span", true),
-					await differ("#picks-b + span", "#picks-a + span", true),
-				];
-			},
-			{ width: 1440, height: 1400, mobile: false },
-		);
+		const pairs = await chosenShows(output, [
+			["#one-10_20_kWh", "#one-15_20_kWh", false],
+			["#many-10_20_kWh", "#many-15_20_kWh", false],
+			["#pick-b + span", "#pick-a + span", true],
+			["#picks-b + span", "#picks-a + span", true],
+		]);
 		expect(pairs).toEqual([true, true, true, true]);
+	}, 30_000);
+
+	test("with forced colours, the chosen cell of an Explore choice, a Controls choice and a Records view switch looks unlike the others", async () => {
+		const output = await packedMdx(
+			dir,
+			"forced-kit-seg",
+			`import { Controls, Explore, Records } from "kit";
+
+export const frame = (k) => ({ readout: k });
+
+# Seg
+
+<Controls id="shared" controls={[{ id: "kind", label: "Kind", choice: ["AM", "FM"] }]} />
+
+<Explore label="Own" controls={[{ id: "mode", label: "Mode", choice: ["Slow", "Fast"] }]} frame={frame} />
+
+<Records id="tasks" data={[{ id: "A", phase: "One" }, { id: "B", phase: "Two" }]} idField="id" fields={{ id: { label: "Task", kind: "text" }, phase: { label: "Phase", kind: "text" } }} columns={["id"]} groupBy={["phase"]} views={["tree", "table"]} />
+`,
+		);
+		const shown = await chosenShows(output, [
+			["#kind-0 + span", "#kind-1 + span", false],
+			["#mode-0 + span", "#mode-1 + span", false],
+			[".toolbar .seg input:checked + span", ".toolbar .seg input:not(:checked) + span", false],
+		]);
+		expect(shown).toEqual([true, true, true]);
+	}, 30_000);
+
+	test("with forced colours, a chosen segmented button looks unlike an unchosen one, as a view switch and in a toolbar", async () => {
+		const seg = (name: string) =>
+			`<div class="seg">${["a", "b"].map((v) => `<label><input type="radio" name="${name}" id="${name}-${v}"${v === "b" ? " checked" : ""} /><span>${v}</span></label>`).join("")}</div>`;
+		const output = await packedMdx(
+			dir,
+			"forced-seg",
+			`# Seg\n\n${seg("plain")}\n\n<div class="toolbar">${seg("bar")}</div>\n`,
+		);
+		const shown = await chosenShows(output, [
+			["#plain-b + span", "#plain-a + span", false],
+			["#bar-b + span", "#bar-a + span", false],
+		]);
+		expect(shown).toEqual([true, true]);
 	}, 30_000);
 });

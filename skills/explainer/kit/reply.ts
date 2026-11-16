@@ -10,7 +10,7 @@
        <label class="field"><span>Max latency</span><input type="range" min="1" max="50" value="10" /><output>10 ms</output></label>
      </div>
    A control works alone too: <select data-reply="Region">…</select>. Radios and checkboxes group by name; a checkbox group answers with the
-   checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A text field or textarea with
+   checked labels (a Question's single option too), a lone toggle with on/off; a range or number shows its <output> when it has one. A text field or textarea with
    data-note inside a data-reply element is the note on that element's other control and goes with it, under it in the reply.
    The reply lists the answers, each with its note under it; a control the reader never touched keeps its default, marked
    "(default)", and every one with nothing chosen and no note is left out of the list and named in one line, "Not answered: a; b".
@@ -142,9 +142,16 @@
 
 	const checked = (c: ReplyControl) => c instanceof HTMLInputElement && c.checked;
 
-	/** A checkbox group answers with the checked labels ("none" when empty), a lone checkbox with on/off. */
+	/** The input of an option a Question draws: in its fieldset's segmented row, or the name cell of a row it makes a choice. */
+	const QUESTION_OPTION =
+		"fieldset[data-reply] > .seg > label > input, fieldset[data-reply] .compare tbody > tr > th > label:first-child > input";
+
+	/**
+	 * A checkbox group answers with the checked labels ("none" when empty), as does a Question's single option; a lone checkbox
+	 * that is not an option (a toggle) answers on/off.
+	 */
 	function checkboxValue(cs: Group) {
-		if (cs.length === 1) {
+		if (cs.length === 1 && !cs[0].matches(QUESTION_OPTION)) {
 			return checked(cs[0]) ? "on" : "off";
 		}
 		return cs.filter(checked).map(optionText).join(", ") || "none";

@@ -523,3 +523,186 @@ export function Maybe({ index }: { index: number }) {
 		expect(shown).toEqual([true, true]);
 	}, 30_000);
 });
+
+describe("a Question under the heading that asks it", () => {
+	test("without a legend the section heading names the group and the reply, and a nested heading wins over the section's", async () => {
+		const output = await packedMdx(
+			dir,
+			"heading-legend",
+			`import { Question } from "kit";
+
+# Page
+
+## Which fix would you try first?
+
+<Question name="fix" options={["Second barista", "Steadier orders"]} note />
+
+### How soon?
+
+<Question name="soon" options={["This week", "Later"]} />
+`,
+		);
+		const seen = await inPage(output, async (cdp) => {
+			await cdp.send("Accessibility.enable");
+			const { nodes } = await cdp.send<{
+				nodes: { role?: { value: string }; name?: { value: string } }[];
+			}>("Accessibility.getFullAXTree");
+			return {
+				legends: await cdp.evaluate(`document.querySelectorAll("fieldset legend").length`),
+				note: await cdp.evaluate(`document.getElementById("fix.note").getAttribute("aria-label")`),
+				groups: nodes.filter((n) => n.role?.value === "group").map((n) => n.name?.value),
+				lines: await act(
+					cdp,
+					`document.getElementById("fix-Second_20_barista").click(); document.getElementById("soon-Later").click(); document.querySelector(".reply-bar .primary").click()`,
+					`document.querySelector(".reply-md").textContent.split("\\n").filter((line) => line.startsWith("- "))`,
+				),
+			};
+		});
+		expect(seen.legends).toBe(0);
+		expect(seen.note).toBe("Note: Which fix would you try first?");
+		expect(seen.groups).toEqual(["Which fix would you try first?", "How soon?"]);
+		expect(seen.lines).toEqual([
+			"- Which fix would you try first? Second barista",
+			"- How soon? Later",
+		]);
+	}, 30_000);
+
+	test("each section names its own Questions: a nested section or an in-place View neither lends nor takes its heading", async () => {
+		const output = await packedMdx(
+			dir,
+			"heading-scopes",
+			`import { Question, View } from "kit";
+
+# Page
+
+<section>
+
+<h2>Outer?</h2>
+
+<section>
+
+<h3>Inner?</h3>
+
+<Question name="inner" options={["a"]} />
+
+</section>
+
+<section>
+
+<p>No heading here.</p>
+
+<Question name="own" legend="Its own" options={["a"]} />
+
+</section>
+
+<View name="v" back="Page">
+<h1>V</h1>
+<section>
+<h2>Inside the view?</h2>
+<Question name="viewq" options={["a"]} />
+</section>
+</View>
+
+<Question name="outer" options={["a"]} />
+
+</section>
+`,
+		);
+		const names = await inPage(output, (cdp) =>
+			cdp.evaluate(
+				`Object.fromEntries([...document.querySelectorAll("fieldset")].map((f) => [f.querySelector("input").name, f.getAttribute("aria-label")]))`,
+			),
+		);
+		expect(names).toEqual({
+			inner: "Inner?",
+			own: null,
+			viewq: "Inside the view?",
+			outer: "Outer?",
+		});
+	}, 30_000);
+
+	test("a Question in a later section does not take the heading of one that closed", async () => {
+		expect(
+			await packFailure(
+				"heading-closed",
+				'<section>\n\n<h2>Earlier?</h2>\n\n<Question name="a" options={["x"]} />\n\n</section>\n\n<section>\n\n<Question name="b" options={["x"]} />\n\n</section>',
+			),
+		).toEqual([1, expect.stringContaining('<Question name="b"> has no legend')]);
+	}, 30_000);
+
+	test("a Question with no legend and no heading before it fails the pack, saying what to write", async () => {
+		expect(
+			await packFailure("no-heading", '<Question name="lonely" options={["a", "b"]} />'),
+		).toEqual([
+			1,
+			expect.stringContaining(
+				'<Question name="lonely"> has no legend and no heading before it: write legend="...", or put it under the heading that asks the question',
+			),
+		]);
+	}, 30_000);
+
+	test("a written answer still needs its legend", async () => {
+		expect(await packFailure("written", '<Question name="why" />')).toEqual([
+			1,
+			expect.stringContaining('<Question name="why"> has no legend'),
+		]);
+	}, 30_000);
+});
+
+describe("a multiple Question with one option", () => {
+	test("the reply names the checked label, in options and in rows", async () => {
+		const output = await packedMdx(
+			dir,
+			"single-multiple",
+			`import { Question } from "kit";
+
+# One
+
+<Question name="agree" legend="Do you agree?" options={["I agree"]} multiple />
+
+<Question name="row" legend="Which row?" rows={[{ k: "Only" }]} cols={[{ head: "Row", value: "k" }]} multiple />
+`,
+		);
+		const lines = await inPage(output, async (cdp) => {
+			await act(
+				cdp,
+				`document.getElementById("agree-I_20_agree").click(); document.getElementById("row-Only").click(); document.querySelector(".reply-bar .primary").click()`,
+				"0",
+			);
+			return cdp.evaluate(
+				`document.querySelector(".reply-md").textContent.split("\\n").filter((line) => line.startsWith("- "))`,
+			);
+		});
+		expect(lines).toEqual(["- Do you agree? I agree", "- Which row? Only"]);
+	}, 30_000);
+});
+
+describe("a lone checkbox that is not a Question's option", () => {
+	test("answers on or off, in a comparison table cell or a hand-written segmented toggle inside a panel", async () => {
+		const output = await packedMdx(
+			dir,
+			"lone-checkbox",
+			`# Lone
+
+<div data-reply="Panel">
+<table class="compare"><tbody><tr><th scope="row">Row</th><td><label><input type="checkbox" id="lone" name="lone" /> <span>Keep</span></label></td></tr></tbody></table>
+</div>
+
+<div data-reply="Tools">
+<div class="seg"><label><input type="checkbox" id="fast" name="fast" /><span>Fast</span></label></div>
+</div>
+`,
+		);
+		const lines = await inPage(output, async (cdp) => {
+			await act(
+				cdp,
+				`document.getElementById("lone").click(); document.getElementById("fast").click(); document.querySelector(".reply-bar .primary").click()`,
+				"0",
+			);
+			return cdp.evaluate(
+				`document.querySelector(".reply-md").textContent.split("\\n").filter((line) => line.startsWith("- "))`,
+			);
+		});
+		expect(lines).toEqual(["- Panel: on", "- Tools: on"]);
+	}, 30_000);
+});

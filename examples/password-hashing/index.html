@@ -925,6 +925,16 @@ legend {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
+/* Forced colours drop the ink fill that marks the chosen cell, so it takes the system's selection colours. A Question's options
+   mark their choice with a dot of their own (below). */
+@media (forced-colors: active) {
+	:not(fieldset) > .seg input:checked + span {
+		forced-color-adjust: none;
+		background: Highlight;
+		border-color: Highlight;
+		color: HighlightText;
+	}
+}
 .toggle {
 	display: inline-flex;
 	align-items: center;
@@ -5197,7 +5207,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
        <label class="field"><span>Max latency</span><input type="range" min="1" max="50" value="10" /><output>10 ms</output></label>
      </div>
    A control works alone too: <select data-reply="Region">…</select>. Radios and checkboxes group by name; a checkbox group answers with the
-   checked labels, a lone one with on/off; a range or number shows its <output> when it has one. A text field or textarea with
+   checked labels (a Question's single option too), a lone toggle with on/off; a range or number shows its <output> when it has one. A text field or textarea with
    data-note inside a data-reply element is the note on that element's other control and goes with it, under it in the reply.
    The reply lists the answers, each with its note under it; a control the reader never touched keeps its default, marked
    "(default)", and every one with nothing chosen and no note is left out of the list and named in one line, "Not answered: a; b".
@@ -5286,8 +5296,9 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
     return clean(c.getAttribute("aria-label") || group?.getAttribute("aria-label") || group?.querySelector("legend")?.textContent || c.closest(".field")?.firstElementChild?.textContent || own || c.name || "control");
   }
   const checked = (c) => c instanceof HTMLInputElement && c.checked;
+  const QUESTION_OPTION = "fieldset[data-reply] > .seg > label > input, fieldset[data-reply] .compare tbody > tr > th > label:first-child > input";
   function checkboxValue(cs) {
-    if (cs.length === 1) {
+    if (cs.length === 1 && !cs[0].matches(QUESTION_OPTION)) {
       return checked(cs[0]) ? "on" : "off";
     }
     return cs.filter(checked).map(optionText).join(", ") || "none";

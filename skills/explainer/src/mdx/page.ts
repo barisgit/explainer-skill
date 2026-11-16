@@ -18,6 +18,7 @@ import {
 	scriptsInHtml,
 } from "./kit-scripts.ts";
 import { MATH_ELEMENT } from "./math.ts";
+import { nameFromHeadings, recordHeadingProblems } from "./question-heading.ts";
 
 /** Island markers, and the element a rendered View is wrapped in (VIEW_MARKER in kit/components/view.tsx) so pack can move it. */
 const VIEW = /<!--island:\d+-->|<!--\/island-->|<explainer-view>|<\/explainer-view>/g;
@@ -181,16 +182,19 @@ async function recordsLinkProblems(html: string, islands: Island[]): Promise<str
 	);
 }
 
-/** The ids each filled View's record repeats while it is open, in itself or beside the page's own `html` (ids.ts). */
-async function recordIds(html: string, islands: Island[]): Promise<string[]> {
+/** What is wrong in the filled Views' records: a legendless Question, and the ids each repeats while open, in itself or beside the page's own `html` (ids.ts). */
+async function recordProblems(html: string, islands: Island[]): Promise<string[]> {
 	const filled = filledRecords(islands);
 	if (!filled.length) {
 		return [];
 	}
 	const page = await idUses(html);
-	return (
-		await Promise.all(filled.map(({ place, record }) => recordIdProblems(page, record, place)))
-	).flat();
+	return [
+		...filled.flatMap(({ place, record }) => recordHeadingProblems(record, place)),
+		...(
+			await Promise.all(filled.map(({ place, record }) => recordIdProblems(page, record, place)))
+		).flat(),
+	];
 }
 
 /** The islands as the page carries them for kit/islands/client.ts, each module named by its index in `modules`. */
@@ -241,14 +245,16 @@ export async function mdxPage(
 	};
 	const css = new Set<string>();
 	const prerendered = await prerender(compiled, css, page.front.labels);
+	const named = await nameFromHeadings(prerendered.html);
 	const clashes = [
-		...(await answerClashes(prerendered.html)),
-		...(await recordsLinkProblems(prerendered.html, prerendered.islands)),
+		...named.problems,
+		...(await answerClashes(named.html)),
+		...(await recordsLinkProblems(named.html, prerendered.islands)),
 	];
 	if (clashes.length) {
 		throw new PackError(clashes.map((clash) => `${shownPath(path)}: ${clash}`).join("\n"));
 	}
-	const html = await drawDiagrams(prerendered.html);
+	const html = await drawDiagrams(named.html);
 	const islands = prerendered.islands;
 	// The client modules the islands are from, and those whose exported functions their props hold.
 	const modules = [
@@ -263,7 +269,7 @@ export async function mdxPage(
 	if (loads.length) {
 		throw new PackError(`${loads.map((load) => `- ${load}`).join("\n")}\n${CLIENT_LOAD_FIX}`);
 	}
-	const repeated = await recordIds(html, islands);
+	const repeated = await recordProblems(html, islands);
 	if (repeated.length) {
 		throw new PackError(repeated.map((problem) => `- ${problem}`).join("\n"));
 	}

@@ -227,7 +227,7 @@ import { Question } from "kit";
 
 # Kit chrome
 
-<Question name="answer" label="Choose" options={["Yes", "No"]} />
+<Question name="answer" legend="Choose" options={["Yes", "No"]} />
 
 ${[1, 2, 3, 4].map((n) => `<h2 data-nav="Section ${n}">Section ${n}</h2>\n\nParagraph ${n}.`).join("\n\n")}
 

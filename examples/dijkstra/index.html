@@ -925,6 +925,16 @@ legend {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
+/* Forced colours drop the ink fill that marks the chosen cell, so it takes the system's selection colours. A Question's options
+   mark their choice with a dot of their own (below). */
+@media (forced-colors: active) {
+	:not(fieldset) > .seg input:checked + span {
+		forced-color-adjust: none;
+		background: Highlight;
+		border-color: Highlight;
+		color: HighlightText;
+	}
+}
 .toggle {
 	display: inline-flex;
 	align-items: center;
