@@ -509,5 +509,21 @@
 		}
 	});
 
+	// A Question over table rows (kit Question with rows): a plain click on a row chooses and focuses its option, as its label does.
+	// A click on something of its own (a control, link, fold or note part) or one that ends a text selection is left alone, so
+	// the cells' text stays selectable for copying or a note.
+	const OWN_CLICK =
+		"a[href], button, input, select, textarea, label, details, [contenteditable], [tabindex]";
+	document.addEventListener("click", (e) => {
+		const el = e.target instanceof Element ? e.target : null;
+		const choice = el
+			?.closest("fieldset[data-reply] .compare tbody > tr")
+			?.querySelector<HTMLInputElement>(":scope > th > label:first-child > input");
+		if (choice && !el?.closest(OWN_CLICK) && getSelection()?.isCollapsed !== false) {
+			choice.focus({ preventScroll: true }); // as a click on its label does, so the arrow keys go on from it
+			choice.click();
+		}
+	});
+
 	keep.attach({ notes: { list: () => filledNotes(), restore: restoreNotes }, onChange: sync });
 })();

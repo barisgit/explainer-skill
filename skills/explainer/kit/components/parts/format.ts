@@ -1,7 +1,7 @@
 /*
  * Numbers as the page's language writes them, for components that write them while pack renders the page (Table, Explore's
- * slider readout). A NumberFormat (kit-types/globals.d.ts) means the same here as in plot.js and charts.js, which write it in
- * the browser.
+ * slider readout). A NumberFormat (kit-types/globals.d.ts) is also written in the browser by plot.js and charts.js, which build
+ * Intl options of their own (kit/parts/plot/draw.ts, kit/parts/charts/option.ts): a change to the rule here belongs there too.
  */
 
 let packLang = "";
@@ -20,7 +20,7 @@ export const pageLabels = (): Readonly<Record<string, string>> =>
 	(typeof kitLabels === "undefined" ? undefined : kitLabels) ?? {};
 
 /**
- * The Intl options of a NumberFormat; plot.js and charts.js build the same. A plain number groups from five digits, so a year stays
+ * The Intl options of a NumberFormat. A plain number groups from five digits, so a year stays
  * 2024; money always groups, so 4,200 stands beside 11,200, and a whole amount has no cents unless `digits` asks for them.
  */
 const intlOptions = ({

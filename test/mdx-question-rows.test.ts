@@ -25,6 +25,25 @@ async function clickOn(cdp: Cdp, selector: string) {
 	await cdp.evaluate(`${FRAMES}.then(() => ${FRAMES})`, true);
 }
 
+/** Drags the mouse with the button held across the text of the first element `selector` matches, from its first to its last character. */
+async function dragAcross(cdp: Cdp, selector: string) {
+	const { x1, x2, y } = await cdp.evaluate<{ x1: number; x2: number; y: number }>(`(() => {
+		const el = document.querySelector(${JSON.stringify(selector)});
+		el.scrollIntoView({ block: "center" });
+		const range = document.createRange();
+		range.selectNodeContents(el);
+		const r = range.getBoundingClientRect();
+		return { x1: r.left + 1, x2: r.right - 1, y: r.top + r.height / 2 };
+	})()`);
+	const at = (type: string, x: number, buttons: number) =>
+		cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: 1 });
+	await at("mousePressed", x1, 1);
+	await at("mouseMoved", (x1 + x2) / 2, 1);
+	await at("mouseMoved", x2, 1);
+	await at("mouseReleased", x2, 0);
+	await cdp.evaluate(`${FRAMES}.then(() => ${FRAMES})`, true);
+}
+
 /** Presses a key on the focused element. */
 async function press(cdp: Cdp, key: string, keyCode: number) {
 	for (const type of ["rawKeyDown", "keyUp"]) {
@@ -152,7 +171,9 @@ describe("Question over table rows", () => {
 		expect(seen).toEqual(["5 kWh,15 kWh", "#5kWh", "5 kWh,15 kWh"]);
 		expect(readFileSync(output, "utf8")).toContain('type="checkbox" name="size" value="5 kWh"');
 	}, 30_000);
+});
 
+describe("Question over table rows at pack", () => {
 	test("props the rows cannot use fail the pack, saying what to write", async () => {
 		const failed = async (name: string, props: string) => {
 			const { result } = await packMdx(
@@ -182,5 +203,106 @@ describe("Question over table rows", () => {
 			1,
 			expect.stringContaining('recommends "20 kWh", which is not one of its option values'),
 		]);
+		expect(await failed("unchecked", `${rows} cols={${COLS}} checked="20 kWh"`)).toEqual([
+			1,
+			expect.stringContaining('checks "20 kWh", which is not one of its option values'),
+		]);
+		expect(await failed("options-unchecked", `options={["a", "b"]} checked="c"`)).toEqual([
+			1,
+			expect.stringContaining('checks "c", which is not one of its option values'),
+		]);
+		expect(
+			await failed(
+				"blank",
+				`rows={[{ size: "5 kWh" }, { size: " " }]} cols={[{ head: "Size", value: "size" }]}`,
+			),
+		).toEqual([1, expect.stringContaining("has a row whose first column is empty")]);
+	}, 30_000);
+});
+
+describe("Question over table rows, beside other controls and in forced colours", () => {
+	test("a button, a fold, a control and text in a row's other cells stay their own: only a plain click on the row chooses it", async () => {
+		const output = await packedMdx(
+			dir,
+			"busy-rows",
+			`import { Question } from "kit";\n\n# Sizes\n\n<Question name="size" legend="Which size?" rows={${SIZES}} cols={[{ head: "Size", value: "size" }, { head: "Price", value: "price", format: { currency: "EUR" } }, { head: "Why", value: (s) => <details><summary>Why {s.size}</summary>Because.</details> }, { head: "Act", value: (s) => <button type="button" data-copy={s.size}>Copy</button> }, { head: "Mine", value: (s) => <label><input type="checkbox" data-mine={s.size} /> keep</label> }]} />\n`,
+		);
+		const seen = await inPage(output, async (cdp) => {
+			await cdp.evaluate(
+				`document.querySelector('[data-copy="10 kWh"]').addEventListener("click", () => { window.copied = true; })`,
+			);
+			await clickOn(cdp, '[data-copy="10 kWh"]');
+			const button = await cdp.evaluate(`[window.copied === true, ${CHOSEN}]`);
+			await clickOn(cdp, 'tr:has([data-copy="15 kWh"]) summary');
+			const fold = await cdp.evaluate(
+				`[document.querySelector('tr:has([data-copy="15 kWh"]) details').open, ${CHOSEN}]`,
+			);
+			await clickOn(cdp, '[data-mine="5 kWh"]');
+			const mine = await cdp.evaluate(
+				`[document.querySelector('[data-mine="5 kWh"]').checked, getComputedStyle(document.querySelector('[data-mine="5 kWh"]')).appearance, getComputedStyle(document.querySelector("#size-5_20_kWh")).appearance, ${CHOSEN}]`,
+			);
+			await dragAcross(cdp, cell("None yet", 1));
+			const dragged = await cdp.evaluate(`[getSelection().toString(), ${CHOSEN}]`);
+			await clickOn(cdp, cell("10 kWh", 1));
+			return { button, fold, mine, dragged, plain: await cdp.evaluate(CHOSEN) };
+		});
+		expect(seen.button).toEqual([true, ""]);
+		expect(seen.fold).toEqual([true, ""]);
+		expect(seen.mine).toEqual([true, "auto", "none", ""]);
+		expect(seen.dragged).toEqual(["€0", ""]);
+		expect(seen.plain).toBe("10 kWh");
+	}, 30_000);
+
+	test("with forced colours, a chosen radio or check box looks unlike an unchosen one, in rows and in a Question's options", async () => {
+		const output = await packedMdx(
+			dir,
+			"forced",
+			`import { Question } from "kit";\n\n# Forced\n\n<Question name="one" legend="One" rows={${SIZES}} cols={${COLS}} checked="10 kWh" />\n\n<Question name="many" legend="Many" rows={${SIZES}} cols={${COLS}} multiple checked={["10 kWh"]} />\n\n<Question name="pick" legend="Pick" options={["a", "b"]} checked="b" />\n\n<Question name="picks" legend="Picks" options={["a", "b"]} multiple checked={["b"]} />\n`,
+		);
+		const pairs = await inPage(
+			output,
+			async (cdp) => {
+				await cdp.send("Emulation.setEmulatedMedia", {
+					features: [
+						{ name: "prefers-reduced-motion", value: "reduce" },
+						{ name: "forced-colors", value: "active" },
+					],
+				});
+				await cdp.evaluate(`${FRAMES}.then(() => ${FRAMES})`, true);
+				// A row's mark is its input; an option's is the dot drawn at the start of its text. A chosen mark is filled, so it
+				// has clearly more pixels unlike the background than an unchosen one.
+				const ink = async (selector: string, dot: boolean) => {
+					const clip = await cdp.evaluate<{
+						x: number;
+						y: number;
+						width: number;
+						height: number;
+					}>(`(() => {
+					const el = document.querySelector(${JSON.stringify(selector)});
+					const r = el.getBoundingClientRect();
+					const box = ${dot} ? { x: r.left + 8, y: r.top + r.height / 2 - 12, width: 24, height: 24 } : { x: r.left - 2, y: r.top - 2, width: r.width + 4, height: r.height + 4 };
+					return { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) };
+				})()`);
+					// The page fits the window: capturing beyond it would end the forced-colours emulation.
+					const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
+						clip: { ...clip, scale: 1 },
+					});
+					return cdp.evaluate<number>(
+						`new Promise((done) => { const img = new Image(); img.onload = () => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d"); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - d[0]) + Math.abs(d[i + 1] - d[1]) + Math.abs(d[i + 2] - d[2]) > 96) n++; done(n); }; img.src = "data:image/png;base64,${data}"; })`,
+						true,
+					);
+				};
+				const differ = async (on: string, off: string, dot = false) =>
+					(await ink(on, dot)) > 1.3 * (await ink(off, dot));
+				return [
+					await differ("#one-10_20_kWh", "#one-15_20_kWh"),
+					await differ("#many-10_20_kWh", "#many-15_20_kWh"),
+					await differ("#pick-b + span", "#pick-a + span", true),
+					await differ("#picks-b + span", "#picks-a + span", true),
+				];
+			},
+			{ width: 1440, height: 1400, mobile: false },
+		);
+		expect(pairs).toEqual([true, true, true, true]);
 	}, 30_000);
 });

@@ -7,7 +7,8 @@
      legend    the question
      options   value: label pairs, or a list of labels that are their own values; each value once
      rows, cols  in place of options, a comparison whose rows are the choices, taken as Table takes them; each row's first
-               column is its value (text or a number), and a click anywhere on a row chooses it. No answer: a self-check uses options
+               column is its value (text or a number), and a click on a row chooses it (not on a control, link or fold in it, and not
+               a text selection). No answer: a self-check uses options
                <Question name="size" legend="Which size?" rows={sizes} cols={[{ head: "Size", value: "size" }, { head: "Price", value: "price", format: { currency: "EUR" } }]} />
      multiple  checkboxes instead of radios: the answer is the checked labels
      checked   the value (or values) chosen to begin with
@@ -17,7 +18,7 @@
      answer    the right value: a self-check. Choosing marks the right option and a wrong choice, says Right or Wrong (also
                to a screen reader) and opens the explanation written inside the Question; it is not part of the reply and
                brings no Reply button
-   Without options the reader writes the answer in a text box (its id is the name, written as above). What is written inside the Question
+   Without options or rows the reader writes the answer in a text box (its id is the name, written as above). What is written inside the Question
    is the model answer, behind a fold the reader opens when ready (kitLabels.showAnswer), which Expand all leaves shut; such a Question
    is a self-check too: kept, but not in the reply. With nothing inside, the written answer joins the reply.
    The reply lists each answered question with its choice and its note; questions left alone are folded into one
@@ -116,16 +117,26 @@ function selfCheckProblem(
 		: `has the answer "${answer}", which is not one of its option values (${values.join(", ")})`;
 }
 
-/** The problem with a recommendation, if any: each recommended value is one of the options, and one alone without multiple. */
-function recommendedProblem(
-	{ recommended, multiple }: QuestionBase,
+/**
+ * The problem with the values checked or recommended, if any: each is one of the options, and one recommendation alone without
+ * multiple.
+ */
+function chosenProblem(
+	{ checked, recommended, multiple }: QuestionBase,
 	values: string[],
 ): string | undefined {
-	const given = new Set([recommended ?? []].flat());
-	const missing = [...given].find((value) => !values.includes(value));
-	if (missing !== undefined) {
-		return `recommends "${missing}", which is not one of its option values (${values.join(", ")})`;
+	const missing = (given: string | string[] | undefined) =>
+		[given ?? []].flat().find((value) => !values.includes(value));
+	for (const [verb, given] of [
+		["checks", checked],
+		["recommends", recommended],
+	] as const) {
+		const value = missing(given);
+		if (value !== undefined) {
+			return `${verb} "${value}", which is not one of its option values (${values.join(", ")})`;
+		}
 	}
+	const given = new Set([recommended ?? []].flat());
 	return given.size > 1 && !multiple
 		? "recommends several values but takes one: recommend one, or add multiple"
 		: undefined;
@@ -201,7 +212,7 @@ function checkValues(props: QuestionBase, values: string[]) {
 	const twice = values.find((value, i) => values.indexOf(value) !== i);
 	const problem =
 		twice === undefined
-			? (selfCheckProblem(props, values) ?? recommendedProblem(props, values))
+			? (selfCheckProblem(props, values) ?? chosenProblem(props, values))
 			: `has the option value "${twice}" twice: the reply could not tell the two apart, so give each option its own value`;
 	if (problem) {
 		throw new Error(`<Question name="${props.name}"> ${problem}`);
@@ -314,6 +325,11 @@ function RowsChoice<Row>(
 	const { name, legend, rows, cols } = props;
 	const [first] = cols;
 	const values = rows.map((row) => (first ? read(row, first.value) : undefined));
+	if (values.some((value) => typeof value === "string" && value.trim() === "")) {
+		throw new Error(
+			`<Question name="${name}"> has a row whose first column is empty: its first column names the row and gives its value, so give every row its name there (write "None yet" for a row that chooses nothing)`,
+		);
+	}
 	if (!values.every((value) => typeof value === "string" || typeof value === "number")) {
 		throw new Error(
 			`<Question name="${name}"> has a row whose first column is not text or a number: its first column gives each row's value, which the option's id, checked and recommended use, so make it a key or (row) => text or a number`,
