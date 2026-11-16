@@ -43,7 +43,7 @@ Showcase assets stay in `examples/`, never in `skills/explainer/`, because insta
 | Command | What it does |
 |---|---|
 | `bun install` | Installs dev tools from the lockfile and the git hook (`prepare` runs husky) |
-| `bun run typecheck` | `bun --check` for the CLI, build and tests, then with `--tsconfig-override` for the kit (`tsconfig.kit.json`) and the records core (`tsconfig.records.json`): Bun's built-in checker, same errors as `tsc`, strictest settings |
+| `bun run typecheck` | `cmp` of `kit-types/globals.d.ts` with its vendored copy (`bun run vendor` copies it), then `bun --check` for the CLI, build and tests, then with `--tsconfig-override` for the kit (`tsconfig.kit.json`) and the records core (`tsconfig.records.json`): Bun's built-in checker, same errors as `tsc`, strictest settings |
 | `bun run lint` | `biome check` (format check, lint, import order), warnings are errors; no writes |
 | `bun run format` | `biome check --write`: formats and applies safe fixes |
 | `bun run test` | Contract tests (Chrome needed, about six minutes) |

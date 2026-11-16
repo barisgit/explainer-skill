@@ -4,7 +4,7 @@
 	"license": "MIT",
 	"type": "module",
 	"scripts": {
-		"typecheck": "bun --check && bun --check --tsconfig-override tsconfig.kit.json && bun --check --tsconfig-override tsconfig.records.json",
+		"typecheck": "cmp kit-types/globals.d.ts skills/explainer/vendor/types/globals.d.ts && bun --check && bun --check --tsconfig-override tsconfig.kit.json && bun --check --tsconfig-override tsconfig.records.json",
 		"lint": "biome check --error-on-warnings .",
 		"format": "biome check --write --error-on-warnings .",
 		"test": "bun test",
