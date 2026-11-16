@@ -60,7 +60,7 @@ const PREPARE_JS = `(() => {
 	const shown = ${REGION_VISIBLE_JS};
 	const omitted = targets.filter(({ el, position }) => {
 		// Known kit chrome is still hidden for the document overview, but is not an actionable author warning.
-		if (el.matches("body > div.reply-ui.reply-bar, .page > nav.toc")) return false;
+		if (el.matches(".page > nav.toc")) return false;
 		if (position !== "fixed" || !shown(el)) return false;
 		for (let p = el; p; p = p.parentElement) if (getComputedStyle(p).opacity === "0") return false;
 		const r = el.getBoundingClientRect();
@@ -80,7 +80,7 @@ const PREPARE_JS = `(() => {
 
 /**
  * Returns the base64 document PNG and short selectors of visible author viewport-fixed boxes omitted only for this capture.
- * The kit's Reply bar and contents rail are omitted silently; first-screen shots already show this known chrome.
+ * The kit's contents rail is omitted silently; first-screen shots already show this known chrome.
  * Chrome's beyond-viewport scrollbar workaround briefly resizes the layout. Stop at a debugger statement while capturing:
  * page tasks defer rather than being discarded by script-execution suppression. Restore styles before resuming, even on failure.
  * First-screen and element shots stay live.

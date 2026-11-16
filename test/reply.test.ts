@@ -445,96 +445,110 @@ ${onLoad(2, "Clear is offered for answers that wait for their panel", `!clearBut
 	expect(checked.code).toBe(0);
 }, 60_000);
 
-/** Rows of a table filling the column, so a control in a corner of the window would sit on them. */
-const ROWS = Array.from(
-	{ length: 12 },
-	(_, i) =>
-		`<tr><th>Option ${i + 1}</th><td style="text-align: right">${(i + 1) * 125} ms</td></tr>`,
-).join("");
 const PROSE = Array.from(
 	{ length: 8 },
 	(_, i) =>
 		`<p>Paragraph ${i + 1} runs the full measure of the column, so it reaches the right edge on a phone and on a desktop.</p>`,
 ).join("");
 
-/**
- * Geometry of the reply bar, in page script. `ownsRow`: every point across the bar's middle row hits the bar, so content can pass only
- * under all of it, as under the window's edge, never beside a control that hides part of it. `coversNothing`: no content box meets it.
- */
-const BAR_GEOMETRY = `
-const bar = () => document.querySelector(".reply-bar");
-const box = () => bar().getBoundingClientRect();
-const at = (top) => (scrollTo({ top, behavior: "instant" }), true);
-const inView = () => box().top >= 0 && box().bottom <= innerHeight + 0.5 && box().height > 0;
-const opaque = () => /^rgb\\(/.test(getComputedStyle(bar()).backgroundColor);
-const ownsRow = () => {
-	const y = (box().top + box().bottom) / 2;
-	for (let x = 1; x < document.documentElement.clientWidth; x += 8) {
-		if (!bar().contains(document.elementFromPoint(x, y))) return false;
-	}
-	return true;
-};
-const meets = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-const coversNothing = () => [...document.querySelectorAll("main *")].every((el) => !meets(el.getBoundingClientRect(), box()));
-const end = () => document.documentElement.scrollHeight - innerHeight;`;
+/** A question as the Question component draws one: a fieldset with data-reply whose radios are named `name`. */
+const QUESTION = (name: string) =>
+	`<fieldset data-reply id="${name}"><legend>${name}?</legend><label><input type="radio" name="${name}" value="a" id="${name}-a"> A</label> <label><input type="radio" name="${name}" value="b" id="${name}-b"> B</label></fieldset>`;
 
-/** A tall page whose first box is a full-width table; `question` adds a data-reply question, so the Reply button shows from the start. */
-const BAR_PAGE = (question: boolean, script: string) =>
+/** Where the reply bar is and what it shows, in page script. */
+const BAR_PLACE = `
+const bar = () => document.querySelector(".reply-bar");
+const $ = (id) => document.getElementById(id);
+const shown = (el) => Boolean(el?.checkVisibility());
+const lastIn = (id) => $(id).lastElementChild === bar();
+const firstScreenQuiet = () => (scrollTo({ top: 0, behavior: "instant" }), [...document.querySelectorAll(".reply-ui")].every((el) => !shown(el) || el.getBoundingClientRect().top >= innerHeight));
+const visibleButtons = () => [...bar().querySelectorAll(".btn")].filter(shown).map((b) => b.textContent).join("|");
+const flows = () => getComputedStyle(bar()).position === "static" && getComputedStyle(document.body).paddingTop === "0px";`;
+
+/** An overview as pack writes it: the masthead, then sections; the questions sit in `withQuestions`' sections. */
+const OVERVIEW_PAGE = (script: string) =>
 	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="kit:theme.css"></head><body><main data-asks-reply><table class="compare">${ROWS}</table><h1>Bar</h1>${PROSE}
-${question ? `<fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" checked> A</label> <label><input type="radio" name="p" value="b" id="b"> B</label></fieldset>` : ""}
-<input id="late" aria-label="Late">${PROSE}<table class="compare">${ROWS}</table></main>
-<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_GEOMETRY}
+<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><div data-overview>
+<header class="masthead"><h1>Bar</h1><p class="lede">The lede.</p></header>
+<section id="first"><h2>First</h2>${PROSE}${PROSE}${QUESTION("one")}<p>After the first question.</p></section>
+<section id="second"><h2>Second</h2>${QUESTION("two")}<p>After the last question.</p></section>
+<section id="third"><h2>Third</h2>${PROSE}</section></div></main>
+<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_PLACE}
 ${script}</script></body></html>`;
 
-test("the reply bar never covers content: at the top nothing is under it, and scrolled it stays in view with the count and content passes only under all of it", async () => {
+test("the reply bar sits in the page's flow at the end of the section with the last question, so the first screen shows none of it", async () => {
 	const contract = pageContract({
-		"an answer shows the count and Clear": `(document.getElementById("b").click(), bar().textContent.includes("Reply (1)") && bar().querySelectorAll(".btn:not([hidden])").length === 2)`,
-		"at the top the bar is in view, opaque and covers nothing":
-			"at(0) && inView() && opaque() && ownsRow() && coversNothing()",
-		"half way down the bar is in view and owns its row": "at(end() / 2) && inView() && ownsRow()",
-		"a control focused under the bar scrolls clear of it": `(() => {
-			const late = document.getElementById("late");
-			at(late.getBoundingClientRect().top + scrollY - box().top - 4);
-			late.focus();
-			return late.getBoundingClientRect().top >= box().bottom;
-		})()`,
-		"at the end the bar is in view and owns its row": "at(end()) && inView() && ownsRow()",
+		"nothing of the reply is on the first screen": "firstScreenQuiet()",
+		"the bar is in the page's flow, and the page keeps no room for it at the top": "flows()",
+		"the bar ends the section that holds the last question": `lastIn("second")`,
+		"Reply and the answered count show before any answer": `shown(bar()) && visibleButtons() === "Reply" && bar().querySelector(".reply-progress").textContent === "0 of 2 answered"`,
+		"an answer counts, and Clear joins Reply in the bar": `($("one-b").click(), visibleButtons().includes("Reply (1)") && visibleButtons().includes("Clear answers and notes") && bar().querySelector(".reply-progress").textContent === "1 of 2 answered")`,
 	});
-	expect(await packAndRun(dir, "bar", BAR_PAGE(true, contract))).toEqual([]);
+	expect(await packAndRun(dir, "bar", OVERVIEW_PAGE(contract))).toEqual([]);
 }, 60_000);
 
-test("a reply bar that long kitLabels wrap onto two rows still covers nothing at the top, and focus clears it", async () => {
-	const labels = `var kitLabels = { reply: "Antworten senden", clear: "Alle Antworten und Notizen dieser Seite löschen" };`;
-	const contract = `${labels}
+test("a question an island draws keeps the bar outside the island, at the end of the overview", async () => {
+	const page = OVERVIEW_PAGE(
+		pageContract({
+			"the bar follows the overview, outside the island's range": `document.querySelector("[data-overview]").nextElementSibling === bar() && shown(bar())`,
+		}),
+	).replace(
+		'<section id="third"><h2>Third</h2>',
+		`<!--island:0--><section id="owned"><h2>Owned</h2>${QUESTION("three")}</section><!--/island--><section id="third"><h2>Third</h2>`,
+	);
+	expect(await packAndRun(dir, "bar-island", page)).toEqual([]);
+}, 60_000);
+
+test("with reply: true and no question, the bar comes at the end of the page once there is something to send, moving nothing", async () => {
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page" data-asks-reply><div data-overview>
+<header class="masthead"><h1>Notes</h1><p class="lede">The lede.</p></header>
+<section><h2>Only</h2>${PROSE}<input id="late" aria-label="Late">${PROSE}</section></div></main>
+<script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_PLACE}
 ${SETTLED}
 var contract = settled.then(async () => {
-	document.getElementById("b").click();
-	await new Promise(requestAnimationFrame);
-	await new Promise(requestAnimationFrame);
-	const late = document.getElementById("late");
-	const top = at(0) && coversNothing();
-	at(late.getBoundingClientRect().top + scrollY - box().bottom + 4);
-	late.focus();
-	// Scroll offsets are whole pixels and the control's top is not, so it may end up to a pixel short of the bar's edge.
-	return [innerWidth > 500 || box().height > 70 ? "" : "the labels do not wrap the bar on a phone", top ? "" : "the wrapped bar covers content at the top", late.getBoundingClientRect().top > box().bottom - 1 ? "" : "a control focused under the wrapped bar stays under it"].filter(Boolean);
-});`;
-	expect(await packAndRun(dir, "bar-long", BAR_PAGE(true, contract))).toEqual([]);
-}, 60_000);
-
-test("the reply bar appearing on a reader's first input does not move the page under the reader", async () => {
-	const contract = `${SETTLED}
-var contract = settled.then(async () => {
-	const late = document.getElementById("late");
+	const failures = [];
+	const late = $("late");
 	const before = late.getBoundingClientRect().top;
-	const hidden = bar().hidden;
+	if (shown(bar())) failures.push("the bar shows before there is anything to send or clear");
 	late.value = "typed";
 	late.dispatchEvent(new Event("input", { bubbles: true }));
 	await new Promise((tick) => setTimeout(tick));
 	await new Promise(requestAnimationFrame);
-	return hidden && !bar().hidden && late.getBoundingClientRect().top === before ? [] : ["the page moved as the bar appeared"];
-});`;
-	expect(await packAndRun(dir, "bar-keep", BAR_PAGE(false, contract))).toEqual([]);
+	if (!shown(bar()) || document.querySelector("[data-overview]").nextElementSibling !== bar()) failures.push("the kept answer does not bring the bar at the end of the page");
+	if (late.getBoundingClientRect().top !== before) failures.push("the page moved as the bar appeared");
+	if (!firstScreenQuiet()) failures.push("the bar is on the first screen");
+	return failures;
+});</script></body></html>`;
+	expect(await packAndRun(dir, "bar-notes", page)).toEqual([]);
+}, 60_000);
+
+test("with questions in several views the bar follows the view shown: under its last question, else at its end once there is something to send", async () => {
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><div data-overview>
+<header class="masthead"><h1>Views</h1><p class="lede">The lede, with <a href="#a">A</a> and <a href="#b">B</a>.</p></header>
+<section id="s-home"><h2>Home</h2>${QUESTION("home")}</section><section><h2>More</h2>${PROSE}</section></div>
+<section class="view" data-view="a"><a class="back" href="#">Home</a><h1>A</h1><section id="s-in-a"><h2>Asked</h2>${QUESTION("in-a")}<p>After.</p></section><section><h2>Then</h2>${PROSE}</section></section>
+<section class="view" data-view="b" id="b"><a class="back" href="#">Home</a><h1>B</h1><section><h2>Nothing asked</h2>${PROSE}</section></section></main>
+<script src="kit:views.js"></script><script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_PLACE}
+${SETTLED}
+const go = (hash) => new Promise((done) => { addEventListener("hashchange", () => requestAnimationFrame(() => done()), { once: true }); location.hash = hash; });
+var contract = settled.then(async () => {
+	const failures = [];
+	const expect = (ok, name) => ok || failures.push(name);
+	expect(lastIn("s-home") && shown(bar()), "on the overview the bar ends the section with its question");
+	await go("#b");
+	expect(!shown(bar()), "a view with no question shows no bar while nothing is answered");
+	await go("#a");
+	expect(lastIn("s-in-a") && shown(bar()), "in a view with a question the bar ends that question's section");
+	$("in-a-b").click();
+	await go("#b");
+	expect($("b").nextElementSibling === bar() && shown(bar()) && visibleButtons().includes("Reply (1)"), "a view with no question has the bar at its end once something is answered");
+	await go("");
+	expect(lastIn("s-home") && visibleButtons().includes("Reply (1)"), "back on the overview the bar is under its question again, with the answer counted");
+	return failures;
+});</script></body></html>`;
+	expect(await packAndRun(dir, "bar-views", page)).toEqual([]);
 }, 60_000);
 
 test("a field the page rebuilds under the same id as a different field does not receive the old field's answer", async () => {

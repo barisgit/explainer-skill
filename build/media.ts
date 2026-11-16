@@ -25,8 +25,7 @@ import { type Example, type Size, THEMES, type Theme } from "./media/types.ts";
 const VIEWPORT: Size = { width: 1440, height: 900 };
 /**
  * The window of the first screens the thumbnails and the hero show: the pages' 1056 px column with a narrow margin, so the
- * type is larger than at 1440 wide, and the whole of the reply strip with its button at the window's right edge, which a
- * crop of a wider window would cut off.
+ * type is larger than at 1440 wide.
  */
 const STILL: Size = { width: 1120, height: 840 };
 /** Gallery thumbnail width in image pixels: a two-column card at the gallery's 1056 px column, at 2x. */

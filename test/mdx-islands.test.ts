@@ -154,6 +154,16 @@ describe("Stepper", () => {
 		expect(state).toEqual({ opening: "is-on is-now,,", next: "is-on,is-on is-now," });
 	}, 30_000);
 
+	test("play and scrubber ask for those controls; without them the markup asks for none", async () => {
+		const asked = readFileSync(
+			await pack("asked-controls", STATIC_STEPPER.replace("start={1}", "start={1} play scrubber")),
+			"utf8",
+		);
+		const plain = readFileSync(await pack("plain-controls", STATIC_STEPPER), "utf8");
+		expect(asked).toContain('data-stepper data-start="1" data-controls="play scrubber"');
+		expect(plain).toContain('<figure class="fig" id="s" data-stepper data-start="1">');
+	}, 30_000);
+
 	test("captionsFirst puts the captions, and the controls over them, before the parts", async () => {
 		const output = await pack(
 			"captions-first",

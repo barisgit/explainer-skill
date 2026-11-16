@@ -442,7 +442,7 @@ test("contents takes true or false", async () => {
 	expect(result.stderr).toContain("contents must be true or false");
 }, 30_000);
 
-test("the contents rail and the Reply bar share the top of the window without either covering the other (#187)", async () => {
+test("the contents rail reaches the window's top on a page with a Reply bar, which sits in the page's flow (#187)", async () => {
 	const sections = ["Cause", "Fix", "Cost", "Risks", "Plan"]
 		.map(
 			(name) =>
@@ -456,18 +456,16 @@ test("the contents rail and the Reply bar share the top of the window without ei
 <section class="view" data-view="i"><a class="back" href="#">Home</a><h1>Item</h1></section></main>
 <script src="kit:views.js"></script><script src="kit:keep.js"></script><script src="kit:reply.js"></script>
 <script>
-const bar = () => document.querySelector(".reply-bar").getBoundingClientRect();
 const rail = () => document.querySelector(".toc").getBoundingClientRect();
 const links = () => [...document.querySelectorAll(".toc a")].filter((a) => a.checkVisibility());
 const atTop = (el) => { const r = el.getBoundingClientRect(); return document.elementFromPoint(r.left + 4, r.top + 2)?.closest("a") === el; };
 const inWindow = (r) => r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
 ${pageContract({
-	"the Reply bar shows": `bar().height > 0`,
-	"the Reply bar's buttons are whole and inside the window": `[...document.querySelectorAll(".reply-bar .btn")].filter((b) => b.checkVisibility()).every((b) => inWindow(b.getBoundingClientRect()))`,
-	"the rail starts below the Reply bar": `rail().top >= bar().bottom - 0.5`,
+	"the Reply bar shows, in the page's flow": `document.querySelector(".reply-bar").checkVisibility() && getComputedStyle(document.querySelector(".reply-bar")).position === "static"`,
+	"the rail starts at the window's top": `innerWidth < 1024 || rail().top === 0`,
 	"on a phone the Contents disclosure is uncovered": `innerWidth >= 1024 || document.elementFromPoint(20, document.querySelector(".toc-toggle").getBoundingClientRect().top + 2)?.closest(".toc-toggle")`,
 	"every rail entry is uncovered at its top edge": `innerWidth < 1024 || (links().length > 0 && links().every(atTop))`,
-	"scrolled, the rail still starts below the bar": `(scrollTo(0, 2000), innerWidth < 1024 || rail().top >= bar().bottom - 0.5)`,
+	"scrolled, the rail still starts at the window's top": `(scrollTo(0, 2000), innerWidth < 1024 || rail().top === 0)`,
 	"scrolled, its shown entries stay uncovered": `innerWidth < 1024 || links().every(atTop)`,
 })}</script></body></html>`;
 	expect(await packAndRun(dir, "rail-reply", page, { widths: RAIL_WIDTHS })).toEqual([]);

@@ -24,7 +24,7 @@ const PAGE = (
 <section><h2>Items</h2><p><a href="#i/1">One</a>, and the <span data-ref="cache">cache</span>.</p>
 <figure aria-label="Scheme"><p>The <span data-ref="db">db</span>.</p></figure>
 <fieldset data-reply><legend>Pick</legend><label><input type="radio" name="p" value="a" id="pa"> A</label> <label><input type="radio" name="p" value="b" id="pb"> B</label></fieldset>
-<figure class="fig" id="s" data-stepper><svg viewBox="0 0 50 20" width="150"><rect data-step="1" width="20" height="20"/><rect data-step="2" x="30" width="20" height="20"/></svg>
+<figure class="fig" id="s" data-stepper data-controls="play scrubber"><svg viewBox="0 0 50 20" width="150"><rect data-step="1" width="20" height="20"/><rect data-step="2" x="30" width="20" height="20"/></svg>
 <ol data-captions><li>one</li><li>two</li></ol></figure></section></div>
 <section class="view" data-view="p"><h1>Person</h1></section>
 <section class="view" data-view="i"><h1>Item</h1></section></main>

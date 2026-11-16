@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Element, Nodes as HastNodes, Root as HastRoot } from "hast";
+import type { Element, ElementContent, Nodes as HastNodes, Root as HastRoot } from "hast";
 import type { Root } from "mdast";
 import { remarkMath } from "../../vendor/math.js";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
@@ -22,6 +22,8 @@ export interface Frontmatter {
 	reply: boolean;
 	/** Give the page the contents rail of its sections (`<main data-contents>`), views or not. */
 	contents: boolean;
+	/** The display face for the headline and section headings (kit:display.css); unset, they are in the kit's text face. */
+	display?: "condensed";
 }
 
 /** An .mdx file compiled to a JavaScript module whose default export is the page's content component. */
@@ -33,7 +35,7 @@ export interface CompiledMdx {
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KEYS = "title, lang, labels, reply, contents, scheme";
+const KEYS = "title, lang, labels, reply, contents, scheme, display";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
@@ -83,7 +85,16 @@ function frontmatter(source: string, file: string): Frontmatter {
 	if (!isRecord(data)) {
 		throw fail(`write key: value lines (${KEYS})`);
 	}
-	const { title, lang = "en", labels, reply = false, contents = false, scheme, ...rest } = data;
+	const {
+		title,
+		lang = "en",
+		labels,
+		reply = false,
+		contents = false,
+		scheme,
+		display,
+		...rest
+	} = data;
 	const unknown = Object.keys(rest)[0];
 	if (unknown !== undefined) {
 		throw fail(`pack does not read "${unknown}"; the keys are ${KEYS}`);
@@ -103,6 +114,11 @@ function frontmatter(source: string, file: string): Frontmatter {
 	if (scheme !== undefined && scheme !== "light" && scheme !== "dark") {
 		throw fail("scheme must be light or dark; leave it out to follow the reader's system");
 	}
+	if (display !== undefined && display !== "condensed") {
+		throw fail(
+			"display takes condensed (Barlow Condensed headings); leave it out for the kit's face",
+		);
+	}
 	const kitTexts = labelTexts(labels, fail);
 	return {
 		lang,
@@ -111,6 +127,7 @@ function frontmatter(source: string, file: string): Frontmatter {
 		...(title === undefined ? {} : { title }),
 		...(kitTexts ? { labels: kitTexts } : {}),
 		...(scheme === undefined ? {} : { scheme }),
+		...(display === undefined ? {} : { display }),
 	};
 }
 
@@ -162,6 +179,50 @@ function drawnFences(tree: HastRoot) {
 	}
 }
 
+/** A word whose case carries meaning: a small letter, and a capital after its first letter (kWh, MHz, dB, iPhone). */
+const casedWord = (word: string) => /\p{Ll}/u.test(word) && /\p{Lu}/u.test(word.slice(1));
+
+/** `text` as text nodes, each cased word (casedWord) in `<span class="cased">`. */
+function casedText(text: string): ElementContent[] {
+	const parts = text.split(/(\p{L}+)/u);
+	return parts.flatMap((part, i): ElementContent[] =>
+		i % 2 === 1 && casedWord(part)
+			? [
+					{
+						type: "element",
+						tagName: "span",
+						properties: { className: ["cased"] },
+						children: [{ type: "text", value: part }],
+					},
+				]
+			: part
+				? [{ type: "text", value: part }]
+				: [],
+	);
+}
+
+/** Wraps the cased words in `node`'s text, at any depth, so a display face's capitals leave them as written. */
+function keepCase(node: Element) {
+	node.children = node.children.flatMap((child) => {
+		if (child.type === "text") {
+			return casedText(child.value);
+		}
+		if (child.type === "element") {
+			keepCase(child);
+		}
+		return [child];
+	});
+}
+
+/** For a display face (frontmatter display): the cased words of each `#` and `##` heading keep their case under its capitals. */
+function casedHeadings(tree: HastRoot) {
+	for (const heading of elementsOf(tree)) {
+		if (heading.tagName === "h1" || heading.tagName === "h2") {
+			keepCase(heading);
+		}
+	}
+}
+
 /** The plain text of a hast node, as a cell's label. */
 const hastText = (node: HastNodes): string =>
 	node.type === "text"
@@ -179,7 +240,7 @@ const childElements = (node: Element, tag: string) =>
 const rowsOf = (table: Element, part: string) =>
 	childElements(table, part).flatMap((section) => childElements(section, "tr"));
 
-/** A body row as v0.8 writes it: the first cell heads the row, every other cell carries its column's name for the phone layout. */
+/** A body row as v0.8 writes it: the first cell heads the row, every other cell carries its column's name. */
 function labelRow(row: Element, labels: string[]) {
 	for (const [i, cell] of childElements(row, "td").entries()) {
 		const label = labels[i];
@@ -194,8 +255,7 @@ function labelRow(row: Element, labels: string[]) {
 
 /**
  * A cell's Markdown alignment as v0.8 writes it: a right-aligned column (`---:`) is a numeric one, `class="num"`, which lines its
- * digits up on wide screens and reads beside its label on phones. Other alignments are dropped: cells align to the start as in
- * v0.8, and on phones an aligned cell would push its label away from the value.
+ * digits up. Other alignments are dropped: cells align to the start as in v0.8.
  */
 function numericCell(cell: Element) {
 	const { align, ...rest } = cell.properties;
@@ -204,8 +264,7 @@ function numericCell(cell: Element) {
 
 /**
  * Markdown tables become the kit's `table.compare`, as a v0.8 page writes one: each body row's first cell is its header
- * (`<th scope="row">`), every other cell carries its column's header as `data-label`, which the phone layout shows beside
- * the value, and a right-aligned column is `class="num"` (numericCell).
+ * (`<th scope="row">`), every other cell carries its column's header as `data-label`, and a right-aligned column is `class="num"` (numericCell).
  */
 function compareTables(tree: HastRoot) {
 	for (const table of elementsOf(tree)) {
@@ -267,6 +326,7 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 					() => compareTables,
 					mathToMathml(file),
 					codeFences(file),
+					...(front.display ? [() => casedHeadings] : []),
 				],
 			},
 		);

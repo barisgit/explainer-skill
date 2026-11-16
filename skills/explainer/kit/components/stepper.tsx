@@ -1,4 +1,4 @@
-/* Stepper: a step-through figure over data-step parts or refs, Mermaid's too: Back/Play/Next, a scrubber and arrow keys.
+/* Stepper: a step-through figure over data-step parts or refs, Mermaid's too: Back, Next, count and arrow keys.
    <Stepper start={1} captions={["The queue is empty", "A burst arrives", "The backlog clears"]}>
      <svg viewBox="0 0 90 20"><rect data-step="1" width="20" height="20" /><rect data-step="2 3" x="35" width="20" height="20" /></svg>
    </Stepper>
@@ -11,7 +11,9 @@
                mermaid), and the code lines or cards that go with each step. Print shows every part
      captionsFirst  the captions (and the controls over them) before the parts, as text to read before the picture; default after
      start     the opening step. By default the stepper opens on the last step (the complete picture, same as print and without JS);
-               study pages start at 1. Play restarts from step 1 and never starts by itself
+               study pages start at 1
+     play      a Play button, for a sequence that is really time (a day, a run): it restarts from step 1 and never starts by itself
+     scrubber  a slider over the steps, for many of them
      label     the accessible name, else kitLabels.stepper ("Step-through; use the arrow keys")
      class     the figure's classes, default "fig"; id as on any element
      onStep    (step, steps) => void, on the opening step and whenever the step or the count changes. A function, so only inside
@@ -22,9 +24,9 @@
    To start new content from step 1 instead (another wave's derivation, a run on another map), name it: restartOn={wave}, text
    or a number; when it changes, the stepper goes back to step 1.
    A stepper with fewer than 2 steps hides its controls and shows everything; they return when it grows.
-   The controls: <button data-go="-1"> Back, <button data-go="1"> Next (check --do click:'[data-go="1"]' steps forward), Play,
-   the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Their texts are the labels back, play, pause,
-   next, stepControls and step in the page's frontmatter labels. Under reduced motion there are no transitions; Play still
+   The controls: <button data-go="-1"> Back, <button data-go="1"> Next (check --do click:'[data-go="1"]' steps forward), the
+   count, and Play and the scrubber when asked for. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Their
+   texts are the labels back, play, pause, next, stepControls and step in the page's frontmatter labels. Under reduced motion there are no transitions; Play still
    advances because the reader asked for it. */
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
@@ -36,6 +38,10 @@ export interface StepperProps {
 	refs?: string[];
 	captionsFirst?: boolean;
 	start?: number;
+	/** A Play button, for a sequence that is really time. */
+	play?: boolean;
+	/** A slider over the steps. */
+	scrubber?: boolean;
 	/**
 	 * A key for the content: a new value sends the stepper back to step 1. Text or a number, so a fresh array is never new; undefined
 	 * is no key, so a wrapper can pass its own optional one through.
@@ -67,6 +73,8 @@ export function Stepper({
 	refs,
 	captionsFirst = false,
 	start,
+	play = false,
+	scrubber = false,
 	restartOn,
 	label,
 	class: classes = "fig",
@@ -118,6 +126,9 @@ export function Stepper({
 			id={id}
 			data-stepper=""
 			data-start={start}
+			data-controls={
+				[play && "play", scrubber && "scrubber"].filter(Boolean).join(" ") || undefined
+			}
 			aria-label={label}
 		>
 			{captionsFirst && list}

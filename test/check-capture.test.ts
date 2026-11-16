@@ -215,7 +215,7 @@ test.each([false, true])(
 	30_000,
 );
 
-test("full-page capture omits the kit Reply bar and contents rail silently, but reports author overlays", async () => {
+test("full-page capture omits the kit contents rail silently, keeps the Reply bar in the page's flow, and reports author overlays", async () => {
 	const page = await packedMdx(
 		dir,
 		"kit-chrome",
@@ -246,7 +246,7 @@ ${[1, 2, 3, 4].map((n) => `<h2 data-nav="Section ${n}">Section ${n}</h2>\n\nPara
 			await cdp.evaluate(
 				`['div.reply-ui.reply-bar', 'nav.toc'].map(selector => getComputedStyle(document.querySelector(selector)).position)`,
 			),
-		).toEqual(["fixed", "fixed"]);
+		).toEqual(["static", "fixed"]);
 		expect((await fullPageScreenshot(cdp, 1440)).omitted).toEqual(["#author-fixed"]);
 		await cdp.evaluate(`document.getElementById('author-fixed').remove()`);
 		expect((await fullPageScreenshot(cdp, 1440)).omitted).toEqual([]);

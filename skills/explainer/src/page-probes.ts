@@ -37,7 +37,7 @@ export interface PageReport {
 /**
  * Runs in the page for the current viewport (`narrow`: the phone width). `culprits`: elements sticking out of the viewport that no scrolling
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
- * than their box and scrolls sideways (a wide data table or equation may, as may an SVG its min-width holds wider than the container's
+ * than their box and scrolls sideways (a wide data table, in a box or as its own box, or equation may, as may an SVG its min-width holds wider than the container's
  * content box, such as a diagram at its readable minimum, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box
  * (ellipsis truncation excepted), a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS
  * names), diagrams and charts (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players
@@ -55,7 +55,7 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	const bad = all.filter((el) => el.getBoundingClientRect().right > vw + 1 && !clipped(el) && getComputedStyle(el).position !== "fixed");
 	const contentWidth = (el) => { const s = getComputedStyle(el); return el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight); };
 	const heldWide = (svg, el) => shown(svg) && parseFloat(getComputedStyle(svg).minWidth) > contentWidth(el) + 1;
-	const wideByDesign = (el) => [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1)
+	const wideByDesign = (el) => el.matches("table") || [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1)
 		|| [...el.querySelectorAll("svg")].some((svg) => heldWide(svg, el));
 	const tinyFix = ${TINY_TEXT_FIX_JS};
 	const inner = all.filter((el) => scrolls(el) && region(el) && !wideByDesign(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);

@@ -74,16 +74,12 @@ export async function boxOf(cdp: Cdp, selector: string): Promise<Rect> {
 }
 
 /**
- * Scrolls so that the first element matching `selector` starts `TOP_MARGIN` below the top of the viewport, or below what
- * the page keeps fixed there: the kit's reply strip sets the root's scroll padding to its height. Under the strip the
- * element would be covered in the frames, and the recorded clicks and drags would land on the strip.
+ * Scrolls so that the first element matching `selector` starts `TOP_MARGIN` below the top of the viewport.
  */
 export async function scrollToTop(cdp: Cdp, selector: string) {
-	await cdp.evaluate(`(() => {
-		const covered = parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockStart) || 0;
-		const top = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect().top;
-		scrollBy(0, top - covered - ${TOP_MARGIN});
-	})()`);
+	await cdp.evaluate(
+		`scrollBy(0, document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect().top - ${TOP_MARGIN})`,
+	);
 	await settle(300);
 }
 

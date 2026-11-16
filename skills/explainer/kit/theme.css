@@ -30,12 +30,11 @@
      <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
    view while the text scrolls; stacked on phones.
-   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
-   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
-   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
-   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+   Tables: .compare is a table on every screen; on a phone one too wide scrolls sideways, its <th scope="row"> names staying in
+   view. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it:
      <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
-       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
+       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table>
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
@@ -43,7 +42,8 @@
    --font --mono;
    --size-headline --size-display --size-text --size-label --radius;
    --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
-   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
+   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt. For poster
+   headings, display: condensed in the frontmatter (kit display).
    Mono is for code, numbers and source lines, not for labels.
    Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
    For an intended restyle, add a class the kit does not use to the element and the selector's last compound: class="chip verdict", .chip.verdict.
@@ -113,20 +113,6 @@ svg.has-lit [data-ref]:not(.is-lit) {
 }
 
 /* Replies: the Reply and Clear answers buttons, the Note button and editor, and the reply dialog. */
-/* The Reply and Clear buttons sit in an opaque strip across the top of the window. A page with reply.js keeps the strip's height
-   free at its top, also while the strip is hidden: at the top of the page nothing is under it, and showing or hiding it never
-   moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button.
-   --reply-bar-height is the strip's last shown height, which reply.js sets: long kitLabels can wrap it onto two rows. */
-:root:has(> body > .reply-bar) {
-	--reply-bar: 3rem;
-}
-body:has(> .reply-bar) {
-	padding-block-start: var(--reply-bar-height, var(--reply-bar));
-}
-/* Focus and in-page links scroll their target clear of the strip. */
-:root:has(> body > .reply-bar:not([hidden])) {
-	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
-}
 /* A term that takes a note (is-annotatable, set by reply.js) and links nothing: a fainter underline than a link's and the menu
    cursor, since a click offers a note rather than lighting anything. */
 :is(span, b, strong, em, code, mark).is-annotatable:not(.is-linked) {
@@ -134,22 +120,16 @@ body:has(> .reply-bar) {
 	text-underline-offset: 0.22em;
 	cursor: context-menu;
 }
+/* The Reply and Clear buttons in the page's flow, under the last question (reply.js places them), Reply first as a form's send. */
 .reply-bar {
-	position: fixed;
-	inset: 0 0 auto;
-	z-index: 20;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 0.25rem 0.75rem;
-	min-block-size: var(--reply-bar);
-	padding: 0.375rem var(--gutter);
-	background: var(--bg);
-	border-block-end: 1px solid var(--rule);
+	gap: 0.5rem 1rem;
+	margin-block-start: 2rem;
 }
-/* How many questions the reader answered, on one line beside the buttons; where the buttons leave too little room (a phone,
-   longer labels) it takes a row of its own above them, so neither the count nor a button is cut or split. */
+/* How many questions the reader answered, on one line after the buttons; where they leave too little room (a phone, longer
+   labels) it takes a row of its own, so neither the count nor a button is cut or split. */
 .reply-progress {
 	white-space: nowrap;
 	font-size: var(--size-label);
@@ -160,7 +140,6 @@ body:has(> .reply-bar) {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
 	gap: 0.5rem;
 }
 .reply-hint {
@@ -284,9 +263,6 @@ dialog.reply-dialog[open] {
 	.keep-clear {
 		/* biome-ignore lint/complexity/noImportantStyles: the reply and clear controls never print, whatever display they set */
 		display: none !important;
-	}
-	body:has(> .reply-bar) {
-		padding-block-start: 0;
 	}
 }
 /* end features */

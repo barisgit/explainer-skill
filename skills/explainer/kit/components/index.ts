@@ -2,13 +2,14 @@
    Frontmatter: title (default: the text of the #), lang (default en), labels (the kit's own texts, English unless set: kit labels
    prints them all to translate and paste here; pack warns when lang is not English and they are missing), reply: true (the
    reader's notes on a page without a reply Question or data-reply), contents: true (the contents rail of the page's sections, for
-   a long page; views inside views get it anyway), scheme: light or dark (forces it; else the page follows the system).
-   The # and the paragraphs right under it are the masthead, the first one its lede. One that opens with a bold label is the
-   reader's next action, read on from the lede: **Start:** change one bit (2 minutes); the rest are small meta lines. Each ##
+   a long page; views inside views get it anyway), scheme: light or dark (forces it; else the page follows the system),
+   display: condensed (poster capitals for the # and ##: kit display).
+   The # and the paragraph right under it are the masthead: the headline states the finding, the lede what it rests on. Each ##
    starts a section; to give one a short name in the contents rail, write its heading as
    <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
-   right-aligned column (---:) is numeric (class="num"), and on phones each row stacks its cells under the column names.
+   right-aligned column (---:) is numeric (class="num"), and on a phone that it does not fit it scrolls sideways, its first column
+   staying in view.
    Markdown link destinations with spaces use angle brackets, [design](<docs/My Design Doc.md>), or %20. pack and check warn
    when link syntax stays literal outside code; use backticks or <code> for intentional examples. check treats missing #targets
    as problems and missing relative files as warnings: distribute those files beside the exported HTML. External links are not fetched.

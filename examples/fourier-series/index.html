@@ -189,7 +189,7 @@ strong {
 }
 h1 {
 	margin: 0 0 1rem;
-	max-inline-size: 22ch;
+	max-inline-size: 19em;
 	font-size: var(--size-headline);
 	font-weight: 650;
 	line-height: 1.08;
@@ -384,9 +384,8 @@ h3,
 	.beside :is(.mermaid, .schematic) {
 		text-align: start;
 	}
-	/* Pinned below the Reply bar when the page has one (theme.css), which content passes under. */
 	.beside > :nth-child(2) {
-		--pin-top: calc(var(--reply-bar-height, var(--reply-bar, 0px)) + 1.5rem);
+		--pin-top: 1.5rem;
 		position: sticky;
 		inset-block-start: var(--pin-top);
 		max-block-size: calc(100vh - var(--pin-top) - 1.5rem);
@@ -1482,8 +1481,7 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	padding: 0.25rem 0 1rem;
 }
 
-/* Comparison matrix; theme.css documents the markup. Wide: a table. On phones each row becomes a stack of label/value lines.
-   class="compare table" keeps a real table on phones: wrap it in .scroll so it scrolls sideways (numeric data tables). */
+/* Comparison matrix; theme.css documents the markup. A table on every screen; on phones one too wide scrolls sideways. */
 .scroll {
 	overflow-x: auto;
 }
@@ -1603,73 +1601,27 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .mark.unk::before {
 	border-style: dotted;
 }
-/* Phone layout at low specificity (:where) so a page rule such as `.compare td.off { display: none }` still wins. */
+/* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
+   table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
+   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. */
 @media (max-width: 48rem) {
-	:where(.compare:not(.table)) thead {
-		display: none;
-	}
-	:where(.compare:not(.table)),
-	:where(.compare:not(.table)) :is(tbody, tr, th, td) {
+	:where(.compare) {
 		display: block;
+		overflow-x: auto;
 	}
-	:where(.compare:not(.table)) tr {
-		padding: 0.75rem 0;
-		border-block-end: 1px solid var(--rule);
-	}
-	:where(.compare:not(.table)) tbody tr:last-child {
-		border-block-end: 0;
-	}
-	:where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: 0.75rem;
-		border-inline-start: 3px solid transparent;
-	}
-	:where(.fig) :where(.compare:not(.table)) tr {
-		padding-inline: var(--pad);
-	}
-	:where(.fig) :where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: max(calc(var(--pad) - 3px), 0.75rem);
-	}
-	:where(.compare:not(.table)) tr[data-state="fit"] {
-		border-inline-start-color: var(--ok);
-	}
-	:where(.compare:not(.table)) tr[data-state="maybe"] {
-		border-inline-start-color: var(--info);
-	}
-	/* Cells drop their table padding, rules, state tints and numeric alignment (a value reads beside its label); this must beat
-	   the wide-layout cell rules above. */
-	.compare:not(.table) tr > :is(th, td),
-	.fig .compare:not(.table) tr > :is(th, td) {
-		padding: 0.1875rem 0;
-		text-align: start;
-		border: 0;
-		box-shadow: none;
-		background: none;
-	}
-	:where(.compare:not(.table)) tbody th {
-		min-inline-size: 0;
-		padding-block-end: 0.375rem;
-	}
-	/* A table, not a grid: the cell's text, <i>, <code> and other inline pieces share one anonymous column beside the label. */
-	:where(.compare:not(.table)) td[data-label] {
+	:where(.scroll) > :where(.compare) {
 		display: table;
-		table-layout: fixed;
-		border-collapse: separate; /* the table's collapsing model, inherited from .compare, would drop the cell's own padding */
-		border-spacing: 0;
-		inline-size: 100%;
 	}
-	:where(.compare:not(.table)) td[data-label]::before {
-		content: attr(data-label);
-		display: table-cell;
-		box-sizing: content-box;
-		inline-size: 36%;
-		min-inline-size: 5.5rem;
-		padding-inline-end: 0.75rem;
-		color: var(--muted);
-		font-size: var(--size-label);
+	:where(.compare) .num {
+		white-space: nowrap;
 	}
-	:where(.compare:not(.table)) tr.evidence {
-		margin-block-start: -0.75rem;
-		padding-block-start: 0;
+	:where(.compare) :is(tbody th[scope="row"], thead th:first-child) {
+		position: sticky;
+		inset-inline-start: 0;
+		background: var(--under);
+	}
+	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
+		background: var(--accent-soft);
 	}
 }
 
@@ -1941,7 +1893,7 @@ details > :last-child:not(summary) {
 /* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
    its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach), or as a full block does
    (--full-reach); below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it, and
-   set in quiet labels; it starts under the Reply bar, so neither covers the other. */
+   set in quiet labels. */
 .toc ol {
 	margin: 0;
 	padding: 0;
@@ -2039,7 +1991,7 @@ details > :last-child:not(summary) {
 	.toc {
 		position: fixed;
 		z-index: 1;
-		inset-block: var(--reply-bar-height, var(--reply-bar, 0px)) 0;
+		inset-block: 0;
 		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--rail-reach));
 		inline-size: 12.5rem;
 		padding-block: var(--page-top) 2rem;
@@ -2551,12 +2503,11 @@ details > :last-child:not(summary) {
      <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
    view while the text scrolls; stacked on phones.
-   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
-   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
-   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
-   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+   Tables: .compare is a table on every screen; on a phone one too wide scrolls sideways, its <th scope="row"> names staying in
+   view. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it:
      <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
-       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
+       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table>
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
@@ -2564,7 +2515,8 @@ details > :last-child:not(summary) {
    --font --mono;
    --size-headline --size-display --size-text --size-label --radius;
    --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
-   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
+   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt. For poster
+   headings, display: condensed in the frontmatter (kit display).
    Mono is for code, numbers and source lines, not for labels.
    Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
    For an intended restyle, add a class the kit does not use to the element and the selector's last compound: class="chip verdict", .chip.verdict.
@@ -2634,20 +2586,6 @@ svg.has-lit [data-ref]:not(.is-lit) {
 }
 
 /* Replies: the Reply and Clear answers buttons, the Note button and editor, and the reply dialog. */
-/* The Reply and Clear buttons sit in an opaque strip across the top of the window. A page with reply.js keeps the strip's height
-   free at its top, also while the strip is hidden: at the top of the page nothing is under it, and showing or hiding it never
-   moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button.
-   --reply-bar-height is the strip's last shown height, which reply.js sets: long kitLabels can wrap it onto two rows. */
-:root:has(> body > .reply-bar) {
-	--reply-bar: 3rem;
-}
-body:has(> .reply-bar) {
-	padding-block-start: var(--reply-bar-height, var(--reply-bar));
-}
-/* Focus and in-page links scroll their target clear of the strip. */
-:root:has(> body > .reply-bar:not([hidden])) {
-	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
-}
 /* A term that takes a note (is-annotatable, set by reply.js) and links nothing: a fainter underline than a link's and the menu
    cursor, since a click offers a note rather than lighting anything. */
 :is(span, b, strong, em, code, mark).is-annotatable:not(.is-linked) {
@@ -2655,22 +2593,16 @@ body:has(> .reply-bar) {
 	text-underline-offset: 0.22em;
 	cursor: context-menu;
 }
+/* The Reply and Clear buttons in the page's flow, under the last question (reply.js places them), Reply first as a form's send. */
 .reply-bar {
-	position: fixed;
-	inset: 0 0 auto;
-	z-index: 20;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 0.25rem 0.75rem;
-	min-block-size: var(--reply-bar);
-	padding: 0.375rem var(--gutter);
-	background: var(--bg);
-	border-block-end: 1px solid var(--rule);
+	gap: 0.5rem 1rem;
+	margin-block-start: 2rem;
 }
-/* How many questions the reader answered, on one line beside the buttons; where the buttons leave too little room (a phone,
-   longer labels) it takes a row of its own above them, so neither the count nor a button is cut or split. */
+/* How many questions the reader answered, on one line after the buttons; where they leave too little room (a phone, longer
+   labels) it takes a row of its own, so neither the count nor a button is cut or split. */
 .reply-progress {
 	white-space: nowrap;
 	font-size: var(--size-label);
@@ -2681,7 +2613,6 @@ body:has(> .reply-bar) {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
 	gap: 0.5rem;
 }
 .reply-hint {
@@ -2805,9 +2736,6 @@ dialog.reply-dialog[open] {
 	.keep-clear {
 		/* biome-ignore lint/complexity/noImportantStyles: the reply and clear controls never print, whatever display they set */
 		display: none !important;
-	}
-	body:has(> .reply-bar) {
-		padding-block-start: 0;
 	}
 }
 /* end features */
@@ -3199,7 +3127,7 @@ body {
      | Quantity | Formula | Symbols |
      |---|---|---|
      | Output voltage | $V_{out} = V_{ref}\,\frac{R_1 + R_2}{R_2}$ | $V_{ref}$ = 7.15 V; $R_1$ output to inverting input |
-   On phones each cell's label goes above its value, so a formula gets the full width; inside a table write | as \vert. */
+   On a phone the sheet scrolls sideways when a formula is wider than the screen; inside a table write | as \vert. */
 
 /* An inline formula is one unit in the line. Temml's sheet makes math a wrapping flex box for its own line breaks, which pack turns off. */
 math:not([display="block"]) {
@@ -3222,20 +3150,6 @@ math {
 
 .math > math {
 	min-width: max-content;
-}
-
-/* A table.compare with formulas, on phones (theme.css's 48rem breakpoint): each cell's label goes above its value, so a formula
-   gets the full width and scrolls sideways when it is wider still, instead of squeezing beside the label. */
-@media (max-width: 48rem) {
-	:where(.compare:not(.table):has(math)) td[data-label] {
-		display: block;
-		overflow-x: auto;
-		overflow-y: hidden;
-	}
-	:where(.compare:not(.table):has(math)) td[data-label]::before {
-		display: block;
-		inline-size: auto;
-	}
 }
 }</style>
 <style>/* Page-specific: everything else comes from the kit's stylesheet. */
@@ -5442,7 +5356,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   }
 })();
 </script>
-<script>/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts (HTML or hand-built SVG), <ol data-captions>; adds Back/Play/Next, scrubber, arrow keys. Needs kit:theme.css.
+<script>/* steps: stepper from attributes: data-stepper on a container, data-step="2 4" on parts (HTML or hand-built SVG), <ol data-captions>; adds Back, Next, the count and arrow keys. Needs kit:theme.css.
    <figure class="fig" data-stepper>             any element; the controls are added before the captions (else at its end)
      <g data-step="2">  <p data-step="0 3">      a part appears at the first listed step and is lit (is-now) on every listed one;
                                                  0 = visible from the start, lit later; a part without data-step never changes
@@ -5452,14 +5366,16 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
    is not-yet (faded, not hidden) before the first step naming it and now (lit) on each step that names it, written as data-state by kit:link.js.
    Steps count from 1; the number of steps is the number of captions, else the highest step used. The stepper opens on the last
    step (the complete picture, same as print and without JS); data-start="1" on the stepper opens it on step 1 instead (any
-   number works; study pages start at the beginning). Play restarts from step 1 and never starts by itself.
+   number works; study pages start at the beginning).
+   data-controls="play scrubber" on the stepper adds Play, the scrubber or both, for a sequence that is really time (a day, a
+   run): Play restarts from step 1 and never starts by itself. Without it the stepper has Back, Next and the count.
    A Mermaid diagram steps through its parts' refs in data-refs (pack refuses data-steps on one).
    Labels: the texts the stepper adds are English. A page in another language sets them, with those of the other kit scripts, in the
    page's frontmatter labels, one key: text per line (back: Nazaj). Keys here:
    back "Back", play "Play", pause "Pause", next "Next", stepControls "Step controls" (the controls' accessible name), step "Step"
    (the scrubber's), stepper "Step-through; use the arrow keys" (the stepper's, unless it has an aria-label). A key left out stays English.
-   Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), <button data-play>
-   is Play, then the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
+   Controls: <button data-go="-1"> is Back and <button data-go="1"> is Next (check --do click:'[data-go="1"]' steps forward), then
+   <button data-play> (Play) and the scrubber when asked for. Focus the stepper (Tab or click inside) and use Left/Right/Home/End.
    Listen for steps: el.addEventListener("stepchange", (e) => e.detail.step). A stepper with no data-step parts or data-refs must
    redraw on it; check warns about one whose steps change only the captions.
    Changing the content: a page may swap scenarios by replacing the captions (ol.innerHTML = ...) or the parts. Replacing
@@ -5651,6 +5567,13 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     }
     mount(captionList) {
       const { root, bar } = this;
+      const asked = (root.dataset.controls ?? "").split(/\s+/);
+      this.play.hidden = !asked.includes("play");
+      this.range.hidden = !asked.includes("scrubber");
+      this.next.classList.toggle("primary", this.play.hidden);
+      if (this.play.hidden) {
+        this.stop();
+      }
       if (captionList) {
         if (bar.nextElementSibling !== captionList) {
           captionList.before(bar);

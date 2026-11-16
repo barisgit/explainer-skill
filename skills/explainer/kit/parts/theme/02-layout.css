@@ -14,7 +14,7 @@
 }
 h1 {
 	margin: 0 0 1rem;
-	max-inline-size: 22ch;
+	max-inline-size: 19em;
 	font-size: var(--size-headline);
 	font-weight: 650;
 	line-height: 1.08;
@@ -209,9 +209,8 @@ h3,
 	.beside :is(.mermaid, .schematic) {
 		text-align: start;
 	}
-	/* Pinned below the Reply bar when the page has one (theme.css), which content passes under. */
 	.beside > :nth-child(2) {
-		--pin-top: calc(var(--reply-bar-height, var(--reply-bar, 0px)) + 1.5rem);
+		--pin-top: 1.5rem;
 		position: sticky;
 		inset-block-start: var(--pin-top);
 		max-block-size: calc(100vh - var(--pin-top) - 1.5rem);

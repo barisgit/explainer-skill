@@ -20,8 +20,11 @@
    (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
    is-annotatable (a faint underline), also those rendered later. An aria-label names a note target explicitly; otherwise a tree
    branch uses its summary's first cell, other parts their text. Put a tree ref on its details, leaving the summary free to fold it.
-   The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
-   cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
+   The Reply and Clear buttons, with the answered count, sit in the page's flow where the reader decides, never on the first
+   screen unless a question is: at the end of the section holding the last question of what is shown (the overview or the open
+   view), else, once there is something to send or clear, at the end of it. So a page with questions in several views has the
+   bar under the last question of each, and a reply: true page at its end. A section a client component draws is its own, so
+   the bar follows it instead. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
@@ -37,7 +40,7 @@
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
    note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
-   "{answered} of {total} answered" (the bar's count). A key left out
+   "{answered} of {total} answered" (the bar's count, over the whole page). A key left out
    stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
@@ -354,31 +357,82 @@
 	);
 	const progress = h("span", { class: "reply-progress" });
 	// The buttons wrap as one group, so a count that does not fit beside them takes a row of its own rather than splitting them.
-	const actions = h("div", { class: "reply-actions" }, clear.status, clear.button, button);
-	const bar = document.body.appendChild(
-		h("div", { class: "reply-ui reply-bar" }, progress, actions),
-	);
-	// The page keeps the strip's height free at its top (theme.css); a hidden strip keeps the room it last took, so showing it again does not move the page.
-	new ResizeObserver(() => {
-		if (!bar.hidden) {
-			const height = `${bar.getBoundingClientRect().height}px`;
-			document.documentElement.style.setProperty("--reply-bar-height", height);
-		}
-	}).observe(bar);
+	const actions = h("div", { class: "reply-actions" }, button, clear.button, clear.status);
+	const bar = h("div", { class: "reply-ui reply-bar", hidden: "" }, actions, progress);
 	function clearAll() {
 		notes.length = 0;
 		keep.clear();
 	}
 
+	// ---- where the bar goes ----
+	/** What the page shows now: the open view, else the overview, else the whole of <main> (a page written without one). */
+	const shownPart = () =>
+		document.querySelector<HTMLElement>("section.view.active") ??
+		document.querySelector<HTMLElement>("[data-overview]") ??
+		root;
+
+	/** Whether `node` lies between an island's markers among its siblings: that range is Preact's (kit/islands/client.ts). */
+	function inIsland(node: Node) {
+		let depth = 0;
+		for (let at = node.previousSibling; at; at = at.previousSibling) {
+			if (at instanceof Comment && at.data === "/island") {
+				depth++;
+			} else if (at instanceof Comment && at.data.startsWith("island:")) {
+				if (depth === 0) {
+					return true;
+				}
+				depth--;
+			}
+		}
+		return false;
+	}
+
+	/** The outermost section around `el` inside `part`, unless a client component draws it: the bar may not go into its DOM. */
+	function sectionAround(el: Element, part: Element) {
+		let section: Element | null = null;
+		for (let at: Element | null = el; at && at !== part; at = at.parentElement) {
+			if (at.localName === "section") {
+				section = at;
+			}
+			if (inIsland(at)) {
+				section = null;
+			}
+		}
+		return section;
+	}
+
 	/**
-	 * Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls. It also
-	 * runs once the page has loaded (the restore), so the buttons take kitLabels the page set after this script.
+	 * Puts the bar at the end of the section holding the last question of the part shown, else at the end of that part (after it,
+	 * as a view a client component fills is Preact's); moves it only when it is elsewhere. Says whether that part asks anything.
+	 */
+	function place() {
+		const part = shownPart();
+		const last = [...part.querySelectorAll("[data-reply]")].at(-1);
+		const section = last && sectionAround(last, part);
+		if (section) {
+			if (section.lastElementChild !== bar) {
+				section.append(bar);
+			}
+		} else if (part === root) {
+			if (bar.parentElement !== root) {
+				root.append(bar);
+			}
+		} else if (part.nextElementSibling !== bar) {
+			part.after(bar);
+		}
+		return last !== undefined;
+	}
+
+	/**
+	 * Brings the buttons and the saved copy in line with the page; the one call after every change to notes or controls, and to the
+	 * view shown. It also runs once the page has loaded (the restore), so the buttons take kitLabels the page set after this script.
 	 */
 	function sync() {
 		// The bar is reply's while the page has something to reply: it asks for replies (reply: true), has a reply question now
 		// (one may render later) or a note. Otherwise keep.js's own Clear clears the answers, so a page that carries reply.js on
 		// pack's safe-side guess looks as it would without it.
 		const asked = document.querySelector("[data-reply]") !== null;
+		const asksHere = place();
 		const inBar =
 			asked || filledNotes().length > 0 || document.querySelector("[data-asks-reply]") !== null;
 		const kept = keep.update(inBar);
@@ -397,7 +451,8 @@
 		progress.textContent = kitText("answered")
 			.replace("{answered}", String(answered.size))
 			.replace("{total}", String(questions.size));
-		button.hidden = !count && !asked;
+		// Reply shows under a question from the start; elsewhere once there is something to send.
+		button.hidden = !count && !asksHere;
 		clear.show(inBar && kept);
 		bar.hidden = button.hidden && !(inBar && kept);
 		button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
@@ -501,6 +556,8 @@
 		keep.touch(control);
 		sync();
 	};
+	// kit:views.js loads first, so its own listener has shown the new view (and drawn a filled one) when this one runs.
+	addEventListener("hashchange", sync);
 	document.addEventListener("input", mark);
 	document.addEventListener("change", mark);
 	document.addEventListener("click", (e) => {

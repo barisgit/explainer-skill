@@ -18,23 +18,47 @@ afterAll(dir.cleanup);
 const HEAD = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main class="page">`;
 
-/** One numeric column, so the same rows read as a stacked .compare and as a .compare.table. */
+/** One numeric column, as a .compare and as a .compare.table in .scroll. */
 const ROWS = `<thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
 <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody>`;
 
-test("a .num column ends with tabular digits, except as a line beside its label in a stacked .compare on phones (#54)", async () => {
-	const page = `${HEAD}<table class="compare" id="stacked">${ROWS}</table>
+test("a .num column ends with tabular digits on every screen (#54)", async () => {
+	const page = `${HEAD}<table class="compare" id="plain">${ROWS}</table>
 <div class="scroll"><table class="compare table" id="grid">${ROWS}</table></div></main>
 <script>
 const style = (selector) => getComputedStyle(document.querySelector(selector));
-const numeric = (selector, align) => style(selector).textAlign === align && style(selector).fontVariantNumeric === "tabular-nums";
+const numeric = (selector) => style(selector).textAlign === "end" && style(selector).fontVariantNumeric === "tabular-nums";
 ${pageContract({
-	"a .compare.table's numeric header ends": `numeric("#grid th.num", "end")`,
-	"a .compare.table's numeric cell ends": `numeric("#grid td.num", "end")`,
-	"a stacked .compare's numeric cell ends wide and starts on phones": `numeric("#stacked td.num", style("#stacked thead").display === "none" ? "start" : "end")`,
+	"a .compare.table's numeric header ends": `numeric("#grid th.num")`,
+	"a .compare.table's numeric cell ends": `numeric("#grid td.num")`,
+	"a .compare's numeric cell ends": `numeric("#plain td.num")`,
 })}</script></body></html>`;
 
 	expect(await packAndRun(dir, "num", page)).toEqual([]);
+}, 30_000);
+
+/** A table as a Markdown truth table packs it, and one too wide for a phone. */
+const SMALL = `<thead><tr><th>A</th><th>B</th><th>Out</th></tr></thead><tbody>
+${["00", "01", "10", "11"].map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td><td>${Number(a) & Number(b)}</td></tr>`).join("")}</tbody>`;
+const WIDE = `<thead><tr><th>Option</th>${["Cost", "Delay", "Risk", "Effort", "Owner"].map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>
+${["Ship now", "One more spin"].map((name) => `<tr><th scope="row">${name}</th>${["Two spare boards per site", "Three weeks after review", "Low, with a fallback plan", "One engineer for a week", "Hardware team lead"].map((v) => `<td>${v}</td>`).join("")}</tr>`).join("")}</tbody>`;
+
+test("on a phone a .compare stays a table: a small one as it is, a wide one scrolling sideways with its row names in view (#183)", async () => {
+	const page = `${HEAD}<table class="compare" id="small">${SMALL}</table><table class="compare" id="wide">${WIDE}</table></main>
+<script>
+const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+const phone = innerWidth < 768;
+${pageContract({
+	"every cell is a table cell": `[...document.querySelectorAll(".compare :is(th, td)")].every((cell) => getComputedStyle(cell).display === "table-cell")`,
+	"the column heads show": `[...document.querySelectorAll(".compare thead")].every((head) => head.checkVisibility() && head.getBoundingClientRect().height > 0)`,
+	"the page itself never scrolls sideways": `document.documentElement.scrollWidth <= innerWidth`,
+	"the small table needs no scrolling": `document.getElementById("small").scrollWidth <= document.getElementById("small").clientWidth`,
+	"on a phone the wide table scrolls sideways inside its box": `!phone || document.getElementById("wide").scrollWidth > document.getElementById("wide").clientWidth + 100`,
+	"scrolled, its row names stay at its start": `!phone || (document.getElementById("wide").scrollLeft = 200, Math.abs(box("#wide tbody th").left - box("#wide").left) < 1 && Math.abs(box("#wide thead th").left - box("#wide").left) < 1)`,
+	"a row name covers the cells that pass under it": `!phone || getComputedStyle(document.querySelector("#wide tbody th")).backgroundColor === getComputedStyle(document.body).backgroundColor`,
+})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "phone-table", page)).toEqual([]);
 }, 30_000);
 
 test("ranking rows disclose by click, Enter and Space, with room for titles (#35)", async () => {
@@ -169,7 +193,7 @@ ${pageContract({
 	expect(await packAndRun(dir, "series-greys", page, { widths: [DESKTOP] })).toEqual([]);
 }, 30_000);
 
-test("text keeps to the text and label sizes: code takes the size of the text around it, and a code block is a label", async () => {
+test("text keeps to the text and label sizes, the label 13 px on every screen: code takes the size of the text around it, and a code block is a label", async () => {
 	const output = await packedMdx(
 		dir,
 		"code-sizes",
@@ -186,8 +210,11 @@ const answer = 42;
 <pre id="hand">hand-written</pre>
 `,
 	);
-	const sizes = await inPage(output, (cdp) =>
-		cdp.evaluate<Record<string, string | boolean>>(`(() => {
+	const sizesAt = (viewport: (typeof WIDTHS)[number]) =>
+		inPage(
+			output,
+			(cdp) =>
+				cdp.evaluate<Record<string, string | boolean>>(`(() => {
 			const size = (selector) => getComputedStyle(document.querySelector(selector)).fontSize;
 			const text = size("body");
 			const label = size("figcaption");
@@ -195,6 +222,7 @@ const answer = 42;
 				.filter((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
 				.map((el) => getComputedStyle(el).fontSize);
 			return {
+				label,
 				levels: [...new Set(own)].sort().join(" ") === [text, label].sort().join(" "),
 				inline: size("p > code") === text,
 				caption: size("figcaption > code") === label,
@@ -203,15 +231,19 @@ const answer = 42;
 				mono: getComputedStyle(document.querySelector("pre > code")).fontFamily.includes("Mono"),
 			};
 		})()`),
-	);
-	expect(sizes).toEqual({
-		levels: true,
-		inline: true,
-		caption: true,
-		fence: true,
-		hand: true,
-		mono: true,
-	});
+			viewport,
+		);
+	for (const viewport of WIDTHS) {
+		expect(await sizesAt(viewport)).toEqual({
+			label: "13px",
+			levels: true,
+			inline: true,
+			caption: true,
+			fence: true,
+			hand: true,
+			mono: true,
+		});
+	}
 }, 30_000);
 
 test("a page's textarea is drawn like the kit's text inputs", async () => {
@@ -242,6 +274,20 @@ ${pageContract({
 })}</script></body></html>`;
 
 	expect(await packAndRun(dir, "pre", page)).toEqual([]);
+}, 30_000);
+
+test("a finding-length headline takes two lines on a desktop", async () => {
+	const output = await packedMdx(
+		dir,
+		"headline",
+		"# The first 5 kWh pays for itself in *10 years*. The second would take 62.\n\nA lede.\n",
+	);
+	const lines = await inPage(output, (cdp) =>
+		cdp.evaluate<number>(
+			`(() => { const h1 = document.querySelector("h1"); return Math.round(h1.getBoundingClientRect().height / parseFloat(getComputedStyle(h1).lineHeight)); })()`,
+		),
+	);
+	expect(lines).toBe(2);
 }, 30_000);
 
 test("a masthead paragraph that starts with a bold label is the next action, set as body text in ink like the lede, the rest as labels (#141)", async () => {
@@ -307,7 +353,7 @@ ${pageContract(checks)}</script></body></html>`;
 	).toEqual([]);
 }, 60_000);
 
-test("a .beside code block pins below the Reply bar, so its first line shows and its last fits the window (#159)", async () => {
+test("on a page with a Reply bar a .beside code block still pins near the window's top, its first line shown and its last in the window (#159)", async () => {
 	const text = "Prose about the code beside it, long enough to scroll past it.\n\n".repeat(120);
 	const code = Array.from({ length: 60 }, (_, i) => `const line${i} = ${i};`).join("\n");
 	const output = await packedMdx(
@@ -320,10 +366,9 @@ test("a .beside code block pins below the Reply bar, so its first line shows and
 			const pre = document.querySelector(".beside > pre");
 			const text = document.querySelector(".beside > div").getBoundingClientRect();
 			scrollTo({ top: scrollY + text.top + text.height / 2, behavior: "instant" });
-			const bar = document.querySelector(".reply-bar").getBoundingClientRect();
 			const box = pre.getBoundingClientRect();
-			return { belowBar: box.top >= bar.bottom, fits: box.bottom <= innerHeight };
+			return { pinned: Math.round(box.top), fits: box.bottom <= innerHeight };
 		})()`),
 	);
-	expect(placed).toEqual({ belowBar: true, fits: true });
+	expect(placed).toEqual({ pinned: 24, fits: true });
 }, 30_000);

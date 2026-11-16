@@ -42,6 +42,32 @@ test("a stepper over hand-built SVG parts", async () => {
 	expect(await packAndRun(dir, "steps", PAGE(CHECKS))).toEqual([]);
 }, 30_000);
 
+/** Two steppers over three steps: one as the kit gives it, one that asks for Play and the scrubber. */
+const CONTROLS_PAGE = (
+	checks: string,
+) => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><h1>Controls</h1>
+<figure class="fig" id="plain" data-stepper data-start="1"><p data-step="1">x</p><p data-step="2">y</p><p data-step="3">z</p></figure>
+<figure class="fig" id="timed" data-stepper data-start="1" data-controls="play scrubber"><p data-step="1">x</p><p data-step="2">y</p><p data-step="3">z</p></figure>
+<script src="kit:steps.js"></script>
+<script>
+const shown = (selector) => document.querySelector(selector)?.checkVisibility() === true;
+const count = (id) => document.querySelector("#" + id + " .player output").textContent;
+const press = (id, key) => document.getElementById(id).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+${checks}</script></body></html>`;
+
+test("a stepper shows Back, Next and the count; Play and the scrubber only where the page asks for them", async () => {
+	const checks = pageContract({
+		"by default Back, Next and the count show": `shown('#plain [data-go="-1"]') && shown('#plain [data-go="1"]') && count("plain") === "1 / 3"`,
+		"by default there is no Play and no scrubber": `!shown("#plain [data-play]") && !shown("#plain input[type=range]")`,
+		"the one primary button is Play where it shows, else Next": `[...document.querySelectorAll("#plain .player .primary")].filter((b) => !b.hidden).map((b) => b.dataset.go).join() === "1" && [...document.querySelectorAll("#timed .player .primary")].filter((b) => !b.hidden).every((b) => b.hasAttribute("data-play"))`,
+		"the arrow keys step it as before": `(press("plain", "ArrowRight"), count("plain") === "2 / 3") && (press("plain", "End"), count("plain") === "3 / 3") && (press("plain", "Home"), count("plain") === "1 / 3")`,
+		"data-controls brings Play and the scrubber": `shown("#timed [data-play]") && shown("#timed input[type=range]")`,
+		"the scrubber steps and Play plays": `(() => { const range = document.querySelector("#timed input[type=range]"); range.value = "3"; range.dispatchEvent(new Event("input")); return count("timed") === "3 / 3"; })() && (document.querySelector("#timed [data-play]").click(), count("timed") === "1 / 3" && document.querySelector("#timed [data-play]").textContent === "Pause")`,
+	});
+	expect(await packAndRun(dir, "controls", CONTROLS_PAGE(checks))).toEqual([]);
+}, 30_000);
+
 test("print shows every stepper part and caption, even on the opening step", async () => {
 	const checks = pageContract({
 		"all SVG and HTML parts print at full opacity":

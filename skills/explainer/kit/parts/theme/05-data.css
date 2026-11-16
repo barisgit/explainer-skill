@@ -168,8 +168,7 @@
 	padding: 0.25rem 0 1rem;
 }
 
-/* Comparison matrix; theme.css documents the markup. Wide: a table. On phones each row becomes a stack of label/value lines.
-   class="compare table" keeps a real table on phones: wrap it in .scroll so it scrolls sideways (numeric data tables). */
+/* Comparison matrix; theme.css documents the markup. A table on every screen; on phones one too wide scrolls sideways. */
 .scroll {
 	overflow-x: auto;
 }
@@ -289,72 +288,26 @@
 .mark.unk::before {
 	border-style: dotted;
 }
-/* Phone layout at low specificity (:where) so a page rule such as `.compare td.off { display: none }` still wins. */
+/* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
+   table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
+   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. */
 @media (max-width: 48rem) {
-	:where(.compare:not(.table)) thead {
-		display: none;
-	}
-	:where(.compare:not(.table)),
-	:where(.compare:not(.table)) :is(tbody, tr, th, td) {
+	:where(.compare) {
 		display: block;
+		overflow-x: auto;
 	}
-	:where(.compare:not(.table)) tr {
-		padding: 0.75rem 0;
-		border-block-end: 1px solid var(--rule);
-	}
-	:where(.compare:not(.table)) tbody tr:last-child {
-		border-block-end: 0;
-	}
-	:where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: 0.75rem;
-		border-inline-start: 3px solid transparent;
-	}
-	:where(.fig) :where(.compare:not(.table)) tr {
-		padding-inline: var(--pad);
-	}
-	:where(.fig) :where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: max(calc(var(--pad) - 3px), 0.75rem);
-	}
-	:where(.compare:not(.table)) tr[data-state="fit"] {
-		border-inline-start-color: var(--ok);
-	}
-	:where(.compare:not(.table)) tr[data-state="maybe"] {
-		border-inline-start-color: var(--info);
-	}
-	/* Cells drop their table padding, rules, state tints and numeric alignment (a value reads beside its label); this must beat
-	   the wide-layout cell rules above. */
-	.compare:not(.table) tr > :is(th, td),
-	.fig .compare:not(.table) tr > :is(th, td) {
-		padding: 0.1875rem 0;
-		text-align: start;
-		border: 0;
-		box-shadow: none;
-		background: none;
-	}
-	:where(.compare:not(.table)) tbody th {
-		min-inline-size: 0;
-		padding-block-end: 0.375rem;
-	}
-	/* A table, not a grid: the cell's text, <i>, <code> and other inline pieces share one anonymous column beside the label. */
-	:where(.compare:not(.table)) td[data-label] {
+	:where(.scroll) > :where(.compare) {
 		display: table;
-		table-layout: fixed;
-		border-collapse: separate; /* the table's collapsing model, inherited from .compare, would drop the cell's own padding */
-		border-spacing: 0;
-		inline-size: 100%;
 	}
-	:where(.compare:not(.table)) td[data-label]::before {
-		content: attr(data-label);
-		display: table-cell;
-		box-sizing: content-box;
-		inline-size: 36%;
-		min-inline-size: 5.5rem;
-		padding-inline-end: 0.75rem;
-		color: var(--muted);
-		font-size: var(--size-label);
+	:where(.compare) .num {
+		white-space: nowrap;
 	}
-	:where(.compare:not(.table)) tr.evidence {
-		margin-block-start: -0.75rem;
-		padding-block-start: 0;
+	:where(.compare) :is(tbody th[scope="row"], thead th:first-child) {
+		position: sticky;
+		inset-inline-start: 0;
+		background: var(--under);
+	}
+	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
+		background: var(--accent-soft);
 	}
 }

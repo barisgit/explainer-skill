@@ -5,11 +5,12 @@
        head    the column's name, also its label beside each value on phones
        value   the record's key, or (record) => text, number or JSX
        format  how the numbers are written in the page's lang: { digits: 1 }, { unit: "min" }, { percent: true }, { currency: "EUR" }
-               (grouped as 4,200, without cents on a whole amount unless digits asks). A column whose values are all numbers is numeric: right-aligned on wide screens
+               (grouped as 4,200, without cents on a whole amount unless digits asks). A column whose values are all numbers is numeric: right-aligned, digits lined up
        link    the key, or (record) => href, that makes each value a link
        note    the key, or (record) => text, of a muted line under the value
      state   (record) => "fit", "maybe" or "out": fit and maybe rows get a coloured edge, out rows are muted
-     class   more classes after "compare": "table" keeps a wide table whole on phones, scrolling sideways in a <div class="scroll">
+     class   more classes after "compare"
+   On a phone a table too wide for it scrolls sideways, its first column staying in view.
    To ask which row the reader picks, give the same rows and cols to a Question (kit Question).
    Rendered when the page packs, so it shows before scripts run and prints. */
 import type { ComponentChildren } from "preact";

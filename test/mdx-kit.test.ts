@@ -341,7 +341,7 @@ test("hand-written records in MDX keep category markers, a plain toolbar's Expan
 		"labels and cells keep their category words": `[...document.querySelectorAll(".tree .chip")].map((c) => c.textContent).join() === "Firmware,FW"`,
 		"the legend and the rows use the same swatch": `new Set([...document.querySelectorAll(".chip i")].map((i) => getComputedStyle(i).backgroundColor)).size === 1`,
 		"only the right-aligned column is numeric": `document.querySelectorAll(".compare .num").length === 2 && document.querySelector(".compare th.num") && document.querySelector(".compare td.num[data-label=Hours]")`,
-		"numeric alignment follows the kit on phones": `getComputedStyle(document.querySelector(".compare td.num")).textAlign === (innerWidth < 640 ? "start" : "end")`,
+		"a numeric cell ends on every screen": `getComputedStyle(document.querySelector(".compare td.num")).textAlign === "end"`,
 		"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
 	});
 	const { result, output } = await pack("records", source, { "records.js": script });

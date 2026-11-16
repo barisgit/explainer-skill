@@ -17,6 +17,7 @@
  *                                 the start of kit:math.css, which pack adds to a page that holds math
  *   vendor/refractor.js           refractor (Prism's grammars) for the languages build/code-entry.ts lists, one ES module; used by
  *                                 `pack` to colour code fences, never inlined
+ *   kit/fonts/barlow-condensed-*  Barlow Condensed 700, Latin and Latin Extended, the face kit:display.css names
  */
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -304,3 +305,21 @@ async function vendorCode() {
 	);
 }
 await vendorCode();
+
+/** The display face: Barlow Condensed 700 from @fontsource, its Latin and Latin Extended files, and the OFL with its copyright. */
+async function vendorDisplayFont() {
+	const pkg = "@fontsource/barlow-condensed";
+	for (const subset of ["latin", "latin-ext"]) {
+		const file = `kit/fonts/barlow-condensed-${subset}.woff2`;
+		copyFileSync(
+			nm(pkg, "files", `barlow-condensed-${subset}-700-normal.woff2`),
+			join(skill, file),
+		);
+		console.log(`${file} ${(statSync(join(skill, file)).size / 1024).toFixed(0)} KB`);
+	}
+	writeFileSync(
+		join(skill, "kit/licenses/barlow-condensed.txt"),
+		`Barlow Condensed (${pkg} ${await versionOf(pkg)}): kit/fonts/barlow-condensed-latin.woff2 and\nkit/fonts/barlow-condensed-latin-ext.woff2, the Bold (700) style.\n\n${(await text(pkg, "LICENSE")).trim()}\n`,
+	);
+}
+await vendorDisplayFont();

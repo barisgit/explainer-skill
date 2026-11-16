@@ -1,15 +1,11 @@
 import { Explore, Plot, Question, Stepper, Table, View } from "kit";
 import { baseline, curve, fixes, fmt, loadFrame } from "./cafe.ts";
 
-{/* First screen: the answer, what it rests on, the next action with a quick route, and the figure that shows it. */}
+{/* First screen: the answer, what it rests on, and the figure that shows it. */}
 
 # A second barista cuts an *18-minute* wait to 30 seconds.
 
-The baseline is a café at 90% busy: random arrivals and orders averaging 2 minutes, some much longer. A queueing model predicts the wait.
-
-**Start:** move one slider below, a minute; or [compare fixes and choose one to try](#fixes).
-
-Illustrative model, not measured in a real café
+The baseline is a café at 90% busy: random arrivals and orders averaging 2 minutes, some much longer. An illustrative queueing model predicts the wait.
 
 {/* frame comes from a module without "use client", so pack computes every slider position and the page carries no model code. */}
 

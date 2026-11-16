@@ -189,7 +189,7 @@ strong {
 }
 h1 {
 	margin: 0 0 1rem;
-	max-inline-size: 22ch;
+	max-inline-size: 19em;
 	font-size: var(--size-headline);
 	font-weight: 650;
 	line-height: 1.08;
@@ -384,9 +384,8 @@ h3,
 	.beside :is(.mermaid, .schematic) {
 		text-align: start;
 	}
-	/* Pinned below the Reply bar when the page has one (theme.css), which content passes under. */
 	.beside > :nth-child(2) {
-		--pin-top: calc(var(--reply-bar-height, var(--reply-bar, 0px)) + 1.5rem);
+		--pin-top: 1.5rem;
 		position: sticky;
 		inset-block-start: var(--pin-top);
 		max-block-size: calc(100vh - var(--pin-top) - 1.5rem);
@@ -1482,8 +1481,7 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	padding: 0.25rem 0 1rem;
 }
 
-/* Comparison matrix; theme.css documents the markup. Wide: a table. On phones each row becomes a stack of label/value lines.
-   class="compare table" keeps a real table on phones: wrap it in .scroll so it scrolls sideways (numeric data tables). */
+/* Comparison matrix; theme.css documents the markup. A table on every screen; on phones one too wide scrolls sideways. */
 .scroll {
 	overflow-x: auto;
 }
@@ -1603,73 +1601,27 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .mark.unk::before {
 	border-style: dotted;
 }
-/* Phone layout at low specificity (:where) so a page rule such as `.compare td.off { display: none }` still wins. */
+/* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
+   table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
+   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. */
 @media (max-width: 48rem) {
-	:where(.compare:not(.table)) thead {
-		display: none;
-	}
-	:where(.compare:not(.table)),
-	:where(.compare:not(.table)) :is(tbody, tr, th, td) {
+	:where(.compare) {
 		display: block;
+		overflow-x: auto;
 	}
-	:where(.compare:not(.table)) tr {
-		padding: 0.75rem 0;
-		border-block-end: 1px solid var(--rule);
-	}
-	:where(.compare:not(.table)) tbody tr:last-child {
-		border-block-end: 0;
-	}
-	:where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: 0.75rem;
-		border-inline-start: 3px solid transparent;
-	}
-	:where(.fig) :where(.compare:not(.table)) tr {
-		padding-inline: var(--pad);
-	}
-	:where(.fig) :where(.compare:not(.table)) tr[data-state] {
-		padding-inline-start: max(calc(var(--pad) - 3px), 0.75rem);
-	}
-	:where(.compare:not(.table)) tr[data-state="fit"] {
-		border-inline-start-color: var(--ok);
-	}
-	:where(.compare:not(.table)) tr[data-state="maybe"] {
-		border-inline-start-color: var(--info);
-	}
-	/* Cells drop their table padding, rules, state tints and numeric alignment (a value reads beside its label); this must beat
-	   the wide-layout cell rules above. */
-	.compare:not(.table) tr > :is(th, td),
-	.fig .compare:not(.table) tr > :is(th, td) {
-		padding: 0.1875rem 0;
-		text-align: start;
-		border: 0;
-		box-shadow: none;
-		background: none;
-	}
-	:where(.compare:not(.table)) tbody th {
-		min-inline-size: 0;
-		padding-block-end: 0.375rem;
-	}
-	/* A table, not a grid: the cell's text, <i>, <code> and other inline pieces share one anonymous column beside the label. */
-	:where(.compare:not(.table)) td[data-label] {
+	:where(.scroll) > :where(.compare) {
 		display: table;
-		table-layout: fixed;
-		border-collapse: separate; /* the table's collapsing model, inherited from .compare, would drop the cell's own padding */
-		border-spacing: 0;
-		inline-size: 100%;
 	}
-	:where(.compare:not(.table)) td[data-label]::before {
-		content: attr(data-label);
-		display: table-cell;
-		box-sizing: content-box;
-		inline-size: 36%;
-		min-inline-size: 5.5rem;
-		padding-inline-end: 0.75rem;
-		color: var(--muted);
-		font-size: var(--size-label);
+	:where(.compare) .num {
+		white-space: nowrap;
 	}
-	:where(.compare:not(.table)) tr.evidence {
-		margin-block-start: -0.75rem;
-		padding-block-start: 0;
+	:where(.compare) :is(tbody th[scope="row"], thead th:first-child) {
+		position: sticky;
+		inset-inline-start: 0;
+		background: var(--under);
+	}
+	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
+		background: var(--accent-soft);
 	}
 }
 
@@ -1941,7 +1893,7 @@ details > :last-child:not(summary) {
 /* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
    its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach), or as a full block does
    (--full-reach); below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it, and
-   set in quiet labels; it starts under the Reply bar, so neither covers the other. */
+   set in quiet labels. */
 .toc ol {
 	margin: 0;
 	padding: 0;
@@ -2039,7 +1991,7 @@ details > :last-child:not(summary) {
 	.toc {
 		position: fixed;
 		z-index: 1;
-		inset-block: var(--reply-bar-height, var(--reply-bar, 0px)) 0;
+		inset-block: 0;
 		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--rail-reach));
 		inline-size: 12.5rem;
 		padding-block: var(--page-top) 2rem;
@@ -2551,12 +2503,11 @@ details > :last-child:not(summary) {
      <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
    view while the text scrolls; stacked on phones.
-   Tables: .compare is a table on wide screens. On phones each row becomes a block: its <th scope="row"> on top, then a line per
-   <td data-label="...">, its label (the column's header, repeated) beside its value; a td without data-label shows its value alone.
-   class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
-   gives a row an ok or info edge, or mutes it. .compare.table inside .scroll stays a table on phones and scrolls sideways:
+   Tables: .compare is a table on every screen; on a phone one too wide scrolls sideways, its <th scope="row"> names staying in
+   view. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   gives a row an ok or info edge, or mutes it:
      <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
-       <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody></table>
+       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table>
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
@@ -2564,7 +2515,8 @@ details > :last-child:not(summary) {
    --font --mono;
    --size-headline --size-display --size-text --size-label --radius;
    --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
-   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt.
+   Fonts: Geist and Geist Mono (SIL OFL 1.1, Vercel), latin subsets, about 70 KB inlined; licence in licenses/OFL.txt. For poster
+   headings, display: condensed in the frontmatter (kit display).
    Mono is for code, numbers and source lines, not for labels.
    Page CSS wins over the kit (pack puts the kit in @layer kit); pack warns when a page rule styles a class the kit styles itself.
    For an intended restyle, add a class the kit does not use to the element and the selector's last compound: class="chip verdict", .chip.verdict.
@@ -2634,20 +2586,6 @@ svg.has-lit [data-ref]:not(.is-lit) {
 }
 
 /* Replies: the Reply and Clear answers buttons, the Note button and editor, and the reply dialog. */
-/* The Reply and Clear buttons sit in an opaque strip across the top of the window. A page with reply.js keeps the strip's height
-   free at its top, also while the strip is hidden: at the top of the page nothing is under it, and showing or hiding it never
-   moves the page. Scrolled, content passes under the whole strip, as under the window's edge, never beside a button.
-   --reply-bar-height is the strip's last shown height, which reply.js sets: long kitLabels can wrap it onto two rows. */
-:root:has(> body > .reply-bar) {
-	--reply-bar: 3rem;
-}
-body:has(> .reply-bar) {
-	padding-block-start: var(--reply-bar-height, var(--reply-bar));
-}
-/* Focus and in-page links scroll their target clear of the strip. */
-:root:has(> body > .reply-bar:not([hidden])) {
-	scroll-padding-block-start: var(--reply-bar-height, var(--reply-bar));
-}
 /* A term that takes a note (is-annotatable, set by reply.js) and links nothing: a fainter underline than a link's and the menu
    cursor, since a click offers a note rather than lighting anything. */
 :is(span, b, strong, em, code, mark).is-annotatable:not(.is-linked) {
@@ -2655,22 +2593,16 @@ body:has(> .reply-bar) {
 	text-underline-offset: 0.22em;
 	cursor: context-menu;
 }
+/* The Reply and Clear buttons in the page's flow, under the last question (reply.js places them), Reply first as a form's send. */
 .reply-bar {
-	position: fixed;
-	inset: 0 0 auto;
-	z-index: 20;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 0.25rem 0.75rem;
-	min-block-size: var(--reply-bar);
-	padding: 0.375rem var(--gutter);
-	background: var(--bg);
-	border-block-end: 1px solid var(--rule);
+	gap: 0.5rem 1rem;
+	margin-block-start: 2rem;
 }
-/* How many questions the reader answered, on one line beside the buttons; where the buttons leave too little room (a phone,
-   longer labels) it takes a row of its own above them, so neither the count nor a button is cut or split. */
+/* How many questions the reader answered, on one line after the buttons; where they leave too little room (a phone, longer
+   labels) it takes a row of its own, so neither the count nor a button is cut or split. */
 .reply-progress {
 	white-space: nowrap;
 	font-size: var(--size-label);
@@ -2681,7 +2613,6 @@ body:has(> .reply-bar) {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
 	gap: 0.5rem;
 }
 .reply-hint {
@@ -2805,9 +2736,6 @@ dialog.reply-dialog[open] {
 	.keep-clear {
 		/* biome-ignore lint/complexity/noImportantStyles: the reply and clear controls never print, whatever display they set */
 		display: none !important;
-	}
-	body:has(> .reply-bar) {
-		padding-block-start: 0;
 	}
 }
 /* end features */
@@ -5220,8 +5148,11 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
    (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
    is-annotatable (a faint underline), also those rendered later. An aria-label names a note target explicitly; otherwise a tree
    branch uses its summary's first cell, other parts their text. Put a tree ref on its details, leaving the summary free to fold it.
-   The Reply and Clear buttons sit in a strip across the top of the window, in space the page keeps free for it, so they never
-   cover content. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
+   The Reply and Clear buttons, with the answered count, sit in the page's flow where the reader decides, never on the first
+   screen unless a question is: at the end of the section holding the last question of what is shown (the overview or the open
+   view), else, once there is something to send or clear, at the end of it. So a page with questions in several views has the
+   bar under the last question of each, and a reply: true page at its end. A section a client component draws is its own, so
+   the bar follows it instead. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
@@ -5237,7 +5168,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
    note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
-   "{answered} of {total} answered" (the bar's count). A key left out
+   "{answered} of {total} answered" (the bar's count, over the whole page). A key left out
    stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 (() => {
@@ -5461,20 +5392,59 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
   });
   const clear = keep.clearButton({ label: () => kitText("clear"), prompt: () => kitText("clearPrompt") }, clearAll);
   const progress = h("span", { class: "reply-progress" });
-  const actions = h("div", { class: "reply-actions" }, clear.status, clear.button, button);
-  const bar = document.body.appendChild(h("div", { class: "reply-ui reply-bar" }, progress, actions));
-  new ResizeObserver(() => {
-    if (!bar.hidden) {
-      const height = `${bar.getBoundingClientRect().height}px`;
-      document.documentElement.style.setProperty("--reply-bar-height", height);
-    }
-  }).observe(bar);
+  const actions = h("div", { class: "reply-actions" }, button, clear.button, clear.status);
+  const bar = h("div", { class: "reply-ui reply-bar", hidden: "" }, actions, progress);
   function clearAll() {
     notes.length = 0;
     keep.clear();
   }
+  const shownPart = () => document.querySelector("section.view.active") ?? document.querySelector("[data-overview]") ?? root;
+  function inIsland(node) {
+    let depth = 0;
+    for (let at = node.previousSibling;at; at = at.previousSibling) {
+      if (at instanceof Comment && at.data === "/island") {
+        depth++;
+      } else if (at instanceof Comment && at.data.startsWith("island:")) {
+        if (depth === 0) {
+          return true;
+        }
+        depth--;
+      }
+    }
+    return false;
+  }
+  function sectionAround(el, part) {
+    let section = null;
+    for (let at = el;at && at !== part; at = at.parentElement) {
+      if (at.localName === "section") {
+        section = at;
+      }
+      if (inIsland(at)) {
+        section = null;
+      }
+    }
+    return section;
+  }
+  function place() {
+    const part = shownPart();
+    const last = [...part.querySelectorAll("[data-reply]")].at(-1);
+    const section = last && sectionAround(last, part);
+    if (section) {
+      if (section.lastElementChild !== bar) {
+        section.append(bar);
+      }
+    } else if (part === root) {
+      if (bar.parentElement !== root) {
+        root.append(bar);
+      }
+    } else if (part.nextElementSibling !== bar) {
+      part.after(bar);
+    }
+    return last !== undefined;
+  }
   function sync() {
     const asked = document.querySelector("[data-reply]") !== null;
+    const asksHere = place();
     const inBar = asked || filledNotes().length > 0 || document.querySelector("[data-asks-reply]") !== null;
     const kept = keep.update(inBar);
     const given = answers();
@@ -5483,7 +5453,7 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     const answered = new Set(given.filter((a) => questions.has(a.host) && a.touched && (a.value !== null || a.note)).map((a) => a.host));
     progress.hidden = questions.size < 2;
     progress.textContent = kitText("answered").replace("{answered}", String(answered.size)).replace("{total}", String(questions.size));
-    button.hidden = !count && !asked;
+    button.hidden = !count && !asksHere;
     clear.show(inBar && kept);
     bar.hidden = button.hidden && !(inBar && kept);
     button.textContent = count ? `${kitText("reply")} (${count})` : kitText("reply");
@@ -5554,6 +5524,7 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     keep.touch(control);
     sync();
   };
+  addEventListener("hashchange", sync);
   document.addEventListener("input", mark);
   document.addEventListener("change", mark);
   document.addEventListener("click", (e) => {

@@ -191,14 +191,15 @@ test("check ignores content inside a closed <details>: no cut-off warnings and n
 	expect(result.stdout).toContain("no figure in view");
 }, 30_000);
 
-test("check does not warn about a data table that scrolls sideways, but does about other sideways scrollers", async () => {
-	const body = `<div id="grid" style="width:200px;overflow-x:auto"><table style="width:600px"><tr><td>wide table</td></tr></table></div><div id="strip" style="width:200px;overflow-x:auto"><div style="width:600px">wide strip</div></div>`;
+test("check does not warn about a data table that scrolls sideways, in a box or as its own box, but does about other sideways scrollers", async () => {
+	const body = `<div id="grid" style="width:200px;overflow-x:auto"><table style="width:600px"><tr><td>wide table</td></tr></table></div><table id="own" style="display:block;width:200px;overflow-x:auto"><tr><td style="min-width:600px">wide table</td></tr></table><div id="strip" style="width:200px;overflow-x:auto"><div style="width:600px">wide strip</div></div>`;
 	const file = dir.write("scrolls.html", page("").replace("</h1>", `</h1>${body}`));
 
 	const result = await checkQuick(file);
 
 	expect(result.stdout).toContain("scrolls sideways: div#strip");
 	expect(result.stdout).not.toContain("div#grid");
+	expect(result.stdout).not.toContain("table#own");
 }, 30_000);
 
 test("check names a fix for tiny diagram text, and takes a diagram held at its readable width as scrolling by design", async () => {

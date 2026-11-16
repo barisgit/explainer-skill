@@ -91,6 +91,50 @@ describe("frontmatter", () => {
 		]);
 	}, 30_000);
 
+	test("display: condensed sets the headings in Barlow Condensed capitals, units keeping their case; without it the page carries no such font", async () => {
+		const body =
+			"# Storage pays 120 kWh a day\n\nText.\n\n## Peak at 5 MHz\n\nMore.\n\n### Detail in kWh\n";
+		const headings = async (name: string, front: string) => {
+			const output = await packedMdx(dir, name, `---\n${front}\n---\n\n${body}`);
+			const html = await Bun.file(output).text();
+			const seen = await inPage(output, async (cdp) =>
+				cdp.evaluate<string[][]>(
+					`document.fonts.ready.then(() => ["h1", "h2", "h3"].map((tag) => {
+						const el = document.querySelector(tag);
+						const unit = el.querySelector(".cased");
+						const style = getComputedStyle(el);
+						return [style.fontFamily.split(",")[0].replaceAll('"', ""), style.textTransform, unit ? getComputedStyle(unit).textTransform + " " + unit.textContent : "-", String([...document.fonts].some((face) => face.family.includes("Barlow") && face.status === "loaded"))];
+					}))`,
+					true,
+				),
+			);
+			return { seen, barlow: html.includes("Barlow Condensed") };
+		};
+		expect(await headings("display-plain", "title: T")).toEqual({
+			seen: [
+				["Geist", "none", "-", "false"],
+				["Geist", "none", "-", "false"],
+				["Geist", "none", "-", "false"],
+			],
+			barlow: false,
+		});
+		// Mixed-case words (kWh, MHz) keep their case; h3 and below stay in the body face.
+		expect(await headings("display-condensed", "display: condensed")).toEqual({
+			seen: [
+				["Barlow Condensed", "uppercase", "none kWh", "true"],
+				["Barlow Condensed", "uppercase", "none MHz", "true"],
+				["Geist", "none", "-", "true"],
+			],
+			barlow: true,
+		});
+		expect(await frontFailure("display-wide", "display: wide")).toEqual([
+			1,
+			expect.stringContaining(
+				"display-wide.mdx frontmatter: display takes condensed (Barlow Condensed headings); leave it out for the kit's face",
+			),
+		]);
+	}, 30_000);
+
 	test("pack warns about a lang other than English with no labels, and says how to translate them", async () => {
 		const warned = async (name: string, front: string) => {
 			const { result } = await packMdx(dir, name, `---\n${front}\n---\n\n# T\n`);

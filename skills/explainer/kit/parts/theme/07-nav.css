@@ -107,7 +107,7 @@
 /* Contents rail. From 64rem it is fixed in the page's left margin and the page grows by the rail, so the reading column keeps
    its width, and it moves out into the window's margin by as much as .wide grows (--wide-reach), or as a full block does
    (--full-reach); below that it is a closed disclosure at the top of the page. Transparent, so a .band's tone runs under it, and
-   set in quiet labels; it starts under the Reply bar, so neither covers the other. */
+   set in quiet labels. */
 .toc ol {
 	margin: 0;
 	padding: 0;
@@ -205,7 +205,7 @@
 	.toc {
 		position: fixed;
 		z-index: 1;
-		inset-block: var(--reply-bar-height, var(--reply-bar, 0px)) 0;
+		inset-block: 0;
 		inset-inline-start: calc((100% - min(100% - 2 * var(--gutter), 81rem)) / 2 - var(--rail-reach));
 		inline-size: 12.5rem;
 		padding-block: var(--page-top) 2rem;
