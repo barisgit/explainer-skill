@@ -96,10 +96,10 @@ const V08_MAIN = `<main class="page"><div data-overview>
 <section data-nav="Plan"><h2>The plan has two phases and 72 hours</h2>
 ${TREE}</section>
 <section><h2>Options</h2><p>See <a href="#about">the method</a>.</p>
-<table class="compare"><thead><tr><th>Option</th><th>What it means</th><th class="num">Delay</th></tr></thead><tbody>
+<div class="scroll"><table class="compare"><thead><tr><th>Option</th><th>What it means</th><th class="num">Delay</th></tr></thead><tbody>
 <tr><th scope="row">A. Ship now</th><td data-label="What it means">Spike boards go out as they are.</td><td class="num" data-label="Delay">0 weeks</td></tr>
 <tr><th scope="row">B. One more spin</th><td data-label="What it means">A second board revision first.</td><td class="num" data-label="Delay">2 weeks</td></tr>
-</tbody></table>
+</tbody></table></div>
 <fieldset data-reply=""><legend>Which option should we take?</legend><div class="seg">
 <label><input type="radio" name="ship" value="a" id="ship-a"><span>Ship now</span></label>
 <label><input type="radio" name="ship" value="b" id="ship-b"><span>One more spin</span></label>

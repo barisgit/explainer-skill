@@ -143,6 +143,7 @@ OWASP calls bcrypt at cost 10 or more acceptable for legacy systems, so those ha
 
 The constraints leave one real decision: whether the FIPS-140 requirement applies to everyone or only to some deployments.
 
+<div class="scroll">
 <table class="compare">
 <thead><tr><th>Option</th><th>What it means</th><th>Cost</th></tr></thead>
 <tbody>
@@ -151,6 +152,7 @@ The constraints leave one real decision: whether the FIPS-140 requirement applie
 <tr data-state="maybe"><th scope="row">C. Argon2id by default, PBKDF2 where FIPS-140 is required</th><td data-label="What it means">Best algorithm where allowed; each record carries its algorithm and cost.</td><td data-label="Cost">Two code paths and two test matrices to maintain.</td></tr>
 </tbody>
 </table>
+</div>
 
 <p class="caveat"><b>Inferred</b>OWASP does not rank these three options; they come from combining its rules. Our reading: if no customer requires FIPS-140, choose A. If only some do, C usually costs less security than B. If all do, choose B. Whichever you pick, set the memory budget from a measurement on your smallest VM, not from this page's sliders.</p>
 

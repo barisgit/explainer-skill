@@ -61,6 +61,53 @@ ${pageContract({
 	expect(await packAndRun(dir, "phone-table", page)).toEqual([]);
 }, 30_000);
 
+test("on a phone a table too wide scrolls further rather than crush its columns: rows one to three lines, a table that fits unchanged (#210)", async () => {
+	const sizes = `[{ size: "5 kWh", price: 4200, back: 10, covers: "The evening peak for a small flat with one person" }, { size: "10 kWh", price: 7900, back: 17, covers: "A family's evening and night use through the winter" }, { size: "15 kWh", price: 11200, back: 23, covers: "Two days of cloud" }]`;
+	const cols = `[{ head: "Size", value: "size" }, { head: "Price", value: "price", format: { currency: "EUR" } }, { head: "Paid back in", value: "back", format: { unit: "years" } }, { head: "What it covers", value: "covers" }]`;
+	const output = await packedMdx(
+		dir,
+		"phone-measure",
+		`import { Question } from "kit";\n\n# Sizes\n\n## Pick one\n\n<Question name="size" legend="Which size?" rows={${sizes}} cols={${cols}} recommended="10 kWh" />\n\n| Size | Price | Paid back in | What it covers |\n|---|---:|---:|---|\n| 5 kWh | €4,200 | 10 years | The evening peak for a small flat with one person |\n| 10 kWh | €7,900 | 17 years | A family's evening and night use through the winter |\n\n| A | B | Out |\n|---|---|---|\n| 00 | 0 | 0 |\n`,
+	);
+	const seen = await inPage(
+		output,
+		(cdp) =>
+			cdp.evaluate<{
+				questionLines: number;
+				markdownLines: number;
+				scrolls: boolean[];
+				pageScrolls: boolean;
+				numbersOnOneLine: boolean;
+				smallFits: boolean;
+			}>(`(() => {
+		const [question, markdown, small] = document.querySelectorAll("table.compare");
+		// Lines a row takes: its height less its cells' padding, in lines of its cells' text.
+		const lines = (table) => [...table.tBodies[0].rows].map((row) => { const cell = getComputedStyle(row.cells[1]); return Math.round((row.getBoundingClientRect().height - parseFloat(cell.paddingTop) - parseFloat(cell.paddingBottom)) / parseFloat(cell.lineHeight) * 10) / 10; });
+		const textLines = (el) => { const range = document.createRange(); range.selectNodeContents(el); return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size; };
+		const box = (table) => table.parentElement.matches(".scroll") ? table.parentElement : table;
+		return {
+			questionLines: Math.max(...lines(question)),
+			markdownLines: Math.max(...lines(markdown)),
+			scrolls: [question, markdown].map((t) => box(t).scrollWidth > box(t).clientWidth),
+			pageScrolls: document.documentElement.scrollWidth > innerWidth,
+			numbersOnOneLine: [...markdown.querySelectorAll("td.num")].every((td) => textLines(td) === 1),
+			smallFits: box(small).scrollWidth <= box(small).clientWidth && Math.abs(small.getBoundingClientRect().width - document.querySelector("h2").getBoundingClientRect().width) < 1,
+		};
+	})()`),
+		WIDTHS[1],
+	);
+	expect(seen).toEqual({
+		questionLines: expect.any(Number),
+		markdownLines: expect.any(Number),
+		scrolls: [true, true],
+		pageScrolls: false,
+		numbersOnOneLine: true,
+		smallFits: true,
+	});
+	expect(seen.questionLines).toBeLessThanOrEqual(3.2);
+	expect(seen.markdownLines).toBeLessThanOrEqual(3.2);
+}, 30_000);
+
 test("printed, a wide .compare keeps every column on the paper, with no scroller to hide the last (#183)", async () => {
 	const heads = Array.from({ length: 12 }, (_, i) => `<th>Month ${i + 1}</th>`).join("");
 	const cells = Array.from({ length: 12 }, (_, i) => `<td>Reading ${i + 1}</td>`).join("");

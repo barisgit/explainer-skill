@@ -1195,9 +1195,10 @@ fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input:ch
 	background: color-mix(in oklab, var(--ink) 9%, var(--under));
 	print-color-adjust: exact;
 }
+/* The dot sits on the name's first line, where a narrow cell wraps the name or its Recommended mark under it. */
 fieldset[data-reply] .compare tbody > tr > th > label:first-child {
 	display: inline-flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 0.625rem;
 	font-weight: 500;
 }
@@ -1213,6 +1214,9 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input {
 	inline-size: 1rem;
 	block-size: 1rem;
 	margin: 0;
+	margin-block-start: calc((1lh - 1rem) / 2);
+	font-size: inherit;
+	line-height: inherit;
 	appearance: none;
 	border: 1.5px solid var(--ink);
 	border-radius: 50%;
@@ -1605,17 +1609,28 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .mark.unk::before {
 	border-style: dotted;
 }
-/* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
-   table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
-   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. Screens only: paper
-   cannot scroll (print below). */
+/* On phones a table stays a table, and one too wide for the column scrolls sideways rather than crush its columns: in its
+   .scroll box (pack writes one around a Markdown table, and Table draws one) it keeps its natural width, a cell wrapping only
+   past 18rem and a row name past 9rem, so a row stays a few lines tall; its numbers stay on one line, and its row names stay at
+   the box's start over the cells passing under. A table that fits fills the column as on a wide screen. A table written
+   without the box scrolls in its own, its columns as narrow as their words. At low specificity (:where), so a page rule such as
+   `.compare td.off { display: none }` still wins. Screens only: paper cannot scroll (print below). */
 @media screen and (max-width: 48rem) {
 	:where(.compare) {
 		display: block;
 		overflow-x: auto;
 	}
-	:where(.scroll) > :where(.compare) {
+	/* Beats .compare's width of 100% above. */
+	.scroll > :where(.compare) {
 		display: table;
+		inline-size: max-content;
+		min-inline-size: 100%;
+	}
+	:where(.compare) :is(th, td) {
+		max-inline-size: 18rem;
+	}
+	:where(.compare) tbody th[scope="row"] {
+		max-inline-size: 9rem;
 	}
 	:where(.compare) .num {
 		white-space: nowrap;
@@ -2518,10 +2533,11 @@ details > :last-child:not(summary) {
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
    view while the text scrolls; stacked on phones.
    Tables: .compare is a table on every screen; on a phone one too wide scrolls sideways, its <th scope="row"> names staying in
-   view. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   view. Markdown tables and Table come in a <div class="scroll">, where it scrolls at readable column widths; wrap a table you
+   write in one too. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
    gives a row an ok or info edge, or mutes it:
-     <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
-       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table>
+     <div class="scroll"><table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table></div>
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).

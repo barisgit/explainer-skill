@@ -401,9 +401,10 @@ fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input:ch
 	background: color-mix(in oklab, var(--ink) 9%, var(--under));
 	print-color-adjust: exact;
 }
+/* The dot sits on the name's first line, where a narrow cell wraps the name or its Recommended mark under it. */
 fieldset[data-reply] .compare tbody > tr > th > label:first-child {
 	display: inline-flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 0.625rem;
 	font-weight: 500;
 }
@@ -419,6 +420,9 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input {
 	inline-size: 1rem;
 	block-size: 1rem;
 	margin: 0;
+	margin-block-start: calc((1lh - 1rem) / 2);
+	font-size: inherit;
+	line-height: inherit;
 	appearance: none;
 	border: 1.5px solid var(--ink);
 	border-radius: 50%;

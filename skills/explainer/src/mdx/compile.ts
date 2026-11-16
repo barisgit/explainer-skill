@@ -283,10 +283,11 @@ function numericCell(cell: Element) {
 }
 
 /**
- * Markdown tables become the kit's `table.compare`, as a v0.8 page writes one: each body row's first cell is its header
+ * Markdown tables become the kit's `table.compare` in a `div.scroll`, as a v0.8 page writes one: each body row's first cell is its header
  * (`<th scope="row">`), every other cell carries its column's header as `data-label`, and a right-aligned column is `class="num"` (numericCell).
  */
 function compareTables(tree: HastRoot) {
+	inScrollBoxes(tree);
 	for (const table of elementsOf(tree)) {
 		if (table.tagName !== "table") {
 			continue;
@@ -303,6 +304,28 @@ function compareTables(tree: HastRoot) {
 			labelRow(row, labels);
 		}
 	}
+}
+
+/**
+ * Puts each table in a `div.scroll`, the box a phone scrolls a table too wide for it in, so the table keeps its columns'
+ * readable widths (theme.css); a Table component draws the same.
+ */
+function inScrollBoxes(node: HastNodes) {
+	if (!("children" in node)) {
+		return;
+	}
+	node.children = node.children.map((child) => {
+		if (child.type === "element" && child.tagName === "table") {
+			return {
+				type: "element",
+				tagName: "div",
+				properties: { className: ["scroll"] },
+				children: [child],
+			};
+		}
+		inScrollBoxes(child);
+		return child;
+	});
 }
 
 /** A message from the MDX parser: where in the file it is and what is wrong. */

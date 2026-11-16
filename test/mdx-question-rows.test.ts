@@ -173,6 +173,27 @@ describe("Question over table rows", () => {
 		expect(tints[1]).toBe(tints[2]);
 	}, 30_000);
 
+	test("on a phone, where a row's name wraps its Recommended mark under it, the radio stays beside the name's first line", async () => {
+		const output = await packedMdx(dir, "phone-radio", page('recommended="10 kWh"'));
+		const offset = await inPage(
+			output,
+			(cdp) =>
+				cdp.evaluate<number[]>(`(() => {
+				const input = document.querySelector("input[value='10 kWh']");
+				const name = document.createRange();
+				name.selectNodeContents(input.nextElementSibling);
+				const first = name.getClientRects()[0];
+				const label = input.closest("label").getBoundingClientRect();
+				const box = input.getBoundingClientRect();
+				return [label.height > 2 * first.height ? 1 : 0, Math.round(Math.abs(box.top + box.height / 2 - (first.top + first.height / 2)))];
+			})()`),
+			WIDTHS[1],
+		);
+		// The label wraps (the mark under the name), and the radio's middle is on the first line's.
+		expect(offset[0]).toBe(1);
+		expect(offset[1]).toBeLessThanOrEqual(2);
+	}, 30_000);
+
 	test("multiple, checked and a note come from Question; a link in a row stays a link", async () => {
 		const output = await packedMdx(
 			dir,

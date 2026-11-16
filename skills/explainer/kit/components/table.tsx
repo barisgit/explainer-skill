@@ -67,7 +67,7 @@ function columnCells<Row>(rows: readonly Row[], col: TableColumn<Row>) {
 export type RowHead = (value: ComponentChildren, index: number) => ComponentChildren;
 
 /**
- * Renders `table.compare` as a Markdown table does (src/mdx/compile.ts): each row's first cell is `<th scope="row">`, every
+ * Renders `table.compare` in a `div.scroll` as a Markdown table does (src/mdx/compile.ts): each row's first cell is `<th scope="row">`, every
  * other cell carries its column's head as `data-label`, and a numeric column is `class="num"` on its header and cells.
  * `head` writes each row's first value (the row's name), before that cell's note.
  */
@@ -78,35 +78,37 @@ export function compareTable<Row>(
 	const columns = cols.map((col) => ({ head: col.head, ...columnCells(rows, col) }));
 	const num = (column: { num: boolean }) => (column.num ? "num" : undefined);
 	return (
-		<table class={classes ? `compare ${classes}` : "compare"} id={id}>
-			<thead>
-				<tr>
-					{columns.map((column) => (
-						<th class={num(column)}>{column.head}</th>
-					))}
-				</tr>
-			</thead>
-			<tbody>
-				{rows.map((row, i) => (
-					<tr data-state={state?.(row)}>
-						{columns.map((column, c) => {
-							const { value, note } = column.cells[i] ?? {};
-							return c === 0 ? (
-								<th class={num(column)} scope="row">
-									{head(value, i)}
-									{note}
-								</th>
-							) : (
-								<td class={num(column)} data-label={column.head}>
-									{value}
-									{note}
-								</td>
-							);
-						})}
+		<div class="scroll">
+			<table class={classes ? `compare ${classes}` : "compare"} id={id}>
+				<thead>
+					<tr>
+						{columns.map((column) => (
+							<th class={num(column)}>{column.head}</th>
+						))}
 					</tr>
-				))}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{rows.map((row, i) => (
+						<tr data-state={state?.(row)}>
+							{columns.map((column, c) => {
+								const { value, note } = column.cells[i] ?? {};
+								return c === 0 ? (
+									<th class={num(column)} scope="row">
+										{head(value, i)}
+										{note}
+									</th>
+								) : (
+									<td class={num(column)} data-label={column.head}>
+										{value}
+										{note}
+									</td>
+								);
+							})}
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
 	);
 }
 

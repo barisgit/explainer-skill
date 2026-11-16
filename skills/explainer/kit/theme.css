@@ -31,10 +31,11 @@
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
    view while the text scrolls; stacked on phones.
    Tables: .compare is a table on every screen; on a phone one too wide scrolls sideways, its <th scope="row"> names staying in
-   view. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   view. Markdown tables and Table come in a <div class="scroll">, where it scrolls at readable column widths; wrap a table you
+   write in one too. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
    gives a row an ok or info edge, or mutes it:
-     <table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
-       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table>
+     <div class="scroll"><table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
+       <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table></div>
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
