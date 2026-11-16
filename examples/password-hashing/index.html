@@ -588,16 +588,16 @@ h3,
 	--_text-faint: color-mix(in srgb, var(--muted) 70%, var(--under));
 	--_line: var(--muted);
 	--_arrow: var(--muted);
-	--_node-fill: var(--surface);
+	--_node-fill: transparent;
 	--_node-stroke: var(--rule-strong);
 	--_group-fill: transparent;
-	--_group-hdr: var(--sunken);
+	--_group-hdr: transparent;
 	--_inner-stroke: var(--rule);
 	--_key-badge: var(--sunken);
 	font-family: var(--font);
 	overflow: visible;
-	/* pack sets both on the svg: 1.2 times the drawn size at most, and at least the width that keeps its smallest text at 10 px,
-	   below which the block scrolls sideways. */
+	/* pack sets both on the svg: the drawn size at most (text at the 13 px label size), and at least the width that keeps its
+	   smallest text at 10 px, below which the block scrolls sideways. */
 	max-width: var(--mermaid-max);
 	min-width: var(--mermaid-min);
 }
@@ -628,7 +628,7 @@ h3,
 	}
 }
 /* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's tokens;
-   a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at body size (16 px); at
+   a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at the label size (13 px); at
    least the width that keeps its smallest text at 10 px, below which the block scrolls sideways; on paper fitted to the column. */
 .schematic {
 	display: block;
@@ -2729,110 +2729,110 @@ dialog.reply-dialog[open] {
 <li>A wrong password is <span data-ref="l_reject">rejected</span>; nothing is stored.</li>
 <li>A correct one is <span data-ref="l_rehash">hashed again</span> with the new algorithm and cost.</li>
 <li><span data-ref="l_store">The new hash replaces the old one.</span> This user no longer has a weak hash at rest.</li>
-</ol></div><figure class="fig" aria-label="Re-hash at login"><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 329.4309999999999 552.554" width="100%" style="--mermaid-max: 396px; --mermaid-min: 300px">
+</ol></div><figure class="fig" aria-label="Re-hash at login"><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 329.4309999999999 555.154" width="100%" style="--mermaid-max: 329px; --mermaid-min: 254px">
 <defs>
   <marker id="mm0-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
-  <marker id="mm0-arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
-    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  <marker id="mm0-arrowhead-start" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto-start-reverse">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
 </defs>
 <polyline class="edge" data-id="L_l_login_l_verify_0" data-ref="L_l_login_l_verify_0" data-from="l_login" data-to="l_verify" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="136.41125,48.900000000000006 136.41125,96.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
 <polyline class="edge" data-id="L_l_verify_l_ok_0" data-ref="L_l_verify_l_ok_0" data-from="l_verify" data-to="l_ok" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="136.41125,133.8 136.41125,181.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
-<polyline class="edge" data-id="L_l_ok_l_reject_0" data-ref="L_l_ok_l_reject_0" data-from="l_ok" data-to="l_reject" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="no" points="116.30224999999999,282.345 116.30224999999999,314.454 53.0535,314.454 53.0535,406.754" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
-<polyline class="edge" data-id="L_l_ok_l_rehash_0" data-ref="L_l_ok_l_rehash_0" data-from="l_ok" data-to="l_rehash" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="yes" points="156.52024999999998,282.345 156.52024999999998,338.454 219.76899999999998,338.454 219.76899999999998,406.754" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
-<polyline class="edge" data-id="L_l_rehash_l_store_0" data-ref="L_l_rehash_l_store_0" data-from="l_rehash" data-to="l_store" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="219.76899999999998,443.654 219.76899999999998,503.654" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
+<polyline class="edge" data-id="L_l_ok_l_reject_0" data-ref="L_l_ok_l_reject_0" data-from="l_ok" data-to="l_reject" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="no" points="116.30224999999999,282.345 116.30224999999999,338.454 53.0535,338.454 53.0535,421.354" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
+<polyline class="edge" data-id="L_l_ok_l_rehash_0" data-ref="L_l_ok_l_rehash_0" data-from="l_ok" data-to="l_rehash" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="yes" points="156.52024999999998,282.345 156.52024999999998,338.454 219.76899999999998,338.454 219.76899999999998,421.354" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
+<polyline class="edge" data-id="L_l_rehash_l_store_0" data-ref="L_l_rehash_l_store_0" data-from="l_rehash" data-to="l_store" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="219.76899999999998,458.25399999999996 219.76899999999998,506.25399999999996" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm0-arrowhead)" />
 <g class="edge-label" data-id="L_l_ok_l_reject_0" data-ref="L_l_ok_l_reject_0" data-from="l_ok" data-to="l_reject" data-label="no">
-  <rect x="37.5535" y="321.454" width="30.344" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
-  <text x="52.7255" y="336.604" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">no</text>
+  <rect x="36.5535" y="345.454" width="32.952" height="32.900000000000006" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="53.0295" y="361.904" text-anchor="middle" font-size="13" font-weight="400" fill="var(--_text-sec)" dy="4.55">no</text>
 </g>
 <g class="edge-label" data-id="L_l_ok_l_rehash_0" data-ref="L_l_ok_l_rehash_0" data-from="l_ok" data-to="l_rehash" data-label="yes">
-  <rect x="201.76899999999998" y="345.454" width="35.448" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
-  <text x="219.49299999999997" y="360.604" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">yes</text>
+  <rect x="200.26899999999998" y="345.454" width="38.984" height="32.900000000000006" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="219.76099999999997" y="361.904" text-anchor="middle" font-size="13" font-weight="400" fill="var(--_text-sec)" dy="4.55">yes</text>
 </g>
 <g class="node" data-id="l_login" data-ref="l_login" data-label="User logs in" data-shape="rectangle">
-  <rect x="79.37424999999998" y="12" width="114.07400000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="79.37424999999998" y="12" width="114.07400000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="136.41125" y="30.450000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">User logs in</text>
 </g>
 <g class="node" data-id="l_verify" data-ref="l_verify" data-label="Check against old hash" data-shape="rectangle">
-  <rect x="43.45524999999999" y="96.9" width="185.91199999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="43.45524999999999" y="96.9" width="185.91199999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="136.41125" y="115.35000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Check against old hash</text>
 </g>
 <g class="node" data-id="l_ok" data-ref="l_ok" data-label="Correct?" data-shape="diamond">
-  <polygon points="136.41125,181.8 196.73825,242.127 136.41125,302.454 76.08425,242.127" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <polygon points="136.41125,181.8 196.73825,242.127 136.41125,302.454 76.08425,242.127" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="136.41125" y="242.127" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Correct?</text>
 </g>
 <g class="node" data-id="l_reject" data-ref="l_reject" data-label="Reject" data-shape="rectangle">
-  <rect x="12" y="406.754" width="82.107" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
-  <text x="53.0535" y="425.204" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Reject</text>
+  <rect x="12" y="421.354" width="82.107" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="53.0535" y="439.804" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Reject</text>
 </g>
 <g class="node" data-id="l_rehash" data-ref="l_rehash" data-label="Hash with new algorithm" data-shape="rectangle">
-  <rect x="122.107" y="406.754" width="195.32399999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
-  <text x="219.76899999999998" y="425.204" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Hash with new algorithm</text>
+  <rect x="122.107" y="421.354" width="195.32399999999996" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="219.76899999999998" y="439.804" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Hash with new algorithm</text>
 </g>
 <g class="node" data-id="l_store" data-ref="l_store" data-label="Store new hash, drop old" data-shape="rectangle">
-  <rect x="122.33449999999999" y="503.654" width="194.869" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
-  <text x="219.769" y="522.104" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Store new hash, drop old</text>
+  <rect x="122.33449999999999" y="506.25399999999996" width="194.869" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="219.769" y="524.704" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Store new hash, drop old</text>
 </g>
 </svg></div></figure></div><div class="beside" data-mig="wrap"><div><p>OWASP's second method feeds the <span data-ref="w_old">existing hash</span> into the new algorithm, so you can protect every row now without knowing any password. It also notes that layering can make hashes easier to crack, so the <span data-ref="w_plain">direct hash</span> should replace it at the next login.</p><ol>
 <li>Every row holds <span data-ref="w_old">a hash made by the legacy algorithm</span>, such as <code>md5(password)</code>.</li>
 <li>A batch job <span data-ref="w_wrap">hashes each stored hash with the new algorithm</span>. No password is needed. Layering has algorithm- and encoding-specific risks, so it is a stopgap.</li>
 <li>At the <span data-ref="w_login">next login</span>, check the password through both layers.</li>
 <li>Then <span data-ref="w_plain">hash the plain password directly</span> with the new algorithm and drop the layered form.</li>
-</ol></div><figure class="fig" aria-label="Wrap the stored hash"><div class="mermaid"><svg id="mm1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 235.92499999999998 315.6" width="100%" style="--mermaid-max: 284px; --mermaid-min: 182px">
+</ol></div><figure class="fig" aria-label="Wrap the stored hash"><div class="mermaid"><svg id="mm1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 235.92499999999998 315.6" width="100%" style="--mermaid-max: 235px; --mermaid-min: 182px">
 <defs>
   <marker id="mm1-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
-  <marker id="mm1-arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
-    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  <marker id="mm1-arrowhead-start" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto-start-reverse">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
 </defs>
 <polyline class="edge" data-id="L_w_old_w_wrap_0" data-ref="L_w_old_w_wrap_0" data-from="w_old" data-to="w_wrap" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="117.96249999999999,48.900000000000006 117.96249999999999,96.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm1-arrowhead)" />
 <polyline class="edge" data-id="L_w_wrap_w_login_0" data-ref="L_w_wrap_w_login_0" data-from="w_wrap" data-to="w_login" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="117.96249999999999,133.8 117.96249999999999,181.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm1-arrowhead)" />
 <polyline class="edge" data-id="L_w_login_w_plain_0" data-ref="L_w_login_w_plain_0" data-from="w_login" data-to="w_plain" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="117.96249999999999,218.70000000000002 117.96249999999999,266.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm1-arrowhead)" />
 <g class="node" data-id="w_old" data-ref="w_old" data-label="Stored: old(password)" data-shape="rectangle">
-  <rect x="28.744" y="12" width="178.43699999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="28.744" y="12" width="178.43699999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="117.96249999999999" y="30.450000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Stored: old(password)</text>
 </g>
 <g class="node" data-id="w_wrap" data-ref="w_wrap" data-label="Stored: new(old(password))" data-shape="rectangle">
-  <rect x="12" y="96.9" width="211.92499999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="12" y="96.9" width="211.92499999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="117.96249999999999" y="115.35000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Stored: new(old(password))</text>
 </g>
 <g class="node" data-id="w_login" data-ref="w_login" data-label="User logs in" data-shape="rectangle">
-  <rect x="60.925499999999985" y="181.8" width="114.07400000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="60.925499999999985" y="181.8" width="114.07400000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="117.96249999999999" y="200.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">User logs in</text>
 </g>
 <g class="node" data-id="w_plain" data-ref="w_plain" data-label="Stored: new(password)" data-shape="rectangle">
-  <rect x="25.376999999999995" y="266.70000000000005" width="185.171" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="25.376999999999995" y="266.70000000000005" width="185.171" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="117.96249999999999" y="285.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Stored: new(password)</text>
 </g>
 </svg></div></figure></div><div class="beside" data-mig="expire"><div><p>The <span data-ref="x_expire">expire-and-delete</span> method removes old hashes of long-inactive users and makes them <span data-ref="x_reset">reset their password</span>. It is safe, but OWASP warns it is unfriendly: it can swamp support, and users may read it as a sign of a breach.</p><ol>
 <li><span data-ref="x_idle">Some users never log in</span>, so the re-hash at login never reaches them.</li>
 <li>After an inactivity period you choose (OWASP gives none), <span data-ref="x_expire">their old hashes are deleted</span> from the database.</li>
 <li>Their next login <span data-ref="x_reset">needs a password reset</span>, which creates a hash with the new algorithm.</li>
-</ol></div><figure class="fig" aria-label="Expire inactive users"><div class="mermaid"><svg id="mm2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 209.873 230.70000000000002" width="100%" style="--mermaid-max: 252px; --mermaid-min: 162px">
+</ol></div><figure class="fig" aria-label="Expire inactive users"><div class="mermaid"><svg id="mm2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 209.873 230.70000000000002" width="100%" style="--mermaid-max: 209px; --mermaid-min: 162px">
 <defs>
   <marker id="mm2-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
-  <marker id="mm2-arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
-    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  <marker id="mm2-arrowhead-start" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto-start-reverse">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
 </defs>
 <polyline class="edge" data-id="L_x_idle_x_expire_0" data-ref="L_x_idle_x_expire_0" data-from="x_idle" data-to="x_expire" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="104.9365,48.900000000000006 104.9365,96.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm2-arrowhead)" />
 <polyline class="edge" data-id="L_x_expire_x_reset_0" data-ref="L_x_expire_x_reset_0" data-from="x_expire" data-to="x_reset" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="104.9365,133.8 104.9365,181.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#mm2-arrowhead)" />
 <g class="node" data-id="x_idle" data-ref="x_idle" data-label="Inactive for a long time" data-shape="rectangle">
-  <rect x="12.935999999999993" y="12" width="184.001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="12.935999999999993" y="12" width="184.001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="104.9365" y="30.450000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Inactive for a long time</text>
 </g>
 <g class="node" data-id="x_expire" data-ref="x_expire" data-label="Delete old hash" data-shape="rectangle">
-  <rect x="36.06299999999999" y="96.9" width="137.747" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="36.06299999999999" y="96.9" width="137.747" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="104.9365" y="115.35000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Delete old hash</text>
 </g>
 <g class="node" data-id="x_reset" data-ref="x_reset" data-label="Reset required to log in" data-shape="rectangle">
-  <rect x="12" y="181.8" width="185.873" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <rect x="12" y="181.8" width="185.873" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="104.9365" y="200.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Reset required to log in</text>
 </g>
 </svg></div></figure></div><p>OWASP calls bcrypt at cost 10 or more acceptable for legacy systems, so those hashes can wait for the re-hash at login.</p></section><section class="band" id="decision"><h2>How many hashing algorithms will you run?</h2><p>The constraints leave one real decision: whether the FIPS-140 requirement applies to everyone or only to some deployments.</p><table class="compare"><thead><tr><th>Option</th><th>What it means</th><th>Cost</th></tr></thead><tbody><tr data-state="maybe"><th scope="row">A. Argon2id everywhere</th><td data-label="What it means">One code path, OWASP's first choice, at least 7 MiB per simultaneous login.</td><td data-label="Cost">Rules out customers who require FIPS-140 validated cryptography, unless your validated module also covers Argon2id (the cheat sheet does not say).</td></tr><tr data-state="maybe"><th scope="row">B. PBKDF2-HMAC-SHA256 everywhere</th><td data-label="What it means">One code path that can serve FIPS-140 customers, provided PBKDF2 runs in a validated module in its approved configuration. No memory-cost parameter.</td><td data-label="Cost">Gives up memory-hard hashing for everyone. OWASP recommends it only when FIPS-140 is required.</td></tr><tr data-state="maybe"><th scope="row">C. Argon2id by default, PBKDF2 where FIPS-140 is required</th><td data-label="What it means">Best algorithm where allowed; each record carries its algorithm and cost.</td><td data-label="Cost">Two code paths and two test matrices to maintain.</td></tr></tbody></table><p class="caveat"><b>Inferred</b>OWASP does not rank these three options; they come from combining its rules. Our reading: if no customer requires FIPS-140, choose A. If only some do, C usually costs less security than B. If all do, choose B. Whichever you pick, set the memory budget from a measurement on your smallest VM, not from this page's sliders.</p><fieldset data-reply><legend id="option.legend">Which option will you take?</legend><div class="seg"><label><input type="radio" name="option" value="A" id="option-A"/><span>A. Argon2id everywhere</span></label><label><input type="radio" name="option" value="B" id="option-B"/><span>B. PBKDF2 everywhere</span></label><label><input type="radio" name="option" value="C" id="option-C"/><span>C. Argon2id plus PBKDF2 for FIPS</span></label><label><input type="radio" name="option" value="Undecided" id="option-Undecided"/><span>Not yet</span></label></div><input type="text" class="note" id="option.note" data-note aria-label="Note" aria-describedby="option.legend" placeholder="Note for the agent"/></fieldset><fieldset data-reply><legend>What do you still need to find out?</legend><div class="seg"><label><input type="checkbox" name="todo" value="fips" id="todo-fips"/><span>Which customers require FIPS-140 validation, and for which part of the system</span></label><label><input type="checkbox" name="todo" value="mem" id="todo-mem"/><span>Measured memory and time per login on the smallest VM</span></label><label><input type="checkbox" name="todo" value="legacy" id="todo-legacy"/><span>Which legacy hash types are in the database</span></label><label><input type="checkbox" name="todo" value="lib" id="todo-lib"/><span>Whether our language has a maintained Argon2id library</span></label></div></fieldset></section><section class="sources minor"><h2>Sources</h2><ul>

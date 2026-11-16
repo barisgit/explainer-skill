@@ -10,10 +10,10 @@ import type { PlacedLabel } from "./labels.ts";
 import { extentOf, type Part, pinsOf, type Scene } from "./scene.ts";
 import { FONT, LINE, runsOf, SUB, VALUE_FONT } from "./text.ts";
 
-/** The size, in px, a part's name reads at when the drawing is as large as it gets: body text, never larger. */
-const BODY_PX = 16;
+/** The size, in px, a part's name reads at when the drawing is as large as it gets: the label size, never larger. */
+const LABEL_PX = 13;
 /** The most a drawing grows past its drawn size; a column narrower than that scales it down instead. */
-const SCALE = BODY_PX / FONT;
+const SCALE = LABEL_PX / FONT;
 const MARGIN = 6;
 const STROKE = 1.5;
 
@@ -142,7 +142,7 @@ export function refsOf(scene: Scene): string[] {
 }
 
 /**
- * The SVG, as wide as its column up to SCALE times its drawn width (names at body size), and at least the width that keeps its smallest
+ * The SVG, as wide as its column up to SCALE times its drawn width (names at the label size), and at least the width that keeps its smallest
  * text at READABLE_PX, below which its block scrolls sideways (theme.css reads both from --schematic-max and --schematic-min).
  */
 export function renderSvg(

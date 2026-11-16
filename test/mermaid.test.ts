@@ -4,7 +4,9 @@ import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
 import {
 	copiesOf,
 	failureOf,
+	inPage,
 	packAndRun,
+	packedMdx,
 	packHtml,
 	pageContract,
 	runCli,
@@ -446,4 +448,104 @@ test("on paper every diagram prints whole as one copy, the top-down one where th
 	// A4 with Chrome's default margins: the page box is 717 px wide.
 	const paper = { width: 717, height: 1123, mobile: false };
 	expect(await packAndRun(dir, "paper", page, { media: "print", widths: [paper] })).toEqual([]);
+}, 30_000);
+
+const ONE_OF_EACH = {
+	flowchart:
+		'flowchart LR\n  subgraph g ["Group"]\n    a["Alpha"] -->|"label"| b{"Beta"}\n  end\n  b <--> c',
+	state:
+		"stateDiagram-v2\n  [*] --> Idle\n  Idle --> Busy: start\n  state Busy {\n    [*] --> Work\n  }",
+	sequence:
+		"sequenceDiagram\n  participant A\n  A->>B: hello\n  Note over A,B: note\n  loop every minute\n    B-->>A: ok\n  end",
+	class:
+		"classDiagram\n  class Animal {\n    +name string\n    +eat() void\n  }\n  Animal <|-- Dog : extends\n  Animal *-- Leg",
+	er: "erDiagram\n  CUSTOMER ||--o{ ORDER : places\n  CUSTOMER {\n    string name PK\n    string email FK\n  }",
+	xychart:
+		'xychart-beta\n  title "Sales"\n  x-axis [a, b, c]\n  y-axis "Units" 0 --> 10\n  bar [1, 2, 3]\n  line [2, 3, 4]',
+};
+
+test.each(Object.entries(ONE_OF_EACH))(
+	"a %s diagram sets all its text at 13 px, the label size, and its boxes and edges draw 1 px",
+	(_, source) => {
+		const svg = svgOf(source);
+		const sizes = [...svg.matchAll(/font-size(?:="|:\s*)([\d.]+)/g)].map((m) => m[1]);
+
+		expect(sizes.length).toBeGreaterThan(0);
+		expect(new Set(sizes)).toEqual(new Set(["13"]));
+		expect(svg).not.toMatch(/stroke="var\(--_node-stroke\)" stroke-width="(?!1")/);
+	},
+);
+
+test("a two-way edge ends in an arrowhead at both ends, the start one pointing out of the line as the end one does", () => {
+	// A marker with orient="auto-start-reverse" is drawn pointing along +x at the line's end and turned round at its start,
+	// so its apex (the point on the marker's centre line) must be its rightmost point, whatever the diagram type.
+	const sources = [
+		'flowchart LR\n  a <--> b\n  b <-->|"both ways"| c',
+		ONE_OF_EACH.class,
+		ONE_OF_EACH.sequence,
+		PIPELINE.replace("-->", "<-->"),
+	];
+	for (const svg of sources.flatMap(copiesOf)) {
+		for (const [, attrs = "", shape = ""] of svg.matchAll(/<marker ([^>]*)>\s*(<[^>]*>)/g)) {
+			if (!attrs.includes("auto-start-reverse")) {
+				continue;
+			}
+			const refY = Number(/refY="([\d.]+)"/.exec(attrs)?.[1]);
+			const points = [...(/points="([^"]*)"/.exec(shape)?.[1] ?? "").split(",")].map((p) =>
+				p.trim().split(/\s+/).map(Number),
+			);
+			const apex = points.filter(([, y]) => y === refY).map(([x]) => x ?? 0);
+			expect(Math.max(...apex)).toBe(Math.max(...points.map(([x]) => x ?? 0)));
+		}
+	}
+	const [wide = "", phone = ""] = copiesOf(
+		'flowchart LR\n  a <-->|"two way, labelled"| b <--> c <--> d <--> e <--> f',
+	);
+	for (const copy of [wide, phone]) {
+		expect(copy.match(/marker-start="url\(#[^)]*arrowhead[^)]*\)"/g)).toHaveLength(5);
+	}
+});
+
+/** The size in px a diagram's smallest and largest text is drawn at, as page expressions over the shown copies of `selector`. */
+const SHOWN_TEXT = (selector: string) => `[...document.querySelectorAll("${selector} > svg")]
+	.filter((svg) => getComputedStyle(svg).display !== "none")
+	.flatMap((svg) => [...svg.querySelectorAll("text")].map((t) => parseFloat(getComputedStyle(t).fontSize) * svg.getScreenCTM().a))`;
+
+test("on wide screens a diagram's text is drawn at 13 px and its boxes have no fill", async () => {
+	const page = diagramPage(
+		`<pre class="mermaid" id="flow">${SHORT_FLOW.replace("-->", "-->|go|")}</pre>`,
+		{
+			"text is 13 px, not larger": `(innerWidth < 640) || ${SHOWN_TEXT("#flow")}.every((px) => px > 12.8 && px < 13.001)`,
+			"node boxes are unfilled": `[...document.querySelectorAll("#flow .node rect")].every((r) => getComputedStyle(r).fill === "rgba(0, 0, 0, 0)")`,
+		},
+	);
+
+	expect(await packAndRun(dir, "plain", page)).toEqual([]);
+}, 30_000);
+
+test("on a phone an LR flowchart wider than the column is drawn top-down at 13 px, in a Stepper as outside one", async () => {
+	const flow = (id: string) =>
+		`flowchart LR\n  ${id}a["panels"] --> ${id}b["hybrid inverter"] --> ${id}c["house"]`;
+	const output = await packedMdx(
+		dir,
+		"stepped",
+		`import { Stepper } from "kit";\n\n# Stepped\n\n<Stepper start={1} captions={["one", "two"]} refs={["sa", "sb sc"]}>\n\n\`\`\`mermaid\n${flow("s")}\n\`\`\`\n\n</Stepper>\n\n\`\`\`mermaid\n${flow("p")}\n\`\`\`\n`,
+	);
+	const sizes = await inPage(
+		output,
+		(cdp) =>
+			cdp.evaluate<number[][]>(
+				`[...document.querySelectorAll(".mermaid")].map((block) => [...block.querySelectorAll(":scope > svg")]
+					.filter((svg) => getComputedStyle(svg).display !== "none")
+					.flatMap((svg) => [svg.hasAttribute("data-phone") ? 1 : 0, ...[...svg.querySelectorAll("text")].map((t) => parseFloat(getComputedStyle(t).fontSize) * svg.getScreenCTM().a)]))`,
+				true,
+			),
+		{ width: 390, height: 844, mobile: true },
+	);
+
+	expect(sizes).toHaveLength(2);
+	for (const [phone, ...px] of sizes) {
+		expect(phone).toBe(1);
+		expect(px.every((size) => size > 12.8 && size < 13.001)).toBe(true);
+	}
 }, 30_000);

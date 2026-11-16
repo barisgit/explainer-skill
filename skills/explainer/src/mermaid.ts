@@ -11,9 +11,10 @@ export interface Diagram {
 	refs: string[];
 }
 
-/** The renderer sets node labels at 13 px; drawn 1.2 times larger they read like the page's 16 px text and Mermaid's labels. */
-const SCALE = 1.2;
-/** A diagram shrinks with its column until its smallest text is this size in px; in a narrower column it scrolls sideways. */
+/**
+ * The renderer sets all its text at 13 px, the kit's label size, and a diagram is never drawn larger. It shrinks with its column
+ * until its smallest text is this size in px; in a narrower column it scrolls sideways.
+ */
 export const READABLE_PX = 10;
 /** The width a diagram block gives its SVG on a 390 px phone: the viewport less the page's and the block's 16 px insets. */
 const PHONE_COLUMN_PX = 326;
@@ -247,12 +248,12 @@ function readableWidth(svg: string): number {
 }
 
 /**
- * The width limits theme.css reads from a diagram's custom properties: at most SCALE times its drawn size, and at least the
- * width that keeps its smallest text readable (never more than the most), below which its block scrolls sideways. Custom
- * properties rather than an inline max-width, so one page rule on `.mermaid > svg` can still size it.
+ * The width limits theme.css reads from a diagram's custom properties: at most its drawn size, and at least the width that
+ * keeps its smallest text readable (never more than the most), below which its block scrolls sideways. Custom properties
+ * rather than an inline max-width, so one page rule on `.mermaid > svg` can still size it.
  */
 function sizeStyle(svg: string): string {
-	const most = Math.ceil(drawnWidth(svg) * SCALE);
+	const most = Math.floor(drawnWidth(svg));
 	return `--mermaid-max: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px`;
 }
 
@@ -278,20 +279,20 @@ function inline(svg: string, id: string): string {
 
 /**
  * The copy of a flowchart or state diagram that phones show instead (theme.css): the source laid out across its direction (LR
- * as top-down, TD as left to right), when the diagram would scroll sideways on a phone and the copy is narrower. Phones then
- * read a left-to-right flow top-down, while wide screens keep the shorter left-to-right layout. Undefined otherwise.
+ * as top-down, TD as left to right), when the diagram is wider than a phone's column, so would shrink its text below 13 px, and
+ * the copy is narrower. Phones then read a left-to-right flow top-down, while wide screens keep the shorter left-to-right
+ * layout. Undefined otherwise.
  */
 function phoneLayout(
 	family: Family,
 	svg: string,
 	draw: (transpose: boolean) => string,
 ): string | undefined {
-	const needed = readableWidth(svg);
-	if (!flows(family) || needed <= PHONE_COLUMN_PX) {
+	if (!flows(family) || drawnWidth(svg) <= PHONE_COLUMN_PX) {
 		return undefined;
 	}
 	const across = draw(true);
-	return readableWidth(across) < needed ? across : undefined;
+	return drawnWidth(across) < drawnWidth(svg) ? across : undefined;
 }
 
 /**

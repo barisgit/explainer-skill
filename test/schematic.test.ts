@@ -256,14 +256,14 @@ test("a part's name and a net's name in the prose light the part and the wires t
 	expect(await packAndRun(dir, "linked", page)).toEqual([]);
 }, 30_000);
 
-test("on a wide screen the drawing fills the column up to part names at body size, and no text is larger", async () => {
+test("on a wide screen the drawing fills the column up to part names at the label size, and no text is larger", async () => {
 	const page = circuitPage({
-		"names read at 16 px, the largest text anywhere, in a drawing narrower than the column": `(() => {
+		"names read at 13 px, the largest text anywhere, in a drawing narrower than the column": `(() => {
 			const svg = document.querySelector(".schematic svg");
 			const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
 			const sizes = [...svg.querySelectorAll("text")].map((t) => parseFloat(getComputedStyle(t).fontSize) * scale);
 			const narrow = svg.getBoundingClientRect().width < document.querySelector(".schematic").clientWidth;
-			return Math.max(...sizes) <= 16.01 && (innerWidth < 640 || (narrow && Math.max(...sizes) >= 15.9));
+			return Math.max(...sizes) <= 13.01 && (innerWidth < 640 || (narrow && Math.max(...sizes) >= 12.9));
 		})()`,
 	});
 	expect(await packAndRun(dir, "wide", page)).toEqual([]);

@@ -85,6 +85,22 @@ index 527da535f7467aeaba67a129f187f401e94fb295..80c329c94953bea50b05361286a8ebbf
    diagram.classes = [...classMap.values()]
    return diagram
  }
+diff --git a/src/class/renderer.ts b/src/class/renderer.ts
+index a5c9d320c18aec84fad3c7dd8b783a47705efc25..2059895274ac8126396210c2df22b27f47f23af2 100644
+--- a/src/class/renderer.ts
++++ b/src/class/renderer.ts
+@@ -20,9 +20,9 @@ import { renderMultilineText, escapeXml as escapeXmlUtil } from '../multiline-ut
+ 
+ /** Font sizes specific to class diagrams */
+ const CLS_FONT = {
+-  memberSize: 11,
++  memberSize: 13,
+   memberWeight: 400,
+-  annotationSize: 10,
++  annotationSize: 13,
+   annotationWeight: 500,
+ } as const
+ 
 diff --git a/src/er/parser.ts b/src/er/parser.ts
 index a4edaa8a57dfa5835675b8ecf1c794897f225076..d02e7185cfa94a999ba669c28a71a6a0a18656e7 100644
 --- a/src/er/parser.ts
@@ -197,6 +213,22 @@ index a4edaa8a57dfa5835675b8ecf1c794897f225076..d02e7185cfa94a999ba669c28a71a6a0
 +  const comment = grammar[2] === undefined ? undefined : normalizeBrTags(grammar[2])
    return { type, name, keys, comment }
  }
+ 
+diff --git a/src/er/renderer.ts b/src/er/renderer.ts
+index e45b018ebfdae8fc81b43208b15b5c025e5cac37..0cdf6ee40b9d104e3e8b6a0be951626974546190 100644
+--- a/src/er/renderer.ts
++++ b/src/er/renderer.ts
+@@ -20,9 +20,9 @@ import { measureMultilineText } from '../text-metrics.ts'
+ 
+ /** Font sizes specific to ER diagrams */
+ const ER_FONT = {
+-  attrSize: 11,
++  attrSize: 13,
+   attrWeight: 400,
+-  keySize: 9,
++  keySize: 13,
+   keyWeight: 600,
+ } as const
  
 diff --git a/src/index.ts b/src/index.ts
 index b4a6454e1015b38924cacc674f488d3460861af2..8108c6980769601de9ef1e10763937285a0ac764 100644
@@ -945,9 +977,33 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..1ac33ef5d582dec3c1d6ebefb530505d
  }
  
 diff --git a/src/renderer.ts b/src/renderer.ts
-index 1485041e9cb01e1a15045cb162fb64bc5167b25e..5bee7d6b4b43aa82221d255f6aa1ba089fcd2841 100644
+index 1485041e9cb01e1a15045cb162fb64bc5167b25e..72ff643bc871fa8d54d2ba19e51362e67abb45ec 100644
 --- a/src/renderer.ts
 +++ b/src/renderer.ts
+@@ -107,9 +107,9 @@ function arrowMarkerDefs(): string {
+     `  <marker id="arrowhead" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
+     `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
+     `\n  </marker>` +
+-    // Reverse arrow (marker-start) — refX=1 so it sits at the line start with slight offset, auto-start-reverse flips it
+-    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
+-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
++    // Reverse arrow (marker-start) — the same shape as the end one: auto-start-reverse turns it to point out of the line start
++    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto-start-reverse">` +
++    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
+     `\n  </marker>`
+   )
+ }
+@@ -129,8 +129,8 @@ function arrowMarkerDefsForColor(color: string): string {
+     `  <marker id="arrowhead-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
+     `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
+     `\n  </marker>` +
+-    `\n  <marker id="arrowhead-start-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
+-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
++    `\n  <marker id="arrowhead-start-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto-start-reverse">` +
++    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
+     `\n  </marker>`
+   )
+ }
 @@ -212,12 +212,14 @@ function renderEdge(edge: PositionedEdge): string {
  
    // Semantic data attributes for edge identification and inspection:
@@ -1098,6 +1154,31 @@ index f6df0c6a84afc1c09881536fa6dae69c3d13ecf3..38cadb6b938d34ca6e81e666924b0671
  /** Ensure an actor exists, creating a default participant if not */
  function ensureActor(diagram: SequenceDiagram, actorIds: Set<string>, id: string): void {
    if (!actorIds.has(id)) {
+diff --git a/src/styles.ts b/src/styles.ts
+index e6f0401e8d69fd26ee2b5fb7883b299f51526582..feb2fa53b2a5b9d5797a90d0016156d220d785e0 100644
+--- a/src/styles.ts
++++ b/src/styles.ts
+@@ -36,9 +36,9 @@ export const FONT_SIZES = {
+   /** Node label text */
+   nodeLabel: 13,
+   /** Edge label text */
+-  edgeLabel: 11,
++  edgeLabel: 13,
+   /** Subgraph header text */
+-  groupHeader: 12,
++  groupHeader: 13,
+ } as const
+ 
+ /** Font weights used per element type */
+@@ -70,7 +70,7 @@ export const NODE_PADDING = {
+ /** Stroke widths per element type (in px) */
+ export const STROKE_WIDTHS = {
+   outerBox: 1,
+-  innerBox: 0.75,
++  innerBox: 1,
+   /** Edge connector stroke (increased from 0.75 for better visibility) */
+   connector: 1,
+ } as const
 diff --git a/src/text-metrics.ts b/src/text-metrics.ts
 index 07766ab65303221352620180c63aa592b5842a10..9c8cfa1b50b1bc000a1c8cfa3991edf108c45040 100644
 --- a/src/text-metrics.ts
@@ -1332,3 +1413,34 @@ index 54408bdeba06334ff24a07e79c73b08e9a6dd26e..c7887fe0581858d2d9fc4d342ede51e6
 +    if (!match[3]) return categories
 +  }
  }
+diff --git a/src/xychart/renderer.ts b/src/xychart/renderer.ts
+index 4f54d52f9c108a4ffec021a046419fa610398962..3c318680247fd4ef5e8152e3922d1196ff81fe39 100644
+--- a/src/xychart/renderer.ts
++++ b/src/xychart/renderer.ts
+@@ -28,13 +28,13 @@ import { getSeriesColor, CHART_ACCENT_FALLBACK } from './colors.ts'
+ // ============================================================================
+ 
+ const CHART_FONT = {
+-  titleSize: 18,
++  titleSize: 13,
+   titleWeight: 600,
+-  axisTitleSize: 15,
++  axisTitleSize: 13,
+   axisTitleWeight: 500,
+-  labelSize: 14,
++  labelSize: 13,
+   labelWeight: 400,
+-  legendSize: 14,
++  legendSize: 13,
+   legendWeight: 400,
+   dotRadius: 5,
+   lineWidth: 2.5,
+@@ -42,7 +42,7 @@ const CHART_FONT = {
+ } as const
+ 
+ const TIP = {
+-  fontSize: 15,
++  fontSize: 13,
+   fontWeight: 500,
+   height: 32,
+   padX: 14,

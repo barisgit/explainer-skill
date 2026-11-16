@@ -588,16 +588,16 @@ h3,
 	--_text-faint: color-mix(in srgb, var(--muted) 70%, var(--under));
 	--_line: var(--muted);
 	--_arrow: var(--muted);
-	--_node-fill: var(--surface);
+	--_node-fill: transparent;
 	--_node-stroke: var(--rule-strong);
 	--_group-fill: transparent;
-	--_group-hdr: var(--sunken);
+	--_group-hdr: transparent;
 	--_inner-stroke: var(--rule);
 	--_key-badge: var(--sunken);
 	font-family: var(--font);
 	overflow: visible;
-	/* pack sets both on the svg: 1.2 times the drawn size at most, and at least the width that keeps its smallest text at 10 px,
-	   below which the block scrolls sideways. */
+	/* pack sets both on the svg: the drawn size at most (text at the 13 px label size), and at least the width that keeps its
+	   smallest text at 10 px, below which the block scrolls sideways. */
 	max-width: var(--mermaid-max);
 	min-width: var(--mermaid-min);
 }
@@ -628,7 +628,7 @@ h3,
 	}
 }
 /* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's tokens;
-   a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at body size (16 px); at
+   a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at the label size (13 px); at
    least the width that keeps its smallest text at 10 px, below which the block scrolls sideways; on paper fitted to the column. */
 .schematic {
 	display: block;
