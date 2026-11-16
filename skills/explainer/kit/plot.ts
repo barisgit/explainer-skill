@@ -182,15 +182,18 @@
 		const labels = [...strip.querySelectorAll<HTMLElement>("[data-full]")];
 		const widest = (key: "full" | "short") =>
 			Math.max(...labels.map((label) => textWidth(label.dataset[key])));
-		// Too narrow for the texts: each by its short form, and where even those touch, every nth, its radio kept.
+		// Too narrow for the texts: each by its short form, and where even those touch, every nth, its radio kept, and the
+		// picked one's always, in place of the neighbours it would touch.
 		const short = widest("full") > band - 8;
 		let every = 1;
 		while (short && widest("short") > every * band - 8 && every < labels.length) {
 			every++;
 		}
+		const picked = option.pick ?? -1;
 		strip.classList.toggle("short", short);
 		for (const [i, label] of labels.entries()) {
-			label.classList.toggle("thin", i % every !== 0);
+			const near = i !== picked && Math.abs(i - picked) < every;
+			label.classList.toggle("thin", i !== picked && (i % every !== 0 || near));
 		}
 		for (const [i, input] of strip.querySelectorAll("input").entries()) {
 			input.setAttribute("aria-description", keyText(option, i));

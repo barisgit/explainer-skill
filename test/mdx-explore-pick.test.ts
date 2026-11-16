@@ -120,18 +120,34 @@ const STRIP = (figure: string) => `(() => {
 			return after === "none" || after === "normal" ? "" : JSON.parse(after);
 		}),
 		shorts: labels.map((label) => label.dataset.short),
+		picked: labels.findIndex((label) => label.querySelector("input:checked")),
 		radios: document.querySelectorAll("#${figure} .plot-strip input[type=radio]").length,
 	};
 })()`;
 
-/** Expects a strip to show its labels' short forms at every nth from the first, none between; returns n. */
-function expectEvery({ shown, shorts }: { shown: string[]; shorts: string[] }) {
+/** Expects a strip to show its labels' short forms at every nth from the first, none between, and the picked one's
+   always, its neighbours nearer than n left out; returns n. */
+function expectEvery({
+	shown,
+	shorts,
+	picked,
+}: {
+	shown: string[];
+	shorts: string[];
+	picked: number;
+}) {
 	const at = shown.flatMap((text, i) => (text ? [i] : []));
-	const every = (at[1] ?? shown.length) - (at[0] ?? 0);
-	expect(at).toEqual(Array.from({ length: Math.ceil(shown.length / every) }, (_, k) => k * every));
+	const every = Math.min(...at.slice(1).map((i, k) => i - (at[k] ?? 0)), shown.length);
+	const nth = Array.from({ length: Math.ceil(shown.length / every) }, (_, k) => k * every);
+	const expected = [...nth.filter((i) => Math.abs(i - picked) >= every), picked].sort(
+		(a, b) => a - b,
+	);
+	expect(at).toEqual(expected);
 	expect(at.map((i) => shown[i])).toEqual(at.map((i) => shorts[i]));
 	return every;
 }
+
+type Strip = { shown: string[]; shorts: string[]; picked: number; radios: number };
 
 const DAYS = `import { Explore } from "kit";
 import { months, year } from "./model.ts";
@@ -152,11 +168,7 @@ test("on a phone, a strip too narrow for its texts shows names by their shortest
 	}
 	const [months, days] = await inPage(
 		output,
-		(cdp) =>
-			Promise.all([
-				cdp.evaluate<{ shown: string[]; shorts: string[] }>(STRIP("own")),
-				cdp.evaluate<{ shown: string[]; shorts: string[]; radios: number }>(STRIP("days")),
-			]),
+		(cdp) => Promise.all([cdp.evaluate<Strip>(STRIP("own")), cdp.evaluate<Strip>(STRIP("days"))]),
 		phone,
 	);
 	// Names by their shortest start no other month shares, every nth where even those touch.
@@ -174,11 +186,37 @@ test("on a phone, a strip too narrow for its texts shows names by their shortest
 		"N",
 		"D",
 	]);
-	expectEvery(months);
+	// December is picked: its own label shows, and November, which would touch it, does not.
+	expect(months.picked).toBe(11);
+	expect(expectEvery(months)).toBeGreaterThan(1);
 	// Every day keeps its radio; the labels shown are whole numbers, evenly spaced.
 	expect(days.radios).toBe(31);
 	expect(days.shorts).toEqual(days.shorts.map((_, i) => String(i + 1)));
 	expect(expectEvery(days)).toBeGreaterThan(1);
+	// A pick elsewhere moves the label shown with it.
+	const feb = await inPage(
+		output,
+		async (cdp) => {
+			return act<Strip>(cdp, `document.getElementById("mon-1").click()`, STRIP("own"));
+		},
+		phone,
+	);
+	expect(feb.picked).toBe(1);
+	expectEvery(feb);
+}, 30_000);
+
+test("a strip marks its picked and focused choice in the ink of the column's frame", async () => {
+	dir.write("model.ts", MODEL);
+	const output = await packedMdx(dir, "year-ink", PAGE);
+	const colours = await inPage(output, async (cdp) => {
+		await cdp.evaluate(`document.getElementById("mon-11").focus({ focusVisible: true })`);
+		return cdp.evaluate<string[]>(`(() => {
+			const label = document.querySelector("#own .plot-strip label:has(input:checked)");
+			const style = getComputedStyle(label);
+			return [style.borderTopColor, style.outlineColor, getComputedStyle(document.querySelector("#own svg rect.picked")).stroke];
+		})()`);
+	});
+	expect(new Set(colours).size).toBe(1);
 }, 30_000);
 
 test("a reply names a strip's choice by its full text, on a phone too", async () => {

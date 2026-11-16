@@ -689,8 +689,9 @@ h3,
 .plot-strip label:has(input:checked) {
 	border-block-start: 2px solid var(--ink);
 }
+/* In ink, as the picked column's frame, so the strip and the plot mark one choice in one colour. */
 .plot-strip label:has(input:focus-visible) {
-	outline: 2px solid var(--accent);
+	outline: 2px solid var(--ink);
 	outline-offset: -2px;
 }
 /* A narrow strip writes each choice's short form as generated text, which a reply and keep do not read; a thin one none. */
@@ -5837,9 +5838,11 @@ window.PlotTween = () => {
     while (short && widest("short") > every * band - 8 && every < labels.length) {
       every++;
     }
+    const picked = option.pick ?? -1;
     strip.classList.toggle("short", short);
     for (const [i, label] of labels.entries()) {
-      label.classList.toggle("thin", i % every !== 0);
+      const near = i !== picked && Math.abs(i - picked) < every;
+      label.classList.toggle("thin", i !== picked && (i % every !== 0 || near));
     }
     for (const [i, input] of strip.querySelectorAll("input").entries()) {
       input.setAttribute("aria-description", keyText(option, i));
