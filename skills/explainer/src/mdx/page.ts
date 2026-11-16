@@ -233,7 +233,12 @@ export async function mdxPage(
 	// The bundler loads modules by their real path (/tmp is /private/tmp on macOS), and the page is recognised by it.
 	const path = realpathSync(file);
 	const page = await compileMdx(path, true);
-	const compiled = { path, js: page.js, lang: page.front.lang };
+	const compiled = {
+		path,
+		js: page.js,
+		lang: page.front.lang,
+		...(page.front.display ? { display: page.front.display } : {}),
+	};
 	const css = new Set<string>();
 	const prerendered = await prerender(compiled, css, page.front.labels);
 	const clashes = [

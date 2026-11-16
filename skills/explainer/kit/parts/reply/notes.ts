@@ -4,9 +4,10 @@
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
      addNote(note)      receives { quote | part, place, where, text } when the reader saves a note
+     toReply()          brings the reader to the Reply button, from the saved note's "Go to Reply"
      paused()           true while the reply dialog is open, when no hint or editor should appear */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
+window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused }) => {
 	const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
 
 	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption, else the page. */
@@ -46,9 +47,11 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		hint?.remove();
 		hint = null;
 	};
+	// Cleared before removing: removing a focused pop fires its focusout, which closes it too.
 	const closePop = () => {
-		pop?.remove();
+		const open = pop;
 		pop = null;
+		open?.remove();
 	};
 
 	/** A small button at a document position; clicking it opens the note editor for `target`, anchored under `at`. */
@@ -68,6 +71,51 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 		hint = button;
 	}
 
+	/** Shows `popup` as the open pop, under `at` and inside the window's width. */
+	function showPop(popup: HTMLElement, at: DOMRect) {
+		document.body.append(popup);
+		popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
+		popup.style.top = `${at.bottom + scrollY + 6}px`;
+		pop = popup;
+	}
+
+	/**
+	 * Where the editor was: "Note saved." with the way to the Reply button, which stays under the last question however far below
+	 * it the note is. Focus moves to that button, so a keyboard reader is one Enter from Reply; leaving it or Escape closes it.
+	 */
+	function showSaved(at: DOMRect) {
+		const go = h(
+			"button",
+			{
+				type: "button",
+				class: "btn",
+				onclick: () => {
+					toReply();
+					closePop();
+				},
+			},
+			kitText("toReply"),
+		);
+		const popup = h(
+			"div",
+			{ class: "reply-ui reply-pop", role: "group", "aria-label": kitText("noteSaved") },
+			h("p", { class: "meta" }, kitText("noteSaved")),
+			h("div", { class: "reply-row" }, go),
+		);
+		popup.addEventListener("keydown", (e) => {
+			if (e.key === "Escape") {
+				closePop();
+			}
+		});
+		popup.addEventListener("focusout", (e) => {
+			if (pop === popup && !(e.relatedTarget instanceof Node && popup.contains(e.relatedTarget))) {
+				closePop();
+			}
+		});
+		showPop(popup, at);
+		go.focus({ preventScroll: true });
+	}
+
 	function openNote(target: Target, at: DOMRect) {
 		closePop();
 		const text = h("textarea", {
@@ -79,6 +127,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 			closePop();
 			if (value) {
 				addNote({ ...target, text: value });
+				showSaved(at);
 			}
 		};
 		const popup = h(
@@ -105,10 +154,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
 				save();
 			}
 		});
-		document.body.append(popup);
-		popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
-		popup.style.top = `${at.bottom + scrollY + 6}px`;
-		pop = popup;
+		showPop(popup, at);
 		text.focus({ preventScroll: true });
 	}
 

@@ -1246,10 +1246,14 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input:focus-
 		box-shadow: inset 0 0 0 0.1875rem Canvas;
 	}
 }
-/* Where a phone stacks the table's rows as cards, a row's tint keeps its text off its edge. */
-@media (max-width: 48rem) {
-	fieldset[data-reply] .compare:not(.table) tbody > tr {
-		padding-inline: 0.75rem;
+/* On a phone the row's name stays in view over the cells scrolling under it (05-data.css), so it takes the row's background,
+   tint included: rows start in the page's ground, which the hover and chosen tints above replace. */
+@media screen and (max-width: 48rem) {
+	fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input) {
+		background: var(--under);
+	}
+	fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input) > th {
+		background: inherit;
 	}
 }
 @media (max-width: 40rem) {
@@ -1603,8 +1607,9 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 }
 /* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
    table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
-   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. */
-@media (max-width: 48rem) {
+   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. Screens only: paper
+   cannot scroll (print below). */
+@media screen and (max-width: 48rem) {
 	:where(.compare) {
 		display: block;
 		overflow-x: auto;
@@ -1622,6 +1627,15 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	}
 	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
 		background: var(--accent-soft);
+	}
+}
+/* Paper cannot scroll, so a printed table fits the page's width: label-size text in tighter cells, words breaking where the
+   columns cannot all fit whole, rather than the last columns falling off the paper. */
+@media print {
+	.compare :is(th, td) {
+		padding-inline: 0.375rem;
+		font-size: var(--size-label);
+		overflow-wrap: anywhere;
 	}
 }
 

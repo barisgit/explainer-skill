@@ -157,7 +157,15 @@ type KitText<Key extends string> = (key: Key) => string;
 
 interface ReplyNotesOptions {
 	kitText: KitText<
-		"note" | "addNote" | "noteOn" | "notePlaceholder" | "part" | "cancel" | "saveNote"
+		| "note"
+		| "addNote"
+		| "noteOn"
+		| "notePlaceholder"
+		| "part"
+		| "cancel"
+		| "saveNote"
+		| "noteSaved"
+		| "toReply"
 	>;
 	h: <K extends keyof HTMLElementTagNameMap>(
 		tag: K,
@@ -168,6 +176,8 @@ interface ReplyNotesOptions {
 	quoted: (text: string) => string;
 	root: HTMLElement;
 	addNote: (note: ReplyNote) => void;
+	/** Scrolls to the Reply button and focuses it. */
+	toReply: () => void;
 	paused: () => boolean;
 }
 

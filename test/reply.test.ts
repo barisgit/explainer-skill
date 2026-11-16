@@ -181,6 +181,44 @@ probe(["answering", () => answer() === "b"],
 	expect(checked.code).toBe(0);
 }, 60_000);
 
+test("a note saved screens below the last question offers the way to Reply: announced, one key press away", async () => {
+	// The checks for each key press run 100 ms after it, in order; a failed one throws "reach contract: <name>".
+	const script = `
+const queue = [];
+document.addEventListener("keydown", () => { const checks = queue.shift() ?? []; setTimeout(() => { for (const [name, ok] of checks) if (!ok()) throw new Error("reach contract: " + name); }, 100); });
+const focused = () => document.activeElement;
+const inWindow = (el) => { const box = el.getBoundingClientRect(); return box.top >= 0 && box.bottom <= innerHeight; };
+queue.push([["Enter opens the note editor", () => focused().matches(".reply-pop textarea")]],
+	[], [],
+	[["Tab reaches Save note", () => focused().textContent === "Save note"]],
+	[["saving leaves focus on the way to Reply", () => focused().matches(".reply-ui button") && focused().textContent === "Go to Reply"],
+		["the bar is far above", () => !inWindow(replyButton())],
+		["saving is announced", () => document.querySelector(".reply-bar [role=status]").textContent === "Note saved."]],
+	[["Enter there reaches Reply, in view", () => focused() === replyButton() && inWindow(replyButton())],
+		["the bar stays under the question", () => document.querySelector("section:first-of-type > .reply-bar") !== null]]);`;
+	const prose = Array.from(
+		{ length: 150 },
+		(_, i) => `<p>Paragraph ${i} of the reading that follows the question.</p>`,
+	).join("");
+	const body = `<section><h2>Question</h2>${CONFIRM_BODY}</section><section><h2>Reading</h2>${prose}<p><span data-ref="late" id="late">A late claim</span> to note.</p></section>`;
+	const input = dir.write("late-note.html", SMALL(body, script));
+	const output = dir.path("late-note.out.html");
+
+	await packHtml(input, output);
+	const checked = await run(output, [
+		"focus:#late",
+		"key:Enter",
+		"key:x",
+		"key:Tab",
+		"key:Tab",
+		"key:Enter",
+		"key:Enter",
+	]);
+
+	expect(checked.stdout).not.toContain("reach contract");
+	expect(checked.code).toBe(0);
+}, 60_000);
+
 test("an unconfirmed Clear cancels itself after about four seconds", async () => {
 	// The page holds back the kit's timer so the test neither sleeps nor races: it records the delay and fires the callback by hand.
 	// The last step clicks the heading, which is not focusable, so only the timer can cancel.

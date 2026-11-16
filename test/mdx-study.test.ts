@@ -135,6 +135,18 @@ describe("frontmatter", () => {
 		]);
 	}, 30_000);
 
+	test("display: condensed keeps case in a JSX section heading, in code in a heading, and in an imported fragment's headings", async () => {
+		const page = `---\ndisplay: condensed\n---\n\nimport Part from "./part.mdx";\n\n# T\n\nText.\n\n<h2 data-nav="Peak">Peak at 5 MHz</h2>\n\nText.\n\n## Run \`npm run Build\` now\n\nText.\n\n<Part />\n`;
+		const output = await packedMdx(dir, "display-forms", page, {
+			"part.mdx": "## Fragment in kWh\n\nText.\n",
+		});
+		// innerText is the text as shown, after text-transform.
+		const shown = await inPage(output, async (cdp) =>
+			cdp.evaluate<string[]>(`[...document.querySelectorAll("h2")].map((h) => h.innerText)`),
+		);
+		expect(shown).toEqual(["PEAK AT 5 MHz", "RUN npm run Build NOW", "FRAGMENT IN kWh"]);
+	}, 30_000);
+
 	test("pack warns about a lang other than English with no labels, and says how to translate them", async () => {
 		const warned = async (name: string, front: string) => {
 			const { result } = await packMdx(dir, name, `---\n${front}\n---\n\n# T\n`);

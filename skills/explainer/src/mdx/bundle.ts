@@ -87,6 +87,8 @@ export interface CompiledPage {
 	js: string;
 	/** The frontmatter lang, which components write numbers in while the page prerenders. */
 	lang: string;
+	/** The frontmatter display face, which the .mdx fragments the page imports set their headings in too. */
+	display?: "condensed";
 }
 
 /**
@@ -125,7 +127,7 @@ function pagePlugin(
 				loader: "js",
 			}));
 			build.onLoad({ filter: /\.mdx$/ }, async ({ path }) => ({
-				contents: path === page.path ? page.js : (await compileMdx(path, false)).js,
+				contents: path === page.path ? page.js : (await compileMdx(path, page)).js,
 				loader: "js",
 			}));
 			build.onLoad({ filter: SCRIPT }, ({ path }) => {

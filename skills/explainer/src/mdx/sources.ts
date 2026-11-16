@@ -31,7 +31,7 @@ export async function pageSources(dir: string): Promise<string[]> {
 	const seen = new Set<string>(pages);
 	const sources = new Set<string>();
 	for (const page of pages) {
-		const { js } = await compileMdx(page, false);
+		const { js } = await compileMdx(page, {});
 		for (const { path: specifier } of scanner.scanImports(js)) {
 			if (!specifier.startsWith(".")) {
 				continue;

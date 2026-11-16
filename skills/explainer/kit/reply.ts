@@ -24,7 +24,8 @@
    screen unless a question is: at the end of the section holding the last question of what is shown (the overview or the open
    view), else, once there is something to send or clear, at the end of it. So a page with questions in several views has the
    bar under the last question of each, and a reply: true page at its end. A section a client component draws is its own, so
-   the bar follows it instead. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
+   the bar follows it instead. A saved note offers "Go to Reply" where it was, so a note far below the questions is one step from
+   the bar. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
@@ -38,7 +39,8 @@
    answers and notes." (announced; kit keep lists the confirm's other texts), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
-   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", noteSaved "Note saved."
+   (announced, and over the saved note's toReply "Go to Reply"), and in the caption over a
    note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
    "{answered} of {total} answered" (the bar's count, over the whole page). A key left out
    stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
@@ -67,6 +69,8 @@
 		part: "Part",
 		cancel: "Cancel",
 		saveNote: "Save note",
+		noteSaved: "Note saved.",
+		toReply: "Go to Reply",
 		figure: "figure",
 		page: "page",
 		answered: "{answered} of {total} answered",
@@ -544,6 +548,11 @@
 		addNote: (note) => {
 			notes.push(note);
 			sync();
+			clear.status.textContent = kitText("noteSaved");
+		},
+		toReply: () => {
+			bar.scrollIntoView({ block: "center" });
+			button.focus({ preventScroll: true });
 		},
 	});
 

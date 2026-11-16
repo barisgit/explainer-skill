@@ -2,7 +2,7 @@
    <Table rows={fixes} cols={[{ head: "Fix", value: "name", link: (f) => `#fix/${f.id}` }, { head: "Wait", value: "wait", format: { digits: 1, unit: "min" } }]} />
      rows   the records, one row each
      cols   one per column; the first one names the rows
-       head    the column's name, also its label beside each value on phones
+       head    the column's name
        value   the record's key, or (record) => text, number or JSX
        format  how the numbers are written in the page's lang: { digits: 1 }, { unit: "min" }, { percent: true }, { currency: "EUR" }
                (grouped as 4,200, without cents on a whole amount unless digits asks). A column whose values are all numbers is numeric: right-aligned, digits lined up

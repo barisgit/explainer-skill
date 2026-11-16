@@ -290,8 +290,9 @@
 }
 /* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
    table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
-   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. */
-@media (max-width: 48rem) {
+   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. Screens only: paper
+   cannot scroll (print below). */
+@media screen and (max-width: 48rem) {
 	:where(.compare) {
 		display: block;
 		overflow-x: auto;
@@ -309,5 +310,14 @@
 	}
 	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
 		background: var(--accent-soft);
+	}
+}
+/* Paper cannot scroll, so a printed table fits the page's width: label-size text in tighter cells, words breaking where the
+   columns cannot all fit whole, rather than the last columns falling off the paper. */
+@media print {
+	.compare :is(th, td) {
+		padding-inline: 0.375rem;
+		font-size: var(--size-label);
+		overflow-wrap: anywhere;
 	}
 }

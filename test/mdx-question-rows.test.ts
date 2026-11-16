@@ -156,6 +156,23 @@ describe("Question over table rows", () => {
 		expect(chosen).toBe("None yet");
 	}, 30_000);
 
+	test("on a phone the chosen row's name, which stays in view as the table scrolls, carries the row's tint", async () => {
+		const output = await packedMdx(dir, "phone-tint", page(""));
+		const tints = await inPage(
+			output,
+			async (cdp) => {
+				await clickOn(cdp, cell("10 kWh", 1));
+				return cdp.evaluate<string[]>(`(() => {
+					const row = document.querySelector("input[value='10 kWh']").closest("tr");
+					return [getComputedStyle(row.querySelector("th")).position, getComputedStyle(row.querySelector("th")).backgroundColor, getComputedStyle(row.querySelector("td")).backgroundColor === "rgba(0, 0, 0, 0)" ? getComputedStyle(row).backgroundColor : getComputedStyle(row.querySelector("td")).backgroundColor];
+				})()`);
+			},
+			WIDTHS[1],
+		);
+		expect(tints[0]).toBe("sticky");
+		expect(tints[1]).toBe(tints[2]);
+	}, 30_000);
+
 	test("multiple, checked and a note come from Question; a link in a row stays a link", async () => {
 		const output = await packedMdx(
 			dir,

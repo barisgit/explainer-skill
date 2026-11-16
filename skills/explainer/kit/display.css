@@ -2,8 +2,9 @@
    claim; the rest of the page, its charts and diagrams stay in Geist. Ask for it in the frontmatter, and only that page carries
    the face (37 KB):
      display: condensed
-   Words whose case means something keep it: in a # or ## pack keeps a word with a capital after a small letter as written (kWh,
-   MHz, dB, iPhone). Wrap any other in <span class="cased">, as in a heading your component writes: 50 <span class="cased">Hz</span>. */
+   Words whose case means something keep it: in a # or ## (or <h2 data-nav>, and in the .mdx files the page imports) pack keeps a
+   word with a capital after a small letter as written (kWh, MHz, dB, iPhone), and code stays as typed. Wrap any other in
+   <span class="cased">, as in a heading your component writes: 50 <span class="cased">Hz</span>. */
 
 @font-face {
 	font-family: "Barlow Condensed";
@@ -41,6 +42,7 @@ h2:not(.minor > h2, dialog h2) {
 	font-size: clamp(2.125rem, 3.7vw, 3.25rem);
 	line-height: 1;
 }
-.cased {
+.cased,
+:is(h1, h2) :is(code, kbd, samp) {
 	text-transform: none;
 }

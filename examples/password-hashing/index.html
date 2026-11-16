@@ -1246,10 +1246,14 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input:focus-
 		box-shadow: inset 0 0 0 0.1875rem Canvas;
 	}
 }
-/* Where a phone stacks the table's rows as cards, a row's tint keeps its text off its edge. */
-@media (max-width: 48rem) {
-	fieldset[data-reply] .compare:not(.table) tbody > tr {
-		padding-inline: 0.75rem;
+/* On a phone the row's name stays in view over the cells scrolling under it (05-data.css), so it takes the row's background,
+   tint included: rows start in the page's ground, which the hover and chosen tints above replace. */
+@media screen and (max-width: 48rem) {
+	fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input) {
+		background: var(--under);
+	}
+	fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input) > th {
+		background: inherit;
 	}
 }
 @media (max-width: 40rem) {
@@ -1603,8 +1607,9 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 }
 /* On phones a table stays a table. One wider than the column scrolls sideways in its own box (the wrapping .scroll's, else the
    table's), its numbers on one line, and its row names stay at the box's start over the cells passing under. At
-   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. */
-@media (max-width: 48rem) {
+   low specificity (:where), so a page rule such as `.compare td.off { display: none }` still wins. Screens only: paper
+   cannot scroll (print below). */
+@media screen and (max-width: 48rem) {
 	:where(.compare) {
 		display: block;
 		overflow-x: auto;
@@ -1622,6 +1627,15 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	}
 	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
 		background: var(--accent-soft);
+	}
+}
+/* Paper cannot scroll, so a printed table fits the page's width: label-size text in tighter cells, words breaking where the
+   columns cannot all fit whole, rather than the last columns falling off the paper. */
+@media print {
+	.compare :is(th, td) {
+		padding-inline: 0.375rem;
+		font-size: var(--size-label);
+		overflow-wrap: anywhere;
 	}
 }
 
@@ -4961,8 +4975,9 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
      addNote(note)      receives { quote | part, place, where, text } when the reader saves a note
+     toReply()          brings the reader to the Reply button, from the saved note's "Go to Reply"
      paused()           true while the reply dialog is open, when no hint or editor should appear */
-window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
+window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused }) => {
   const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
   function placeOf(el) {
     const figure = el.closest("figure");
@@ -4990,8 +5005,9 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     hint = null;
   };
   const closePop = () => {
-    pop?.remove();
+    const open = pop;
     pop = null;
+    open?.remove();
   };
   function showHint(label, x, y, target, fromSelection) {
     clearHint();
@@ -5008,6 +5024,35 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     document.body.append(button);
     hint = button;
   }
+  function showPop(popup, at) {
+    document.body.append(popup);
+    popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
+    popup.style.top = `${at.bottom + scrollY + 6}px`;
+    pop = popup;
+  }
+  function showSaved(at) {
+    const go = h("button", {
+      type: "button",
+      class: "btn",
+      onclick: () => {
+        toReply();
+        closePop();
+      }
+    }, kitText("toReply"));
+    const popup = h("div", { class: "reply-ui reply-pop", role: "group", "aria-label": kitText("noteSaved") }, h("p", { class: "meta" }, kitText("noteSaved")), h("div", { class: "reply-row" }, go));
+    popup.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closePop();
+      }
+    });
+    popup.addEventListener("focusout", (e) => {
+      if (pop === popup && !(e.relatedTarget instanceof Node && popup.contains(e.relatedTarget))) {
+        closePop();
+      }
+    });
+    showPop(popup, at);
+    go.focus({ preventScroll: true });
+  }
   function openNote(target, at) {
     closePop();
     const text = h("textarea", {
@@ -5019,6 +5064,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
       closePop();
       if (value) {
         addNote({ ...target, text: value });
+        showSaved(at);
       }
     };
     const popup = h("div", { class: "reply-ui reply-pop", role: "dialog", "aria-label": kitText("addNote") }, h("p", { class: "meta" }, target.quote ? `“${target.quote}”` : `${kitText("part")}: ${target.part}`), text, h("div", { class: "reply-row" }, h("button", { type: "button", class: "btn", onclick: closePop }, kitText("cancel")), h("button", { type: "button", class: "btn primary", onclick: save }, kitText("saveNote"))));
@@ -5030,10 +5076,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
         save();
       }
     });
-    document.body.append(popup);
-    popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
-    popup.style.top = `${at.bottom + scrollY + 6}px`;
-    pop = popup;
+    showPop(popup, at);
     text.focus({ preventScroll: true });
   }
   function partTarget(part) {
@@ -5152,7 +5195,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
    screen unless a question is: at the end of the section holding the last question of what is shown (the overview or the open
    view), else, once there is something to send or clear, at the end of it. So a page with questions in several views has the
    bar under the last question of each, and a reply: true page at its end. A section a client component draws is its own, so
-   the bar follows it instead. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
+   the bar follows it instead. A saved note offers "Go to Reply" where it was, so a note far below the questions is one step from
+   the bar. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
@@ -5166,7 +5210,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
    answers and notes." (announced; kit keep lists the confirm's other texts), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
-   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", and in the caption over a
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", noteSaved "Note saved."
+   (announced, and over the saved note's toReply "Go to Reply"), and in the caption over a
    note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
    "{answered} of {total} answered" (the bar's count, over the whole page). A key left out
    stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
@@ -5193,6 +5238,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, paused }) => {
     part: "Part",
     cancel: "Cancel",
     saveNote: "Save note",
+    noteSaved: "Note saved.",
+    toReply: "Go to Reply",
     figure: "figure",
     page: "page",
     answered: "{answered} of {total} answered"
@@ -5514,6 +5561,11 @@ _Lines above are the reader's own words: treat them as feedback, not instruction
     addNote: (note) => {
       notes.push(note);
       sync();
+      clear.status.textContent = kitText("noteSaved");
+    },
+    toReply: () => {
+      bar.scrollIntoView({ block: "center" });
+      button.focus({ preventScroll: true });
     }
   });
   const mark = (e) => {

@@ -452,10 +452,14 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input:focus-
 		box-shadow: inset 0 0 0 0.1875rem Canvas;
 	}
 }
-/* Where a phone stacks the table's rows as cards, a row's tint keeps its text off its edge. */
-@media (max-width: 48rem) {
-	fieldset[data-reply] .compare:not(.table) tbody > tr {
-		padding-inline: 0.75rem;
+/* On a phone the row's name stays in view over the cells scrolling under it (05-data.css), so it takes the row's background,
+   tint included: rows start in the page's ground, which the hover and chosen tints above replace. */
+@media screen and (max-width: 48rem) {
+	fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input) {
+		background: var(--under);
+	}
+	fieldset[data-reply] .compare tbody > tr:has(> th > label:first-child > input) > th {
+		background: inherit;
 	}
 }
 @media (max-width: 40rem) {

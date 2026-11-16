@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Element, ElementContent, Nodes as HastNodes, Root as HastRoot } from "hast";
 import type { Root } from "mdast";
+import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { remarkMath } from "../../vendor/math.js";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
 import { kitLabels } from "../kit.ts";
@@ -201,24 +202,43 @@ function casedText(text: string): ElementContent[] {
 	);
 }
 
-/** Wraps the cased words in `node`'s text, at any depth, so a display face's capitals leave them as written. */
-function keepCase(node: Element) {
+/** An element as Markdown makes it or as JSX in the MDX writes it (`<h2 data-nav>`); both hold the same children. */
+type Tagged = Element | MdxJsxFlowElementHast | MdxJsxTextElementHast;
+
+const isTagged = (node: HastNodes): node is Tagged =>
+	node.type === "element" || node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement";
+
+/** `node`'s tag name, whether Markdown or JSX wrote it; a JSX fragment (`<>`) has none. */
+const tagOf = (node: Tagged): string | null => (node.type === "element" ? node.tagName : node.name);
+
+/** Code a reader may copy: display.css keeps its case (display.css), and pack leaves its text alone. */
+const VERBATIM = new Set(["code", "kbd", "samp"]);
+
+/** Wraps the cased words in `node`'s text, at any depth but code, so a display face's capitals leave them as written. */
+function keepCase(node: Tagged) {
 	node.children = node.children.flatMap((child) => {
 		if (child.type === "text") {
 			return casedText(child.value);
 		}
-		if (child.type === "element") {
+		if (isTagged(child) && !VERBATIM.has(tagOf(child) ?? "")) {
 			keepCase(child);
 		}
 		return [child];
 	});
 }
 
-/** For a display face (frontmatter display): the cased words of each `#` and `##` heading keep their case under its capitals. */
-function casedHeadings(tree: HastRoot) {
-	for (const heading of elementsOf(tree)) {
-		if (heading.tagName === "h1" || heading.tagName === "h2") {
-			keepCase(heading);
+/**
+ * For a display face (frontmatter display): the cased words of each `#` and `##` heading, Markdown or JSX, keep their case under
+ * its capitals.
+ */
+function casedHeadings(node: HastNodes) {
+	if (isTagged(node) && ["h1", "h2"].includes(tagOf(node) ?? "")) {
+		keepCase(node);
+		return;
+	}
+	if ("children" in node) {
+		for (const child of node.children) {
+			casedHeadings(child);
 		}
 	}
 }
@@ -296,14 +316,18 @@ const isMdxMessage = (e: unknown): e is MdxMessage =>
 
 /**
  * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), TeX math
- * as MathML (math.ts), Mermaid fences, code fences as lines and tokens (code.ts) and, when `page` is set (the page's own file),
- * the page layout (structure.ts); an imported .mdx file is compiled as a fragment. A syntax error throws PackError with
- * file:line:column.
+ * as MathML (math.ts), Mermaid fences, code fences as lines and tokens (code.ts) and, when `page` is true (the page's own file),
+ * the page layout (structure.ts). Otherwise `page` is the frontmatter of the page that imports the file, compiled as a fragment
+ * whose headings follow that page's display face. A syntax error throws PackError with file:line:column.
  */
-export async function compileMdx(path: string, page: boolean): Promise<CompiledMdx> {
+export async function compileMdx(
+	path: string,
+	page: true | Pick<Frontmatter, "display">,
+): Promise<CompiledMdx> {
 	const file = shownPath(path);
 	const value = readFileSync(path, "utf8");
 	const front = frontmatter(value, file);
+	const display = page === true ? front.display : page.display;
 	let h1: string | undefined;
 	try {
 		const compiled = await compile(
@@ -316,7 +340,7 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 					remarkGfm,
 					remarkMath,
 					() => (tree: Root) => {
-						if (page) {
+						if (page === true) {
 							h1 = structurePage(tree);
 						}
 					},
@@ -326,7 +350,7 @@ export async function compileMdx(path: string, page: boolean): Promise<CompiledM
 					() => compareTables,
 					mathToMathml(file),
 					codeFences(file),
-					...(front.display ? [() => casedHeadings] : []),
+					...(display ? [() => casedHeadings] : []),
 				],
 			},
 		);

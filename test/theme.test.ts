@@ -61,6 +61,28 @@ ${pageContract({
 	expect(await packAndRun(dir, "phone-table", page)).toEqual([]);
 }, 30_000);
 
+test("printed, a wide .compare keeps every column on the paper, with no scroller to hide the last (#183)", async () => {
+	const heads = Array.from({ length: 12 }, (_, i) => `<th>Month ${i + 1}</th>`).join("");
+	const cells = Array.from({ length: 12 }, (_, i) => `<td>Reading ${i + 1}</td>`).join("");
+	const page = `${HEAD}<table class="compare" id="twelve"><thead><tr><th>Site</th>${heads}</tr></thead>
+<tbody><tr><th scope="row">North</th>${cells}</tr></tbody></table></main>
+<script>
+const last = (selector) => document.querySelector(selector).getBoundingClientRect();
+${pageContract({
+	"the table is no scroller": `["visible", "clip"].includes(getComputedStyle(document.getElementById("twelve")).overflowX)`,
+	"the last column's head ends on the paper": `last("#twelve thead th:last-child").right <= document.documentElement.clientWidth`,
+	"the last column's cell ends on the paper": `last("#twelve td:last-child").right <= document.documentElement.clientWidth`,
+	"its text is whole": `[...document.querySelectorAll("#twelve :is(th, td)")].every((cell) => cell.scrollWidth <= cell.clientWidth + 1)`,
+})}</script></body></html>`;
+
+	// A5 and A4 portrait with the printer's margins, in CSS pixels.
+	const paper = [
+		{ width: 480, height: 720, mobile: false },
+		{ width: 718, height: 1047, mobile: false },
+	];
+	expect(await packAndRun(dir, "print-table", page, { media: "print", widths: paper })).toEqual([]);
+}, 30_000);
+
 test("ranking rows disclose by click, Enter and Space, with room for titles (#35)", async () => {
 	const row = `<li><details><summary><span class="name">A long item title that needs more than seven rem</span><span class="bar"><i style="--w:100%"></i></span><span class="val">100%</span></summary><div class="more">Row detail</div></details></li>`;
 	const output = dir.path("ranking.out.html");

@@ -34,6 +34,8 @@ export const ENGLISH = {
 	part: "Part",
 	cancel: "Cancel",
 	saveNote: "Save note",
+	noteSaved: "Note saved.",
+	toReply: "Go to Reply",
 	figure: "figure",
 	page: "page",
 	answered: "{answered} of {total} answered",
@@ -91,6 +93,8 @@ export const SLOVENIAN: typeof ENGLISH = {
 	part: "Del",
 	cancel: "Prekliči",
 	saveNote: "Shrani opombo",
+	noteSaved: "Opomba je shranjena.",
+	toReply: "Pojdi na Odgovor",
 	figure: "slika",
 	page: "stran",
 	answered: "{answered} od {total} odgovorjenih",
@@ -204,6 +208,7 @@ function note() {
 	expect("note editor buttons", $(".btn:not(.primary)", pop).textContent === L.cancel && $(".primary", pop).textContent === L.saveNote);
 	text.value = "x";
 	$(".primary", pop).click();
+	expect("note saved", $(".reply-pop .meta").textContent === L.noteSaved && $(".reply-pop .btn").textContent === L.toReply && $(".reply-bar [role=status]").textContent === L.noteSaved);
 	for (const ref of ["db", "loose"]) {
 		$("[data-ref=" + ref + "]").click();
 		$(".reply-hint").click();
