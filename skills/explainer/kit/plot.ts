@@ -14,11 +14,13 @@
          fill   a bar's state, from the accent: "accent" solid, "hollow" (tint in an accent outline), "hatch" (grey lines at 45
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour).
                 On a line: the area down to 0, true in a tint of its colour or a state
-         name   two or more named lines carry their names at their ends, a moved name tied to its line by a leader, when the names
-                are short (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
-                on and off, a series without a name toggling with the named one before it
+         name   named lines carry their names at their ends, kept off the marks' lines and labels (a name spread off its
+                end tied to it by a leader), when the names are short (about 15 characters) and stack down the plot; else names go
+                in the legend, whose entries switch the series on and off, a series without a name toggling with the named one before it
          label  prints exact values on the marks: true, a format as below, one text per point or bar (["A", "", "C"]),
-                or a function: stem (x, y, i) => text, bar (v, i) => text
+                or a function: line and stem (x, y, i) => text, bar (v, i) => text. A line prints its last point's after its
+                name at its end ("10 kΩ: 847 ns"), wrapped, or left out past two lines. A bar plot whose every bar prints its
+                value (true or a format, side by side) leaves out its value axis, unless a marker on it does not write its number
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
@@ -28,13 +30,14 @@
                 (or a line and a number) over x, filled as a line's fill, its label inside it or beside it
               { at: [11.5, 2.8], label: "full at 11:31" }: a note beside that point
               Notes keep clear of the lines and labels, wrapping or tied by a leader; pack warns about one with no clear place
-       x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
+       x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out, true keeps them):
+              in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
-       legend true shows the legend, false hides it; unset, it shows for two or more named series unless all are lines
+       legend true shows the legend, false hides it and the names at the ends; unset, it shows for two or more named series
+              unless all are lines
        pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
               each named series' value there
-       x/y labels: false  leaves that axis's tick labels out
      picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
              controls, one per category), is padded to line up with the categories, and its radios are described by their values
      set(patch)  shallow-merges the patch into the option (x and y one level deeper); series is replaced whole. The plot moves from
@@ -44,9 +47,9 @@
      dispose()   stops redrawing on resize, for code that takes the element away
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A bar label sits past the bar's end, or inside the end when the panel has no room past it or a marker's line
-   would cross it there (past the line when it fits neither). A label on a stacked segment is left out
+   would cross it there (past the line when it fits neither), and moves across off a neighbour. A label on a stacked segment is left out
    when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
-   Values outside min and max sit on the edge.
+   A bar past min or max is cut where it meets the edge, its true value always printed there; other values sit on the edge.
    Axes carry their labels and one quiet baseline at 0, without gridlines or tick marks. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {

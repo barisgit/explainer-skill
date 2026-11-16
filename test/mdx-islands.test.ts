@@ -267,7 +267,7 @@ import { Chart, Plot } from "kit";
 
 <Plot id="lines" label="Spekter" option={{ x: { min: 898, max: 902, step: 1, format: { unit: "kHz" } }, y: { min: 0, max: 1.25, step: 0.5, format: { digits: 1 } }, series: [{ type: "stem", data: [[899, 0.5], [900, 1], [901, 0.5]], label: ["½mA", "A", ""] }] }} />
 
-<Plot id="shares" label="Deleži" option={{ categories: ["LC", "SC"], series: [{ type: "bar", data: [0.335, 1], label: { percent: true } }] }} />
+<Plot id="shares" label="Deleži" option={{ categories: ["LC", "SC"], series: [{ type: "bar", data: [0.335, 1], label: { percent: true } }, { type: "bar", data: [0.2, 0.6] }] }} />
 
 <Chart id="waits" label="Čakanje" option={{ xAxis: { type: "category", data: ["a", "b"] }, yAxis: { axisLabel: { formatter: { digits: 1, unit: "min" } } }, tooltip: { valueFormatter: { currency: "EUR" } }, series: [{ type: "bar", data: [1, 2], label: { show: true, formatter: ["first", "second"] } }] }} />
 `,
@@ -283,7 +283,7 @@ import { Chart, Plot } from "kit";
 		}));
 		expect(state.lines).toEqual(expect.arrayContaining(["899\u00a0kHz", "0,5", "1,0", "½mA", "A"]));
 		expect(state.lines.filter((t) => t === "")).toEqual([]);
-		// Its axis has no format: the ticks are still written as the page's lang writes numbers.
+		// Its axis has no format (an unlabelled series keeps it): the ticks are still written as the page's lang writes numbers.
 		expect(state.shares).toEqual(expect.arrayContaining(["34\u00a0%", "100\u00a0%", "0,2"]));
 		expect(state.chart).toEqual(["1,5\u00a0min", "12.345,50\u00a0€", "second"]);
 	}, 30_000);

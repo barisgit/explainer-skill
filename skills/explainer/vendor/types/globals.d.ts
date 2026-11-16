@@ -39,7 +39,10 @@ interface AxisSpec {
 	step?: number;
 	name?: string;
 	format?: ((value: number) => string) | NumberFormat;
-	/** false leaves the axis's tick labels out, and the room they take. */
+	/**
+	 * false leaves the axis's tick labels out, and the room they take; true keeps them. Unset, a bar plot whose every bar prints
+	 * its value leaves its value axis's out, unless a marker on it does not write its value.
+	 */
 	labels?: boolean;
 }
 

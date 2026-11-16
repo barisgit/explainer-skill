@@ -602,6 +602,11 @@ h3,
 	stroke-width: 1.5;
 	pointer-events: none;
 }
+/* A bar cut where it leaves its axis: a band in the tone under the plot across its end. */
+.plot svg .cut {
+	fill: var(--under);
+	pointer-events: none;
+}
 /* An area: a tint of its line's colour, or one of the accent's states, as a bar takes them. */
 .plot svg .area {
 	fill: color-mix(in oklab, var(--c) 22%, var(--under));

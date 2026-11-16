@@ -257,23 +257,56 @@ window.PlotMarks = ({ svgLine, svgText }) => {
 		return { x0, x1: x0 + width, y0: y - f.line / 2, y1: y - f.line / 2 + lines.length * f.line };
 	}
 
-	/** A horizontal marker: its line across the plot, its label on top at its end, or under it where the plot has no room above. */
-	function across(at: number, label: string, f: PlotMarkFrame) {
-		const words = label ? wrap(label, f.R - f.L, f.textWidth) : [];
-		const above = at - GAP - words.length * f.line;
-		const first = above >= 0 ? above + f.line / 2 : at + GAP + f.line / 2;
+	/**
+	 * A horizontal marker: its line across the plot, its label above it at its right end, else (f.choose picks, where a line
+	 * crosses it there) under it, or at its left end above or under it, then each wrapped to half the plot; under it where the
+	 * plot has no room above.
+	 */
+	function across(at: number, label: string, f: PlotMarkFrame, placed: readonly PlotBox[]) {
+		// Wrapped to the plot's width, then to a half and a third of it, which a line may pass beside.
+		const spots = [1, 2, 3].flatMap((share) => {
+			const width = (f.R - f.L) / share;
+			const words = label ? wrap(label, width, f.textWidth) : [];
+			const above = at - GAP - words.length * f.line;
+			const ys = [...(above >= 0 ? [above + f.line / 2] : []), at + GAP + f.line / 2];
+			return [f.R, f.L].flatMap((x) =>
+				ys.map((y) => {
+					const anchor = x === f.R ? ("end" as const) : ("start" as const);
+					return { box: linesBox(words, x, y, anchor, f), lines: words, anchor };
+				}),
+			);
+		});
+		// spots always holds the first choice; the fallback only satisfies the type.
+		const { box, anchor, lines } = f.choose?.(spots, placed) ??
+			spots[0] ?? { box: linesBox([], f.R, at, "end", f), lines: [], anchor: "end" };
+		const x = anchor === "end" ? box.x1 : box.x0;
 		return {
 			line: svgLine("mark", f.L, f.R, at, at),
-			label: textLines(words, f.R, first, "end", f.line),
-			box: linesBox(words, f.R, first, "end", f),
+			label: textLines(lines, x, box.y0 + f.line / 2, anchor, f.line),
+			box,
 		};
+	}
+
+	/** The horizontal markers (see across), each label clear of those placed before it, which it joins (`placed`). */
+	function acrossAll(marks: readonly PlotMark[], f: PlotMarkFrame, placed: PlotBox[]) {
+		let lines = "";
+		let labels = "";
+		for (const { y, label = "" } of marks) {
+			const flat = y === undefined || !f.Y ? undefined : across(f.Y(y), label, f, placed);
+			if (flat) {
+				lines += flat.line;
+				labels += flat.label;
+				placed.push(flat.box);
+			}
+		}
+		return { lines, labels };
 	}
 
 	/**
 	 * The markers' dashed lines and the spans' brackets (`lines`, drawn under the values) and their labels (`labels`, drawn over
 	 * everything): a vertical marker from the top of its label's row to the plot's bottom, a horizontal one across the plot (see
-	 * across), a span's bracket in its label's row; and the labels' boxes, which notes keep clear of. `top` is where the labels on
-	 * top start.
+	 * across), a span's bracket in its label's row; and the labels' boxes, which other labels keep clear of. `top` is where the
+	 * labels on top start.
 	 */
 	function markers(marks: readonly PlotMark[], f: PlotMarkFrame, top: number) {
 		let lines = "";
@@ -292,14 +325,11 @@ window.PlotMarks = ({ svgLine, svgText }) => {
 			labels += textLines(span.side.lines, span.side.x, from + f.line / 2, "middle", f.line);
 			boxes.push(linesBox(span.side.lines, span.side.x, from + f.line / 2, "middle", f));
 		}
-		const { Y } = f;
-		const flat = Y
-			? marks.flatMap(({ y, label = "" }) => (y === undefined ? [] : [across(Y(y), label, f)]))
-			: [];
+		const flat = acrossAll(marks, f, boxes);
 		return {
-			lines: lines + flat.map((d) => d.line).join(""),
-			labels: labels + flat.map((d) => d.label).join(""),
-			boxes: [...boxes, ...flat.map((d) => d.box)].filter((b) => b.x1 > b.x0),
+			lines: lines + flat.lines,
+			labels: labels + flat.labels,
+			boxes: boxes.filter((b) => b.x1 > b.x0),
 		};
 	}
 
@@ -319,8 +349,24 @@ window.PlotMarks = ({ svgLine, svgText }) => {
 		return `<i class="${type}${state && state !== "accent" ? ` ${state}` : ""}" style="${style}"></i>`;
 	}
 
+	/**
+	 * A break across a bar at `at` on the value axis, [from, to] across it: a slanted band in the tone under the plot, 4 px wide,
+	 * which also cuts a hollow bar's outline.
+	 */
+	function cut(at: number, [from, to]: readonly [number, number], horizontal: boolean) {
+		const band: PlotPx[] = [
+			[at - 4, to + 1],
+			[at, to + 1],
+			[at + 4, from - 1],
+			[at, from - 1],
+		];
+		const points = band.map(([a, c]) => (horizontal ? [a, c] : [c, a]).map(px).join(","));
+		return `<path class="cut" d="M${points.join("L")}Z"/>`;
+	}
+
 	return {
 		bar,
+		cut,
 		area,
 		markers,
 		wrap,

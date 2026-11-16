@@ -11,10 +11,13 @@
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour; the legend
                 shows a state every bar shares, else the series' colour). On a line: the area down to 0, true in a tint of its
                 colour or a state
-         name   two or more named lines carry their names at their ends, a moved name tied to its line by a leader, when the names
-                are short (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
+         name   named lines carry their names at their ends, kept off the marks' lines and labels, when the names are short
+                (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
                 on and off, a series without a name toggling with the named one before it
-         label  prints exact values on the marks: true, a format as below, or one text per point or bar: ["½mA", "A", "½mA"]
+         label  prints exact values on the marks: true, a format as below, or one text per point or bar: ["½mA", "A", "½mA"];
+                a line prints its last point's after its name: "10 kΩ: 847 ns", wrapped, or left out past two lines. A bar plot
+                whose every bar prints its value (true or a format, side by side) leaves out its value axis, unless a marker on
+                it does not write its number
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
@@ -25,10 +28,12 @@
                 (or a line and a number) over x, filled as a line's fill, its label inside it or beside it
               { at: [11.5, 2.8], label: "full at 11:31" }: a note beside that point
               Notes keep clear of the lines and labels, wrapping or tied by a leader; pack warns about one with no clear place
-       x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out): in a horizontal bar plot y holds the categories, x the values.
+       x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out, true keeps them):
+              in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; numbers follow the page's lang, and format sets how:
               { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
-       legend true shows the legend, false hides it; unset, it shows for two or more named series unless all are lines
+       legend true shows the legend, false hides it and the names at the ends; unset, it shows for two or more named series
+              unless all are lines
        pick   3 picks a bar plot's fourth category: its bars framed, and the legend becomes its key, each series' value there.
               An Explore choice with axis: true sets it and lets the reader pick
      label   the accessible name (role="img")
@@ -42,10 +47,10 @@
    written already the new ones; at once under reduced motion and before the reader acts): series is replaced whole, other keys merge into the plot (x and y one level deeper).
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
    A label on a stacked segment is left out when it does not fit: when every exact value must stay visible, add a readout or table.
-   Values outside min and max sit on the edge.
+   A bar past min or max is cut where it meets the edge, its true value always printed there; other values sit on the edge.
    Axes carry their labels and one quiet baseline at 0, without gridlines or tick marks.
    A plot a slider, choice or toggle switches is an Explore. format and label may also be functions, from your own client
-   component or exported by a "use client" module: format (v) => text, label stem (x, y, i) => text, bar (v, i) => text. */
+   component or exported by a "use client" module: format (v) => text, label line and stem (x, y, i) => text, bar (v, i) => text. */
 "use client";
 import type { RefObject } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
@@ -79,16 +84,36 @@ const MOST = 34;
 const BAR_FRAME = 2.75;
 const X_NAME = 1.375;
 const Y_NAME = 1.125;
+/** rem of those value labels (21 px), which a bar plot may leave out (valueAxisOut in draw.ts, the same rule). */
+const VALUES = 1.3125;
+const digits = (v: unknown) => String(v).replace(/\D/g, "").replace(/^0+/, "");
+/** Whether a horizontal bar plot leaves out its value axis's labels, as valueAxisOut in kit/parts/plot/draw.ts decides. */
+function valueAxisOut({ stack, series = [], marks = [], x }: PlotOption) {
+	if (x?.labels !== undefined) {
+		return !x.labels;
+	}
+	const printed = (s: PlotSeries) =>
+		s.type === "bar" &&
+		(s.label === true || (typeof s.label === "object" && !Array.isArray(s.label)));
+	const readable = (m: PlotMark) =>
+		[m.x ?? []].flat().every((v) => digits(m.label ?? "").includes(digits(v)));
+	return !stack && series.every(printed) && marks.every(readable);
+}
 /**
  * The height of a horizontal bar plot by its bar count: rows of 3.5rem, up to the tall 34rem, past which the rows get thinner.
  * Other plots take the theme's height, and so does one with a legend, whose rows depend on the width.
  */
-function barsHeight({ horizontal, categories, series = [], x, y, legend }: PlotOption) {
+function barsHeight(option: PlotOption) {
+	const { horizontal, categories, series = [], x, y, legend } = option;
 	const legendShown = legend !== false && series.filter((s) => s.name).length > 1;
 	if (!(horizontal && categories?.length) || legendShown) {
 		return undefined;
 	}
-	const frame = BAR_FRAME + (x?.name ? X_NAME : 0) + (y?.name ? Y_NAME : 0);
+	const frame =
+		BAR_FRAME +
+		(x?.name ? X_NAME : 0) +
+		(y?.name ? Y_NAME : 0) -
+		(valueAxisOut(option) ? VALUES : 0);
 	return `${Math.min(categories.length * BAR_ROW + frame, MOST)}rem`;
 }
 

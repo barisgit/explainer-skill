@@ -11,6 +11,22 @@ declare var PlotFormat: (env: { lang: () => string }) => {
 		stem: boolean,
 	): PlotLabeller | undefined;
 };
+declare var PlotLegend: (env: {
+	swatch: ReturnType<typeof PlotMarks>["swatch"];
+	esc: (s: unknown) => string;
+	colour: (s: PlotSeries, i: number) => string;
+	dash: (s: PlotSeries, i: number) => string;
+	fill: (s: PlotSeries, i: number) => PlotFill | undefined;
+	pick: ReturnType<typeof PlotPick>;
+}) => {
+	/**
+	 * The legend's buttons for the named series, or "" when it is off, has one entry or the names sit at the ends (atEnds); a bar
+	 * plot with a picked category has its key instead.
+	 */
+	markup(option: PlotOption, atEnds: boolean): string;
+	/** Per series: whether it is switched on, given the names switched off. */
+	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
+};
 /** How plot.js's parts write an SVG line and text (kit/parts/plot/draw.ts). */
 interface PlotSvg {
 	svgLine: (cls: string, x1: number, x2: number, y1: number, y2: number, style?: string) => string;
@@ -36,15 +52,24 @@ interface PlotBarGeometry {
 	/** The bar's colour, which a value inside it is written against, unless it is `open`: light, so the value reads as one outside it. */
 	colour: string;
 	open: boolean;
+	/** Whether the bar is cut at the axis's end, its value past it. */
+	cut: boolean;
+}
+/** What a bar's value label keeps clear of: the markers' lines at `crossing` px, every bar's box and the labels placed. */
+interface PlotBarRoom {
+	crossing: readonly number[];
+	bars: readonly PlotBox[];
+	/** The labels placed before it, which it joins. */
+	placed: PlotBox[];
 }
 declare var PlotBarLabels: (env: PlotSvg & { size: () => number }) => {
-	/** A value label: inside a stacked segment when it fits, else at the end of a side-by-side bar, clear of the markers' lines at `crossing` px. */
+	/** A bar's value label t: inside its segment when stacked, else at its end clear of the markers, the bars and other labels. */
 	barLabel(
 		t: string,
 		bar: PlotBarGeometry,
 		stack: boolean,
 		textWidth: (s: unknown) => number,
-		crossing: readonly number[],
+		room: PlotBarRoom,
 	): string;
 };
 /** A line's name at its end: the line's last point, colour and dash ("" for none), which a leader to a moved name takes. */
@@ -54,13 +79,43 @@ interface PlotEndName {
 	colour: string;
 	dash: string;
 }
-declare var PlotEnds: (env: PlotSvg & { size: () => number }) => {
+/** How a plot maps data to px, which series are switched on and how text is measured. */
+interface PlotEndMap {
+	X: (v: number) => number;
+	Y: (v: number) => number;
+	shown: boolean[];
+	textWidth: (s: unknown) => number;
+	/** The option whose values the texts give, where a move is going; unset, the option drawn. */
+	texts?: PlotOption | undefined;
+}
+declare var PlotEnds: (
+	env: PlotSvg & {
+		size: () => number;
+		place: PlotPlacer;
+		format: ReturnType<typeof PlotFormat>;
+		colour: (s: PlotSeries, i: number) => string;
+		dash: (s: PlotSeries, i: number) => string;
+		wrap: (text: string, width: number, textWidth: (s: unknown) => number) => string[];
+	},
+) => {
 	/** Whether the names go at the line ends, above a plot whose bottom edge is `bottom` px down. */
 	fit(option: PlotOption, textWidth: (s: unknown) => number, bottom: number): boolean;
+	/** The lines with text at their ends, with their index: name and value, or the value alone. */
+	named(
+		option: PlotOption,
+		textWidth: (s: unknown) => number,
+		bottom: number,
+	): { s: PlotSeries; i: number; name: string }[];
 	/** px a name takes right of the plot. */
 	room(name: string, textWidth: (s: unknown) => number): number;
-	/** The names drawn, spread apart above B. */
-	marks(named: readonly PlotEndName[], B: number): string;
+	/** The texts drawn, spread apart in the frame, clear of the boxes `placed`, which they join. */
+	marks(
+		option: PlotOption,
+		map: PlotEndMap,
+		bottom: number,
+		frame: PlotNoteFrame,
+		placed: PlotBox[],
+	): string;
 };
 /** Where a bar plot's picked category lies: the category axis's pick and band centres, the value axis's mapping, the bars' thickness. */
 interface PlotPickedBars {
@@ -121,12 +176,15 @@ declare var PlotBars: (
 		pick: ReturnType<typeof PlotPick>;
 	},
 ) => {
-	/** The bars of the series switched on with the picked category's frame (rects), and their value labels. */
+	/**
+	 * The bars of the series switched on with the picked category's frame (rects), each cut where it leaves the axis, their value
+	 * labels, a cut bar's always, and the boxes bars and labels take.
+	 */
 	draw(
 		series: readonly PlotSeries[],
 		option: PlotOption,
 		frame: PlotBarFrame,
-	): { rects: string; labels: string };
+	): { rects: string; labels: string; boxes: PlotBox[] };
 };
 /** A step of a plot's tween: the option `k` of the way (0 to 1) from `from` to `to`, numbers moved where the shapes match. */
 declare var PlotTween: () => {
@@ -150,6 +208,8 @@ declare var PlotMarks: (env: PlotSvg) => {
 		box: readonly [number, number, number, number],
 		title: string,
 	): { markup: string; open: boolean };
+	/** A break across a bar at `at` px on the value axis, [from, to] px across it. */
+	cut(at: number, across: readonly [number, number], horizontal: boolean): string;
 	/** The markers' lines and labels; top is where labels on top start. */
 	markers(
 		marks: readonly PlotMark[],
@@ -161,13 +221,6 @@ declare var PlotMarks: (env: PlotSvg) => {
 	/** A series' legend swatch: its type, colour, dash (an SVG dash array, "" solid) and its bars' state. */
 	swatch(type: string, colour: string, dash: string, state: PlotFill | undefined): string;
 };
-/** A label's box in a plot's drawing, in px. */
-interface PlotBox {
-	x0: number;
-	x1: number;
-	y0: number;
-	y1: number;
-}
 /** A point in a plot's drawing, in px. */
 type PlotPx = readonly [number, number];
 /** A note to place on the plot: its label, beside a point or in a region (its edges and polygon in px). */
@@ -182,6 +235,13 @@ interface PlotNote {
 				colour?: string | undefined;
 		  }
 		| undefined;
+}
+/** A label's box in px. */
+interface PlotBox {
+	x0: number;
+	x1: number;
+	y0: number;
+	y1: number;
 }
 /**
  * A place a label may take: its box, its lines and how they align in it, the region it is inside, and the point a leader ties it
@@ -223,7 +283,50 @@ interface PlotAreaFrame {
 	shown: boolean[];
 	colour: (s: PlotSeries, i: number) => string;
 }
+/** How end names and notes are placed (kit/parts/plot/place.ts). */
+interface PlotPlacer {
+	/** What a spot may cost and still be clear. */
+	CLEAR: number;
+	/** Whether two boxes keep apart. */
+	apart(a: PlotBox, b: PlotBox): boolean;
+	/** What a spot costs: boxes placed under it or its leader most, then lines it crosses, a leader, filled regions under it. */
+	cost(spot: PlotSpot, frame: PlotNoteFrame, placed: readonly PlotBox[]): number;
+	/** The spot that costs least, the first on a tie. */
+	cheapest<S extends PlotSpot>(
+		spots: readonly S[],
+		frame: PlotNoteFrame,
+		placed: readonly PlotBox[],
+	): S | undefined;
+	/** A label's spot wrapped to room px, from x (by anchor) and y0 down, kept inside the frame and across inside [lo, hi]. */
+	spot(
+		label: string,
+		room: number,
+		x: number,
+		y0: number,
+		anchor: PlotSpot["anchor"],
+		frame: PlotNoteFrame,
+		across?: readonly [number, number],
+	): PlotSpot;
+	/** px of a label's longest word. */
+	longest(label: string, frame: PlotNoteFrame): number;
+	/** px a label may run across: half the plot, or its longest word. */
+	widest(label: string, frame: PlotNoteFrame): number;
+	/** The spots beside a point, wrapped narrower, then away from it with a leader, in the order they are preferred. */
+	pointSpots(label: string, at: PlotPx, frame: PlotNoteFrame): PlotSpot[];
+	/** The spots away from a point, each tied to it by a leader. */
+	leaderSpots(label: string, at: PlotPx, frame: PlotNoteFrame): PlotSpot[];
+	/** The point of a box nearest p, where a leader from p ends. */
+	nearest(box: PlotBox, at: PlotPx): PlotPx;
+	/** Whether a point lies inside a polygon. */
+	within(polygon: readonly PlotPx[], at: PlotPx): boolean;
+	/** The lines labels keep clear of: the line series switched on and the markers' lines, in px. */
+	obstacles(option: PlotOption, frame: PlotAreaFrame): PlotPx[][];
+}
+declare var PlotPlace: (env: {
+	wrap: (text: string, width: number, textWidth: (s: unknown) => number) => string[];
+}) => PlotPlacer;
 declare var PlotAreas: (env: {
+	place: PlotPlacer;
 	svgText: PlotSvg["svgText"];
 	svgLine: PlotSvg["svgLine"];
 	wrap: (text: string, width: number, textWidth: (s: unknown) => number) => string[];
@@ -256,4 +359,6 @@ interface PlotMarkFrame {
 	W: number;
 	line: number;
 	textWidth: (s: unknown) => number;
+	/** Picks where a label across the plot goes, of the spots it may take; unset, the first. */
+	choose?: ((spots: PlotSpot[], placed: readonly PlotBox[]) => PlotSpot | undefined) | undefined;
 }

@@ -3,9 +3,10 @@
    legendMarkup(option, textWidth, H), the legend's buttons (none when names sit at the line ends of an H px high area), and
    switchedOn(series, off), which series the legend leaves on; numbers are written in lang(), text is set at size() px (the
    theme's --size-label), and textWidth measures a label at that size. Bars' and areas' states and markers are marks.ts's
-   (PlotMarks), regions and notes areas.ts's (PlotAreas), bars and their value labels bars.ts's (PlotBars), a picked category's
-   frame and key pick.ts's (PlotPick). bands(option, W, H, textWidth) is where a bar plot's categories lie
-   along their axis, for code that maps a click to one. */
+   (PlotMarks), regions and notes areas.ts's (PlotAreas), bars and their value labels bars.ts's (PlotBars), the lines' ends
+   ends.ts's (PlotEnds), the legend legend.ts's (PlotLegend), a picked category's frame and key pick.ts's (PlotPick); end names
+   and notes are placed together by place.ts (PlotPlace), after the markers' labels. bands(option, W, H, textWidth) is where a
+   bar plot's categories lie along their axis, for code that maps a click to one. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotDraw = ({ lang, size }) => {
 	// px: the label size, as theme.css sets it for .plot text (--size-label); read again at each render and legend.
@@ -81,16 +82,33 @@ window.PlotDraw = ({ lang, size }) => {
 	const svgText = (cls: string, x: number, y: number, anchor: Anchor, s: unknown, style = "") =>
 		`<text${attr("class", cls)} x="${px(x)}" y="${px(y)}" dy="0.35em" text-anchor="${anchor}"${attr("style", style)}>${esc(s)}</text>`;
 	const marks = window.PlotMarks({ svgLine, svgText });
-	const areas = window.PlotAreas({ svgText, svgLine, wrap: marks.wrap, area: marks.area });
+	const placer = window.PlotPlace({ wrap: marks.wrap });
+	const areas = window.PlotAreas({
+		svgText,
+		svgLine,
+		wrap: marks.wrap,
+		area: marks.area,
+		place: placer,
+	});
 	/** The notes the last render found no clear place for. */
 	let crowded: string[] = [];
-	const ends = window.PlotEnds({ svgLine, svgText, size });
-	const { formatter, labeller } = window.PlotFormat({ lang });
+	const format = window.PlotFormat({ lang });
+	const { formatter, labeller } = format;
 	const pick = window.PlotPick({ esc, formatter, labeller });
 	const seriesColor = (s: PlotSeries, i: number) => s.color ?? `var(--c${(i % 6) + 1})`;
 	/** A line's dash: the author's (dash: true or false), none for a colour of the author's, else its palette slot's. */
 	const dashOf = (s: PlotSeries, i: number) =>
 		s.dash !== undefined ? (s.dash ? AUTHOR_DASH : "") : s.color ? "" : (DASHES[i % 6] ?? "");
+	const ends = window.PlotEnds({
+		svgLine,
+		svgText,
+		size,
+		place: placer,
+		format,
+		colour: seriesColor,
+		dash: dashOf,
+		wrap: marks.wrap,
+	});
 	/** A bar's state: its own entry in the series' fill, else the series' fill; undefined is solid in the series' colour. */
 	const fillOf = (s: PlotSeries, i: number) =>
 		(Array.isArray(s.fill) ? s.fill[i] : (s.fill as PlotFill | undefined)) || undefined;
@@ -105,21 +123,51 @@ window.PlotDraw = ({ lang, size }) => {
 		labeller,
 		pick,
 	});
+	const legend = window.PlotLegend({
+		swatch: marks.swatch,
+		esc,
+		colour: seriesColor,
+		dash: dashOf,
+		fill: fillOf,
+		pick,
+	});
 	/**
 	 * px from the top of a W x H drawing to the plot's bottom edge, under which sit the x labels (with a line more for categories'
 	 * notes) unless they are left out, and the x axis's name.
 	 */
 	const bottomAt = (H: number, xName: unknown, notes = false, labelled = true) =>
 		Math.floor(H - (labelled ? GAP + FONT + 8 : 4) - (xName ? 22 : 0) - (notes ? lineHeight() : 0));
-	/** Whether the series carry their names at their line ends in place of a legend, in a drawing H px high; see PlotEnds' fit. */
+	/** A line or stem plot's bottom edge in a drawing H px high, its x labels left out when its x axis says so. */
+	const pointBottom = (option: PlotOption, H: number) =>
+		bottomAt(H, option.x?.name, false, option.x?.labels !== false);
+	/** Whether names sit at the line ends, and which lines carry text there, in a drawing H px high (PlotEnds). */
 	const namesAtEnds = (option: PlotOption, textWidth: TextWidth, H: number) =>
-		ends.fit(option, textWidth, bottomAt(H, option.x?.name, false, option.x?.labels !== false));
-	/** The series whose names sit at their line ends, with their index. */
+		ends.fit(option, textWidth, pointBottom(option, H));
 	const endNamed = (option: PlotOption, textWidth: TextWidth, H: number) =>
-		namesAtEnds(option, textWidth, H)
-			? (option.series ?? []).flatMap((s, i) => (s.name ? [{ s, i, name: s.name }] : []))
-			: [];
-
+		ends.named(option, textWidth, pointBottom(option, H));
+	/** A number's digits, without sign, point or leading zeros: what a label that writes it holds in some format. */
+	const digits = (v: unknown) => String(v).replace(/\D/g, "").replace(/^0+/, "");
+	/**
+	 * Whether a bar plot leaves out its value axis's labels: as its axis's `labels` says, else when every bar prints its value,
+	 * written by the kit from the value (label true or a format), side by side, and every marker on that axis writes its own:
+	 * the labels would only repeat them. Text labels may say something else, a stacked segment too thin for its value drops it,
+	 * and a marker without its number is read against the axis, so those keep it. plot.tsx sizes a bar plot by the same rule.
+	 */
+	function valueAxisOut(option: PlotOption) {
+		const key = option.horizontal ? "x" : "y";
+		const said = option[key]?.labels;
+		if (said !== undefined) {
+			return !said;
+		}
+		const printed = (s: PlotSeries) =>
+			s.type === "bar" &&
+			(s.label === true || (typeof s.label === "object" && !Array.isArray(s.label)));
+		const readable = (m: PlotMark) =>
+			[m[key] ?? []].flat().every((v) => digits(m.label ?? "").includes(digits(v)));
+		return (
+			!option.stack && (option.series ?? []).every(printed) && (option.marks ?? []).every(readable)
+		);
+	}
 	/** 1, 2, 5 times a power of ten giving about `count` steps over `span`. */
 	function niceStep(span: number, count: number) {
 		const raw = span / count;
@@ -326,7 +374,7 @@ window.PlotDraw = ({ lang, size }) => {
 			pick.pickedAt(option),
 		);
 		const val = numericAxis(
-			option.horizontal ? x : y,
+			{ ...(option.horizontal ? x : y), labels: !valueAxisOut(option) },
 			span,
 			option.horizontal ? W : H,
 			!option.horizontal,
@@ -365,7 +413,7 @@ window.PlotDraw = ({ lang, size }) => {
 
 	/**
 	 * The plot rectangle inside W x H: room left for the value labels and axis names, right and left for half a label, and on the
-	 * right for the names at the line ends (`named`).
+	 * right for the names at the line ends (`named`, each with the x its line ends at).
 	 */
 	function plotBox(
 		xa: Axis,
@@ -373,7 +421,7 @@ window.PlotDraw = ({ lang, size }) => {
 		W: number,
 		H: number,
 		textWidth: TextWidth,
-		named: string[],
+		named: { name: string; x: number }[],
 	) {
 		const yLabelWidth = Math.max(
 			0,
@@ -382,11 +430,15 @@ window.PlotDraw = ({ lang, size }) => {
 		);
 		const firstHalf = textWidth(xa.labels[0] ?? "") / 2;
 		const lastHalf = textWidth(xa.labels.at(-1) ?? "") / 2;
+		const L = Math.ceil(Math.max(PAD + yLabelWidth + GAP + 4, firstHalf + 4));
+		// The right edge leaves each name room past its line's end, which lies `share` of the way across.
+		const reach = named.map(({ name, x }) => {
+			const share = "lo" in xa ? Math.min(1, (x - xa.lo) / (xa.hi - xa.lo)) : 1;
+			return share > 0 ? L + (W - ends.room(name, textWidth) - L) / share : W;
+		});
 		return {
-			L: Math.ceil(Math.max(PAD + yLabelWidth + GAP + 4, firstHalf + 4)),
-			R: Math.floor(
-				W - Math.max(PAD, lastHalf + 4, ...named.map((name) => ends.room(name, textWidth))),
-			),
+			L,
+			R: Math.floor(Math.min(W - Math.max(PAD, lastHalf + 4), ...reach)),
 			T: ya.name ? FONT + 15 : 10,
 			B: bottomAt(H, xa.name, Boolean(xa.notes), xa.labels.some(Boolean)),
 		};
@@ -397,24 +449,6 @@ window.PlotDraw = ({ lang, size }) => {
 		return series
 			.map((s, i) => (ctx.shown[i] ? (s.type === "stem" ? stemMark : lineMark)(s, i, ctx) : ""))
 			.join("");
-	}
-
-	/** Each named line's name just past its last point, spread apart (see PlotEnds' marks). */
-	function endMarks(option: PlotOption, { X, Y, B, H, shown, textWidth }: PointCtx) {
-		const named = endNamed(option, textWidth, H).flatMap(({ s, i, name }) => {
-			const last = s.data.filter(finite).at(-1);
-			return last && shown[i]
-				? [
-						{
-							name,
-							at: { x: X(last[0]), y: Y(last[1]) },
-							colour: seriesColor(s, i),
-							dash: dashOf(s, i),
-						},
-					]
-				: [];
-		});
-		return ends.marks(named, B);
 	}
 
 	/** What PlotMarks needs to place markers: the numeric axes' mappings (a category axis has none), the box and the text. */
@@ -435,7 +469,10 @@ window.PlotDraw = ({ lang, size }) => {
 			? barAxes(option, option.categories, W, H)
 			: plotAxes(option, W, H);
 		const { xa, ya } = axes;
-		const named = endNamed(option, textWidth, H).map((end) => end.name);
+		const named = endNamed(option, textWidth, H).map(({ s, name }) => ({
+			name,
+			x: s.data.filter(finite).at(-1)?.[0] ?? 0,
+		}));
 		const box = { ...plotBox(xa, ya, W, H, textWidth, named), textWidth };
 		place(xa, box.L, box.R);
 		return { axes, box, rows: marks.rows(option.marks ?? [], markFrame({ ...box, xa, ya, W })) };
@@ -459,27 +496,34 @@ window.PlotDraw = ({ lang, size }) => {
 		if (!laid) {
 			return "";
 		}
-		const { axes, ctx, marked } = laid;
+		const { axes, box, ctx } = laid;
 		if ("cat" in axes) {
+			// A marker's label across the bars keeps off them and their values.
 			const drawn = bars.draw(series, option, { ...ctx, cat: axes.cat, val: axes.val });
+			const frame = { ...ctx, line: lineHeight(), lines: [], fills: [] };
+			const choose = (spots: PlotSpot[], placed: readonly PlotBox[]) =>
+				placer.cheapest(spots, frame, [...placed, ...drawn.boxes]);
+			const marked = marks.markers(option.marks ?? [], { ...markFrame(ctx), choose }, box.T - 6);
 			return drawAxes(ctx) + drawn.rects + marked.lines + drawn.labels + marked.labels;
 		}
-		// While the plot moves, its notes stay where they go, carried along with their points and regions.
+		// While the plot moves, its notes stay where the move's end places them, carried along with their points and regions.
 		const going = texts === option ? undefined : laidOut(texts, W, H, textWidth, shown, texts);
-		const notes = noted(option, laid, going && noted(texts, going)?.placed);
-		if (!notes) {
-			return "";
-		}
-		const { points } = notes;
-		crowded = notes.crowded;
+		const goal =
+			going && !("cat" in going.axes) ? labelled(texts, { ...going, ...going.axes }) : undefined;
+		const { points, marked, named, noted } = labelled(
+			option,
+			{ ...laid, ...axes },
+			goal?.noted.placed,
+		);
+		crowded = noted.crowded;
 		return (
-			drawAxes(ctx) +
-			notes.fills +
+			drawAxes(points) +
+			noted.fills +
 			pointMarks(series, points) +
 			marked.lines +
-			endMarks(option, points) +
+			named +
 			marked.labels +
-			notes.notes
+			noted.notes
 		);
 	}
 
@@ -504,72 +548,35 @@ window.PlotDraw = ({ lang, size }) => {
 		}
 		place(ya, ya.names ? T : B, ya.names ? B : T);
 		const ctx = { xa, ya, L, R, T, B, W, H, textWidth, shown, texts };
-		return { axes, box, ctx, marked: marks.markers(option.marks ?? [], markFrame(ctx), box.T - 6) };
+		return { axes, box, ctx };
 	}
 
-	/** A line or stem plot's areas and notes (see PlotAreas) as laid out, with its points' mapping; none for a bar plot. */
-	function noted(
+	/**
+	 * A line and stem plot's labels placed together, the markers' first (a label across the plot keeps off the lines), then the
+	 * names and values at the ends, then the notes (with a move's `goal`, where it placed them), each clear of those before it.
+	 * Names and notes may use the room above the plot that no label on top takes, and names the room kept for them on the right.
+	 */
+	function labelled(
 		option: PlotOption,
-		{ axes, box, ctx, marked }: NonNullable<ReturnType<typeof laidOut>>,
+		{ xa, ya, box, ctx }: { xa: NumericAxis; ya: NumericAxis; box: { T: number }; ctx: Ctx },
 		goal?: PlotNotesPlaced,
 	) {
-		if ("cat" in axes) {
-			return undefined;
-		}
-		const points = { ...ctx, xa: axes.xa, ya: axes.ya, X: axes.xa.at, Y: axes.ya.at };
-		// Notes may use the room above the plot that no label on top takes.
+		const points = { ...ctx, xa, ya, X: xa.at, Y: ya.at };
 		const frame = { ...points, T: box.T - 10, line: lineHeight(), colour: seriesColor };
-		return { points, ...areas.draw(option, frame, marked.boxes, goal) };
+		const labelFrame = { ...frame, lines: placer.obstacles(option, frame), fills: [] };
+		const choose = (spots: PlotSpot[], placed: readonly PlotBox[]) =>
+			placer.cheapest(spots, labelFrame, placed);
+		const marked = marks.markers(option.marks ?? [], { ...markFrame(points), choose }, box.T - 6);
+		const placed = [...marked.boxes];
+		const bottom = pointBottom(option, points.H);
+		const named = ends.marks(option, points, bottom, { ...labelFrame, R: points.W - 2 }, placed);
+		return { points, marked, named, noted: areas.draw(option, frame, placed, goal) };
 	}
 
-	/**
-	 * Legend buttons for the named series, or "" when the legend is off, has fewer than two entries or the names sit at the line
-	 * ends of a drawing H px high, the plot's area with no legend. A bar plot with a picked category has its key instead, from one
-	 * named series: the category's name, then each series' value there after its name.
-	 */
+	/** Legend buttons for the named series, or "" when names sit at the line ends of a drawing H px high (see PlotLegend). */
 	function legendMarkup(option: PlotOption, textWidth: TextWidth, H: number) {
 		FONT = size();
-		const named = (option.series ?? []).map((s, i) => [s, i] as const).filter(([s]) => s.name);
-		const at = pick.pickedAt(option);
-		if (option.legend === false || named.length < (at === undefined ? 2 : 1)) {
-			return "";
-		}
-		if (at !== undefined) {
-			return pick.key(
-				option,
-				at,
-				named.map(([s, i]) => [s, i, swatch(s, i)] as const),
-			);
-		}
-		if (namesAtEnds(option, textWidth, H)) {
-			return "";
-		}
-		return named
-			.map(
-				([s, i]) =>
-					`<li><button type="button" data-i="${i}">${swatch(s, i)}${esc(s.name)}</button></li>`,
-			)
-			.join("");
-	}
-
-	/**
-	 * A series' legend swatch: a line in its dash, or a square in its bars' state when every bar takes that one; bars in mixed
-	 * states show the series' colour, and the page's chips say what the states mean.
-	 */
-	function swatch(s: PlotSeries, i: number) {
-		const type = s.type ?? "line";
-		const states = new Set(s.data.map((_, k) => fillOf(s, k)));
-		const [state] = type === "bar" && states.size === 1 ? states : [undefined];
-		return marks.swatch(type, seriesColor(s, i), type === "line" ? dashOf(s, i) : "", state);
-	}
-
-	/** Per series: whether it is switched on. An unnamed series belongs to the named one before it. */
-	function switchedOn(series: PlotSeries[], off: Set<string | undefined>) {
-		let owner: string | undefined;
-		return series.map((s) => {
-			owner = s.name ?? owner;
-			return !off.has(owner);
-		});
+		return legend.markup(option, namesAtEnds(option, textWidth, H));
 	}
 
 	return {
@@ -578,7 +585,7 @@ window.PlotDraw = ({ lang, size }) => {
 		keyText: pick.keyText,
 		bands: (option: PlotOption, W: number, H: number, textWidth: TextWidth) =>
 			pick.bands(option, layoutOf(option, W, H, textWidth), lineHeight()),
-		switchedOn,
+		switchedOn: legend.switchedOn,
 		markLines: (option: PlotOption, W: number, H: number, textWidth: TextWidth) =>
 			layoutOf(option, W, H, textWidth).rows,
 		crowded: () => crowded,

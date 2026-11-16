@@ -51,3 +51,29 @@ export const JULY = {
 		{ x: [ends, empty], label: `on the battery until ${clock(empty)}` },
 	],
 };
+
+/** kWh in the battery, hour by hour from 10 % until full, at a charger of `kw` kW (charging slows past 80 %). */
+function charge(kw: number): [number, number][] {
+	const points: [number, number][] = [[0, 1]];
+	for (let [t, e] = [0, 1]; e < 10; ) {
+		const step = Math.min(e < 8 ? kw / 4 : kw / 12, 10 - e);
+		[t, e] = [t + 0.25, e + step];
+		points.push([t, +e.toFixed(2)]);
+	}
+	return points;
+}
+/** A line's labels: none but the last, the hours it took. */
+const hours = (points: [number, number][]) =>
+	points.map(([x], i) => (i === points.length - 1 ? `${x.toFixed(1)} h` : ""));
+const [slow, fast] = [charge(3), charge(11)];
+
+/** Two chargers' curves, each ending in its name and the hours it takes: "3 kW: 3.8 h". */
+export const CHARGE = {
+	series: [
+		{ name: "3 kW", data: slow, color: "var(--accent)", dash: false, label: hours(slow) },
+		{ name: "11 kW", data: fast, dash: false, label: hours(fast) },
+	],
+	marks: [{ y: 8, label: "80 %: charging slows" }],
+	x: { min: 0, format: { unit: "h" } },
+	y: { min: 0, max: 10, format: { unit: "kWh" } },
+};
