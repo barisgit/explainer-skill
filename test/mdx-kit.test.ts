@@ -202,6 +202,32 @@ import { Table } from "kit";
 		);
 	});
 
+	test("a currency column groups every amount alike and writes whole amounts without cents unless digits ask", async () => {
+		const { result, output } = await pack(
+			"currency",
+			`import { Table } from "kit";
+
+# Prices
+
+<Table rows={[{ item: "Battery", eur: 4200 }, { item: "Two", eur: 11200 }, { item: "Cable", eur: 12.5 }]} cols={[{ head: "Item", value: "item" }, { head: "Price", value: "eur", format: { currency: "EUR" } }, { head: "Cents", value: "eur", format: { currency: "EUR", digits: 2 } }]} />
+`,
+		);
+		expect(result.stderr).toBe("");
+		const cells = [
+			...readFileSync(output, "utf8").matchAll(
+				/<td class="num" data-label="(Price|Cents)">([^<]*)</g,
+			),
+		].map(([, column, text]) => `${column} ${text}`);
+		expect(cells).toEqual([
+			"Price €4,200",
+			"Cents €4,200.00",
+			"Price €11,200",
+			"Cents €11,200.00",
+			"Price €12.50",
+			"Cents €12.50",
+		]);
+	});
+
 	test("a View inside another View fails the pack, saying where views go", async () => {
 		const { result } = await pack(
 			"nested",

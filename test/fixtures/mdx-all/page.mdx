@@ -2,7 +2,7 @@
 title: Home battery size
 ---
 import { Chart, Explore, Plot, Question, Records, Stepper, View } from "kit";
-import { euro, MONTHS, PRODUCTION, payback, quote, SIZES, supplier, USE } from "./data.ts";
+import { euro, MONTHS, PRODUCTION, payback, quote, SIZE_ROWS, SIZES, supplier, USE } from "./data.ts";
 import { Day } from "./day.tsx";
 import "./page.css";
 
@@ -120,7 +120,7 @@ Each reading ends up in the <span data-ref="logged">meter log</span>.
 
 ## Which size?
 
-<Question name="size" legend="Which size would you buy?" options={Object.fromEntries(SIZES.map((s) => [s.id, s.name]).concat([["none", "None yet"]]))} />
+<Question name="size" legend="Which size would you buy?" rows={SIZE_ROWS} recommended="5 kWh" cols={[{ head: "Size", value: "size" }, { head: "Price", value: "price", format: { currency: "EUR" } }, { head: "Saves a year", value: "saved", format: { currency: "EUR" } }, { head: "Paid back in", value: "back", format: { unit: "years" } }, { head: "Summer evenings carried to midnight", value: "evenings", format: { percent: true } }]} />
 
 </section>
 

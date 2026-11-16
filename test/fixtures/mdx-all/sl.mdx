@@ -57,7 +57,7 @@ Ponudba za baterijo k 6-kilovatni sončni elektrarni na strehi štiričlanske hi
 
 [Kako so nastale številke](#metoda)
 
-<Question name="velikost" legend="Katero velikost bi kupili?" options={["5 kWh", "10 kWh", "Še nobene"]} />
+<Question name="velikost" legend="Katero velikost bi kupili?" recommended="5 kWh" rows={[{ size: "5 kWh", price: 4200 }, { size: "10 kWh", price: 7900 }, { size: "Še nobene", price: 0 }]} cols={[{ head: "Velikost", value: "size" }, { head: "Cena", value: "price", format: { currency: "EUR" } }]} />
 
 <View name="metoda" back="Ponudba">
 

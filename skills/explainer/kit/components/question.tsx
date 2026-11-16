@@ -1,4 +1,4 @@
-/* Question: a question the reader answers in the reply, checks on the spot (given the right answer), or writes out (no options).
+/* Question: a question answered in the reply (choices or table rows), checked on the spot (given the right answer), or written out.
    <Question name="first-fix" legend="Which fix would you try first?" options={{ second: "Second barista", steady: "Steadier orders" }} />
    <Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>
    <Question name="why" legend="Why does the queue grow at noon?">Orders arrive faster than one barista serves them.</Question>
@@ -6,6 +6,9 @@
                a letter, digit or - is written _hex_, so "5 kWh" is 5_20_kWh), and a reload keeps the answer by it
      legend    the question
      options   value: label pairs, or a list of labels that are their own values; each value once
+     rows, cols  in place of options, a comparison whose rows are the choices, taken as Table takes them; each row's first
+               column is its value (text or a number), and a click anywhere on a row chooses it. No answer: a self-check uses options
+               <Question name="size" legend="Which size?" rows={sizes} cols={[{ head: "Size", value: "size" }, { head: "Price", value: "price", format: { currency: "EUR" } }]} />
      multiple  checkboxes instead of radios: the answer is the checked labels
      checked   the value (or values) chosen to begin with
      recommended  the value (or values) you recommend: marked on its choice (kitLabels.recommended); the reply sends the
@@ -25,12 +28,12 @@
 import type { ComponentChildren } from "preact";
 import { idOf, idPart } from "./parts/answer-ids.ts";
 import { NoteField } from "./parts/records-answer.tsx";
+import { compareTable, read, type TableColumn } from "./table.tsx";
 
-export interface QuestionProps {
+/** What every form of Question takes. */
+interface QuestionBase {
 	name: string;
 	legend: ComponentChildren;
-	/** The choices; left out, the reader writes the answer. */
-	options?: Record<string, string> | string[];
 	multiple?: boolean;
 	checked?: string | string[];
 	/** The value (or values) the page recommends, marked on its choice. */
@@ -42,6 +45,13 @@ export interface QuestionProps {
 	/** A self-check's explanation, or a written answer's model answer. */
 	children?: ComponentChildren;
 }
+
+/** The choices: options, the rows of a table (each row one option, valued by its first column), or neither (a written answer). */
+type QuestionChoices<Row> =
+	| { options?: Record<string, string> | string[]; rows?: undefined; cols?: undefined }
+	| { rows: readonly Row[]; cols: readonly TableColumn<Row>[]; options?: undefined };
+
+export type QuestionProps<Row = unknown> = QuestionBase & QuestionChoices<Row>;
 
 /** The English texts the component adds, by kitLabels key; `kit labels` lists them with the kit scripts' own. */
 const LABELS = {
@@ -67,7 +77,7 @@ function writtenProblem({
 	answer,
 	recommended,
 	note,
-}: QuestionProps): string | undefined {
+}: QuestionBase): string | undefined {
 	if (answer !== undefined) {
 		return "has an answer but no options: a written answer has no value to check, so write the model answer inside the Question";
 	}
@@ -81,7 +91,7 @@ function writtenProblem({
 
 /** The problem with a self-check's props, if any: it needs one right value among the options and starts unanswered. */
 function selfCheckProblem(
-	{ multiple, checked, answer, recommended, note, children }: QuestionProps,
+	{ multiple, checked, answer, recommended, note, children }: QuestionBase,
 	values: string[],
 ): string | undefined {
 	if (answer === undefined) {
@@ -108,7 +118,7 @@ function selfCheckProblem(
 
 /** The problem with a recommendation, if any: each recommended value is one of the options, and one alone without multiple. */
 function recommendedProblem(
-	{ recommended, multiple }: QuestionProps,
+	{ recommended, multiple }: QuestionBase,
 	values: string[],
 ): string | undefined {
 	const given = new Set([recommended ?? []].flat());
@@ -121,22 +131,44 @@ function recommendedProblem(
 		: undefined;
 }
 
+/** The problem with a Question over rows, if any: rows replace options, need their columns, and are never a self-check. */
+function rowsProblem<Row>({ options, rows, cols, answer }: QuestionProps<Row>): string | undefined {
+	if (rows === undefined) {
+		return cols === undefined ? undefined : "has cols but no rows: give the rows the columns show";
+	}
+	if (options !== undefined) {
+		return "has options and rows: each row is an option, so give the choices one way";
+	}
+	if (cols === undefined) {
+		return "has rows but no cols: give the columns each row shows, as a Table's cols";
+	}
+	return answer === undefined
+		? undefined
+		: "has rows and an answer: a self-check asks with options, so give them as options";
+}
+
 /**
- * Renders a question in one of three forms. With `options`: `<fieldset data-reply="">` with its legend and a `.seg` of radios,
+ * Renders a question in one of four forms. With `options`: `<fieldset data-reply="">` with its legend and a `.seg` of radios,
  * or checkboxes when `multiple`, a recommended option's text carrying `data-recommended` (the mark the theme shows, outside the
  * label's text the reply sends), and with `note` a `data-note` field after them; with `answer` as well, a
  * `<fieldset class="self-check">` whose right option carries `data-right`, followed by a paragraph holding both words, each `data-verdict` (the
  * theme shows the one that applies), an empty `role="status"` that kit keep.js fills for the reader's own choice, and the
- * children in a `.explain` that the theme shows once an option is chosen. Without `options`: a
+ * children in a `.explain` that the theme shows once an option is chosen. With `rows` and `cols`: the same fieldset around the
+ * `table.compare` a Table draws of them, each row's name cell holding that row's option. Without either: a
  * `<fieldset class="written">` with a textarea; with children it is also a self-check (`class="written self-check"`, kept
  * but out of the reply) and holds them in a `details.answer`, the fold kit views.js's Expand all skips; without, it is
  * `data-reply`. A repeated value, or props that do not fit the form, throw.
  */
-export function Question(props: QuestionProps) {
-	const { name, options } = props;
-	const problem = options === undefined ? writtenProblem(props) : undefined;
+export function Question<Row>(props: QuestionProps<Row>) {
+	const { name, options, rows, cols } = props;
+	const problem =
+		rowsProblem(props) ??
+		(options === undefined && rows === undefined ? writtenProblem(props) : undefined);
 	if (problem) {
 		throw new Error(`<Question name="${name}"> ${problem}`);
+	}
+	if (rows !== undefined && cols !== undefined) {
+		return <RowsChoice {...props} rows={rows} cols={cols} />;
 	}
 	return options === undefined ? <Written {...props} /> : <Choice {...props} options={options} />;
 }
@@ -145,7 +177,7 @@ export function Question(props: QuestionProps) {
  * A written answer: the legend names the text box (aria-labelledby), since a fieldset's legend names only the group. The
  * children decide its form, as kit-scripts.ts's questionScripts reads them in client code.
  */
-function Written({ name, legend, children }: QuestionProps) {
+function Written({ name, legend, children }: QuestionBase) {
 	const id = idPart(name);
 	const selfCheck = children !== undefined;
 	return (
@@ -164,58 +196,141 @@ function Written({ name, legend, children }: QuestionProps) {
 	);
 }
 
+/** Throws when the option values repeat or the props that pick among them do not fit them. */
+function checkValues(props: QuestionBase, values: string[]) {
+	const twice = values.find((value, i) => values.indexOf(value) !== i);
+	const problem =
+		twice === undefined
+			? (selfCheckProblem(props, values) ?? recommendedProblem(props, values))
+			: `has the option value "${twice}" twice: the reply could not tell the two apart, so give each option its own value`;
+	if (problem) {
+		throw new Error(`<Question name="${props.name}"> ${problem}`);
+	}
+}
+
+/** What the options of one Question share: how they are picked, and which start chosen or recommended. */
+interface OptionGroup {
+	name: string;
+	multiple: boolean | undefined;
+	chosen: Set<string>;
+	recommended: Set<string>;
+	/** The right value of a self-check. */
+	answer: string | undefined;
+}
+
+const optionGroup = ({
+	name,
+	multiple,
+	checked,
+	recommended,
+	answer,
+}: QuestionBase): OptionGroup => ({
+	name,
+	multiple,
+	answer,
+	chosen: new Set(checked === undefined ? [] : [checked].flat()),
+	recommended: new Set([recommended ?? []].flat()),
+});
+
+/** One option: its input (id name-value) and its text, which carries the recommendation mark. */
+function Option({
+	group,
+	value,
+	children,
+}: {
+	group: OptionGroup;
+	value: string;
+	children: ComponentChildren;
+}) {
+	const { name, multiple, answer } = group;
+	return (
+		<label>
+			<input
+				type={multiple ? "checkbox" : "radio"}
+				name={name}
+				value={value}
+				id={idOf(name, value)}
+				checked={group.chosen.has(value)}
+				data-right={answer !== undefined && value === answer ? "" : undefined}
+			/>
+			<span data-recommended={group.recommended.has(value) ? kitText("recommended") : undefined}>
+				{children}
+			</span>
+		</label>
+	);
+}
+
+/** A reply question's legend id. A dot never appears in an option's id, so the legend's and the note's ids cannot meet one. */
+const legendId = (name: string) => `${idPart(name)}.legend`;
+
+/** The note field under a reply question's choices, described by its legend. */
+function Note({ name }: { name: string }) {
+	return (
+		<NoteField
+			id={`${idPart(name)}.note`}
+			label={kitText("note")}
+			placeholder={kitText("notePlaceholder")}
+			describedBy={legendId(name)}
+		/>
+	);
+}
+
 /** A reply question or a self-check over its options. */
-function Choice(props: QuestionProps & Required<Pick<QuestionProps, "options">>) {
-	const { name, legend, options, multiple, checked, answer, children } = props;
+function Choice(props: QuestionBase & { options: Record<string, string> | string[] }) {
+	const { name, legend, options, answer, children } = props;
 	const pairs = Array.isArray(options)
 		? options.map((label) => [label, label] as const)
 		: Object.entries(options);
-	const values = pairs.map(([value]) => value);
-	const twice = values.find((value, i) => values.indexOf(value) !== i);
-	if (twice !== undefined) {
-		throw new Error(
-			`<Question name="${name}"> has the option value "${twice}" twice: the reply could not tell the two apart, so give each option its own value`,
-		);
-	}
-	const problem = selfCheckProblem(props, values) ?? recommendedProblem(props, values);
-	if (problem) {
-		throw new Error(`<Question name="${name}"> ${problem}`);
-	}
-	const chosen = new Set(checked === undefined ? [] : [checked].flat());
-	const recommended = new Set([props.recommended ?? []].flat());
+	checkValues(
+		props,
+		pairs.map(([value]) => value),
+	);
+	const group = optionGroup(props);
 	const selfCheck = answer !== undefined;
-	// A dot never appears in an option's id, so the legend's and the note's ids cannot meet one.
-	const legendId = `${idPart(name)}.legend`;
 	return (
 		<fieldset {...(selfCheck ? { class: "self-check" } : { "data-reply": "" })}>
-			<legend id={props.note ? legendId : undefined}>{legend}</legend>
+			<legend id={props.note ? legendId(name) : undefined}>{legend}</legend>
 			<div class="seg">
 				{pairs.map(([value, label]) => (
-					<label key={value}>
-						<input
-							type={multiple ? "checkbox" : "radio"}
-							name={name}
-							value={value}
-							id={idOf(name, value)}
-							checked={chosen.has(value)}
-							data-right={selfCheck && value === answer ? "" : undefined}
-						/>
-						<span data-recommended={recommended.has(value) ? kitText("recommended") : undefined}>
-							{label}
-						</span>
-					</label>
+					<Option key={value} group={group} value={value}>
+						{label}
+					</Option>
 				))}
 			</div>
-			{props.note && (
-				<NoteField
-					id={`${idPart(name)}.note`}
-					label={kitText("note")}
-					placeholder={kitText("notePlaceholder")}
-					describedBy={legendId}
-				/>
-			)}
+			{props.note && <Note name={name} />}
 			{selfCheck && <Verdict />}
 			{selfCheck && children !== undefined && <div class="explain">{children}</div>}
+		</fieldset>
+	);
+}
+
+/**
+ * A reply question over the rows of a table: each row's value is its first column's text or number, and its name cell holds
+ * the option, whose label the theme stretches over the whole row.
+ */
+function RowsChoice<Row>(
+	props: QuestionBase & { rows: readonly Row[]; cols: readonly TableColumn<Row>[] },
+) {
+	const { name, legend, rows, cols } = props;
+	const [first] = cols;
+	const values = rows.map((row) => (first ? read(row, first.value) : undefined));
+	if (!values.every((value) => typeof value === "string" || typeof value === "number")) {
+		throw new Error(
+			`<Question name="${name}"> has a row whose first column is not text or a number: its first column gives each row's value, which the option's id, checked and recommended use, so make it a key or (row) => text or a number`,
+		);
+	}
+	const strings = values.map(String);
+	checkValues(props, strings);
+	const group = optionGroup(props);
+	return (
+		<fieldset data-reply="">
+			<legend id={props.note ? legendId(name) : undefined}>{legend}</legend>
+			{compareTable({ rows, cols }, (shown, i) => (
+				<Option group={group} value={strings[i] ?? ""}>
+					{shown}
+				</Option>
+			))}
+			{props.note && <Note name={name} />}
 		</fieldset>
 	);
 }

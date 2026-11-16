@@ -19,7 +19,10 @@ export const pageLang = (): string =>
 export const pageLabels = (): Readonly<Record<string, string>> =>
 	(typeof kitLabels === "undefined" ? undefined : kitLabels) ?? {};
 
-/** The Intl options of a NumberFormat; plot.js and charts.js build the same. */
+/**
+ * The Intl options of a NumberFormat; plot.js and charts.js build the same. A plain number groups from five digits, so a year stays
+ * 2024; money always groups, so 4,200 stands beside 11,200, and a whole amount has no cents unless `digits` asks for them.
+ */
 const intlOptions = ({
 	digits,
 	percent,
@@ -27,8 +30,9 @@ const intlOptions = ({
 	compact,
 }: NumberFormat): Intl.NumberFormatOptions => ({
 	style: percent ? "percent" : currency ? "currency" : "decimal",
-	useGrouping: "min2", // 12 345, but a year stays 2024
+	useGrouping: currency ? "always" : "min2",
 	...(currency ? { currency } : {}),
+	...(currency && digits === undefined ? { trailingZeroDisplay: "stripIfInteger" } : {}),
 	...(compact ? { notation: "compact" } : {}),
 	...(digits === undefined ? {} : { minimumFractionDigits: digits, maximumFractionDigits: digits }),
 });

@@ -28,7 +28,7 @@ export const CONTROLS_JS = `(() => {
 	const rules = [
 		['[data-stepper]', ['button[data-go="1"]', 'button[data-go="-1"]']],
 		['.plot', ['.plot-legend button[data-i]']],
-		['fieldset.self-check, fieldset[data-reply]', ['.seg input[type="radio"]:not(:checked)', '.seg input[type="checkbox"]:not(:checked)', '.seg input[type="checkbox"]']],
+		['fieldset.self-check, fieldset[data-reply]', [':is(.seg, .compare) input[type="radio"]:not(:checked)', ':is(.seg, .compare) input[type="checkbox"]:not(:checked)', ':is(.seg, .compare) input[type="checkbox"]']],
 		['fieldset.written.self-check', ['details.answer > summary']],
 		['.tree', ['details > summary']],
 		['section, [data-records]', ['button.expand.fold-all']],

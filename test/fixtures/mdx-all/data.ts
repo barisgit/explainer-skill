@@ -69,6 +69,27 @@ export const SIZES: Size[] = [
 
 export const payback = (s: Size) => Math.round(s.price / s.saved);
 
+/** A row of the size question: one size's numbers, or buying none, which has a price alone. */
+export interface SizeRow {
+	size: string;
+	price: number;
+	saved?: number;
+	back?: number;
+	evenings?: number;
+}
+
+/** The sizes as the rows of the question that asks which to buy, buying none last. */
+export const SIZE_ROWS: SizeRow[] = [
+	...SIZES.map((s) => ({
+		size: s.name,
+		price: s.price,
+		saved: s.saved,
+		back: payback(s),
+		evenings: s.evenings,
+	})),
+	{ size: "None yet", price: 0 },
+];
+
 /**
  * What the 5 kWh installation costs, as the installer's quote lists it, as Records' config with the column names given; its
  * ref field names the part in the system diagram, which a page that draws the diagram links with refField="ref".

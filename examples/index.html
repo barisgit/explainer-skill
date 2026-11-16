@@ -1125,7 +1125,8 @@ fieldset:is([data-reply], .self-check) > .seg input:checked + span::before {
 	background: var(--choice-mark);
 	box-shadow: inset 0 0 0 0.1875rem var(--under);
 }
-fieldset:is([data-reply], .self-check) > .seg [data-recommended]::after {
+fieldset:is([data-reply], .self-check) > .seg [data-recommended]::after,
+fieldset[data-reply] .compare [data-recommended]::after {
 	content: attr(data-recommended);
 	padding-inline: 0.375rem;
 	font-size: var(--size-label);
@@ -1134,6 +1135,70 @@ fieldset:is([data-reply], .self-check) > .seg [data-recommended]::after {
 	color: var(--muted);
 	border: 1px solid var(--rule-strong);
 	border-radius: var(--radius);
+}
+/* A Question over table rows: each row one option. The label in the row's name cell stretches over the row (its ::after), so a
+   click anywhere on the row chooses it; a link in the row stays above the stretch. The input is the dot (or box) itself. The
+   chosen row is tinted and its name bold beside a filled dot, so it never shows by colour alone, on paper too. */
+fieldset[data-reply] .compare tbody tr {
+	position: relative;
+}
+fieldset[data-reply] .compare tbody tr:hover {
+	background: color-mix(in oklab, var(--ink) 4%, var(--under));
+}
+fieldset[data-reply] .compare tbody tr:has(input:checked) {
+	background: color-mix(in oklab, var(--ink) 9%, var(--under));
+	print-color-adjust: exact;
+}
+fieldset[data-reply] .compare tbody label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.625rem;
+	font-weight: 500;
+	cursor: pointer;
+}
+fieldset[data-reply] .compare tbody label::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+fieldset[data-reply] .compare tbody tr:has(input:checked) label {
+	font-weight: 600;
+}
+fieldset[data-reply] .compare [data-recommended]::after {
+	display: inline-block;
+	margin-inline-start: 0.5rem;
+}
+fieldset[data-reply] .compare tbody a {
+	position: relative;
+	z-index: 1;
+}
+fieldset[data-reply] .compare tbody input {
+	flex: none;
+	inline-size: 1rem;
+	block-size: 1rem;
+	margin: 0;
+	appearance: none;
+	border: 1.5px solid var(--ink);
+	border-radius: 50%;
+	background: var(--under);
+	print-color-adjust: exact;
+}
+fieldset[data-reply] .compare tbody input[type="checkbox"] {
+	border-radius: var(--radius);
+}
+fieldset[data-reply] .compare tbody input:checked {
+	background: var(--ink);
+	box-shadow: inset 0 0 0 0.1875rem var(--under);
+}
+fieldset[data-reply] .compare tbody input:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+/* Where a phone stacks the table's rows as cards, a row's tint keeps its text off its edge. */
+@media (max-width: 48rem) {
+	fieldset[data-reply] .compare:not(.table) tbody tr {
+		padding-inline: 0.75rem;
+	}
 }
 @media (max-width: 40rem) {
 	fieldset:is([data-reply], .self-check):not(.answer) > .seg {

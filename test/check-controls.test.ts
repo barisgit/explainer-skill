@@ -249,6 +249,22 @@ test("control selection claims stateful and escaped view routes like discovery",
 	});
 }, 30_000);
 
+test("a Question over table rows is sampled by its first row not chosen", async () => {
+	const row = (value: string, checked = "") =>
+		`<tr><th scope="row"><label><input type="radio" name="size" id="size-${value}"${checked}>${value}</label></th></tr>`;
+	const file = dir.write(
+		"rows.html",
+		`<!doctype html><fieldset data-reply><legend>Which size?</legend><table class="compare"><tbody>${row("a", " checked")}${row("b")}</tbody></table></fieldset>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		const selected = await cdp.evaluate<{ name: string }[]>(CONTROLS_JS);
+		expect(selected.map((c) => c.name)).toEqual(["#size-b"]);
+	});
+}, 30_000);
+
 test("the cap spreads samples across control kinds before filling in document order", async () => {
 	const questions = Array.from(
 		{ length: 13 },

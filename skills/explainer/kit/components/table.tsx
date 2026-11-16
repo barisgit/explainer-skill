@@ -4,12 +4,13 @@
      cols   one per column; the first one names the rows
        head    the column's name, also its label beside each value on phones
        value   the record's key, or (record) => text, number or JSX
-       format  how the numbers are written in the page's lang: { digits: 1 }, { unit: "min" }, { percent: true }, { currency: "EUR" }.
-               A column whose values are all numbers is numeric: right-aligned on wide screens
+       format  how the numbers are written in the page's lang: { digits: 1 }, { unit: "min" }, { percent: true }, { currency: "EUR" }
+               (grouped as 4,200, without cents on a whole amount unless digits asks). A column whose values are all numbers is numeric: right-aligned on wide screens
        link    the key, or (record) => href, that makes each value a link
        note    the key, or (record) => text, of a muted line under the value
      state   (record) => "fit", "maybe" or "out": fit and maybe rows get a coloured edge, out rows are muted
      class   more classes after "compare": "table" keeps a wide table whole on phones, scrolling sideways in a <div class="scroll">
+   To ask which row the reader picks, give the same rows and cols to a Question (kit Question).
    Rendered when the page packs, so it shows before scripts run and prints. */
 import type { ComponentChildren } from "preact";
 import { numberText } from "./parts/format.ts";
@@ -35,7 +36,7 @@ export interface TableProps<Row> {
 }
 
 /** What a field gives for one record. */
-function read<Row, Value>(row: Row, field: Field<Row, Value>): Value {
+export function read<Row, Value>(row: Row, field: Field<Row, Value>): Value {
 	return typeof field === "function" ? field(row) : (row[field] as Value);
 }
 
@@ -44,7 +45,7 @@ const numeric = (values: unknown[]) =>
 	values.some((value) => typeof value === "number") &&
 	values.every((value) => value == null || typeof value === "number");
 
-/** One column's cells, written once for every row. */
+/** One column's cells, written once for every row: the value (a link when it has one) and the muted note under it. */
 function columnCells<Row>(rows: readonly Row[], col: TableColumn<Row>) {
 	const values = rows.map((row) => read(row, col.value));
 	const text = numberText(col.format);
@@ -53,21 +54,26 @@ function columnCells<Row>(rows: readonly Row[], col: TableColumn<Row>) {
 		const href = col.link && read(row, col.link);
 		const shown = typeof value === "number" ? text(value) : value;
 		const note = col.note && read(row, col.note);
-		return (
-			<>
-				{href ? <a href={href}>{shown}</a> : shown}
-				{note != null && note !== "" && <span class="why">{note}</span>}
-			</>
-		);
+		return {
+			value: href ? <a href={href}>{shown}</a> : shown,
+			note: note != null && note !== "" && <span class="why">{note}</span>,
+		};
 	});
 	return { num: numeric(values), cells };
 }
 
+/** What a row's first cell shows of its value; a Question over rows puts its choice there. */
+export type RowHead = (value: ComponentChildren, index: number) => ComponentChildren;
+
 /**
  * Renders `table.compare` as a Markdown table does (src/mdx/compile.ts): each row's first cell is `<th scope="row">`, every
  * other cell carries its column's head as `data-label`, and a numeric column is `class="num"` on its header and cells.
+ * `head` writes each row's first value (the row's name), before that cell's note.
  */
-export function Table<Row>({ rows, cols, state, class: classes, id }: TableProps<Row>) {
+export function compareTable<Row>(
+	{ rows, cols, state, class: classes, id }: TableProps<Row>,
+	head: RowHead = (value) => value,
+) {
 	const columns = cols.map((col) => ({ head: col.head, ...columnCells(rows, col) }));
 	const num = (column: { num: boolean }) => (column.num ? "num" : undefined);
 	return (
@@ -82,20 +88,28 @@ export function Table<Row>({ rows, cols, state, class: classes, id }: TableProps
 			<tbody>
 				{rows.map((row, i) => (
 					<tr data-state={state?.(row)}>
-						{columns.map((column, c) =>
-							c === 0 ? (
+						{columns.map((column, c) => {
+							const { value, note } = column.cells[i] ?? {};
+							return c === 0 ? (
 								<th class={num(column)} scope="row">
-									{column.cells[i]}
+									{head(value, i)}
+									{note}
 								</th>
 							) : (
 								<td class={num(column)} data-label={column.head}>
-									{column.cells[i]}
+									{value}
+									{note}
 								</td>
-							),
-						)}
+							);
+						})}
 					</tr>
 				))}
 			</tbody>
 		</table>
 	);
+}
+
+/** A comparison table of `rows`: compareTable with each row named by its first value. */
+export function Table<Row>(props: TableProps<Row>) {
+	return compareTable(props);
 }
