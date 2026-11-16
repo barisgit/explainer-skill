@@ -1044,7 +1044,7 @@ index 685835e3f1a9a480370ec8e1ff40b7356a3ed3c1..1ac33ef5d582dec3c1d6ebefb530505d
  }
  
 diff --git a/src/renderer.ts b/src/renderer.ts
-index 1485041e9cb01e1a15045cb162fb64bc5167b25e..f6cbd9895b4884b45d3fc2fe1b4f2ef17f0a6a92 100644
+index 1485041e9cb01e1a15045cb162fb64bc5167b25e..0658b988ea89c6e1f0ebc5f445e22a39b215c77e 100644
 --- a/src/renderer.ts
 +++ b/src/renderer.ts
 @@ -1,7 +1,7 @@
@@ -1095,7 +1095,15 @@ index 1485041e9cb01e1a15045cb162fb64bc5167b25e..f6cbd9895b4884b45d3fc2fe1b4f2ef1
      `data-from="${escapeAttr(edge.source)}"`,
      `data-to="${escapeAttr(edge.target)}"`,
      `data-style="${edge.style}"`,
-@@ -266,7 +268,7 @@ function renderEdgeLabel(edge: PositionedEdge, font: string): string {
+@@ -260,13 +262,13 @@ function renderEdgeLabel(edge: PositionedEdge, font: string): string {
+     padding,
+     // Use --_text-sec for better contrast (was --_text-muted)
+     `text-anchor="middle" font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-sec)"`,
+-    // Increased stroke width from 0.5 to 1 for better label separation from edges
+-    `rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1"`
++    // Plain text on the diagram's tone: the unbordered box only masks the line under the label
++    `fill="var(--bg)" stroke="none"`
+   )
  
    // Semantic wrapper: links label to its edge via data-from/data-to
    return (
@@ -1104,7 +1112,7 @@ index 1485041e9cb01e1a15045cb162fb64bc5167b25e..f6cbd9895b4884b45d3fc2fe1b4f2ef1
      `  ${content.replace(/\n/g, '\n  ')}\n` +
      `</g>`
    )
-@@ -571,18 +573,30 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
+@@ -571,18 +573,34 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
      if (!node.label) return ''
    }
  
@@ -1117,6 +1125,12 @@ index 1485041e9cb01e1a15045cb162fb64bc5167b25e..f6cbd9895b4884b45d3fc2fe1b4f2ef1
    // Resolve text color — inline styles can override the CSS variable default
    const textColor = escapeAttr(node.inlineStyle?.color ?? 'var(--_text)')
 +  const attrs = `text-anchor="middle" font-size="${FONT_SIZES.nodeLabel}" font-weight="${FONT_WEIGHTS.nodeLabel}" fill="${textColor}"`
++
++  const label = renderMultilineText(node.label, cx, cy, FONT_SIZES.nodeLabel, attrs)
++  if (!node.tag) return label
++  const labelWidth = measureMultilineText(node.label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel).width
++  return renderNodeTag(node, node.tag, cx - labelWidth / 2 - room, cy, attrs) + '\n' + label
++}
  
 -  return renderMultilineText(
 -    node.label,
@@ -1124,17 +1138,15 @@ index 1485041e9cb01e1a15045cb162fb64bc5167b25e..f6cbd9895b4884b45d3fc2fe1b4f2ef1
 -    cy,
 -    FONT_SIZES.nodeLabel,
 -    `text-anchor="middle" font-size="${FONT_SIZES.nodeLabel}" font-weight="${FONT_WEIGHTS.nodeLabel}" fill="${textColor}"`
-+  const label = renderMultilineText(node.label, cx, cy, FONT_SIZES.nodeLabel, attrs)
-+  if (!node.tag) return label
-+  const labelWidth = measureMultilineText(node.label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel).width
-+  return renderNodeTag(node, node.tag, cx - labelWidth / 2 - room, cy, attrs) + '\n' + label
-+}
-+
-+/** A node's number tag: its text in a ring whose left edge is `left`, centred on `cy`, in a group carrying the node's id. */
++/**
++ * A node's number tag: its text in a ring whose left edge is `left`, centred on `cy`, in a group carrying the node's id and named
++ * by the number and the node's label on one line ("2, hybrid inverter"), since a reader may reach it on its own.
++ */
 +function renderNodeTag(node: PositionedNode, tag: string, left: number, cy: number, attrs: string): string {
 +  const width = tagWidth(tag)
++  const name = `${tag}, ${node.label.replace(/<\/?(?:b|strong|i|em|u|s|del)\s*>/gi, '').replace(/\s+/g, ' ').trim()}`
 +  return (
-+    `<g class="tag" data-id="${escapeAttr(node.id)}">` +
++    `<g class="tag" data-id="${escapeAttr(node.id)}" aria-label="${escapeAttr(name)}">` +
 +    `\n  <rect x="${left}" y="${cy - TAG.height / 2}" width="${width}" height="${TAG.height}" rx="${TAG.height / 2}" ry="${TAG.height / 2}" ` +
 +    `fill="none" stroke="var(--_text)" stroke-width="${STROKE_WIDTHS.outerBox}" />` +
 +    `\n  ${renderMultilineText(tag, left + width / 2, cy, FONT_SIZES.nodeLabel, attrs)}` +

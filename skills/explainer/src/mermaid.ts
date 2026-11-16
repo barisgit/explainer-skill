@@ -310,7 +310,8 @@ const TAG = /^tag:([^\s=]+)=(?:"([^"]*)"|'([^']*)'|(\S*))$/;
 
 /**
  * The number tags a fence's meta puts on nodes, by node id. Throws, saying what to write, for anything else in the meta, a tag
- * that is not 1 to 3 digits, one number on two nodes, and tags on a diagram that has no nodes to carry them.
+ * that is not 1 to 3 digits, one node with two numbers or one number on two nodes, and tags on a diagram that has no nodes to
+ * carry them.
  */
 function tagsOf(meta: string, family: Family): Map<string, string> {
 	const tags = new Map<string, string>();
@@ -323,7 +324,11 @@ function tagsOf(meta: string, family: Family): Map<string, string> {
 		if (!/^\d{1,3}$/.test(tag)) {
 			throw new Error(`${word} is not a number; a tag is 1 to 3 digits, as in tag:${id}=2`);
 		}
-		const other = [...tags].find(([, number]) => number === tag)?.[0];
+		const given = tags.get(id);
+		if (given !== undefined && given !== tag) {
+			throw new Error(`tag:${id} is given ${given} and ${tag}; give each part one number`);
+		}
+		const other = [...tags].find(([key, number]) => number === tag && key !== id)?.[0];
 		if (other) {
 			throw new Error(`tag ${tag} is on ${other} and ${id}; give each part its own number`);
 		}

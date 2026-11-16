@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
-import { packAndRun, packMdx, pageContract, scratch } from "./support.ts";
+import { inPage, packAndRun, packedMdx, packMdx, pageContract, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -43,7 +43,7 @@ test("tag:id=n in a flowchart fence's meta draws n as a tag inside that node, in
 	expect(phone).not.toBe("");
 	for (const copy of [wide, phone]) {
 		const tags = [
-			...copy.matchAll(/<g class="tag" data-id="(\w+)" data-ref="\1" data-tag>[\s\S]*?<\/g>/g),
+			...copy.matchAll(/<g class="tag" data-id="(\w+)" data-ref="\1" data-tag[^>]*>[\s\S]*?<\/g>/g),
 		];
 		expect(tags.map((m) => m[1]).sort()).toEqual(["bat", "inv", "meter", "roof"]);
 		const inv = /<g class="node" data-id="inv"[\s\S]*?\n<\/g>/.exec(copy)?.[0] ?? "";
@@ -95,6 +95,12 @@ test.each([
 		message: "tag 2 is on inv and bat; give each part its own number",
 	},
 	{
+		name: "one node with two numbers",
+		source: SYSTEM,
+		meta: "tag:inv=2 tag:inv=5",
+		message: "tag:inv is given 2 and 5; give each part one number",
+	},
+	{
 		name: "anything else in the meta",
 		source: SYSTEM,
 		meta: "title",
@@ -115,7 +121,7 @@ test("a mention whose text is its part's tag is drawn as that tag; another numbe
 	const { result, output } = await packMdx(
 		dir,
 		"mentions",
-		`# System\n\nThe inverter <span data-ref="inv">2</span> charges the battery <span data-ref="bat">5</span>, and the <span data-ref="house">house</span> uses it.\n\n\`\`\`mermaid ${TAGS}\n${SYSTEM}\n\`\`\`\n`,
+		`# System\n\nThe inverter <span data-ref="inv">2</span> charges the battery <span data-ref="bat">5</span>, and the <span data-ref="house">house</span> uses it.\n\n\`\`\`mermaid ${TAGS}\n${SYSTEM}\n\`\`\`\n\n<table><tbody><tr data-ref="meter"><td data-ref="roof">1</td><td data-ref="bat">7</td><td><span data-ref="inv">2</span></td></tr></tbody></table>\n`,
 	);
 
 	expect(result.code).toBe(0);
@@ -124,6 +130,41 @@ test("a mention whose text is its part's tag is drawn as that tag; another numbe
 	expect(html).toContain('<span data-ref="inv" data-tag="">2</span>');
 	expect(html).toContain('<span data-ref="bat">5</span>');
 	expect(html).toContain('<span data-ref="house">house</span>');
+	expect(html).toContain(
+		'<td data-ref="roof">1</td><td data-ref="bat">7</td><td><span data-ref="inv" data-tag="">2</span></td>',
+	);
+	expect(result.stdout).not.toContain("says 7");
+});
+
+test("one part tagged with two numbers in two drawings fails, naming both; the same number twice packs", async () => {
+	const fence = (tags: string) => `\`\`\`mermaid ${tags}\nflowchart LR\n  inv --> bat\n\`\`\`\n`;
+	const page = (second: string) =>
+		`# Two\n\n${fence("tag:inv=2 tag:bat=3")}\n## Again\n\n${fence(second)}`;
+	const { result } = await packMdx(dir, "twice", page("tag:inv=5"));
+
+	expect(result.code).toBe(1);
+	expect(result.stderr).toContain(
+		"mermaid block 2: tag:inv=5, but mermaid block 1 tags inv 2; give inv the same number in every drawing",
+	);
+	expect((await packMdx(dir, "same", page("tag:inv=2"))).result.code).toBe(0);
+});
+
+test("a tag in the drawing is named by its number and its node's label", async () => {
+	const output = await packedMdx(
+		dir,
+		"named",
+		`# Named\n\nThe <span data-ref="atob">2</span> step.\n\n\`\`\`mermaid ${PATH_TAGS}\n${PATH}\n\`\`\`\n`,
+	);
+	const names = await inPage(output, async (cdp) => {
+		await cdp.send("Accessibility.enable");
+		const { nodes } = await cdp.send<{ nodes: { name?: { value: string } }[] }>(
+			"Accessibility.getFullAXTree",
+		);
+		return nodes.map((n) => n.name?.value ?? "");
+	});
+
+	expect(names).toContain("2, atob 11 ms");
+	expect(names).toContain("1, page file");
 });
 
 test("a tag and its mention light each other on hover and focus, read at the 13 px label size, and the tag sits beside its label", async () => {

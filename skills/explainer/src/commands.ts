@@ -47,7 +47,8 @@ Use the ids from prose and replies:
   <Stepper captions={[...]} refs={["m1", "m2 call"]}>  a step shows and lights the parts it names (kit Stepper); an Explore frame's states set their data-state (kit Explore)
 Keep ids short and meaningful: they are what you type here.
 Number tags key a drawing of parts to the text: \`\`\`mermaid tag:inv=2 tag:bat=3 rings 2 before node inv's label (flowchart and state nodes, 1 to 3 digits);
-  <span data-ref="inv">2</span> in prose or a table cell is drawn as the same ring, and either lights both; pack warns when it says another number.
+  <span data-ref="inv">2</span> in prose or inside a table cell is drawn as the same ring (a cell or row with the ref stays a cell), and either lights both;
+  pack warns when it says another number, and one part keeps one number in every drawing. Mentions a client component or filled view draws link but are not ringed.
   A measured value sits in its stage's label or on the edge: atob["atob<br>11 ms"], file -->|418 KB| atob.
 Colours are the kit tokens, read by the browser, so any token the page overrides (e.g. :root { --accent: ... }) reaches the diagram.
 Text is 13 px, the label size, on boxes with no fill, never drawn larger. Phones: a flowchart or state diagram wider than the column also gets a copy laid out across its direction, shown instead, when that is narrower (text shrinks less, to 13 px where it fits); other diagrams shrink no further than readable text and then scroll sideways. Print fits each diagram to the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;

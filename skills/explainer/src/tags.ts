@@ -1,8 +1,17 @@
 /**
- * Mentions of a diagram's number tags. An element outside every SVG that carries one tagged ref and says that part's number
- * (`<span data-ref="inv">2</span>` for `tag:inv=2`) is drawn as the tag: pack writes data-tag on it, which theme.css rings. One
- * that says another number of 1 to 3 digits is a warning, since a renumbered drawing leaves its mentions behind.
+ * Mentions of a diagram's number tags. A phrasing element (a span, b, a, ...) outside every SVG that carries one tagged ref and
+ * says that part's number (`<span data-ref="inv">2</span>` for `tag:inv=2`) is drawn as the tag: pack writes data-tag on it,
+ * which theme.css rings. One that says another number of 1 to 3 digits is a warning, since a renumbered drawing leaves its
+ * mentions behind. A cell, row or other block keeps its layout and is never ringed: a linked number in a table is data unless
+ * the author puts the span inside the cell.
  */
+
+/** The elements a mention may be: inline text, never a box whose layout a ring would change. */
+const PHRASING = new Set(
+	"a abbr b bdi bdo cite code data dfn em i kbd mark q s samp small span strong sub sup time u var".split(
+		" ",
+	),
+);
 
 /** One `[data-ref]` element outside every SVG, in document order: its refs and the text in it. */
 interface Mention {
@@ -36,7 +45,10 @@ async function mentionsIn(html: string): Promise<Mention[]> {
 	const mentions: Mention[] = [];
 	const open = new Set<Mention>();
 	await refsOutsideSvg((el) => {
-		const mention = { refs: (el.getAttribute("data-ref") ?? "").split(/\s+/), text: "" };
+		const mention = {
+			refs: PHRASING.has(el.tagName) ? (el.getAttribute("data-ref") ?? "").split(/\s+/) : [],
+			text: "",
+		};
 		mentions.push(mention);
 		if (el.canHaveContent) {
 			open.add(mention);

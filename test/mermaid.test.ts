@@ -285,6 +285,14 @@ test.each([
 	expect(refs.sort()).toEqual(["L_a_b_0", "a", "b"]);
 });
 
+test("an edge label is plain text on the diagram's tone, masking the line under it without a border", () => {
+	for (const copy of copiesOf(`flowchart LR\n  a -->|"418 KB"| b --> c --> d --> e --> f --> g`)) {
+		const label = /<g class="edge-label"[\s\S]*?<\/g>/.exec(copy)?.[0] ?? "";
+		expect(label).toMatch(/<rect [^>]*fill="var\(--bg\)" stroke="none"/);
+		expect(label).not.toContain("--_inner-stroke");
+	}
+});
+
 test("each of two edges between the same nodes keeps its own id on its line and its label", () => {
 	const svg = svgOf("flowchart LR\n  a e1@--> b\n  a e2@-->|second| b");
 	expect(svg.match(/<polyline class="edge"[^>]* data-ref="(e\d)"/g)?.length).toBe(2);
