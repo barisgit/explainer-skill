@@ -12,7 +12,8 @@
          color  any CSS colour, default var(--c1)..var(--c6) in turn: muted inks, a line in each also dashed its own way.
                 Put "var(--accent)" on the series the page is about; color-mix(...) works too
          fill   a bar's state, from the accent: "accent" solid, "hollow" (tint in an accent outline), "hatch" (grey lines at 45
-                degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour)
+                degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour).
+                On a line: the area down to 0, true in a tint of its colour or a state
          name   two or more named lines carry their names at their ends, a moved name tied to its line by a leader, when the names
                 are short (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
                 on and off, a series without a name toggling with the named one before it
@@ -22,6 +23,11 @@
                    stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
        marks  [{ x: 16, label: "Payback" }]: a dashed reference line at x (or y), its label on top beside it, wrapped inside the plot
+              { x: [20, 30], label: "night" }: a span, a bracket on top with its label
+              { x: [6, 11.5], between: ["Roof", "House"], fill: "accent", label: "charging" }: the region between two named lines
+                (or a line and a number) over x, filled as a line's fill, its label inside it or beside it
+              { at: [11.5, 2.8], label: "full at 11:31" }: a note beside that point
+              Notes keep clear of the lines and labels, wrapping or tied by a leader; pack warns about one with no clear place
        x, y   { min, max, step, name, format }  screen axes: in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
@@ -37,7 +43,8 @@
              and until the reader has acted on the page, so the first drawing and a restored control never move.
      dispose()   stops redrawing on resize, for code that takes the element away
    Exact values without hovering: label on stems and bars, a readout in the page for lines; each bar (zero ones too) also has a title.
-   A bar label sits past the bar's end, or inside the end when the panel has no room past it. A label on a stacked segment is left out
+   A bar label sits past the bar's end, or inside the end when the panel has no room past it or a marker's line
+   would cross it there (past the line when it fits neither). A label on a stacked segment is left out
    when it does not fit the segment: when every exact value must stay visible, add a readout or table next to the plot.
    Values outside min and max sit on the edge.
    Axes carry their labels and one quiet baseline at 0, without gridlines or tick marks. */

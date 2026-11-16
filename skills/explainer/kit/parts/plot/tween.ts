@@ -1,9 +1,10 @@
 /* plot tween: the steps plot.js draws between two options when a set() changes what a plot shows, so bars grow or shrink and
    lines morph from the state they are in. between(from, to, k) is `to` with its numbers k of the way from `from`'s: a bar's value,
-   a point (a line of another length is read off the old one at the new x values), an axis's min and max, a marker's place. What
+   a point (a line of another length is read off the old one at the new x values), an axis's min and max, a marker's place, a span's and a note's point. What
    has no counterpart in `from` (a series of a new name, an unnamed one where `from` has none unnamed at its place, another type, a
    different number of bars) is `to`'s at once; series are matched by name, unnamed ones by place. Not referenced from
    pages: pack joins it in front of plot.js. same(a, b) says whether two options draw alike, so setting one changes nothing. */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotTween = () => {
 	const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 	const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -67,18 +68,26 @@ window.PlotTween = () => {
 		return { ...b, ...at("min"), ...at("max") };
 	}
 
-	/** Markers k of the way, when there are as many. */
+	/** A number, or each of a pair, k of the way from `from`; `to` where their shapes differ. */
+	function step(from: unknown, to: unknown, k: number): unknown {
+		if (num(from) && num(to)) {
+			return lerp(from, to, k);
+		}
+		const pair = (v: unknown): v is readonly [number, number] =>
+			Array.isArray(v) && v.length === 2 && v.every(num);
+		return pair(from) && pair(to) ? [lerp(from[0], to[0], k), lerp(from[1], to[1], k)] : to;
+	}
+
+	/** Markers, spans and notes' points k of the way, when there are as many. */
 	function marks(a: readonly PlotMark[] | undefined, b: readonly PlotMark[], k: number) {
 		if (a?.length !== b.length) {
 			return [...b];
 		}
 		return b.map((m, i) => {
 			const o = a[i];
-			const at = (key: "x" | "y") => {
-				const [from, to] = [o?.[key], m[key]];
-				return num(from) && num(to) ? { [key]: lerp(from, to, k) } : {};
-			};
-			return { ...m, ...at("x"), ...at("y") };
+			const at = (key: "x" | "y" | "at") =>
+				m[key] === undefined ? {} : { [key]: step(o?.[key], m[key], k) };
+			return { ...m, ...at("x"), ...at("y"), ...at("at") } as PlotMark;
 		});
 	}
 

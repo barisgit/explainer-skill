@@ -9,7 +9,8 @@
                 Put "var(--accent)" on the series the page is about; color-mix(...) works too
          fill   a bar's state, from the accent: "accent" solid, "hollow" (tint in an accent outline), "hatch" (grey lines at 45
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour; the legend
-                shows a state every bar shares, else the series' colour)
+                shows a state every bar shares, else the series' colour). On a line: the area down to 0, true in a tint of its
+                colour or a state
          name   two or more named lines carry their names at their ends, a moved name tied to its line by a leader, when the names
                 are short (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
                 on and off, a series without a name toggling with the named one before it
@@ -19,6 +20,11 @@
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
        marks  [{ x: 16, label: "Payback" }]: a dashed reference line at x (or y), its label on top beside it, wrapped inside the plot,
               a row higher where it would touch another's
+              { x: [20, 30], label: "night" }: a span, a bracket on top with its label
+              { x: [6, 11.5], between: ["Roof", "House"], fill: "accent", label: "charging" }: the region between two named lines
+                (or a line and a number) over x, filled as a line's fill, its label inside it or beside it
+              { at: [11.5, 2.8], label: "full at 11:31" }: a note beside that point
+              Notes keep clear of the lines and labels, wrapping or tied by a leader; pack warns about one with no clear place
        x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out): in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; numbers follow the page's lang, and format sets how:
               { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
@@ -144,7 +150,9 @@ export function Plot({ option, label, class: extra, id, height, pick }: PlotProp
 	const bars = height || classes.split(/\s+/).includes("tall") ? undefined : barsHeight(shown);
 	const sized = height ?? bars;
 	const place = placeOf(classes, id, sized, Boolean(bars));
-	const marked = bars && shown.marks?.some((mark) => mark.x !== undefined && mark.label);
+	// Markers and spans on x take lines on top; a region's label sits in the plot.
+	const marked =
+		bars && shown.marks?.some((mark) => mark.x !== undefined && !mark.between && mark.label);
 	// An object, so a re-render sets the block size alone and leaves the --plot-mark-lines plot.js sets on the element.
 	const style = sized && {
 		blockSize: marked ? withMarkLines(sized, drawnMarkLines(option, place)) : sized,

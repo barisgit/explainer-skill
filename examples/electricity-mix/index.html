@@ -538,8 +538,8 @@ h3,
 .plot .cat {
 	fill: var(--ink);
 }
-/* A value on a mark, a line's name at its end and a marker's label. */
-.plot :is(.value, .end, .mark-label) {
+/* A value on a mark, a line's name at its end, a marker's label and a note. */
+.plot :is(.value, .end, .mark-label, .note) {
 	fill: var(--ink);
 	paint-order: stroke;
 	stroke: var(--under);
@@ -549,14 +549,14 @@ h3,
 .plot .value {
 	font-weight: 600;
 }
-/* A value inside its bar: near white on a dark bar, near black on a light one, read from the bar's colour (--c) where the
-   browser reads colours so. */
-.plot .value.inside {
+/* A value inside its bar, or a note inside a solid area: near white on a dark colour, near black on a light one, read from the
+   colour (--c) where the browser reads colours so. */
+.plot :is(.value, .note).inside {
 	fill: var(--surface);
 	stroke: none;
 }
 @supports (color: oklch(from red l c h)) {
-	.plot .value.inside {
+	.plot :is(.value, .note).inside {
 		fill: oklch(from var(--c) calc(0.2 + 0.785 * clamp(0, (0.58 - l) * 1000, 1)) 0 0);
 	}
 }
@@ -601,6 +601,30 @@ h3,
 	stroke: var(--hatch);
 	stroke-width: 1.5;
 	pointer-events: none;
+}
+/* An area: a tint of its line's colour, or one of the accent's states, as a bar takes them. */
+.plot svg .area {
+	fill: color-mix(in oklab, var(--c) 22%, var(--under));
+}
+.plot svg .area.accent {
+	fill: var(--accent);
+}
+.plot svg .area.hollow {
+	fill: var(--hollow);
+	stroke: var(--accent);
+	stroke-width: 1.5;
+	stroke-linejoin: round;
+}
+.plot svg .area.hatch {
+	fill: transparent;
+	stroke: var(--hatch);
+	stroke-width: 1;
+	stroke-linejoin: round;
+}
+/* A span's bracket on top. */
+.plot svg .span {
+	stroke: var(--ink);
+	stroke-width: 1;
 }
 /* A reference marker: a dashed line in ink, under the values. */
 .plot svg .mark {

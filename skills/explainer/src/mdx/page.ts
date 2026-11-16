@@ -228,7 +228,7 @@ async function kitScripts(html: string, scan: string, front: Frontmatter): Promi
  * bundle, kitLabels and the kit scripts it needs, with `<html data-scheme>` when the frontmatter forces one and `<main
  * data-asks-reply>` for reply: true, which keeps reply.js's bar on a page with no reply question, and `data-contents` for contents: true, which gives it views.js's contents rail. Every error the author can fix is a PackError;
  * `records` are the filled Views' records drawn at pack time, which pack checks the refs their controls name against;
- * `warnings` are what pack prints about the frontmatter (frontmatterWarnings).
+ * `warnings` are what pack prints about the frontmatter (frontmatterWarnings) and the figures it drew.
  */
 export async function mdxPage(
 	file: string,
@@ -315,6 +315,6 @@ export async function mdxPage(
 	return {
 		html: shell.join("\n"),
 		records: filledRecords(islands),
-		warnings: frontmatterWarnings(page.front),
+		warnings: [...frontmatterWarnings(page.front), ...prerendered.warnings],
 	};
 }

@@ -60,6 +60,7 @@ interface PlotDraw {
 	legendMarkup(option: Option, textWidth: (s: unknown) => number, H: number): string;
 	switchedOn(series: unknown[], off: Set<string | undefined>): boolean[];
 	markLines(option: Option, W: number, H: number, textWidth: (s: unknown) => number): number;
+	crowded(): string[];
 }
 type PlotDrawPart = (env: { lang: () => string; size: () => number }) => PlotDraw;
 
@@ -178,6 +179,59 @@ function validateChart(option: unknown): void {
 		if (!bundled.includes(type)) {
 			throw new PackError(
 				`ECharts series type "${type}" is not bundled; use ${bundled.join(", ")} instead.`,
+			);
+		}
+	}
+}
+
+/** A Plot mark's shapes, by the key that names each, with the keys each takes (kit-types/globals.d.ts's PlotMark). */
+const MARK_SHAPES = [
+	{ by: "at", name: "a note at a point", keys: ["at", "label"] },
+	{ by: "between", name: "a region", keys: ["x", "between", "fill", "label"] },
+	{ by: "y", name: "a marker across", keys: ["y", "label"] },
+	{ by: "x", name: "a marker or a span", keys: ["x", "label"] },
+] as const;
+
+/** What is wrong with one Plot mark's shape, which plot.js would draw as another shape or leave out without a word. */
+function markShapeProblem(mark: Record<string, unknown>): string | undefined {
+	const written = JSON.stringify(mark);
+	const shape = MARK_SHAPES.find(({ by }) => by in mark);
+	if (!shape) {
+		return `Plot mark ${written}: a mark takes x, y, at or between.`;
+	}
+	const { x } = mark;
+	if (shape.by === "between" && !(Array.isArray(x) && x.length === 2)) {
+		return `Plot mark ${written}: a region needs x: [from, to], the span it covers.`;
+	}
+	const extra = Object.keys(mark).filter((key) => !(shape.keys as readonly string[]).includes(key));
+	return extra.length
+		? `Plot mark ${written}: ${shape.name} takes only ${shape.keys.join(", ")}; write ${extra.join(", ")} in a mark of its own (a fill goes with between and x: [from, to]).`
+		: undefined;
+}
+
+/**
+ * Rejects a Plot mark of no one shape and a region between a series the plot does not have, which plot.js would draw otherwise
+ * or leave out without a word.
+ */
+function validatePlot(option: Option): void {
+	const { marks: written } = option as { marks?: unknown };
+	const problem = (Array.isArray(written) ? written : [])
+		.map((mark) => (mark && typeof mark === "object" ? markShapeProblem(mark) : undefined))
+		.find(Boolean);
+	if (problem) {
+		throw new PackError(problem);
+	}
+	const lines = (option.series ?? []).flatMap((s) => {
+		const { name, type = "line" } = (s ?? {}) as { name?: unknown; type?: unknown };
+		return type === "line" && typeof name === "string" ? [name] : [];
+	});
+	const { marks: given } = option as { marks?: unknown };
+	const marks = Array.isArray(given) ? (given as { between?: unknown }[]) : [];
+	for (const bound of marks.flatMap((m) => (Array.isArray(m?.between) ? m.between : []))) {
+		if (typeof bound === "string" && !lines.includes(bound)) {
+			const named = lines.length ? lines.map((n) => `"${n}"`).join(", ") : "none: name one";
+			throw new PackError(
+				`Plot mark between "${bound}": no line series has that name; the plot's named lines are ${named}.`,
 			);
 		}
 	}
@@ -362,6 +416,13 @@ function chartCopy(copy: Copy, height: number, how: ChartHow): string | undefine
 	return stable ? kitSvg(drawing.svg, svgTag(copy, height), paintOf) : undefined;
 }
 
+/** What pack says about the notes a plot drawn `width` px wide found no clear place for. */
+const crowdedWarnings = (notes: string[], width: number) =>
+	notes.map(
+		(note) =>
+			`Plot note "${note}" finds no clear place at ${width} px wide and is drawn over a line, a label or the plot's edge: shorten it, or anchor it where the plot has room.`,
+	);
+
 /** The drawer pack renders a page in `lang` with (kit/components/parts/drawn.ts's Drawer). */
 export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	const pageTouchesBox = pageBoxTouch(stylesheets);
@@ -385,6 +446,8 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		size: () => LABEL,
 	});
 	const width = (s: unknown) => textWidth(String(s), LABEL, 500);
+	/** What pack says about the figures it drew: the notes a plot found no clear place for, by the copy's width. */
+	const warnings = new Set<string>();
 	/** The lines a plot's markers' labels take on top in each copy, laid out as plot.js lays them out at the copy's width. */
 	const markRows = (option: Option, place: Place) => {
 		const heights = heightsOf(place);
@@ -412,8 +475,53 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const copies = COPIES.map((copy, i) => chartCopy(copy, heights[i] as number, how));
 		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 	});
+	const drawPlot = orNothing((option: Option, place: Place) => {
+		const rows = markRows(option, place);
+		const grown = heightsOf(place)?.map((h) => h + (place.grows ? (rows[0] ?? 0) * MARK_LINE : 0));
+		// A bar plot that grows by its markers' lines has one height for every copy only when they wrap alike.
+		const heights = place.grows && new Set(rows).size > 1 ? undefined : grown;
+		if (!heights) {
+			return "";
+		}
+		// Names at the line ends take the legend's place where they fit the area's height with no legend, so the copies can
+		// differ; one legend is drawn for all of them, so a plot whose copies differ is left to plot.js.
+		const legends = new Set(
+			heights.map((height) => plots.legendMarkup(option, width, height - LEGEND.top)),
+		);
+		const [markup = ""] = legends;
+		if (legends.size > 1) {
+			return "";
+		}
+		// Every series starts switched on; plot.js marks its buttons so as it draws.
+		const legend = markup.replace(/<button /g, '<button aria-pressed="true" ');
+		const items = legendItems(legend);
+		const shown = plots.switchedOn(option.series ?? [], new Set());
+		const copies = COPIES.map((copy, i) => {
+			// The legend wraps by the element's width, which a copy is shown over a range of, for labels set lighter or heavier
+			// than measured: the area is the same height only where the rows are the same across all of it.
+			const rows = new Set(
+				copy.shown.flatMap((w) =>
+					[400, 500].map((weight) => (items.length ? legendRows(items, w, weight) : 0)),
+				),
+			);
+			const [one] = rows;
+			if (rows.size > 1) {
+				return undefined;
+			}
+			const H = (heights[i] as number) - LEGEND.top - (one as number) * LEGEND.row;
+			const drawn = plots.render(option, copy.width, H, width, shown);
+			for (const w of crowdedWarnings(plots.crowded(), copy.width)) {
+				warnings.add(w);
+			}
+			return `${svgTag(copy, H)}${shorterPaths(drawn)}</svg>`;
+		});
+		return copies.every((copy) => copy !== undefined)
+			? `<ul class="plot-legend">${legend}</ul><div class="plot-area">${drawnCopies(copies)}</div>`
+			: "";
+	});
 	return {
 		validateChart,
+		warnings: () => [...warnings],
 		plotMarkLines: (option: Option, place: Place) => markRows(option, place)[0] ?? 0,
 		chart(option: Option, place: Place) {
 			// Validate before the optional drawing: an absent SVG must not hide an unsupported series.
@@ -421,47 +529,9 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			// renderItem is arbitrary drawing code: its geometry and colours cannot be proven exact by the SVG pass.
 			return seriesIn(option).includes("custom") ? "" : drawChart(option, place);
 		},
-		plot: orNothing((option: Option, place: Place) => {
-			const rows = markRows(option, place);
-			const grown = heightsOf(place)?.map(
-				(h) => h + (place.grows ? (rows[0] ?? 0) * MARK_LINE : 0),
-			);
-			// A bar plot that grows by its markers' lines has one height for every copy only when they wrap alike.
-			const heights = place.grows && new Set(rows).size > 1 ? undefined : grown;
-			if (!heights) {
-				return "";
-			}
-			// Names at the line ends take the legend's place where they fit the area's height with no legend, so the copies can
-			// differ; one legend is drawn for all of them, so a plot whose copies differ is left to plot.js.
-			const legends = new Set(
-				heights.map((height) => plots.legendMarkup(option, width, height - LEGEND.top)),
-			);
-			const [markup = ""] = legends;
-			if (legends.size > 1) {
-				return "";
-			}
-			// Every series starts switched on; plot.js marks its buttons so as it draws.
-			const legend = markup.replace(/<button /g, '<button aria-pressed="true" ');
-			const items = legendItems(legend);
-			const shown = plots.switchedOn(option.series ?? [], new Set());
-			const copies = COPIES.map((copy, i) => {
-				// The legend wraps by the element's width, which a copy is shown over a range of, for labels set lighter or heavier
-				// than measured: the area is the same height only where the rows are the same across all of it.
-				const rows = new Set(
-					copy.shown.flatMap((w) =>
-						[400, 500].map((weight) => (items.length ? legendRows(items, w, weight) : 0)),
-					),
-				);
-				const [one] = rows;
-				if (rows.size > 1) {
-					return undefined;
-				}
-				const H = (heights[i] as number) - LEGEND.top - (one as number) * LEGEND.row;
-				return `${svgTag(copy, H)}${shorterPaths(plots.render(option, copy.width, H, width, shown))}</svg>`;
-			});
-			return copies.every((copy) => copy !== undefined)
-				? `<ul class="plot-legend">${legend}</ul><div class="plot-area">${drawnCopies(copies)}</div>`
-				: "";
-		}),
+		plot(option: Option, place: Place) {
+			validatePlot(option);
+			return drawPlot(option, place);
+		},
 	};
 }

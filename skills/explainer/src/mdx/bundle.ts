@@ -228,14 +228,14 @@ interface Prerender {
  * one Preact), which is imported from a temporary file and run once. Returns the HTML (islands between comment markers) and
  * the islands, and adds the stylesheets the page's modules import to `css`. While it renders, the page's frontmatter `labels` are
  * the global kitLabels, as in the browser, so the components that add text (Question) read the page's, and Chart and Plot draw
- * themselves (draw.ts). An error the author can fix (kit/islands/server.ts's IslandError) or any error the page throws is a
+ * themselves (draw.ts), with what the drawer warns about. An error the author can fix (kit/islands/server.ts's IslandError) or any error the page throws is a
  * PackError.
  */
 export async function prerender(
 	page: CompiledPage,
 	css: Set<string>,
 	labels: Record<string, string> | undefined,
-): Promise<{ html: string; islands: Island[] }> {
+): Promise<{ html: string; islands: Island[]; warnings: string[] }> {
 	const code = `import Content from ${JSON.stringify(page.path)};
 export { setPageLang } from ${JSON.stringify(join(KIT_DIR, "components/parts/format.ts"))};
 export { setDrawer } from ${JSON.stringify(join(KIT_DIR, "components/parts/drawn.ts"))};
@@ -261,8 +261,9 @@ export function render(labels) {
 		writeFileSync(file, js);
 		const module: Prerender = await import(file);
 		module.setPageLang(page.lang);
-		module.setDrawer(pageDrawer(page.lang, css));
-		return module.render(labels);
+		const drawer = pageDrawer(page.lang, css);
+		module.setDrawer(drawer);
+		return { ...module.render(labels), warnings: drawer.warnings() };
 	} catch (e) {
 		if (e instanceof PackError) {
 			throw e;

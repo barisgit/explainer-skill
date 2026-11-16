@@ -9,9 +9,11 @@ export type PlotDrawing = {
 		H: number,
 		width: (s: unknown) => number,
 		shown: boolean[],
+		texts?: object,
 	): string;
 	legendMarkup(option: object, textWidth: (s: unknown) => number, H: number): string;
 	markLines(option: object, W: number, H: number, width: (s: unknown) => number): number;
+	crowded(): string[];
 };
 export const plotDrawAt = (size: number) =>
 	(

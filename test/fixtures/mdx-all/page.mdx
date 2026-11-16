@@ -4,6 +4,7 @@ title: Home battery size
 import { Chart, Explore, Plot, Question, Records, Stepper, View } from "kit";
 import { euro, MONTHS, month, PRODUCTION, payback, quote, SIZE_ROWS, SIZES, supplier, USE } from "./data.ts";
 import { Day } from "./day.tsx";
+import { JULY } from "./july.ts";
 import "./page.css";
 
 # A 5 kWh battery carries *80% of summer evenings*; doubling it adds 9 points for 3,700 € more.
@@ -31,6 +32,8 @@ Illustrative numbers, not a real quote
 <img class="roof" src="./house.svg" alt="The house with its south-facing panels" />
 
 <h2 data-nav="Day">On a summer day the battery is full by early afternoon</h2>
+
+<Plot label="A July day: what the roof makes and the house uses, and what the battery moves to the evening" option={JULY} />
 
 <Day />
 
