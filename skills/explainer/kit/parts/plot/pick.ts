@@ -36,7 +36,10 @@ window.PlotPick = ({ esc, formatter, labeller }) => {
 		return `<rect class="picked" x="${px(x - AROUND)}" y="${px(y - AROUND)}" width="${px(w + 2 * AROUND)}" height="${px(h + 2 * AROUND)}"/>`;
 	}
 
-	/** A bar's value as its label writes it, else as the value axis does; "" for a bar with no value. */
+	/**
+	 * A bar's value as its label's format writes it, else as the value axis does (a label of texts says something else, so the key
+	 * keeps the number); "" for a bar with no value.
+	 */
 	function valueText(option: PlotOption) {
 		const format = formatter((option.horizontal ? option.x : option.y)?.format);
 		return (s: PlotSeries, i: number) => {
@@ -44,7 +47,8 @@ window.PlotPick = ({ esc, formatter, labeller }) => {
 			if (typeof v !== "number" || !Number.isFinite(v)) {
 				return "";
 			}
-			return (labeller(s.label, format, false) ?? format)(v, i, 0);
+			const label = Array.isArray(s.label) ? undefined : s.label;
+			return (labeller(label, format, false) ?? format)(v, i, 0);
 		};
 	}
 

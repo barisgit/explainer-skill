@@ -121,6 +121,16 @@ test("a plot's text is set as wide as plot.js measures it, digits included, so w
 	expect(Math.max(...gaps)).toBeLessThan(0.5);
 }, 30_000);
 
+test("a key keeps a bar's value when its series labels the bars with texts of their own", () => {
+	const option = {
+		...year,
+		pick: 0,
+		series: year.series.map((s, i) => (i ? { ...s, label: ["over 3 mA", "", "", ""] } : s)),
+	};
+	const key = plotDraw.legendMarkup(option, width, 300);
+	expect(key).toContain('bought<span class="v">400\u00a0kWh</span>');
+});
+
 test("a strip shortens names that are words, never values such as 4k7", () => {
 	const codes = [
 		"680",
