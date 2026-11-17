@@ -516,3 +516,31 @@ test("a bar is cut where its visible part meets the axis's end, and a cut bar al
 		expect(v.y1).toBeLessThanOrEqual(bottom);
 	}
 });
+
+test("a stack piles its negative values down from 0 and its positive ones up, each sign on its own", () => {
+	const svg = render(
+		{
+			categories: ["day"],
+			stack: true,
+			series: [
+				{ name: "made", type: "bar", data: [10] },
+				{ name: "used", type: "bar", data: [-6], fill: "hatch" },
+				{ name: "sold", type: "bar", data: [4], fill: "hollow" },
+			],
+		},
+		600,
+		300,
+	);
+	const [made = [], used = [], sold = []] = ["bar", "bar hatch", "bar hollow"].map(
+		(cls) => rects(svg, cls)[0] ?? [],
+	);
+	const top = (b: number[]) => b[1] as number;
+	const bottom = (b: number[]) => (b[1] as number) + (b[3] as number);
+	const zero = bottom(made);
+	// sold sits on made, not on what made and used leave; used hangs from 0, its full length below the axis.
+	expect(Math.abs(bottom(sold) - top(made))).toBeLessThanOrEqual(1);
+	expect(Math.abs(top(used) - zero)).toBeLessThanOrEqual(1);
+	expect(Math.abs((used[3] as number) / (made[3] as number) - 0.6)).toBeLessThan(0.02);
+	// The value axis reaches both piles' ends, -6 and 14, rounded out to its step.
+	expect(ticks(svg).slice(1)).toEqual(["-10", "-5", "0", "5", "10", "15"]);
+});

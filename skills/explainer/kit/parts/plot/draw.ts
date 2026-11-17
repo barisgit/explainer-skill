@@ -362,11 +362,14 @@ window.PlotDraw = ({ lang, size }) => {
 				return (typeof v === "number" && v) || 0;
 			}),
 		);
-		const tops = cols.map((c) => (option.stack ? c.reduce((a, b) => a + b, 0) : Math.max(...c)));
+		// A stack's ends: its negative values piled down from 0, its positive ones up.
+		const sum = (c: number[], sign: number) =>
+			c.filter((v) => v * sign > 0).reduce((a, b) => a + b, 0);
+		const ends = cols.flatMap((c) => (option.stack ? [sum(c, -1), sum(c, 1)] : c));
 		const marked = markedAt(option, option.horizontal ? "x" : "y");
 		const span: [number, number] = [
-			Math.min(0, ...cols.flat(), ...marked),
-			Math.max(0, ...tops, ...marked),
+			Math.min(0, ...ends, ...marked),
+			Math.max(0, ...ends, ...marked),
 		];
 		const x = option.x ?? {};
 		const y = option.y ?? {};

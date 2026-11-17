@@ -19,7 +19,7 @@
                 whose every bar prints its value (true or a format, side by side) leaves out its value axis, unless a marker on
                 it does not write its number
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
-                   stack: true piles the series (non-negative values) into one bar per category, else they sit side by side. Keep names short.
+                   stack: true piles the series into one bar per category, negative values down from 0, else they sit side by side. Keep names short.
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
        marks  [{ x: 16, label: "Payback" }]: a dashed reference line at x (or y), its label on top beside it, wrapped inside the plot,
               a row higher where it would touch another's

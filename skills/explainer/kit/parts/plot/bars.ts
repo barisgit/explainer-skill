@@ -9,7 +9,10 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 	const CUT = 10; // px inside the axis's end where a bar past it is cut
 	const BAND = 8; // px of a bar's visible part the cut's slanted band needs
 
-	/** Layout shared by the bars of a plot: which axis holds the categories, the bar thickness, running stack ends. */
+	/**
+	 * Layout shared by the bars of a plot: which axis holds the categories, the bar thickness, and each category's running stack
+	 * ends, [below 0, above 0], since a stack piles negative values down from 0 and positive ones up.
+	 */
 	function barLayout(
 		series: readonly PlotSeries[],
 		option: PlotOption,
@@ -33,7 +36,7 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 			val,
 			thick,
 			each,
-			stacked: cat.names.map(() => 0),
+			stacked: cat.names.map((): [number, number] => [0, 0]),
 			bounds,
 			crossing,
 			grow: horizontal ? 1 : -1, // screen direction of a positive value
@@ -85,15 +88,16 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 		option: PlotOption,
 	) {
 		const { horizontal, val, thick, each, stacked, bounds, grow } = layout;
-		const from = option.stack ? (stacked[i] ?? 0) : 0;
-		stacked[i] = from + v;
+		const ends = stacked[i] ?? [0, 0];
+		const up = v >= 0 ? 1 : 0;
+		const from = option.stack ? ends[up] : 0;
+		ends[up] = from + v;
 		// at() keeps a value inside the axis, so a and b are the ends of the bar's visible part.
 		const a = val.at(from);
 		const b = val.at(from + v);
 		const start = Math.min(a, b);
 		const length = Math.abs(b - a);
 		const offset = layout.cat.at(i) - thick / 2 + (option.stack ? 0 : j * each);
-		const up = v >= 0 ? 1 : 0;
 		const shape = marks.bar(
 			fill(s, i),
 			colour(s, j),
