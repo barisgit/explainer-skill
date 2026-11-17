@@ -27,7 +27,7 @@ export const plotDrawAt = (size: number) =>
 	});
 export const plotDraw = plotDrawAt(13);
 export const width = (s: unknown) => String(s).length * 7;
-export const draw = (option: { series: object[] }, W = 600, H = 300) =>
+export const draw = (option: { series: object[]; [key: string]: unknown }, W = 600, H = 300) =>
 	plotDraw.render(
 		option,
 		W,

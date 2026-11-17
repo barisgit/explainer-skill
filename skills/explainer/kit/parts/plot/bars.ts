@@ -71,9 +71,16 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 		return v > hi + slack || v < lo - slack;
 	};
 
-	/** How a bar's value label is written: as its series asks, and a cut bar's value, asked for or not. */
-	const formatOf = (s: PlotSeries, cut: boolean, { format }: PlotBarFrame["val"]) =>
-		labeller(s.label, format, false) ?? (cut ? format : undefined);
+	/**
+	 * How a bar's value label is written: as its series asks, and a cut bar's value, asked for or not; none for a stacked segment
+	 * that starts past the axis's end, wholly hidden beyond the cut segment under it, which prints the value there.
+	 */
+	const formatOf = (
+		s: PlotSeries,
+		cut: boolean,
+		hidden: boolean,
+		{ format }: PlotBarFrame["val"],
+	) => (hidden ? undefined : (labeller(s.label, format, false) ?? (cut ? format : undefined)));
 	/** A bar's title: its category, its series' name and the value it says. */
 	const titleOf = (s: PlotSeries, i: number, said: number, { cat, val }: Layout) =>
 		`<title>${esc(`${cat.names[i]}${s.name ? ` · ${s.name}` : ""}: ${val.format(said)}`)}</title>`;
@@ -122,7 +129,7 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 		return {
 			rect: shape.markup + cutMark(cut, a, b, offset, layout),
 			bar,
-			format: formatOf(s, cut, val),
+			format: formatOf(s, cut, cut && Boolean(option.stack) && from !== 0 && length < 0.5, val),
 		};
 	}
 
