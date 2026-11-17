@@ -40,10 +40,11 @@ interface AxisSpec {
 	name?: string;
 	format?: ((value: number) => string) | NumberFormat;
 	/**
-	 * false leaves the axis's tick labels out, and the room they take; true keeps them. Unset, a bar plot whose every bar prints
-	 * its value leaves its value axis's out, unless a marker on it does not write its value.
+	 * false leaves the axis's tick labels out, and the room they take; true keeps them; texts are a number axis's own labels,
+	 * spread evenly from its min to its max (["06:00", "12:00", "18:00"]). Unset, a bar plot whose every bar prints its value
+	 * leaves its value axis's out, unless a marker on it does not write its value.
 	 */
-	labels?: boolean;
+	labels?: boolean | readonly string[];
 }
 
 /** A line or stem point, or a bar value. */

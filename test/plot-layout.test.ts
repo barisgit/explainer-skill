@@ -544,3 +544,29 @@ test("a stack piles its negative values down from 0 and its positive ones up, ea
 	// The value axis reaches both piles' ends, -6 and 14, rounded out to its step.
 	expect(ticks(svg).slice(1)).toEqual(["-10", "-5", "0", "5", "10", "15"]);
 });
+
+test("an axis's labels may be its own texts, spread evenly from its min to its max", () => {
+	const svg = render(
+		{
+			series: [
+				{
+					type: "line",
+					data: [
+						[6, 1],
+						[30, 2],
+					],
+				},
+			],
+			x: { min: 6, max: 30, labels: ["06:00", "12:00", "18:00", "00:00", "06:00"] },
+		},
+		600,
+		300,
+	);
+	expect(ticks(svg).filter((t) => t?.includes(":"))).toEqual([
+		"06:00",
+		"12:00",
+		"18:00",
+		"00:00",
+		"06:00",
+	]);
+});

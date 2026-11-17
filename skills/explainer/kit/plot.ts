@@ -30,7 +30,8 @@
                 (or a line and a number) over x, filled as a line's fill, its label inside it or beside it
               { at: [11.5, 2.8], label: "full at 11:31" }: a note beside that point
               Notes keep clear of the lines and labels, wrapping or tied by a leader; pack warns about one with no clear place
-       x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out, true keeps them):
+       x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out, true keeps them, and texts are
+              a number axis's own, spread evenly from min to max: ["06:00", "12:00", "18:00", "00:00", "06:00"]):
               in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.

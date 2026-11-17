@@ -176,13 +176,48 @@ window.PlotDraw = ({ lang, size }) => {
 		return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
 	}
 
-	/** Numeric axis over the data extent: min and max round outwards to the step unless given. */
+	/** The multiples of step from lo to hi. */
+	function steps(lo: number, hi: number, step: number) {
+		const ticks: number[] = [];
+		for (let k = Math.ceil(lo / step - 1e-9); k * step <= hi + step * 1e-9; k++) {
+			ticks.push(+(k * step).toFixed(10));
+		}
+		return ticks;
+	}
+	/** n values evenly from lo to hi, both included. */
+	const spread = (lo: number, hi: number, n: number) =>
+		Array.from({ length: n }, (_, k) => lo + ((hi - lo) * k) / Math.max(1, n - 1));
+
+	/** Numeric axis over the data extent (rangeOf); texts as its labels stand evenly from its min to its max, in place of the steps. */
 	function numericAxis(
+		spec: AxisSpec,
+		data: readonly [number, number],
+		length: number,
+		vertical: boolean,
+	): NumericAxis {
+		const { lo, hi, step } = rangeOf(spec, data, length, vertical);
+		const format = formatter(spec.format);
+		const said = Array.isArray(spec.labels) ? spec.labels : undefined;
+		const ticks = said ? spread(lo, hi, said.length) : steps(lo, hi, step);
+		return {
+			lo,
+			hi,
+			ticks,
+			format,
+			labels: said ?? ticks.map((v) => (spec.labels === false ? "" : format(v))),
+			name: spec.name,
+			vertical,
+			...unplaced,
+		};
+	}
+
+	/** A numeric axis's range and step: min and max round outwards to the step unless given. */
+	function rangeOf(
 		spec: AxisSpec,
 		[dataMin, dataMax]: readonly [number, number],
 		length: number,
 		vertical: boolean,
-	): NumericAxis {
+	) {
 		let lo = spec.min ?? dataMin;
 		let hi = spec.max ?? dataMax;
 		if (!(hi > lo)) {
@@ -197,21 +232,7 @@ window.PlotDraw = ({ lang, size }) => {
 		if (spec.max == null) {
 			hi = Math.ceil(hi / step - 1e-9) * step;
 		}
-		const ticks: number[] = [];
-		for (let k = Math.ceil(lo / step - 1e-9); k * step <= hi + step * 1e-9; k++) {
-			ticks.push(+(k * step).toFixed(10));
-		}
-		const format = formatter(spec.format);
-		return {
-			lo,
-			hi,
-			ticks,
-			format,
-			labels: ticks.map((v) => (spec.labels === false ? "" : format(v))),
-			name: spec.name,
-			vertical,
-			...unplaced,
-		};
+		return { lo, hi, step };
 	}
 
 	/** Category axis: one band per name, ticks at the band centres; notes when a category has a second line. */
@@ -379,8 +400,10 @@ window.PlotDraw = ({ lang, size }) => {
 			Boolean(option.horizontal),
 			pick.pickedAt(option),
 		);
+		const valueSpec = option.horizontal ? x : y;
+		// Labels out when valueAxisOut says so, else the axis's own texts, if any.
 		const val = numericAxis(
-			{ ...(option.horizontal ? x : y), labels: !valueAxisOut(option) },
+			{ ...valueSpec, labels: !valueAxisOut(option) && (valueSpec.labels ?? true) },
 			span,
 			option.horizontal ? W : H,
 			!option.horizontal,
