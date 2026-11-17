@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { shortTexts } from "../skills/explainer/kit/components/parts/short-texts.ts";
 import { withTestPage } from "./browser.ts";
 import { draw, plotDraw, rects, texts, width } from "./plot-draw.ts";
 import { inPage, packedMdx, scratch } from "./support.ts";
@@ -119,3 +120,25 @@ test("a plot's text is set as wide as plot.js measures it, digits included, so w
 	expect(gaps.length).toBeGreaterThan(3);
 	expect(Math.max(...gaps)).toBeLessThan(0.5);
 }, 30_000);
+
+test("a strip shortens names that are words, never values such as 4k7", () => {
+	const codes = [
+		"680",
+		"820",
+		"1k",
+		"1k2",
+		"1k5",
+		"1k8",
+		"2k2",
+		"2k7",
+		"3k3",
+		"3k9",
+		"4k7",
+		"5k6",
+		"6k8",
+		"8k2",
+		"10k",
+	];
+	expect(shortTexts(codes)).toEqual(codes);
+	expect(shortTexts(["Jan", "Feb", "Mar", "Jun", "Jul"])).toEqual(["Ja", "F", "M", "Jun", "Jul"]);
+});

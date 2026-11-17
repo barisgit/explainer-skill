@@ -1,5 +1,6 @@
 /* The strip of radios an Explore's axis choice shows under its plot's columns (see ../explore.tsx), in place of their names. */
 import type { RefObject } from "preact";
+import { shortTexts } from "./short-texts.ts";
 
 /** The axis choice's radios: named `id` (ids `id-0`, `id-1`, ...), shown as `texts`, worth `values`, the group named `label`. */
 export interface PickStripSpec {
@@ -7,21 +8,6 @@ export interface PickStripSpec {
 	label: string;
 	texts: string[];
 	values: string[];
-}
-
-/**
- * Each text as a narrow strip shows it: a number whole, a name by its shortest start no other text shares, up to three letters.
- */
-export function shortTexts(texts: readonly string[]): string[] {
-	const start = (text: string, n: number) => [...text].slice(0, n).join("").toLowerCase();
-	return texts.map((text) => {
-		if (/^[\d\s.,:%+−-]+$/.test(text)) {
-			return text;
-		}
-		const n =
-			[1, 2].find((n) => texts.filter((t) => start(t, n) === start(text, n)).length === 1) ?? 3;
-		return [...text].slice(0, n).join("");
-	});
 }
 
 /**
