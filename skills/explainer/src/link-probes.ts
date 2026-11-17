@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { unescapeHtml } from "./escape.ts";
-import { ELEMENT_NAME_JS, VIEW_ROUTES_JS } from "./page-js.ts";
+import { ELEMENT_NAME_JS, PAGE_ROUTES_JS } from "./page-js.ts";
 
 const NON_PROSE = "code, pre, script, style, textarea, title";
 
@@ -62,7 +62,7 @@ export interface LinkReport {
 export const LINKS_JS = `(() => {
 	const name = ${ELEMENT_NAME_JS};
 	const literals = ${literalLinks.toString()};
-	const route = (${VIEW_ROUTES_JS})([...document.querySelectorAll('[data-view]')].map(el => el.dataset.view));
+	const route = (${PAGE_ROUTES_JS})();
 	const problems = [], warnings = [], files = [];
 	const decode = text => { try { return decodeURIComponent(text); } catch { return text; } };
 	const records = hash => document.getElementById(decode(hash.split('?')[0]))?.hasAttribute('data-records');

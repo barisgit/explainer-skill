@@ -5,11 +5,23 @@
 import { add, type Point } from "./geometry.ts";
 import type { NetPart, Placement } from "./netlist.ts";
 import { type Part, pinAt, pinNamed } from "./scene.ts";
+import { LETTERS } from "./symbols.ts";
 
 const at = (part: Part) => `line ${part.line} (${part.id})`;
 
 /** The pin names of a part, as the author is told them. */
 const pinList = (part: Part) => Object.keys(part.def.pins).join(", ");
+
+/** A SPICE-named part can mistake its first net for an explicit kind; name the unambiguous spelling. */
+function kindHint(part: Part): string {
+	const inferred = LETTERS[part.id[0]?.toUpperCase() ?? ""];
+	return inferred &&
+		inferred !== part.kind &&
+		part.id.toLowerCase() !== part.kind &&
+		["vdd", "vss"].includes(part.kind)
+		? `; ${part.kind} was read as the part kind; if it is a net, write ${part.id} ${inferred} ${part.kind} ... to make the kind explicit`
+		: "";
+}
 
 /**
  * Where a part goes once the part it is placed by is placed: its own pin (the origin when it names none) at the other part's
@@ -22,11 +34,11 @@ function resolve(
 ): Point | string {
 	const anchor = pinNamed(other, rel.anchor);
 	if (!anchor) {
-		return `${at(part)}: ${other.id} has no pin ${rel.anchor} (${pinList(other)})`;
+		return `${at(part)}: ${other.id} has no pin ${rel.anchor} (${pinList(other)})${kindHint(other)}`;
 	}
 	const own = rel.pin === undefined ? undefined : pinNamed(part, rel.pin);
 	if (rel.pin !== undefined && !own) {
-		return `${at(part)}: ${part.id} has no pin ${rel.pin} (${pinList(part)})`;
+		return `${at(part)}: ${part.id} has no pin ${rel.pin} (${pinList(part)})${kindHint(part)}`;
 	}
 	const target = add(pinAt(other, anchor) ?? other.at, rel.offset);
 	const local = own ? pinAt({ ...part, at: { x: 0, y: 0 } }, own) : undefined;

@@ -75,10 +75,11 @@ export function Figure({ start = first }: { start?: number }) {
 	const checked = await run(["--check"]);
 	expect(checked.stdout + checked.stderr).not.toContain("error TS");
 	expect(checked.code).toBe(0);
+	expect(checked.stdout + checked.stderr).toContain("No type errors");
 	expect(checked.stdout + checked.stderr).not.toContain("REPOSITORY_CHECK_RAN_INSTEAD");
 	write(
 		"figure.tsx",
-		`${good}\nconst badNumber: number = "wrong";\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Records {...plan} cell="4rem" />;\n`,
+		`${good}\nconst badNumber: number = "wrong";\nconst bad: PlotOption = { series: [{ data: ["wrong"] }] };\nconst wrong = <Records {...plan} cell="4rem" />;\nexport const exact: { value?: number } = { value: undefined };\n`,
 	);
 	const failed = await run(["--check"]);
 	expect(failed.code).not.toBe(0);
@@ -86,6 +87,7 @@ export function Figure({ start = first }: { start?: number }) {
 		"Type 'string' is not assignable to type 'number'",
 	);
 	expect(failed.stdout + failed.stderr).toContain("cell");
+	expect(failed.stdout + failed.stderr).toContain("exactOptionalPropertyTypes");
 	expect(failed.stdout + failed.stderr).not.toContain("prepare.ts");
 	expect(failed.stdout + failed.stderr).not.toContain("probe.ts");
 }, 30_000);

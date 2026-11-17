@@ -248,7 +248,7 @@ async function types(): Promise<number> {
 		console.log(authorTsconfig(dir, sources));
 		console.error(
 			sources.length
-				? `kit types: checks ${sources.map((file) => relative(dir, file)).join(", ")} and the files they import; run bun --check; run it again when a page imports another file`
+				? `kit types: config only, not checked yet; covers ${sources.map((file) => relative(dir, file)).join(", ")} and the files they import; run bun --check; run it again when a page imports another file`
 				: "kit types: the pages import no .ts or .tsx file, so there is nothing to check yet; run it again when one does",
 		);
 		return 0;

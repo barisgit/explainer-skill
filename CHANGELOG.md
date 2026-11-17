@@ -4,6 +4,12 @@
 
 Linked parts now share a screen: `.beside` keeps a figure, diagram or code in view while its text scrolls, a `Stepper` steps through a Mermaid diagram by naming its refs, an `Explore` frame sets states on the page's parts, and code fences are coloured at pack time with marks that link to the prose. Questions read as answers, with a recommended choice, a note and an answered count. The kit's look is plainer: a darker dark scheme, three type sizes, figures without panels, and one square control style. A long page asks for the contents rail with `contents: true`, and the masthead can carry the reader's next action. `check` tries the page's kit controls by itself, drags, prints the reply it would send, follows dead links and sweeps inner scrollers.
 
+### Pack and check diagnostics
+
+- Markdown link destinations containing braces now fail `pack` with the JSX form to use: `<a href={...}>`. `check` reports links to absent records of filled Views (including a bare `#name` with no record) and leaves them out of its view captures and control sample.
+- `pack` diagnoses a Question sharing its radio name with an Explore choice (use a different control id or Question name). A schematic pin error explains when a net such as `vdd` was read as a kind and shows the explicit-kind spelling.
+- `kit types` now uses the repository's strict browser options, including `exactOptionalPropertyTypes` and unchecked-index checks. Its output says it only prepares a config; `bun --check` performs semantic typechecking and reports the result. MDX expressions themselves are not typechecked.
+
 ### Pages that may need a change
 
 - A `Stepper` shows Back, Next and the count; Play and the scrubber appear only when the page asks for them with `play` and `scrubber` (#190). A page whose stepper relies on Play, an animation say, needs `play`. The arrow keys work as before.

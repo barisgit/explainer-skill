@@ -1,7 +1,7 @@
 /* Explore: sliders, choices or toggles switching a plot, chart, readout or parts' states through your function; Controls shares them across figures.
    <Explore label="Envelope against g(t)" controls={[{ id: "m", label: "Modulation index m", range: [0, 1.5, 0.05], value: 0.5 }]}
      frame={envelope} />
-     controls  one or more, each with a label and an id (its value is kept across reloads):
+     controls  one or more, each with a label and an id (its value is kept across reloads; a choice's id is also its radio name, so use one different from a Question's name):
        range: [min, max, step]   a slider; value is where it starts (default min), format writes its readout ({ digits: 2 }, { unit: "%" })
        choice: ["LC", "SC"]      one of the texts, as a segmented switch ({ lc: "With carrier", ... } gives frame "lc");
                                  value is the one it starts on (default the first); axis: true makes it the plot's

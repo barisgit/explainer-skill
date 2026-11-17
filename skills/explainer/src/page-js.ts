@@ -35,7 +35,7 @@ export const REGION_VISIBLE_JS = `(el) => {
 }`;
 
 /** Page-side factory matching declared view names: split local state before decoding, prefer exact static routes, then templates (as views.js). */
-export const VIEW_ROUTES_JS = `(names) => {
+export const VIEW_ROUTES_JS = `(names, records = {}) => {
 	const canonical = text => new URL('#' + text, 'file:///').hash.slice(1);
 	const decode = text => { try { return decodeURIComponent(text); } catch { return text; } };
 	const statics = new Map();
@@ -48,8 +48,17 @@ export const VIEW_ROUTES_JS = `(names) => {
 		const key = decode(path);
 		const name = path.split('/')[0];
 		const view = (path.includes('/') ? statics.get(key) : undefined) ?? names.find(view => view === name);
-		return {key, name: view?.split('/')[0]};
+		const record = key.slice(key.indexOf('/') + 1);
+		const valid = view && (!Object.hasOwn(records, view) || (key.includes('/') && Object.hasOwn(records[view], record)));
+		return {key, name: valid ? view.split('/')[0] : undefined};
 	};
+}`;
+
+/** The settled page's routes, including the actual record keys of filled Views. Older exports without record metadata keep their template matching. */
+export const PAGE_ROUTES_JS = `() => {
+	const data = JSON.parse(document.getElementById('explainer-islands')?.textContent || '[]');
+	const records = Object.fromEntries(data.filter(island => island.v).map(island => [island.v, island.p.records]));
+	return (${VIEW_ROUTES_JS})([...document.querySelectorAll('[data-view]')].map(el => el.dataset.view), records);
 }`;
 
 /** Timers due within this time count as work the page is about to do: check waits for them. */

@@ -73,23 +73,40 @@ const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u0
  */
 async function answerClashes(html: string): Promise<string[]> {
 	const groups = new Map<string, Set<number>>();
+	const total = new Map<string, number>();
+	const insideCount = new Map<string, number>();
 	let fieldsets = 0;
 	await new HTMLRewriter()
+		.on("input[type=radio][name]", {
+			element(el) {
+				const name = el.getAttribute("name") ?? "";
+				total.set(name, (total.get(name) ?? 0) + 1);
+			},
+		})
 		.on("fieldset[data-reply], fieldset.self-check", { element: () => void fieldsets++ })
 		.on("fieldset[data-reply] input[name], fieldset.self-check input[name]", {
 			element(el) {
 				const name = el.getAttribute("name") ?? "";
 				groups.set(name, (groups.get(name) ?? new Set()).add(fieldsets));
+				if (el.getAttribute("type") === "radio") {
+					insideCount.set(name, (insideCount.get(name) ?? 0) + 1);
+				}
 			},
 		})
 		.transform(new Response(html))
 		.text();
-	return [...groups]
-		.filter(([, inside]) => inside.size > 1)
-		.map(
-			([name, inside]) =>
-				`${inside.size} questions use the name "${name}", so their options would form one group: give each Question its own name`,
-		);
+	return [...groups].flatMap(([name, inside]) => [
+		...(inside.size > 1
+			? [
+					`${inside.size} questions use the name "${name}", so their options would form one group: give each Question its own name`,
+				]
+			: []),
+		...((insideCount.get(name) ?? 0) > 0 && (total.get(name) ?? 0) > (insideCount.get(name) ?? 0)
+			? [
+					`<Question name="${name}"> shares name="${name}" with an input name="${name}" outside the Question (an Explore choice uses its control id as its name); give the Question or the control another name/id so their radio groups stay separate`,
+				]
+			: []),
+	]);
 }
 
 /** A Records block as the prerendered page shows it: its id, and the View names its row links open. */

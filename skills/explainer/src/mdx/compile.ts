@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Element, ElementContent, Nodes as HastNodes, Root as HastRoot } from "hast";
-import type { Root } from "mdast";
+import type { Nodes, Root } from "mdast";
 import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { remarkMath } from "../../vendor/math.js";
 import { compile, remarkFrontmatter, remarkGfm } from "../../vendor/mdx.js";
@@ -330,6 +330,20 @@ function inScrollBoxes(node: HastNodes) {
 	});
 }
 
+/** Markdown destinations are strings, not MDX expressions; JSX is the dynamic-link form. */
+function linkExpressions(node: Nodes, file: string) {
+	if ((node.type === "link" || node.type === "definition") && /\{[^}]*\}/.test(node.url)) {
+		throw new PackError(
+			`${file}:${node.position?.start.line ?? 1}: Markdown link destinations do not evaluate expressions: write <a href={...}>...</a> for a dynamic link, or encode literal braces as %7B and %7D`,
+		);
+	}
+	if ("children" in node) {
+		for (const child of node.children) {
+			linkExpressions(child, file);
+		}
+	}
+}
+
 /** A message from the MDX parser: where in the file it is and what is wrong. */
 interface MdxMessage {
 	reason: string;
@@ -365,6 +379,7 @@ export async function compileMdx(
 					remarkGfm,
 					remarkMath,
 					() => (tree: Root) => {
+						linkExpressions(tree, file);
 						if (page === true) {
 							h1 = structurePage(tree);
 						}

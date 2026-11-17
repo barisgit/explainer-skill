@@ -4,7 +4,7 @@
  * Chrome through them and turns their results into the report.
  */
 import { READABLE_PX } from "./mermaid.ts";
-import { ELEMENT_NAME_JS, PAINTS_JS, REGION_VISIBLE_JS, VIEW_ROUTES_JS } from "./page-js.ts";
+import { ELEMENT_NAME_JS, PAGE_ROUTES_JS, PAINTS_JS, REGION_VISIBLE_JS } from "./page-js.ts";
 
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
@@ -110,7 +110,7 @@ export const FIRST_SCREEN_JS = `(() => {
  */
 export const DISCOVER_JS = `(() => {
 	const names = new Set([...document.querySelectorAll("[data-view]")].map((v) => v.dataset.view));
-	const route = (${VIEW_ROUTES_JS})([...names]);
+	const route = (${PAGE_ROUTES_JS})();
 	const byRoute = new Map([...names].filter((n) => n.includes("/")).map((n) => {
 		const hash = n.replace(/\\?/g, '%3F');
 		return [route(hash).key, '#' + hash];

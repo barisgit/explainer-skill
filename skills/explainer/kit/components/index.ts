@@ -10,7 +10,7 @@
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
    right-aligned column (---:) is numeric (class="num"), and on a phone that it does not fit it scrolls sideways, its first column
    staying in view.
-   Markdown link destinations with spaces use angle brackets, [design](<docs/My Design Doc.md>), or %20. pack and check warn
+   Computed destinations use <a href={...}>; braces in Markdown destinations fail pack. Destinations with spaces use angle brackets, [design](<docs/My Design Doc.md>), or %20. pack and check warn
    when link syntax stays literal outside code; use backticks or <code> for intentional examples. check treats missing #targets
    as problems and missing relative files as warnings: distribute those files beside the exported HTML. External links are not fetched.
    Data and styles are imported files: import plan from "./plan.json", import { rows } from "./data.ts", import "./page.css".
@@ -18,7 +18,7 @@
    import the files it shows: pack fails on a file path written in it, in its props or in a filled view's records, since the
    browser would load that file later, from beside the page. An SVG file a client component draws keeps its own colours in dark.
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
-   To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun --check (no install).
+   To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun --check (no install); the first command only prepares the config, the second reports type errors or success. MDX expressions are not typechecked.
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its
    state and handlers work. Props from the page into such a component must be JSON, or functions a "use client" module exports
    (a formatter, Explore's frame). Markdown written between its tags is its children, rendered once as static HTML that it
