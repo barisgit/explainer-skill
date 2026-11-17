@@ -240,7 +240,7 @@
 	background: none;
 	border: 0;
 	padding: 0.25rem 0;
-	color: var(--accent);
+	color: var(--link);
 	font-size: var(--size-label);
 	font-weight: 500;
 	cursor: pointer;

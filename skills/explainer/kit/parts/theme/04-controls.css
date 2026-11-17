@@ -1,6 +1,6 @@
 /* theme part: control row, fields, segmented choice, toggle, inputs, buttons, playback, tabs. */
 /* One control style: square-ish, a 1px edge in --rule-strong (3:1 on every tone), the chosen or pressed state filled in ink, text
-   at the label's size. Links and focus rings keep the accent. */
+   at the label's size. Focus rings keep the accent, links the --link colour. */
 /* Controls: a row right above the figure it acts on. Field captions keep the case you write. */
 .controls {
 	display: flex;
@@ -241,7 +241,7 @@ output {
 	background: none;
 	border: 0;
 	padding: 0;
-	color: var(--accent);
+	color: var(--link);
 	cursor: pointer;
 	text-decoration: underline;
 	text-decoration-thickness: 1px;

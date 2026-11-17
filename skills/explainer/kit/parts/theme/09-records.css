@@ -88,7 +88,7 @@
 }
 
 /* Tree: the widths Records computes for its columns, all of them on wide screens and the numbers alone on phones (below). Rows
-   that link to their view keep the ink colour, so ninety links do not shout; the hover underline marks them. */
+   that link to their view keep the ink colour, so ninety links do not shout; the label's quiet underline marks them. */
 .records .tree {
 	--tree-cols: var(--records-cols);
 }

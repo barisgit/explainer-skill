@@ -446,18 +446,21 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		const values = { ...axis, axisLabel: { ...axis.axisLabel, hideOverlap: true } };
 		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a halo in the tone under the chart.
 		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
-		// A treemap is plain: tile text without a halo, no breadcrumb or roaming, and borders in the page's tone, so dark has no light seams.
-		const tile = { label: { ...label.label, textBorderWidth: 0 } };
+		// A treemap is plain: every tile one muted fill that ink text passes AA on, told apart by a page-toned border (so dark has no
+		// light seams), no text halo, no breadcrumb or roaming, and a click that does not zoom, which has no way back without them.
+		// What an author sets on the series or an item wins, as for any series.
+		const tile = { color: ink, textBorderWidth: 0, fontSize };
 		return {
 			...Object.fromEntries(LABELLED.map((type) => [type, label])),
 			treemap: {
-				...tile,
-				upperLabel: tile.label,
+				label: tile,
+				upperLabel: tile,
 				breadcrumb: { show: false },
 				roam: false,
-				itemStyle: { borderColor: token("bg") },
+				nodeClick: false,
+				color: [token("sunken")],
+				itemStyle: { borderColor: token("bg"), borderWidth: 1, gapWidth: 0 },
 			},
-			line: { ...label, endLabel: label.label },
 			grid: { __kitLegendRoom: true, outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
 			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
 			backgroundColor: "transparent",

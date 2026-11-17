@@ -61,6 +61,32 @@ window.ChartsDefaults = (() => {
 			: {};
 	}
 
+	/**
+	 * A treemap's tiles the author coloured with the accent, and the tiles inside them that take its colour, get the accent's ink
+	 * for their label, since the ink the theme sets is only legible on the muted fill the other tiles take. Their own label colour wins.
+	 */
+	function accentLabels(nodes: unknown, inherited = false): unknown {
+		if (!Array.isArray(nodes)) {
+			return nodes;
+		}
+		return nodes.map((node) => {
+			if (!isObject(node)) {
+				return node;
+			}
+			const own = objectAt(node, "itemStyle").color;
+			const accent = own === undefined ? inherited : own === "var(--accent)";
+			const tinted = accent && !("color" in objectAt(node, "label"));
+			return {
+				...node,
+				...(tinted && { label: { ...objectAt(node, "label"), color: "var(--accent-ink)" } }),
+				...("children" in node && { children: accentLabels(node.children, accent) }),
+			};
+		});
+	}
+
+	const labelled = (s: Item): Item =>
+		s.type === "treemap" ? { ...s, data: accentLabels(s.data) } : s;
+
 	/** `s` with what the kit generated (`extra`) under it: style objects merged key by key, other keys only where `s` has none. */
 	const styled = (s: Item, extra: Item): Item => ({
 		...extra,
@@ -127,7 +153,7 @@ window.ChartsDefaults = (() => {
 				return s;
 			}
 			if (!over) {
-				return marked(styled(s, generated(s, i)), option, sides.get(i) ?? new Set());
+				return marked(styled(labelled(s), generated(s, i)), option, sides.get(i) ?? new Set());
 			}
 			// An override: the kit's styling where it differs from what the base series gets, solid where a dash goes.
 			const base = isObject(over[i]) ? over[i] : {};

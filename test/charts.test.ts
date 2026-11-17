@@ -3,11 +3,14 @@ import { readFileSync, statSync } from "node:fs";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import {
 	act,
+	DESKTOP,
+	FRAMES,
 	inPage,
 	packAndRun,
 	packedMdx,
 	packHtml,
 	packMdx,
+	pageContract,
 	scratch,
 	until,
 } from "./support.ts";
@@ -772,21 +775,66 @@ test("a series the reader hid in the legend that stands in for crowded names sta
 	expect(await packAndRun(dir, "fallback-hidden", page)).toEqual([]);
 }, 30_000);
 
-test("a treemap written as data alone is plain: page-toned borders at every level, no text halo", async () => {
-	const output = await packedMdx(
-		dir,
-		"treemap",
-		`import { Chart } from "kit";
+const TREEMAP = `import { Chart } from "kit";
 
 # Sizes
 
-<Chart label="Sizes" option={{ series: [{ type: "treemap", data: [{ name: "a", value: 3, children: [{ name: "a1", value: 2 }, { name: "a2", value: 1 }] }, { name: "b", value: 2 }] }] }} />
-`,
-	);
+<Chart label="Sizes" option={{ series: [{ type: "treemap", width: "100%", height: "100%", left: 0, top: 0, data: [{ name: "a", value: 3, children: [{ name: "a1", value: 2, children: [{ name: "a1x", value: 1 }, { name: "a1y", value: 1 }] }, { name: "a2", value: 1 }] }, { name: "b", value: 2, itemStyle: { color: "var(--accent)" } }] }] }} />
+`;
+
+test("a data-only treemap's labels pass AA on their tiles in both schemes, an accent tile included, and tiles stay apart", async () => {
+	const output = await packedMdx(dir, "treemap", TREEMAP);
 	const html = readFileSync(output, "utf8");
-	const drawn = html.slice(html.indexOf('class="chart-drawn"'), html.indexOf("</svg>"));
-	expect(drawn).toContain("fill:var(--bg)");
-	expect(drawn).not.toMatch(/#fff|rgb\(255/i);
-	expect(drawn).not.toMatch(/<text[^>]*stroke-width="[1-9]/);
-	expect(drawn).not.toContain("treemap-breadcrumb");
+	const start = html.indexOf('class="chart-drawn"');
+	const svg = html.slice(html.indexOf("<svg", start), html.indexOf("</svg>", start) + 6);
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><div id="box" style="position:relative;width:1054px;height:416px">${svg.replace("<svg", '<svg style="display:block;width:100%;height:100%"')}</div></main>
+<script>
+const luminance = (rgb) => rgb.match(/[\\d.]+/g).slice(0, 3).map(Number).map((c) => c / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+const rgb = (css) => { pixel.clearRect(0, 0, 1, 1); pixel.fillStyle = css; pixel.fillRect(0, 0, 1, 1); return "rgb(" + [...pixel.getImageData(0, 0, 1, 1).data.slice(0, 3)].join(", ") + ")"; };
+const labels = () => [...document.querySelectorAll("text")].map((text) => {
+	const box = text.getBoundingClientRect();
+	const tile = document.elementsFromPoint(box.x + box.width / 2, box.y + box.height / 2).find((el) => el.tagName === "path");
+	return { name: text.textContent, ratio: contrast(rgb(getComputedStyle(text).fill), rgb(getComputedStyle(tile).fill)), halo: getComputedStyle(text).strokeWidth };
+});
+const inScheme = (scheme) => { document.documentElement.dataset.scheme = scheme; return labels(); };
+const passes = (scheme) => inScheme(scheme).length >= 3 && inScheme(scheme).every((l) => l.ratio >= 4.5);
+const fills = () => new Set([...document.querySelectorAll("path")].map((p) => getComputedStyle(p).fill));
+${pageContract({
+	"light: every label passes AA on its tile": `passes("light")`,
+	"dark: every label passes AA on its tile": `passes("dark")`,
+	"the accent tile and the muted tiles differ": `fills().size >= 3`,
+	"tiles are separated by the page's tone": `[...document.querySelectorAll("path")].some((p) => getComputedStyle(p).fill === rgb(getComputedStyle(document.body).backgroundColor))`,
+})}</script></body></html>`;
+	expect(await packAndRun(dir, "treemap-contrast", page, { widths: [DESKTOP] })).toEqual([]);
 }, 30_000);
+
+test("a treemap's click does not zoom unless the author sets nodeClick", async () => {
+	for (const [name, extra] of [
+		["plain", ""],
+		["zoom", ', nodeClick: "zoomToNode"'],
+	] as const) {
+		const output = await packedMdx(
+			dir,
+			`treemap-click-${name}`,
+			TREEMAP.replace('type: "treemap"', `type: "treemap"${extra}`),
+		);
+		const moved = await inPage(output, async (cdp) => {
+			const layouts = `(() => {
+				const data = echarts.getInstanceByDom(document.querySelector(".chart")).getModel().getSeriesByIndex(0).getData();
+				return JSON.stringify(data.mapArray((i) => JSON.stringify(data.getItemLayout(i))));
+			})()`;
+			const before = await cdp.evaluate<string>(layouts);
+			const point = await cdp.evaluate<{ x: number; y: number }>(`(() => {
+				const b = document.querySelector(".chart").getBoundingClientRect();
+				return { x: b.x + b.width / 8, y: b.y + b.height / 3 };
+			})()`);
+			await runStep(cdp, `click:${Math.round(point.x)},${Math.round(point.y)}`, () => "");
+			await cdp.evaluate(FRAMES, true);
+			return before !== (await cdp.evaluate<string>(layouts));
+		});
+		expect([name, moved]).toEqual([name, name === "zoom"]);
+	}
+}, 60_000);

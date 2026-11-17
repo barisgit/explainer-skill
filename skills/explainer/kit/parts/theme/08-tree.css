@@ -60,8 +60,14 @@
 	font-weight: 400;
 	text-decoration: none;
 }
-.tree :where(.tree > a, details > a):hover > :first-child {
+/* A link row's label carries the quiet underline of a link (ink on hover), so the row reads as one to follow. */
+.tree :where(.tree > a, details > a) > :first-child {
 	text-decoration: underline;
+	text-decoration-color: var(--rule-strong);
+	text-underline-offset: 0.2em;
+}
+.tree :where(.tree > a, details > a):hover > :first-child {
+	text-decoration-color: currentcolor;
 }
 /* The head: the columns' names over the first row, in the numbers' size. */
 .tree > .tree-head {
