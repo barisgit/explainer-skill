@@ -771,3 +771,22 @@ test("a series the reader hid in the legend that stands in for crowded names sta
 	);
 	expect(await packAndRun(dir, "fallback-hidden", page)).toEqual([]);
 }, 30_000);
+
+test("a treemap written as data alone is plain: page-toned borders at every level, no text halo", async () => {
+	const output = await packedMdx(
+		dir,
+		"treemap",
+		`import { Chart } from "kit";
+
+# Sizes
+
+<Chart label="Sizes" option={{ series: [{ type: "treemap", data: [{ name: "a", value: 3, children: [{ name: "a1", value: 2 }, { name: "a2", value: 1 }] }, { name: "b", value: 2 }] }] }} />
+`,
+	);
+	const html = readFileSync(output, "utf8");
+	const drawn = html.slice(html.indexOf('class="chart-drawn"'), html.indexOf("</svg>"));
+	expect(drawn).toContain("fill:var(--bg)");
+	expect(drawn).not.toMatch(/#fff|rgb\(255/i);
+	expect(drawn).not.toMatch(/<text[^>]*stroke-width="[1-9]/);
+	expect(drawn).not.toContain("treemap-breadcrumb");
+}, 30_000);

@@ -25,6 +25,8 @@
 	--rule: light-dark(#e0d9cd, #302b26);
 	--rule-strong: light-dark(#8f8574, #706759);
 	--accent: light-dark(#b93a05, #ff8a3d);
+	/* Links are ink with a quiet underline, so the accent keeps its one meaning; a page rule --link: var(--accent) brings it back. */
+	--link: var(--ink);
 	--accent-ink: light-dark(#fff, #1b1208);
 	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
 	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
@@ -154,11 +156,13 @@ pre code {
 	}
 }
 a {
-	color: var(--accent);
+	color: var(--link);
+	text-decoration-color: var(--rule-strong);
 	text-decoration-thickness: 1px;
 	text-underline-offset: 0.2em;
 }
 a:hover {
+	text-decoration-color: currentcolor;
 	text-decoration-thickness: 2px;
 }
 b,

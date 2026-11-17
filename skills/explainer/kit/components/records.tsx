@@ -33,7 +33,8 @@
    A tree or board alone, with no search, facets or reply is static markup. Otherwise it is an island that carries the data as JSON, a
    second copy beside a filled View of the same records; its controls show once the script runs, and before that the default
    view reads as it is. pack checks the config and names the path of each problem (fields.hours.kind); it also fails on a link
-   that names no View and on a block id that is a View's name. It prints as the whole tree. */
+   that names no View and on a block id that is a View's name. It prints as the whole tree. To fold a block, wrap it in
+   <details><summary>title</summary> (block tags on their own lines). */
 import { createRecords, type RecordsConfig } from "../records/index.ts";
 import { pageLabels, pageLang } from "./parts/format.ts";
 import { RecordsIsland } from "./parts/records-island.tsx";

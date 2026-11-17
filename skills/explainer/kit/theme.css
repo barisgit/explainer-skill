@@ -2,7 +2,7 @@
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions).
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
-     :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
+     :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
    <html data-scheme="dark">; charts and diagrams follow it too.
    The accent has one meaning, the finding: the headline phrase (h1 em), and on a chart the series or bar the page is about
@@ -39,7 +39,7 @@
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
-   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --hollow --hatch --hatch-fill
+   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --link --accent-soft --ok --bad --warn --info --c1..--c6 --hollow --hatch --hatch-fill
    --font --mono;
    --size-headline --size-display --size-text --size-label --radius;
    --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
@@ -61,6 +61,10 @@
 }
 :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 	opacity: 0.15;
+}
+/* Code stays readable (muted, 4.5:1 or near) where a step does not name its lines. */
+pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
+	opacity: 0.65;
 }
 [data-captions] {
 	margin: 0;
@@ -254,7 +258,8 @@ dialog.reply-dialog[open] {
 	pointer-events: none;
 }
 @media print {
-	:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
+	:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]),
+	pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 		opacity: 1;
 	}
 	[data-live] [data-captions] > li:not(.is-now) {

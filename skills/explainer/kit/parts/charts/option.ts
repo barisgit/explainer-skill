@@ -446,8 +446,17 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		const values = { ...axis, axisLabel: { ...axis.axisLabel, hideOverlap: true } };
 		// ECharts picks label colours itself (#333 with a white outline), which fails in dark mode: give series labels ink with a halo in the tone under the chart.
 		const label = { label: { color: ink, textBorderColor: under, textBorderWidth: 2 } };
+		// A treemap is plain: tile text without a halo, no breadcrumb or roaming, and borders in the page's tone, so dark has no light seams.
+		const tile = { label: { ...label.label, textBorderWidth: 0 } };
 		return {
 			...Object.fromEntries(LABELLED.map((type) => [type, label])),
+			treemap: {
+				...tile,
+				upperLabel: tile.label,
+				breadcrumb: { show: false },
+				roam: false,
+				itemStyle: { borderColor: token("bg") },
+			},
 			line: { ...label, endLabel: label.label },
 			grid: { __kitLegendRoom: true, outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
 			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),

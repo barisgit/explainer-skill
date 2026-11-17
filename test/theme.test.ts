@@ -441,3 +441,22 @@ test("on a page with a Reply bar a .beside code block still pins near the window
 	);
 	expect(placed).toEqual({ pinned: 24, fits: true });
 }, 30_000);
+
+test("links are ink with a quiet underline until a page sets --link, and faded code stays readable in both schemes", async () => {
+	const page = `${HEAD}<p><a id="plain" href="#x">link</a> <a id="branded" href="#x" style="--link: var(--accent)">brand</a></p>
+<pre id="pre" style="background: var(--sunken)"><code><span id="faded" data-kit-state data-state="not-yet">old line</span></code></pre>
+<div id="bg" style="background: var(--sunken)">.</div></main>
+<script>${CONTRAST}
+const inScheme = (scheme, check) => { document.documentElement.dataset.scheme = scheme; return check(); };
+// The faded text as the eye gets it: ink blended into the block's tone by the span's opacity.
+const blend = () => { const [r, g, b] = colour("faded", "color").match(/[\\d.]+/g).map(Number); const [br, bg, bb] = colour("bg", "backgroundColor").match(/[\\d.]+/g).map(Number); const o = Number(colour("faded", "opacity")); return "rgb(" + [[r, br], [g, bg], [b, bb]].map(([c, d]) => c * o + d * (1 - o)).join(", ") + ")"; };
+${pageContract({
+	"a link is the ink colour": `colour("plain", "color") === getComputedStyle(document.body).color`,
+	"a link's underline is quiet": `colour("plain", "textDecorationColor") !== colour("plain", "color") && colour("plain", "textDecorationLine") === "underline"`,
+	"--link brings the accent back": `colour("branded", "color") !== colour("plain", "color")`,
+	"light: faded code is readable": `inScheme("light", () => contrast(blend(), colour("bg", "backgroundColor")) >= 4.5)`,
+	"dark: faded code is readable": `inScheme("dark", () => contrast(blend(), colour("bg", "backgroundColor")) >= 4.5)`,
+})}</script></body></html>`;
+
+	expect(await packAndRun(dir, "links-fade", page, { widths: [DESKTOP] })).toEqual([]);
+}, 30_000);
