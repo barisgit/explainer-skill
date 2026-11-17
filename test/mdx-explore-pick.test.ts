@@ -513,3 +513,55 @@ test("pack draws a picked plot only where its key has the room of its tallest ca
 	// The long name's key wraps into more rows than the picked one's on a phone: that figure is left to plot.js.
 	expect([drawn("short"), drawn("long")]).toEqual([true, false]);
 });
+
+/** Page expression: where the picked strip label's text lies, as [left, right] px, beside the plot's own [left, right]. */
+const PICKED_TEXT = `(() => {
+	const strip = document.querySelector("#long .plot-strip");
+	const label = strip.querySelector("label:has(input:checked)");
+	const full = label.querySelector(".full");
+	const shown = getComputedStyle(full).display !== "none" ? full : null;
+	const style = shown ? getComputedStyle(shown) : getComputedStyle(label, "::after");
+	const box = label.getBoundingClientRect();
+	const shift = Number.parseFloat(style.translate) || 0;
+	const width = shown ? shown.getBoundingClientRect().width : Number.parseFloat(style.width);
+	const centre = shown ? null : box.left + box.width / 2 + shift;
+	const [left, right] = shown ? [shown.getBoundingClientRect().left, shown.getBoundingClientRect().right] : [centre - width / 2, centre + width / 2];
+	const area = strip.getBoundingClientRect();
+	const s = getComputedStyle(strip);
+	return { text: [left, right], plot: [area.left + Number.parseFloat(s.paddingLeft), area.right - Number.parseFloat(s.paddingRight)], overflow: style.textOverflow };
+})()`;
+
+test("a picked strip label too wide for its column stays inside the plot, cut short with an ellipsis only past the plot's width", async () => {
+	const names = [
+		"Scenario2024LongUnbrokenIdentifierScenario2024LongUnbrokenIdentifier",
+		...Array.from({ length: 13 }, (_, i) => `c${i + 2}`),
+		"Scenario2024LongUnbrokenIdentifier",
+	];
+	const output = await packedMdx(
+		dir,
+		"long-strip",
+		`import { Explore } from "kit";
+
+# Long
+
+<Explore id="long" label="Scenarios" controls={[{ id: "s", label: "Scenario", choice: ${JSON.stringify(names)}, value: "${names[0]}", axis: true }]} frame={() => ({ plot: { categories: ${JSON.stringify(names)}, series: [{ type: "bar", data: ${JSON.stringify(names.map((_, i) => i + 1))} }] } })} />
+`,
+	);
+	type Placed = { text: [number, number]; plot: [number, number]; overflow: string };
+	const [first, last] = await inPage(
+		output,
+		async (cdp) => [
+			await cdp.evaluate<Placed>(PICKED_TEXT),
+			await act<Placed>(cdp, `document.getElementById("s-14").click()`, PICKED_TEXT),
+		],
+		WIDTHS[1],
+	);
+	for (const { text, plot } of [first, last]) {
+		expect(text[0]).toBeGreaterThanOrEqual(plot[0] - 1);
+		expect(text[1]).toBeLessThanOrEqual(plot[1] + 1);
+	}
+	// The first is wider than the plot: it fills it, cut short; the last fits whole, moved in from the plot's edge.
+	expect(first.overflow).toBe("ellipsis");
+	expect(first.text[1] - first.text[0]).toBeGreaterThan(first.plot[1] - first.plot[0] - 2);
+	expect(last.text[1]).toBeGreaterThan(last.plot[1] - 2);
+}, 30_000);

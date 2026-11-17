@@ -288,6 +288,15 @@
 .plot-strip.short label.thin::after {
 	content: none;
 }
+/* The picked label is always shown: plot.js moves its text in from the plot's edge and, past the plot's width, cuts it short. */
+.plot-strip label.bound > .full,
+.plot-strip label.bound::after {
+	max-inline-size: var(--room);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	translate: var(--shift) 0;
+}
 
 /* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,
    --_node-fill, ...), set here from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no

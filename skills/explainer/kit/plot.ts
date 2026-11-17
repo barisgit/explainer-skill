@@ -173,6 +173,35 @@
 		timer.id = requestAnimationFrame(step);
 	}
 
+	/**
+	 * Keeps the picked label's text inside the plot's span `at`, each label `band` px wide: moved in from an edge, and cut short
+	 * with an ellipsis when wider than the plot (theme.css, .bound). `width` measures a label's text as shown.
+	 */
+	function bound(
+		labels: HTMLElement[],
+		picked: number,
+		band: number,
+		{ start, end }: { start: number; end: number },
+		width: (label: HTMLElement) => number,
+	) {
+		const room = end - start;
+		for (const [i, label] of labels.entries()) {
+			label.classList.toggle("bound", i === picked);
+			if (i !== picked) {
+				label.style.removeProperty("--shift");
+				label.style.removeProperty("--room");
+				continue;
+			}
+			const centre = (i + 0.5) * band;
+			const half = Math.min(width(label), room) / 2;
+			label.style.setProperty(
+				"--shift",
+				`${Math.min(Math.max(centre, half), room - half) - centre}px`,
+			);
+			label.style.setProperty("--room", `${room}px`);
+		}
+	}
+
 	/** A picker's strip under the categories at W x H: padded to their span, each radio described by its values. */
 	function lineUp(
 		strip: HTMLElement,
@@ -203,6 +232,7 @@
 			const near = i !== picked && Math.abs(i - picked) < every;
 			label.classList.toggle("thin", i !== picked && (i % every !== 0 || near));
 		}
+		bound(labels, picked, band, at, (label) => textWidth(label.dataset[short ? "short" : "full"]));
 		for (const [i, input] of strip.querySelectorAll("input").entries()) {
 			input.setAttribute("aria-description", keyText(option, i));
 		}
