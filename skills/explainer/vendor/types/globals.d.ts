@@ -41,7 +41,7 @@ interface AxisSpec {
 	format?: ((value: number) => string) | NumberFormat;
 	/**
 	 * false leaves the axis's tick labels out, and the room they take; true keeps them; texts are a number axis's own labels,
-	 * spread evenly from its min to its max (["06:00", "12:00", "18:00"]). Unset, a bar plot whose every bar prints its value
+	 * spread evenly from its min to its max, else the data's ends, unrounded (["06:00", "12:00", "18:00"]). Unset, a bar plot whose every bar prints its value
 	 * leaves its value axis's out, unless a marker on it does not write its value.
 	 */
 	labels?: boolean | readonly string[];

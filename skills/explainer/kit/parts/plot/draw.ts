@@ -211,7 +211,10 @@ window.PlotDraw = ({ lang, size }) => {
 		};
 	}
 
-	/** A numeric axis's range and step: min and max round outwards to the step unless given. */
+	/**
+	 * A numeric axis's range and step: min and max round outwards to the step unless given. An axis with texts of its own keeps
+	 * the data's extent as it is, since the step, and so the rounding, depends on the plot's width.
+	 */
 	function rangeOf(
 		spec: AxisSpec,
 		[dataMin, dataMax]: readonly [number, number],
@@ -226,10 +229,11 @@ window.PlotDraw = ({ lang, size }) => {
 		}
 		const count = clamp(Math.round(length / (vertical ? 48 : 80)), 2, 10);
 		const step = spec.step ?? niceStep(hi - lo, count);
-		if (spec.min == null) {
+		const round = !Array.isArray(spec.labels);
+		if (spec.min == null && round) {
 			lo = Math.floor(lo / step + 1e-9) * step;
 		}
-		if (spec.max == null) {
+		if (spec.max == null && round) {
 			hi = Math.ceil(hi / step - 1e-9) * step;
 		}
 		return { lo, hi, step };
