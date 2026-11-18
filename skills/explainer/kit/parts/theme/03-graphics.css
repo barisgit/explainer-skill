@@ -130,6 +130,9 @@
 	stroke-width: 3px;
 	stroke-linejoin: round;
 }
+.plot .value-ground {
+	fill: var(--bg);
+}
 .plot .value {
 	font-weight: 600;
 }

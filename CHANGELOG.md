@@ -10,6 +10,10 @@ Linked parts now share a screen: `.beside` keeps a figure, diagram or code in vi
 - `pack` diagnoses a Question sharing its radio name with an Explore choice (use a different control id or Question name). A schematic pin error explains when a net such as `vdd` was read as a kind and shows the explicit-kind spelling.
 - `kit types` now uses the repository's strict browser options, including `exactOptionalPropertyTypes` and unchecked-index checks. Its output says it only prepares a config; `bun --check` performs semantic typechecking and reports the result. MDX expressions themselves are not typechecked.
 
+### Drawing fixes
+
+- Values printed inside a Plot’s hollow or hatched bars sit on a page-toned plate, so the pattern does not run through the value. The same drawing code runs at pack time and in the browser.
+
 ### Pages that may need a change
 
 - Links are ink with a quiet underline instead of the accent, so the accent keeps its one meaning (the finding). A page that wants coloured links sets `--link: var(--accent)` on `:root`. Code a `Stepper` or link fades is now readable (65% instead of 15%), and a `treemap` written as data alone is plain: one muted tile fill told apart by page-toned borders, labels in ink (the accent's ink on a tile you colour `var(--accent)`), no breadcrumb or roaming, and a click that does not zoom (set `nodeClick`, `breadcrumb` or `roam` to bring them back). A link row of a `.tree` carries the quiet underline of a link, and `.reset` and `.expand` follow `--link`. Wrap a `Records` block in `<details><summary>…</summary>` to fold it.

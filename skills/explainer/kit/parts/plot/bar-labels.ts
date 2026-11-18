@@ -7,6 +7,24 @@ window.PlotBarLabels = ({ svgText, size }) => {
 	const onBar = ({ open, colour }: PlotBarGeometry) =>
 		open ? (["value", ""] as const) : (["value inside", `--c:${colour}`] as const);
 
+	/** Text on a bar: an open bar masks its pattern behind the whole value, not just each glyph's halo. */
+	function onBarText(
+		t: string,
+		bar: PlotBarGeometry,
+		x: number,
+		y: number,
+		anchor: "start" | "middle" | "end",
+		tw: number,
+	) {
+		const [cls, style] = onBar(bar);
+		const x0 = x - (anchor === "end" ? tw : anchor === "middle" ? tw / 2 : 0);
+		const px = (v: number) => +v.toFixed(1);
+		const plate = bar.open
+			? `<rect class="value-ground" x="${px(x0 - 2)}" y="${px(y - size() / 2 - 2)}" width="${px(tw + 4)}" height="${px(size() + 4)}"/>`
+			: "";
+		return plate + svgText(cls, x, y, anchor, t, style);
+	}
+
 	/** Label of a stacked segment: centred when it fits, else none. */
 	function segmentLabel(t: string, bar: PlotBarGeometry, textWidth: (s: unknown) => number) {
 		const { horizontal, start, length, mid, each } = bar;
@@ -15,9 +33,8 @@ window.PlotBarLabels = ({ svgText, size }) => {
 			? length >= tw + 10 && each >= size() + 2
 			: length >= size() + 6 && each >= tw + 6;
 		const centre = start + length / 2;
-		const [cls, style] = onBar(bar);
 		return fits
-			? svgText(cls, horizontal ? centre : mid, horizontal ? mid : centre, "middle", t, style)
+			? onBarText(t, bar, horizontal ? centre : mid, horizontal ? mid : centre, "middle", tw)
 			: "";
 	}
 
@@ -101,11 +118,12 @@ window.PlotBarLabels = ({ svgText, size }) => {
 		c: number,
 		at: number,
 		inside: boolean,
+		tw: number,
 	) {
-		const [cls, style] = inside ? onBar(bar) : (["value", ""] as const);
-		return bar.horizontal
-			? svgText(cls, along, c, at > 0 ? "start" : "end", t, style)
-			: svgText(cls, c, along, "middle", t, style);
+		const x = bar.horizontal ? along : c;
+		const y = bar.horizontal ? c : along;
+		const anchor = bar.horizontal ? (at > 0 ? "start" : "end") : "middle";
+		return inside ? onBarText(t, bar, x, y, anchor, tw) : svgText("value", x, y, anchor, t);
 	}
 
 	/** Label of a side-by-side bar, where endSpot puts it, moved across where it would sit on another bar or label. */
@@ -124,7 +142,7 @@ window.PlotBarLabels = ({ svgText, size }) => {
 		const box = (shift: number) => labelBox(bar, along, at, tw, mid + shift);
 		const shift = inside ? 0 : sideways(box, horizontal ? size() : tw, bar, room);
 		room.placed.push(box(shift));
-		return valueText(t, bar, along, mid + shift, at, inside);
+		return valueText(t, bar, along, mid + shift, at, inside, tw);
 	}
 
 	/** A value label: inside a stacked segment when it fits, else at the end of a side-by-side bar. */

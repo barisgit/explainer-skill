@@ -340,7 +340,7 @@ test("a bar takes one of the accent's three states, per series or per bar: solid
 	for (const [i, c] of along.slice(1).entries()) {
 		expect(c - (along[i] ?? 0)).toBeCloseTo(6 * Math.SQRT2, 0);
 	}
-	// The value on the hatched bar, which has no room past its end, reads as one outside it: ink on a halo, not on the bar.
+	// These values fit outside their bars: ink on the page, not the solid bar's contrast colour.
 	expect(svg).toContain('class="value" ');
 	expect(svg).not.toContain("value inside");
 	// One state for the whole series.
