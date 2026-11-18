@@ -12,7 +12,7 @@
      param   the record this view shows (#person/ana); leave it out for a single view at #name. Pass the id as it is; a link
              escapes ? # % the way encodeURIComponent does: id "a?b" opens at #person/a%3Fb, what follows a route's first ? being
              the state of what the view holds
-     back    the text of its Back link, naming the overview
+     back    the text of its Back link, naming the overview; it returns to the overview's last URL state
    Its # and the paragraphs right under it are the view's head (the first one its lede), and each ## starts a section, as on
    the page. pack puts every View after the overview wherever the page renders it, so one View per record works from data:
    {people.map((p) => <View name="person" param={p.id} back="Team"><h1>{p.name}</h1><p>{p.role}</p><section>...</section></View>)}
