@@ -311,20 +311,34 @@ test("a choice restored on reload draws at once rather than moving on arrival", 
 		);
 		await motion(cdp);
 		await cdp.load();
-		const seen = await cdp.evaluate<string[]>(
+		const seen = await cdp.evaluate<
+			{
+				path: string;
+				width: number;
+				height: number;
+				fonts: string;
+				choice: string;
+				elapsed: number;
+			}[]
+		>(
 			`(async () => {
-				const seen = new Set();
+				const seen = new Map();
 				const t0 = performance.now();
 				while (performance.now() - t0 < 700) {
 					await new Promise(requestAnimationFrame);
 					const d = document.querySelector("#f .plot-area path.line")?.getAttribute("d");
-					if (d) seen.add(d);
+					if (d && !seen.has(d)) {
+						const box = document.querySelector("#f .plot-area").getBoundingClientRect();
+						seen.set(d, { path: d, width: box.width, height: box.height,
+							fonts: document.fonts.status, choice: document.querySelector("#f input:checked")?.id ?? "",
+							elapsed: Math.round(performance.now() - t0) });
+					}
 				}
-				return [...seen];
+				return [...seen.values()];
 			})()`,
 			true,
 		);
-		expect(seen.at(-1)).toBe(target);
-		expect(seen.length).toBeLessThanOrEqual(2);
+		expect(seen.at(-1)?.path).toBe(target);
+		expect(seen.length, JSON.stringify(seen)).toBeLessThanOrEqual(2);
 	});
 }, 30_000);

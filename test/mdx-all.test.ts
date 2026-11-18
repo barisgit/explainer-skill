@@ -19,8 +19,8 @@ test.each(["page", "sl"])(
 		expect(packed.code).toBe(0);
 
 		const checked = await runCli(["check", output, "--out", dir.path(name)]);
+		expect(checked.code, checked.stderr).toBe(0);
 		expect(checked.stdout).toContain("Verdict: ok, 0 problems");
-		expect(checked.code).toBe(0);
 	},
 	120_000,
 );
