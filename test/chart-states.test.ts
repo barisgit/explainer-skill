@@ -408,3 +408,21 @@ import "./big.css";
 	expect(sizes.length).toBeGreaterThan(0);
 	expect(sizes.every((size) => size.includes("16"))).toBe(true);
 }, 30_000);
+
+test("responsive series keep the palette slot matched by id or name, not their override order", () => {
+	const defaults = runKitPart("charts/defaults.ts", "ChartsDefaults") as {
+		defaults(option: object): {
+			media: { option: { series: { lineStyle?: { type?: unknown } }[] } }[];
+		};
+	};
+	for (const key of ["id", "name"]) {
+		const result = defaults.defaults({
+			series: ["A", "B"].map((value) => ({ [key]: value, type: "line", data: [1, 2] })),
+			media: [{ option: { series: ["B", "A"].map((value) => ({ [key]: value, data: [2, 3] })) } }],
+		});
+		expect(result.media[0]?.option.series.map((s) => s.lineStyle?.type)).toEqual([
+			[6, 4],
+			undefined,
+		]);
+	}
+});

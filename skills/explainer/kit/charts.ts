@@ -138,7 +138,7 @@
 	 */
 	function merge(target: unknown, patch: unknown, topLevel = false): unknown {
 		if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
-			const at = places(target, patch);
+			const at = window.ChartsDefaults.places(target, patch);
 			patch.forEach((item, index) => {
 				const place = at[index];
 				if (place === undefined) {
@@ -160,6 +160,10 @@
 
 	/** Applies a top-level option patch to the saved option; see merge. Components named in `replace` are swapped for the patch's list. */
 	function mergeOption(option: ChartOption, patch: ChartOption, replace: string[]) {
+		if (isObject(option.baseOption)) {
+			mergeBase(option, patch, replace);
+			return;
+		}
 		for (const key of replace) {
 			if (!(key in patch)) {
 				delete option[key];
@@ -173,61 +177,41 @@
 		}
 	}
 
+	/** Fold root patches into an existing baseOption as ECharts does, so a replay draws the same data as an update. */
+	function mergeBase(option: ChartOption, patch: ChartOption, replace: string[]) {
+		const { baseOption, media, options, ...root } = patch;
+		mergeOption(
+			settings(option),
+			{ ...root, ...(isObject(baseOption) ? baseOption : {}) },
+			replace,
+		);
+		if (media !== undefined) {
+			option.media = media;
+		}
+		if (options !== undefined) {
+			option.options = options;
+		}
+	}
+
 	function isObject(value: unknown): value is Record<string, unknown> {
 		return value !== null && typeof value === "object" && !Array.isArray(value);
 	}
 
-	/** A copy of the objects in `value`, which merge changes in place; arrays inside them it replaces, so they stay shared. */
+	/** A copy of the objects and arrays merge changes in place, including a baseOption's component lists. */
 	const copyObjects = (value: unknown): unknown =>
-		isObject(value)
-			? Object.fromEntries(Object.entries(value).map(([key, v]) => [key, copyObjects(v)]))
-			: value;
+		Array.isArray(value)
+			? value.map(copyObjects)
+			: isObject(value)
+				? Object.fromEntries(Object.entries(value).map(([key, v]) => [key, copyObjects(v)]))
+				: value;
 
 	/** The saved option as mergeOption would leave it, without changing it. */
 	function merged(option: ChartOption, patch: ChartOption, replace: string[]) {
 		const copy: ChartOption = Object.fromEntries(
-			Object.entries(option).map(([key, v]) => [
-				key,
-				Array.isArray(v) ? v.map(copyObjects) : copyObjects(v),
-			]),
+			Object.entries(option).map(([key, v]) => [key, copyObjects(v)]),
 		);
 		mergeOption(copy, patch, replace);
 		return copy;
-	}
-
-	/** An item's id or name as ECharts compares them: numbers equal to their text. */
-	const keyOf = (item: unknown, key: "id" | "name") =>
-		isObject(item) && item[key] != null ? String(item[key]) : undefined;
-
-	/**
-	 * Where each patch item lands in the saved list, as ECharts' normal merge maps them: by id, then an id-less item by name,
-	 * then an id-less item into the first place still free. An item with an id no place has is added (undefined).
-	 */
-	function places(target: unknown[], patch: unknown[]): (number | undefined)[] {
-		const taken = new Set<number>();
-		const take = (find: (saved: unknown, index: number) => boolean) => {
-			const index = target.findIndex((saved, i) => !taken.has(i) && find(saved, i));
-			if (index >= 0) {
-				taken.add(index);
-			}
-			return index >= 0 ? index : undefined;
-		};
-		const at = patch.map((item) => {
-			const id = keyOf(item, "id");
-			return id === undefined ? undefined : take((saved) => keyOf(saved, "id") === id);
-		});
-		patch.forEach((item, index) => {
-			const name = keyOf(item, "name");
-			if (at[index] === undefined && keyOf(item, "id") === undefined && name !== undefined) {
-				at[index] = take((saved) => keyOf(saved, "name") === name);
-			}
-		});
-		patch.forEach((item, index) => {
-			if (at[index] === undefined && keyOf(item, "id") === undefined) {
-				at[index] = take(() => true);
-			}
-		});
-		return at;
 	}
 
 	/** The live model of a component; ECharts declares no public type for it. */
@@ -417,7 +401,7 @@
 					return;
 				}
 				mergeOption(option, patch, replace);
-				chart?.setOption(resolveOption(patch));
+				chart?.setOption(resolveOption(defaults(patch, undefined, option)));
 			},
 		};
 	}

@@ -84,8 +84,12 @@ window.ChartsDefaults = (() => {
 		});
 	}
 
-	const labelled = (s: Item): Item =>
-		s.type === "treemap" ? { ...s, data: accentLabels(s.data) } : s;
+	const labelled = (s: Item, base: Item = {}): Item =>
+		(s.type ?? base.type) === "treemap" && "data" in s ? { ...s, data: accentLabels(s.data) } : s;
+
+	/** Data whose generated labels must be rebuilt rather than merged into a previous draw's labels. */
+	const treemapData = (s: Item, base: unknown) =>
+		(s.type ?? (isObject(base) ? base.type : undefined)) === "treemap" ? s.data : null;
 
 	/** `s` with what the kit generated (`extra`) under it: style objects merged key by key, other keys only where `s` has none. */
 	const styled = (s: Item, extra: Item): Item => ({
@@ -146,8 +150,44 @@ window.ChartsDefaults = (() => {
 		return { ...s, markLine: { ...markLine, data } };
 	}
 
+	/** An item's id or name as ECharts compares them: numbers equal to their text. */
+	const keyOf = (item: unknown, key: "id" | "name") =>
+		isObject(item) && item[key] != null ? String(item[key]) : undefined;
+
+	/**
+	 * Where each patch item lands in the saved list, as ECharts' normal merge maps them: by id, then an id-less item by name,
+	 * then an id-less item into the first place still free. An item with an id no place has is added (undefined).
+	 */
+	function places(target: unknown[], patch: unknown[]): (number | undefined)[] {
+		const taken = new Set<number>();
+		const take = (find: (saved: unknown, index: number) => boolean) => {
+			const index = target.findIndex((saved, i) => !taken.has(i) && find(saved, i));
+			if (index >= 0) {
+				taken.add(index);
+			}
+			return index >= 0 ? index : undefined;
+		};
+		const at = patch.map((item) => {
+			const id = keyOf(item, "id");
+			return id === undefined ? undefined : take((saved) => keyOf(saved, "id") === id);
+		});
+		patch.forEach((item, index) => {
+			const name = keyOf(item, "name");
+			if (at[index] === undefined && keyOf(item, "id") === undefined && name !== undefined) {
+				at[index] = take((saved) => keyOf(saved, "name") === name);
+			}
+		});
+		patch.forEach((item, index) => {
+			if (at[index] === undefined && keyOf(item, "id") === undefined) {
+				at[index] = take(() => true);
+			}
+		});
+		return at;
+	}
+
 	/** A list of series with the kit's defaults; `over` is the list it overrides (a media option's over its baseOption's). */
 	function series(list: unknown[], option: Item, sides: Sides, over?: unknown[]) {
+		const at = over ? places(over, list) : [];
 		return list.map((s, i) => {
 			if (!isObject(s)) {
 				return s;
@@ -155,21 +195,26 @@ window.ChartsDefaults = (() => {
 			if (!over) {
 				return marked(styled(labelled(s), generated(s, i)), option, sides.get(i) ?? new Set());
 			}
-			// An override: the kit's styling where it differs from what the base series gets, solid where a dash goes.
-			const base = isObject(over[i]) ? over[i] : {};
-			const was = generated(base, i);
-			const now = generated(
-				{
-					...base,
-					...s,
-					lineStyle: { ...objectAt(base, "lineStyle"), ...objectAt(s, "lineStyle") },
-				},
-				i,
-			);
-			const dropped =
-				"lineStyle" in was && !("lineStyle" in now) && !("type" in objectAt(s, "lineStyle"));
-			return styled(s, dropped ? { lineStyle: { type: "solid" } } : now);
+			return overridden(s, over[at[i] ?? -1], at[i] ?? i);
 		});
+	}
+
+	/** An override's styling uses its matched base series and palette slot. */
+	function overridden(s: Item, inherited: unknown, slot: number): Item {
+		// An override: the kit's styling where it differs from what the base series gets, solid where a dash goes.
+		const base = isObject(inherited) ? inherited : {};
+		const was = generated(base, slot);
+		const now = generated(
+			{
+				...base,
+				...s,
+				lineStyle: { ...objectAt(base, "lineStyle"), ...objectAt(s, "lineStyle") },
+			},
+			slot,
+		);
+		const dropped =
+			"lineStyle" in was && !("lineStyle" in now) && !("type" in objectAt(s, "lineStyle"));
+		return styled(labelled(s, base), dropped ? { lineStyle: { type: "solid" } } : now);
 	}
 
 	type Sides = ReadonlyMap<number, ReadonlySet<number>>;
@@ -185,20 +230,27 @@ window.ChartsDefaults = (() => {
 		return { ...component, series: Array.isArray(component.series) ? done : done[0] };
 	}
 
+	const settings = (option: ChartOption): ChartOption =>
+		isObject(option.baseOption) ? option.baseOption : option;
+
 	/**
 	 * The option with the kit's defaults on its series: at its root, or in its baseOption and, over that, each of its timeline
 	 * options and media options. `sides` names, by series index, the markers whose labels go left of their line (see place).
 	 */
-	function defaults(option: ChartOption, sides: Sides = new Map()): ChartOption {
-		if (!isObject(option.baseOption)) {
-			return withSeries(option, option, sides);
-		}
-		const base = option.baseOption;
+	function defaults(
+		option: ChartOption,
+		sides: Sides = new Map(),
+		inherited?: ChartOption,
+	): ChartOption {
+		const parent = inherited && settings(inherited);
+		const base = isObject(option.baseOption) ? option.baseOption : (parent ?? option);
 		const baseSeries = listOf(base.series) ?? [];
 		const over = (o: unknown) => (isObject(o) ? withSeries(o, base, sides, baseSeries) : o);
 		return {
-			...option,
-			baseOption: withSeries(base, base, sides),
+			...(isObject(option.baseOption)
+				? option
+				: withSeries(option, base, sides, parent ? baseSeries : undefined)),
+			...(isObject(option.baseOption) && { baseOption: withSeries(base, base, sides) }),
 			...(Array.isArray(option.options) ? { options: option.options.map(over) } : {}),
 			...(Array.isArray(option.media)
 				? {
@@ -216,10 +268,24 @@ window.ChartsDefaults = (() => {
 	 */
 	const styling = (option: ChartOption) => {
 		const listed = (o: unknown) => (isObject(o) ? (listOf(o.series) ?? []) : []);
-		const root = isObject(option.baseOption) ? option.baseOption : option;
-		return JSON.stringify(
-			listed(root).map((s, i) => (isObject(s) ? [generated(s, i), s.markLine ?? null] : null)),
-		);
+		const root = settings(option);
+		const base = listed(root);
+		const styles = (o: unknown) => {
+			const list = listed(o);
+			const at = places(base, list);
+			return list.map((s, i) =>
+				isObject(s)
+					? [generated(s, i), s.markLine ?? null, treemapData(s, base[at[i] ?? -1])]
+					: null,
+			);
+		};
+		return JSON.stringify([
+			styles(root),
+			...(Array.isArray(option.options) ? option.options.map(styles) : []),
+			...(Array.isArray(option.media)
+				? option.media.map((m: unknown) => styles(isObject(m) ? m.option : null))
+				: []),
+		]);
 	};
 
 	/** The private model of a drawn chart, as far as place reads it; ECharts declares no public type for it. */
@@ -273,5 +339,5 @@ window.ChartsDefaults = (() => {
 		return past;
 	}
 
-	return { defaults, styling, place };
+	return { defaults, styling, place, places };
 })();
