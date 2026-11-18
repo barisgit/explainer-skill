@@ -54,7 +54,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		open?.remove();
 	};
 
-	/** A measured overlay inside the page column and viewport: beside the target, else above, below, then clamped. */
+	/** A measured overlay inside the page column and viewport: above the target, else beside, below, then clamped. */
 	function position(popup: HTMLElement, at: DOMRect) {
 		const column = root.getBoundingClientRect();
 		const left = Math.max(8, column.left);
@@ -66,12 +66,14 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		const clampY = (y: number) => Math.max(8, Math.min(y, innerHeight - height - 8));
 		let x = clampX(at.right - width);
 		let y = at.top - height - 6;
-		// Beside the selection keeps the following line clear even when there is no room above it.
-		if (at.right + 6 + width <= right) {
-			x = at.right + 6;
-			y = at.bottom - height;
-		} else if (y < 8) {
-			y = at.bottom + 6;
+		// Above keeps following prose clear; beside is useful for a selection at the very top of the screen.
+		if (y < 8) {
+			if (at.right + 6 + width <= right) {
+				x = at.right + 6;
+				y = at.bottom - height;
+			} else {
+				y = at.bottom + 6;
+			}
 		}
 		popup.style.left = `${clampX(x) + scrollX}px`;
 		popup.style.top = `${clampY(y) + scrollY}px`;
@@ -305,12 +307,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 			return;
 		}
 		const target = partTarget(part);
-		showHint(
-			`${kitText("noteOn")} “${target.part}”`,
-			new DOMRect(e.clientX, e.clientY, 0, 0),
-			target,
-			false,
-		);
+		showHint(`${kitText("noteOn")} “${target.part}”`, part.getBoundingClientRect(), target, false);
 	});
 	markTargets();
 	document.addEventListener("keydown", (e) => {

@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Cdp } from "../skills/explainer/src/cdp.ts";
+import { runStep } from "../skills/explainer/src/steps.ts";
 import { withTestPage } from "./browser.ts";
 import { load, packedMdx, scratch, WIDTHS } from "./support.ts";
 
@@ -23,6 +24,8 @@ Select a passage to send feedback.
 <h3>What each stack has</h3>
 <p>The next line must remain readable while the reader adds a note.</p>
 <p id="right" style={{ textAlign: "right" }}>A selection at the right edge.</p>
+<p>The <span id="term" data-ref="input">input</span> reaches the processor. A longer explanation continues through several sentences to hold a figure beside the argument.</p>
+<div data-ref="input">Input partner</div>
 
 | Item | Explanation |
 | --- | --- |
@@ -95,12 +98,24 @@ const MEASURE = `(selector) => {
 /** Exercise the same selection-to-editor journey at each edge and in nested content. */
 async function scenario(cdp: Cdp, label: string, name: string, selector: string, edge: string) {
 	const failed: string[] = [];
-	await select(cdp, selector, edge);
+	if (name === "term") {
+		await cdp.evaluate(
+			"document.querySelector('.reply-pop .btn')?.click(); getSelection().removeAllRanges()",
+		);
+		await runStep(cdp, `hover:${selector}`, () => "");
+		const point = await cdp.evaluate<{ x: number; y: number }>(`(() => {
+			const box = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+			return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
+		})()`);
+		await runStep(cdp, `click:${point.x},${point.y}`, () => "");
+	} else {
+		await select(cdp, selector, edge);
+	}
 	await shot(cdp, `${label}-hint`);
 	const hint = await cdp.evaluate<Record<string, boolean>>(`(${MEASURE})('.reply-hint')`);
 	const nextReadable = await cdp.evaluate<boolean>(`(() => {
 		const hint = document.querySelector('.reply-hint').getBoundingClientRect();
-		const selection = getSelection().getRangeAt(0).getBoundingClientRect();
+		const selection = ${name === "term" ? "document.querySelector('#term').getBoundingClientRect()" : "getSelection().getRangeAt(0).getBoundingClientRect()"};
 		return hint.bottom <= selection.bottom || hint.left >= selection.right;
 	})()`);
 	// At 8 px from the top a full-width selection leaves neither an above nor a beside slot; below is the bounded fallback.
@@ -141,6 +156,7 @@ test("selection notes have opaque surfaces and stay in the column and viewport w
 					["right", "#right", "center"],
 					["table", "#cell", "center"],
 					["code", "pre code", "center"],
+					["term", "#term", "center"],
 				] as const) {
 					failed.push(
 						...(await scenario(cdp, `${viewport.width}-${scheme}-${name}`, name, selector, edge)),
