@@ -100,6 +100,8 @@ body {
 	color: var(--ink);
 	font: var(--size-text) / 1.55 var(--font);
 	text-wrap: pretty;
+	/* Emergency breaks keep URLs and other unbroken prose inside their column; pre keeps its own whitespace rules. */
+	overflow-wrap: break-word;
 	font-synthesis: none;
 	-webkit-font-smoothing: antialiased;
 }
@@ -2086,6 +2088,10 @@ details > :last-child:not(summary) {
 	font-size: var(--size-label);
 	line-height: 1.35;
 	text-decoration: none;
+}
+/* The rail and its narrow disclosure scroll: keep the ring inside a link's box, clear of their clips. */
+.toc a:focus-visible {
+	outline-offset: -2px;
 }
 .toc a:hover,
 .toc a:is([aria-current], .is-trail) {
@@ -5333,6 +5339,7 @@ window.ViewsFolds = (kitText) => {
 window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const STATE_KEY = "viewTrail";
   const AT_KEY = "viewTrailAt";
+  const OVERVIEW_KEY = "viewTrailOverview";
   const RAIL_LIST_MAX = 12;
   const KIT_NAV = ".trail, .toc";
   const overview = document.querySelector("[data-overview]");
@@ -5341,6 +5348,8 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const names = new Set(views.map((v) => nameOf(v.dataset.view ?? "")));
   const drawn = new Map;
   let steps = [];
+  let overviewHash = "";
+  const backHrefs = new WeakMap;
   function clean(text) {
     return (text ?? "").replace(/\s+/g, " ").trim();
   }
@@ -5435,6 +5444,12 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const atHere = (step) => key(locationHash()) === step.hash ? { ...step, at: locationHash() } : step;
   function stamp(hash, redrawn) {
     const kept = savedTrail();
+    const savedOverview = entryState()[OVERVIEW_KEY];
+    if (!hash) {
+      overviewHash = locationHash();
+    } else if (typeof savedOverview === "string") {
+      overviewHash = savedOverview;
+    }
     const last = kept?.at(-1);
     if (kept && last?.hash === hash) {
       steps = [...kept.slice(0, -1), atHere(redrawn ? { ...last, label: label(hash) } : last)];
@@ -5443,12 +5458,24 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     }
     clicked = null;
     try {
-      navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
+      navigation.updateCurrentEntry({
+        state: { [STATE_KEY]: steps, [AT_KEY]: locationHash(), [OVERVIEW_KEY]: overviewHash }
+      });
     } catch {}
+  }
+  function updateBackLinks(view) {
+    for (const link of view.querySelectorAll(".back")) {
+      const href = link.getAttribute("href");
+      if (href === "#" || href === backHrefs.get(link)) {
+        const next = `#${overviewHash}`;
+        link.setAttribute("href", next);
+        backHrefs.set(link, next);
+      }
+    }
   }
   function crumbs(here, back) {
     const list = make("ol", { class: "crumbs" });
-    list.append(item(back ?? make("a", { href: "#" }, overviewName())));
+    list.append(item(back ?? make("a", { href: `#${overviewHash}` }, overviewName())));
     for (const step of steps.slice(0, -1)) {
       list.append(item(make("a", { href: `#${step.at ?? hrefFor(step.hash)}` }, step.label)));
     }
@@ -5551,6 +5578,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     return sub;
   }
   function updateRail(rail, hash) {
+    rail.home.setAttribute("href", hash ? `#${overviewHash}` : "#");
     for (const { li, owns } of rail.entries) {
       for (const old of li.querySelectorAll("ol")) {
         old.remove();
@@ -5592,13 +5620,16 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       const own = revisited();
       history.replaceState(history.state, "", hash ? `#${hash}` : location.pathname + location.search);
       const last = steps.at(-1);
+      if (!last) {
+        overviewHash = locationHash();
+      }
       if (last) {
         steps = [...steps.slice(0, -1), atHere(last)];
       }
       if (own) {
         try {
           navigation.updateCurrentEntry({
-            state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() }
+            state: { [STATE_KEY]: steps, [AT_KEY]: locationHash(), [OVERVIEW_KEY]: overviewHash }
           });
         } catch {}
       }
@@ -5621,6 +5652,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       stamp(current, redrawn);
       const here = steps.at(-1);
       if (view && here) {
+        updateBackLinks(view);
         const back = view.querySelector(".back");
         trailBar(view).replaceChildren(crumbs(here, back), ...neighbours(here));
       }

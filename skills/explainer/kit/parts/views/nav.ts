@@ -35,6 +35,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	const STATE_KEY = "viewTrail";
 	/** The location hash the trail was saved for: a fragment navigation copies the state into its new entry, where it is not yet its own. */
 	const AT_KEY = "viewTrailAt";
+	const OVERVIEW_KEY = "viewTrailOverview";
 	const RAIL_LIST_MAX = 12;
 	/** The navigation this part builds: its links are never the page's own. */
 	const KIT_NAV = ".trail, .toc";
@@ -47,6 +48,9 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	/** The hash each view element was last drawn for: its heading and links belong to that hash. */
 	const drawn = new Map<HTMLElement, string>();
 	let steps: Step[] = [];
+	/** The overview URL left behind, carried with the trail through siblings, history and reload. */
+	let overviewHash = "";
+	const backHrefs = new WeakMap<Element, string>();
 
 	function clean(text: string | null | undefined) {
 		return (text ?? "").replace(/\s+/g, " ").trim();
@@ -222,6 +226,12 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	 */
 	function stamp(hash: string, redrawn: boolean) {
 		const kept = savedTrail();
+		const savedOverview = entryState()[OVERVIEW_KEY];
+		if (!hash) {
+			overviewHash = locationHash();
+		} else if (typeof savedOverview === "string") {
+			overviewHash = savedOverview;
+		}
 		const last = kept?.at(-1);
 		if (kept && last?.hash === hash) {
 			// The same view, perhaps with other local state after its route: its crumb returns to the state now shown.
@@ -231,15 +241,29 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 		}
 		clicked = null;
 		try {
-			navigation.updateCurrentEntry({ state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() } });
+			navigation.updateCurrentEntry({
+				state: { [STATE_KEY]: steps, [AT_KEY]: locationHash(), [OVERVIEW_KEY]: overviewHash },
+			});
 		} catch {
 			// No Navigation API, or a document whose entries it disables (a sandboxed frame): the trail stays in memory.
 		}
 	}
 
+	/** Default Back links return to the overview state; explicitly authored destinations keep their meaning. */
+	function updateBackLinks(view: HTMLElement) {
+		for (const link of view.querySelectorAll(".back")) {
+			const href = link.getAttribute("href");
+			if (href === "#" || href === backHrefs.get(link)) {
+				const next = `#${overviewHash}`;
+				link.setAttribute("href", next);
+				backHrefs.set(link, next);
+			}
+		}
+	}
+
 	function crumbs(here: Step, back: Element | null) {
 		const list = make("ol", { class: "crumbs" });
-		list.append(item(back ?? make("a", { href: "#" }, overviewName())));
+		list.append(item(back ?? make("a", { href: `#${overviewHash}` }, overviewName())));
 		for (const step of steps.slice(0, -1)) {
 			list.append(item(make("a", { href: `#${step.at ?? hrefFor(step.hash)}` }, step.label)));
 		}
@@ -399,6 +423,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	}
 
 	function updateRail(rail: Rail, hash: string) {
+		rail.home.setAttribute("href", hash ? `#${overviewHash}` : "#");
 		for (const { li, owns } of rail.entries) {
 			for (const old of li.querySelectorAll("ol")) {
 				old.remove();
@@ -461,13 +486,16 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 				hash ? `#${hash}` : location.pathname + location.search,
 			);
 			const last = steps.at(-1);
+			if (!last) {
+				overviewHash = locationHash();
+			}
 			if (last) {
 				steps = [...steps.slice(0, -1), atHere(last)];
 			}
 			if (own) {
 				try {
 					navigation.updateCurrentEntry({
-						state: { [STATE_KEY]: steps, [AT_KEY]: locationHash() },
+						state: { [STATE_KEY]: steps, [AT_KEY]: locationHash(), [OVERVIEW_KEY]: overviewHash },
 					});
 				} catch {
 					// No Navigation API, or a document whose entries it disables: the trail stays in memory, as in stamp().
@@ -500,6 +528,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 			const here = steps.at(-1);
 			if (view && here) {
 				// Found before the bar is redrawn: the .back link sits beside the new bar, or in the crumbs it is about to replace.
+				updateBackLinks(view);
 				const back = view.querySelector(".back");
 				trailBar(view).replaceChildren(crumbs(here, back), ...neighbours(here));
 			}
