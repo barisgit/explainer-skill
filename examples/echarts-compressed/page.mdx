@@ -1,0 +1,67 @@
+---
+title: Shipping ECharts compressed
+display: condensed
+---
+import { Question, Table } from "kit";
+import data from "./data.json";
+import { alternatives } from "./rows.ts";
+import Opening from "./opening.mdx";
+
+# Shipping ECharts compressed takes *{data.saved} KB* off every chart page and costs {Object.values(data.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms.
+
+Commit 7d4f018 makes pack inline `kit/echarts.js` as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.
+
+<Opening />
+
+## Four files change, and the charts wait for ECharts
+
+```mermaid tag:file=1 tag:atob=2 tag:inflate=3 tag:run=4 tag:mount=5
+flowchart LR
+	file["page file<br>418 KB inlined"] --> atob["atob<br>11 ms"]
+	atob -->|313 KB| inflate["inflate<br>3 ms"]
+	inflate -->|931 KB| run["parse and run<br>17 ms"]
+	run --> mount["charts mount"]
+```
+
+<span data-ref="file">1</span> `pack` writes the deflated bytes into the script's `data-deflate`. A loader decodes them <span data-ref="atob">2</span>, inflates them <span data-ref="inflate">3</span> and runs the result <span data-ref="run">4</span>. <span data-ref="mount">5</span> `charts.js` mounts a chart once `echartsReady` has resolved.
+
+```diff ref:file="deflateRawSync" ref:file='data-deflate'
+--- skills/explainer/src/kit.ts
++		deflate: deflateRawSync(text.slice(header.length), { level: 9 }).toString("base64"),
+--- skills/explainer/src/pack.ts
+-	`<script${type ? ` type="${type}"` : ""}>${safeScript(readKitText(path))}</script>`,
++	`<script${type ? ` type="${type}"` : ""}${deflate ? ` data-deflate="${deflate}"` : ""}>${safeScript(text)}</script>`,
+```
+
+```diff ref:atob="atob(packed)" ref:inflate="DecompressionStream" ref:run="document.head.append(script)"
+--- skills/explainer/kit/unpack.ts (new)
++		const bytes = Uint8Array.from(atob(packed), (char) => char.charCodeAt(0));
++		const inflated = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
++		const script = document.createElement("script");
++		script.text = await new Response(inflated).text();
++		document.head.append(script);
++	window.echartsReady = unpack();
+```
+
+```diff ref:mount="window.echartsReady"
+--- skills/explainer/kit/charts.ts
+-	if (!window.echarts) {
++	if (!(window.echarts || window.echartsReady)) {
++		window.echartsReady,
+```
+
+## Nothing measured beat deflate-raw
+
+<Table rows={alternatives} state={(a) => a.state} cols={[{ head: "Alternative", value: "name" }, { head: "In the page", value: "size" }, { head: "Why", value: "why" }]} />
+
+## A browser without DecompressionStream keeps the drawn charts
+
+Before Chrome 103, Firefox 113 and Safari 16.4 the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.
+
+<section class="band">
+
+## Approve shipping ECharts compressed?
+
+<Question name="verdict" recommended="approve" note options={{ approve: "Approve", changes: "Request changes", ask: "Ask a question" }} />
+
+</section>

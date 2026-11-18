@@ -1,0 +1,4 @@
+import { Chart } from "kit";
+import { treemap } from "./model.ts";
+
+<Chart label="Every package npm installed for express, eslint and jest, sized by unpacked bytes and grouped by the dependency that brings it; the heaviest packages, which hold half the bytes, are in the accent colour" option={treemap(props.links === true)} height="clamp(24rem, 42vw, 34rem)" />

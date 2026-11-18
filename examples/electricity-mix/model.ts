@@ -1,5 +1,5 @@
 /* The electricity extract (data.json, written by extract.py) and every number the page shows, as pure functions of it.
-   page.mdx renders the world table from it when it packs; figures.tsx redraws the figures from it in the browser. */
+   Source: Our World in Data energy dataset (CC BY 4.0), electricity columns by Ember and the Energy Institute. */
 import data from "./data.json";
 
 /** A place in the extract: OWID's reported total and one series per source, in TWh, one value per year; null where blank. */
@@ -11,37 +11,23 @@ export interface Place {
 	twh: (number | null)[][];
 }
 
-/** A band of the stacked mix: a source, or the generation no source accounts for. */
-export interface Part {
-	id: string;
-	name: string;
-	color: string;
-}
-
-/** A source, `at` its column in the extract. */
-export interface Source extends Part {
-	at: number;
-}
-
 export const Y0 = data.first;
 export const Y1 = data.last;
 export const YEARS = Array.from({ length: Y1 - Y0 + 1 }, (_, i) => Y0 + i);
 
-export const COAL: Source = { id: "coal", name: "Coal", at: 0, color: "var(--s-coal)" };
-// Stack order runs bottom to top: fossil fuels, then nuclear, then renewables.
-export const SOURCES: Source[] = [
-	COAL,
-	{ id: "oil", name: "Oil and other fossil", at: 2, color: "var(--s-oil)" },
-	{ id: "gas", name: "Gas", at: 1, color: "var(--s-gas)" },
-	{ id: "nuclear", name: "Nuclear", at: 3, color: "var(--s-nuclear)" },
-	{ id: "hydro", name: "Hydro", at: 4, color: "var(--s-hydro)" },
-	{ id: "wind", name: "Wind", at: 5, color: "var(--s-wind)" },
-	{ id: "solar", name: "Solar", at: 6, color: "var(--s-solar)" },
-	{ id: "bio", name: "Bioenergy", at: 7, color: "var(--s-bio)" },
-	{ id: "other", name: "Other renewables", at: 8, color: "var(--s-other)" },
-];
-/** Generation the release reports in a total but does not split by source (Europe and the EU, 2000 to 2003). */
-export const REST: Part = { id: "rest", name: "Not itemised", color: "var(--rule-strong)" };
+/** The sources, `at` their column in the extract. */
+export const SOURCES = [
+	{ id: "coal", name: "Coal", at: 0 },
+	{ id: "gas", name: "Gas", at: 1 },
+	{ id: "oil", name: "Oil and other fossil", at: 2 },
+	{ id: "nuclear", name: "Nuclear", at: 3 },
+	{ id: "hydro", name: "Hydro", at: 4 },
+	{ id: "wind", name: "Wind", at: 5 },
+	{ id: "solar", name: "Solar", at: 6 },
+	{ id: "bio", name: "Bioenergy", at: 7 },
+	{ id: "other", name: "Other renewables", at: 8 },
+] as const;
+export type SourceId = (typeof SOURCES)[number]["id"];
 
 const slug = (name: string) =>
 	name
@@ -51,87 +37,70 @@ const slug = (name: string) =>
 
 /** Regions first (World leading), then countries by name, as extract.py sorts them. */
 export const PLACES: Place[] = data.places.map((p) => ({ ...p, slug: slug(p.name) }));
-export const COUNTRIES = PLACES.filter((p) => !p.region);
 const bySlug = new Map(PLACES.map((p) => [p.slug, p]));
 export const placeOf = (key: string) => bySlug.get(key);
-
 const world = bySlug.get("world");
 if (!world) {
 	throw new Error("data.json has no World row: rerun extract.py");
 }
 export const WORLD = world;
 
-/* ---- Values. Blank cells stay null; totals are OWID's reported totals. ---- */
-
-/** OWID's reported total in TWh: null where the place has no data that year, possibly 0. */
-export const total = (p: Place, year: number) => p.total[year - Y0] ?? null;
-/** A source's value as the release gives it, blank as null. */
-export const raw = (p: Place, src: Source, year: number) => p.twh[src.at]?.[year - Y0] ?? null;
-const reported = (p: Place, year: number) =>
-	SOURCES.reduce((sum, s) => sum + (raw(p, s, year) ?? 0), 0);
-/** The part of the total the listed sources do not account for. */
-const rest = (p: Place, year: number) => {
-	const t = total(p, year);
-	return t === null ? null : t - reported(p, year);
-};
+const total = (p: Place, y: number) => p.total[y - Y0] ?? null;
+const sum = (p: Place, y: number) => p.twh.reduce((s, series) => s + (series[y - Y0] ?? 0), 0);
 /** A year is itemised when the sources add up to the total within rounding (0.1%). */
-export const itemised = (p: Place, year: number) => {
-	const t = total(p, year);
-	return t !== null && Math.abs(t - reported(p, year)) <= Math.max(0.01, 0.001 * t);
+const itemised = (p: Place, y: number) => {
+	const t = total(p, y);
+	return t !== null && Math.abs(t - sum(p, y)) <= Math.max(0.01, 0.001 * t);
 };
-/** Years with a total that the sources do not account for. */
-export const partialYears = (p: Place) =>
-	YEARS.filter((y) => total(p, y) !== null && !itemised(p, y));
-/**
- * A source's TWh. A blank cell counts as zero only in an itemised year, where the other sources already add up to the total;
- * in a partial year it is unknown (null).
- */
-export const twh = (p: Place, src: Source, year: number) =>
-	raw(p, src, year) ?? (itemised(p, year) ? 0 : null);
-export const restTwh = (p: Place, year: number) => (itemised(p, year) ? 0 : rest(p, year));
-/** Share of a place's generation in percent; null when the value is unknown or the place generated nothing. */
-export const pctOf = (value: number | null, tot: number | null) =>
-	value === null || !tot ? null : (100 * value) / tot;
-export const share = (p: Place, src: Source, year: number) =>
-	pctOf(twh(p, src, year), total(p, year));
-/** The summed share of some sources; null when any of them is unknown. */
-export function sumShare(p: Place, ids: string[], year: number) {
-	let sum = 0;
-	for (const s of SOURCES.filter((src) => ids.includes(src.id))) {
-		const v = share(p, s, year);
-		if (v === null) {
-			return null;
-		}
-		sum += v;
-	}
-	return sum;
-}
+/** A source's TWh; a blank counts as zero only in an itemised year, else it is unknown (null). */
+export const twh = (p: Place, id: SourceId, y: number) => {
+	const at = SOURCES.find((s) => s.id === id)?.at ?? 0;
+	return p.twh[at]?.[y - Y0] ?? (itemised(p, y) ? 0 : null);
+};
 
-/* ---- Text. ---- */
+/** What a place's generation, wind and solar, and coal did in a year, against the year before; null where unknown. */
+export interface Step {
+	year: number;
+	total: number;
+	windSolar: number;
+	coal: number;
+}
+export function step(p: Place, y: number): Step | null {
+	const [t0, t1] = [total(p, y - 1), total(p, y)];
+	const part = (id: SourceId) => {
+		const [a, b] = [twh(p, id, y - 1), twh(p, id, y)];
+		return a === null || b === null ? null : b - a;
+	};
+	const [wind, solar, coal] = [part("wind"), part("solar"), part("coal")];
+	if (t0 === null || t1 === null || wind === null || solar === null || coal === null) {
+		return null;
+	}
+	return { year: y, total: t1 - t0, windSolar: wind + solar, coal };
+}
+/** Every year of a place with a known step. */
+export const steps = (p: Place) =>
+	YEARS.slice(1).flatMap((y) => {
+		const s = step(p, y);
+		return s ? [s] : [];
+	});
+/** The step into the last year of the data, null when the place lacks it. */
+export const latest = (p: Place) => step(p, Y1);
+/** One source's change into the last year, for places with both years. */
+export const change = (p: Place, id: SourceId) => {
+	const [a, b] = [twh(p, id, Y1 - 1), twh(p, id, Y1)];
+	return a === null || b === null ? null : b - a;
+};
 
 const MINUS = "\u2212";
-export const num = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-/** TWh with enough digits that a small value never shows as zero. */
-export function fmtT(v: number) {
+const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+/** A TWh figure with a thousands separator and two significant digits at least, a leading minus where negative. */
+export const fmt = (v: number) => {
 	const a = Math.abs(v);
-	if (v === 0) {
-		return "0";
-	}
-	if (a >= 100) {
-		return num.format(v);
-	}
-	return v.toFixed(a >= 1 ? 1 : a >= 0.01 ? 2 : 3);
-}
-export const pc = (v: number | null, digits = 0) => (v === null ? "–" : `${v.toFixed(digits)}%`);
-const sign = (v: number, text: string) => (v > 0 ? `+${text}` : v < 0 ? `${MINUS}${text}` : text);
-/** A signed change in TWh. */
-export const dT = (v: number) => sign(v, fmtT(Math.abs(v)));
-/** A signed change in percentage points. */
-export const dP = (v: number) =>
-	sign(v, Math.abs(v) >= 0.1 ? Math.abs(v).toFixed(1) : Math.abs(v).toFixed(2));
-/** A table cell: "–" for a value the release leaves blank. */
-export const cell = (v: number | null, fmt: (v: number) => string) => (v === null ? "–" : fmt(v));
-export const list = (names: string[]) => (names.length ? names.join(", ") : "none");
-/** Smallest change that counts as a change, in the unit of each measure (the data has 0.001 TWh resolution). */
-export const EPS = { twh: 0.0005, share: 0.005 };
-export type Unit = keyof typeof EPS;
+	return (v < 0 ? MINUS : "") + (a >= 10 ? nf : a >= 1 ? nf1 : nf2).format(a);
+};
+/** A signed change. */
+export const signed = (v: number) => (v > 0 ? "+" : "") + fmt(v);
+/** The countries with a step into the last year. */
+export const COUNTRIES = PLACES.filter((p) => !p.region && latest(p));

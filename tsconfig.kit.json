@@ -25,5 +25,6 @@
 		"kit-types"
 	],
 	// tsconfig.json leaves test/fixtures out of the Bun-typed check; here the fixture pages' components are browser code to check.
-	"exclude": []
+	// A gallery page's measure.ts runs in Bun and reads the CLI's sources, so tsconfig.json checks it.
+	"exclude": ["examples/*/measure.ts"]
 }

@@ -1,0 +1,15 @@
+import { Graph } from "./graph.tsx";
+import { BELLMAN, BELLMAN_PATH, DIJKSTRA, DIJKSTRA_PATH, TARGET } from "./model.ts";
+
+<figure class="fig">
+<div class="split">
+<div>
+<p class="label">Dijkstra: {TARGET} is {DIJKSTRA.dist[TARGET]} from S, by {DIJKSTRA_PATH.join(" → ")}</p>
+<Graph dist={DIJKSTRA.dist} settled={["S", "A", "B"]} accent={[TARGET]} edges={{ "S>A": "accent" }} />
+</div>
+<div>
+<p class="label">Bellman–Ford: {TARGET} is {BELLMAN.dist[TARGET]} from S, by {BELLMAN_PATH.join(" → ")}</p>
+<Graph dist={BELLMAN.dist} edges={{ "S>B": "ink", "B>A": "ink" }} />
+</div>
+</div>
+</figure>

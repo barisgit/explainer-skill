@@ -203,7 +203,7 @@ test("documented numeric formats retain their drawings, including locale spaces 
 	}
 });
 
-test("each SSR copy lays out the effective legend and keeps electricity-mix's explicit drawing", async () => {
+test("each SSR copy lays out the effective legend and keeps explicit scroll legends drawn", async () => {
 	const base = {
 		legend: {},
 		grid: [{}],
@@ -219,18 +219,17 @@ test("each SSR copy lays out the effective legend and keeps electricity-mix's ex
 		dir,
 		"effective-drawn-legends",
 		`import { Chart } from "kit";
-import { WorldMix } from "${import.meta.dir}/../examples/electricity-mix/figures.tsx";
 
 # Effective legends
 
 <Chart id="inherited" height="520px" label="Inherited" option={${JSON.stringify({ ...base, textStyle: { fontSize: 60 } })}} />
 <Chart id="media" height="520px" label="Responsive" option={${JSON.stringify({ baseOption: { ...base, textStyle: { fontSize: 60 } }, media: [{ query: { minWidth: 440 }, option: { textStyle: { fontSize: 12 } } }] })}} />
 <Chart id="unknown" label="Unknown glyphs" option={${JSON.stringify({ ...base, series: [{ name: "東京", type: "bar", data: [1, 3] }] })}} />
-<WorldMix />
+<Chart id="scroll" label="Explicit scroll legend" option={${JSON.stringify({ ...base, grid: { top: 64, left: 8, right: 24, bottom: 8 }, legend: { type: "scroll", top: 8, left: 8, right: 8 } })}} />
 `,
 	);
 	const figures = drawnFigures(path);
-	expect(figures.get("world")).toContain("chart-drawn");
+	expect(figures.get("scroll")).toContain("chart-drawn");
 	expect(figures.get("unknown")).toBeUndefined();
 	for (const id of ["inherited", "media"]) {
 		expect(viewBoxes(figures.get(id))).toEqual(["1054x520", "527x520", "356x520"]);

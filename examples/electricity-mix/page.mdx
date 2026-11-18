@@ -1,64 +1,53 @@
 ---
-title: How the world's electricity mix changed since 2000
+title: Is wind and solar replacing coal?
 ---
-import { Table, View } from "kit";
-import { CoalRanking } from "./coal.tsx";
-import { ChangeExplorer, WorldMix } from "./figures.tsx";
-import { PLACES, raw, SOURCES, total, WORLD, YEARS } from "./model.ts";
+import { Plot, Records, View } from "kit";
+import Opening from "./opening.mdx";
+import { BY_SOURCE, COAL, FELL, MOVERS, OTHERS, REST, ROSE, TOTAL, WS } from "./facts.ts";
+import { fmt, signed, Y1 } from "./model.ts";
+import places from "./places.ts";
 import { PlaceView } from "./place.tsx";
-import "./page.css";
 
-# The world generates twice the electricity it did in 2000. Wind and solar grew from 0.2% of it to 15%, but *coal still supplies about a third*.
+# Wind and solar added <em>{fmt(WS)} TWh</em> in {Y1}. Total generation added {fmt(TOTAL)}.
 
-Explore any country or region, and see who left coal fastest.
+World electricity generation, change on the year before, in TWh. Source: Our World in Data, from Ember and the Energy Institute.
 
-<WorldMix />
+<Opening />
+
+## {OTHERS.slice(0, 3).map((s, i) => (i ? s.name.toLowerCase() : s.name)).join(", ").replace(/, ([^,]+)$/, " and $1")} supplied most of the other {fmt(REST)} TWh. Coal grew {fmt(COAL)}.
+
+<Plot
+	height="22rem"
+	label={`What each source added to world generation in ${Y1}, TWh`}
+	option={{
+		horizontal: true,
+		categories: BY_SOURCE.map((s) => s.name),
+		series: [{ type: "bar", data: BY_SOURCE.map((s) => Math.round(s.value)), fill: BY_SOURCE.map((s) => (s.windSolar ? "accent" : "")), label: true }],
+	}}
+/>
+
+## Coal fell in {FELL.n} countries ({signed(FELL.twh)} TWh) and rose in {ROSE.n} ({signed(ROSE.twh)}).
+
+<Plot
+	height="44rem"
+	label={`Countries where coal generation changed most in ${Y1}, with their wind and solar, TWh`}
+	option={{
+		horizontal: true,
+		categories: MOVERS.map((c) => c.name),
+		series: [
+			{ name: "Coal", type: "bar", data: MOVERS.map((c) => Math.round(c.coal)), label: true },
+			{ name: "Wind and solar", type: "bar", color: "var(--accent)", data: MOVERS.map((c) => Math.round(c.windSolar)), label: true },
+		],
+	}}
+/>
 
 <details>
-<summary>Values, world, every year (TWh, rounded)</summary>
-<div class="scroll table-box">
-<Table
-	class="table"
-	rows={YEARS}
-	cols={[
-		{ head: "Year", value: String },
-		...SOURCES.map((s) => ({ head: s.name, value: (y) => raw(WORLD, s, y), format: { digits: 0 } })),
-		{ head: "Total", value: (y) => total(WORLD, y), format: { digits: 0 } },
-	]}
-/>
-</div>
+<summary>Every place, with its own view</summary>
+<Records {...places} />
 </details>
 
-{/* These sections' headings state what their controls show, so the components render them, then the intro written here. */}
+## Sources
 
-<section>
-<ChangeExplorer>
-Pick any place and stretch the end year. Bars to the right grew; bars to the left shrank. Switch the unit: a source can produce more electricity and still supply a smaller share of a growing total.
-</ChangeExplorer>
-</section>
+Our World in Data, [energy dataset](https://github.com/owid/energy-data) (CC BY 4.0), electricity columns from [Ember](https://ember-energy.org/data/yearly-electricity-data/) and the [Energy Institute](https://www.energyinst.org/statistical-review/), 2000 to {Y1}. Figures are generation, not consumption, and each is the change from the year before, so weather moves them: a wet year lifts hydro. A blank cell counts as zero only where the other sources already add up to the reported total; countries without both years are left out of the counts.
 
-<section>
-<CoalRanking>
-Every country with data for both years, ranked. Change the period or the size cut-off, flip to the countries that moved toward coal, or switch from share to terawatt-hours: the order changes, and for China the two tell opposite stories.
-</CoalRanking>
-
-<p class="caveat"><b>Reading it</b>Shares in a single year move with weather and demand: a wet year can lift hydro and lower coal's share without any policy change. Over a short period that can overstate or understate the underlying trend.</p>
-</section>
-
-<section class="minor">
-
-## Where the numbers come from
-
-- **Dataset.** Our World in Data, [Energy dataset](https://github.com/owid/energy-data) (`owid-energy-data.csv`), downloaded 22 October 2026. Authors: Pablo Rosado, Hannah Ritchie, Edouard Mathieu and Max Roser. The dataset page marks this release as legacy and no longer updated.
-- **Underlying sources and licences.** The electricity columns come from [Ember, Yearly Electricity Data](https://ember-energy.org/data/yearly-electricity-data/) (published under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), per [Ember's API documentation](https://api.ember-energy.org/v1/docs)) and, for some places and years, the [Energy Institute, Statistical Review of World Energy](https://www.energyinst.org/statistical-review/). Our World in Data licenses its own visualisations, data and code under CC BY 4.0, but states that third-party data stays under the original provider's terms. The Energy Institute's terms are its own, not CC BY: attribution is required and extensive reproduction needs its permission, so check them before reusing the extract.
-- **What was kept.** Electricity generation in terawatt-hours (TWh) for nine sources and OWID's reported total, 2000 to 2024, for the world, seven regions, the European Union and every country with data: 215 countries and territories. 2025 is left out because the release covers it for only 106 places.
-- **Missing values.** Blank cells stay blank and show as "–" in tables. Where the listed sources add up to less than the reported total (Europe and the EU, 2000 to 2003, where wind is blank) the difference is drawn as "Not itemised". Where a source is blank but the others already add up to the total, the charts count it as zero.
-- **Source definitions.** "Oil and other fossil" is OWID's oil column, which draws on Ember's "Other fossil": oil and petroleum products, manufactured gases and waste. "Other renewables" excludes bioenergy and, in [Ember's definition](https://api.ember-energy.org/v1/docs), includes geothermal, tidal and wave generation.
-- **Generation, not consumption.** Shares are of electricity generated inside a place, so imports and exports are not counted. A place with no data for a chosen year (Ukraine after 2022, for example), or that generated nothing in it, is left out of rankings that use that year and has no shares for it.
-- **Rankings.** Change in coal's share is the end-year share minus the start-year share, in percentage points of that place's own generation. Any change counts, however small; countries with no change are not listed. The size cut-off uses electricity generated in the end year.
-
-</section>
-
-{/* One view for every place, drawn when the reader opens it (#place/china): the page carries the data once, not 223 views. */}
-
-<View name="place" records={PLACES.map((p) => ({ id: p.slug }))} render={PlaceView} back="All places" />
+<View name="place" records={places.data.map((p) => ({ id: p.id }))} render={PlaceView} back="All places" />

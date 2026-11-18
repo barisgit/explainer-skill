@@ -1,0 +1,17 @@
+import { Plot } from "kit";
+import { LIMIT, THOUSAND, fixed, idealLine, sumLine } from "./fourier.ts";
+
+<Plot
+	label={`The square wave and its ${THOUSAND}-term sum, zoomed on the jump at x = 0`}
+	height="clamp(16rem, 36vw, 22rem)"
+	option={{
+		series: [
+			{ name: "Square wave", type: "line", data: idealLine(0.01), width: 1.5 },
+			{ name: `${THOUSAND} terms`, type: "line", data: sumLine(THOUSAND, -0.01, 0.01, 800), color: "var(--accent)", width: 2 },
+		],
+		marks: [{ y: LIMIT, label: `${fixed(LIMIT)}: limit of the peak` }],
+		x: { min: -0.01, max: 0.01, step: 0.005, name: "x, radians from the jump" },
+		y: { min: -1.5, max: 1.5, step: 0.5 },
+		legend: false,
+	}}
+/>

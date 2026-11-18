@@ -1,0 +1,67 @@
+---
+title: Why the I²C sensor drops bytes at 400 kHz
+---
+import { Explore, Question, Table } from "kit";
+import Opening from "./opening.mdx";
+import { LIMITS, N, VALUES, stripFrame } from "./bus.ts";
+
+# The {N.found} pull-ups take {N.foundTr} ns to raise the line. At 400 kHz the bus allows {N.fastTr}.
+
+A {N.vdd} V bus with about {N.cb} pF on each line, timed from 0.3 to 0.7 VDD as the I²C specification times it.
+
+<Opening />
+
+## Nothing drives the line high but a resistor
+
+<div class="beside">
+<div>
+
+The <span data-ref="U1">MCU</span> and the <span data-ref="U2">sensor</span> can only pull <span data-ref="sda">SDA</span> and <span data-ref="scl">SCL</span> low. When they let go, <span data-ref="R_SDA">R<sub>SDA</sub></span> has to charge the line's capacitance <span data-ref="C_SDA">C<sub>SDA</sub></span> on its own, and the time that takes grows with the product of the two.
+
+At 100 kHz an {N.foundTr} ns edge fits inside the {N.standardTr} ns Standard-mode allows. At 400 kHz the edge outlasts the {N.fastTr} ns the specification allows, so SDA may still be under 0.7 VDD, the lowest level UM10204 counts as high (Table 10), when the sensor reads it.
+
+</div>
+
+```schematic
+U1 ic MCU @0,0 right SDA=sda SCL=scl
+U2 ic Sensor SDA@U1.SDA 6,0 left SDA=sda SCL=scl
+R_SDA vbus sda 10k b@U1.SDA 2,-3 v
+R_SCL vbus scl 10k a@R_SDA.a 3,0 v
+C_SDA sda 0 100 pF a@U1.SDA 2,5 v
+C_SCL scl 0 100 pF a@C_SDA.a 3,0 v
+VDD port vbus 3.3 V @R_SDA.a -4,-2
+```
+
+</div>
+
+## Any standard value from {N.low} to {N.high} fits; {N.fix} leaves room
+
+<Explore label="Rise time of each E12 pull-up from 680 Ω to 10 kΩ against the 300 ns limit" controls={[{ id: "r", label: "Pull-up", choice: VALUES, value: "2200", axis: true }]} frame={stripFrame} />
+
+{N.high} only just fits, at {N.highTr} ns, if the {N.cb} pF estimate is right. {N.fix} still fits up to {N.fixCbMax} pF.
+
+## Where 0.8473 comes from
+
+Released at $t = 0$, the line charges towards VDD as $V(t) = V_{DD}\,(1 - e^{-t/RC})$. It crosses 0.3 VDD at $t_1 = RC \ln\frac{1}{0.7}$ and 0.7 VDD at $t_2 = RC \ln\frac{1}{0.3}$, so
+
+$$
+\begin{aligned} t_r &= t_2 - t_1 = RC \ln\frac{0.7}{0.3} = 0.8473\,R\,C_b \\ &= 0.8473 \cdot 10\,\text{k}\Omega \cdot 100\,\text{pF} = 847\,\text{ns} \end{aligned}
+$$
+
+The bounds follow: $R_{max} = t_r / (0.8473\,C_b)$, which is {N.fastRMax} kΩ at 400 kHz, and $R_{min} = (V_{DD} - 0.4\,\text{V}) / I_{OL}$, which is {N.fastRMin} Ω for a 3 mA pin.
+
+## The limits per mode
+
+<Table rows={LIMITS} cols={[{ head: "Mode", value: "name", note: "fSCL" }, { head: "Rise time, max", value: "tr", format: { unit: "ns" } }, { head: "Bus capacitance, max", value: "cb", format: { unit: "pF" } }, { head: "Sink current, min", value: "iol", format: { unit: "mA" } }, { head: "Pull-up, min at 3.3 V", value: "rMin", format: { unit: "Ω" } }, { head: "Pull-up, max at 100 pF", value: "rMax", format: { digits: 1, unit: "kΩ" } }]} />
+
+<Question name="grown" legend={`A longer cable brings each line to ${N.grownCb} pF. What should the pull-ups be at 400 kHz?`} options={{ same: `${N.fix} still fits`, [N.grownHighCode]: N.grownHigh, none: "No standard value fits" }} answer={N.grownHighCode}>
+
+{N.fix} now takes {N.grownFixTr} ns. {N.grownHigh} takes {N.grownHighTr} ns and sinks well under 3 mA; the next value up, {N.grownNext}, takes {N.grownNextTr}.
+
+</Question>
+
+<section class="minor">
+
+Limits from the NXP [I²C-bus specification UM10204, Rev. 7.0](https://www.nxp.com/docs/en/user-guide/UM10204.pdf): Table 10 (thresholds, 3 mA at 0.4 V), Table 11 (rise time, bus capacitance) and Section 7.1 (0.8473 and the pull-up bounds). VDD = {N.vdd} V and {N.cb} pF per line are assumptions for an illustrative board; the model is an ideal RC charge, with no pin leakage and no current-source or switched pull-ups.
+
+</section>

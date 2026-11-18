@@ -1,0 +1,14 @@
+{
+	"plain": 931,
+	"binary": 313,
+	"packed": 418,
+	"saved": 513,
+	"gzip": 418,
+	"brotli": 344,
+	"latin1": 470,
+	"unpackMs": {
+		"atob": 11,
+		"inflate": 3,
+		"run": 17
+	}
+}

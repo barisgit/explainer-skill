@@ -1,0 +1,9 @@
+{
+	"name": "node-modules-example",
+	"private": true,
+	"dependencies": {
+		"eslint": "^10.0.0",
+		"express": "^5.0.0",
+		"jest": "^30.0.0"
+	}
+}

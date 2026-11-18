@@ -1,0 +1,15 @@
+import { Plot } from "kit";
+import { euro } from "./energy.ts";
+import { BLOCKS, CYCLES, LIFE } from "./model.ts";
+
+<Plot
+	height="clamp(15rem, 24vw, 21rem)"
+	label={`Years until each 5 kWh block of a home battery has paid for itself: ${BLOCKS.map((b) => `${b.name} ${b.years}`).join(", ")}, against cells rated for ${LIFE} years`}
+	option={{
+		horizontal: true,
+		categories: BLOCKS.map((b) => ({ name: b.name, note: `${euro(b.cost)} ÷ ${euro(b.saves)} a year` })),
+		series: [{ type: "bar", data: BLOCKS.map((b) => b.years), fill: ["accent", "hollow", "hatch"], label: { unit: "years" } }],
+		marks: [{ x: LIFE, label: `${LIFE} years: cells rated for ${CYCLES.toLocaleString("en")} cycles` }],
+		x: { min: 0, max: Math.ceil((BLOCKS[1].years * 1.15) / 10) * 10 },
+	}}
+/>

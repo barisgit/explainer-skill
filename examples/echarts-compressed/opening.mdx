@@ -1,0 +1,16 @@
+import { Plot } from "kit";
+import data from "./data.json";
+
+<Plot
+	label={`ECharts in a chart page: ${data.plain} KB plain, ${data.packed} KB compressed`}
+	height="clamp(10rem, 16vw, 14rem)"
+	option={{
+		horizontal: true,
+		categories: [
+			{ name: "Plain", note: "kit/echarts.js" },
+			{ name: "Compressed", note: "deflate-raw in base64" },
+		],
+		series: [{ type: "bar", data: [data.plain, data.packed], fill: ["", "accent"], label: { unit: "KB" } }],
+		x: { min: 0 },
+	}}
+/>
