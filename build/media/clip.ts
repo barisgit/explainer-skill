@@ -2,8 +2,8 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Cdp } from "../../skills/explainer/src/cdp.ts";
 import { settle } from "../../skills/explainer/src/chrome.ts";
-import { boxOf, resolveRegion, SCALE, screenshot, scrollToTop } from "./page.ts";
-import type { Action, Clip, Frame, Rect, Target } from "./types.ts";
+import { boxOf, resolveRegion, SCALE, screenshot, scrollToTop, TOP_MARGIN } from "./page.ts";
+import type { Action, Clip, Frame, Rect } from "./types.ts";
 import { DEFAULT_HOLD, DEFAULT_TRAVEL } from "./types.ts";
 
 /** How long the mouse button stays down in a click, long enough to show in at least one frame. */
@@ -136,35 +136,23 @@ class Recorder {
 		await this.button("mousePressed");
 	}
 
+	/** Scrolls the page to `to` over `ms`, easing in and out, with the cursor put away: it would ride along over the page. */
+	async scroll(to: number, ms: number) {
+		this.cursor = null;
+		await this.cdp.evaluate(`document.getElementById("media-cursor").style.display = "none"`);
+		const from = await this.cdp.evaluate<number>("scrollY");
+		await this.tween(ms, async (t) => {
+			await this.cdp.evaluate(`scrollTo(0, ${lerp(from, to, t)})`);
+		});
+	}
+
 	async release() {
 		await this.button("mouseReleased");
 	}
 }
 
-/**
- * The middle of bar `index` of the bar chart in `chart`, in viewport coordinates, read from the live ECharts instance so
- * that it follows the data. Works for either axis being the category axis.
- */
-function barCentre(chart: string, index: number): string {
-	return `(() => {
-		const el = document.querySelector(${JSON.stringify(chart)});
-		const c = echarts.getInstanceByDom(el);
-		const o = c.getOption();
-		const horizontal = o.yAxis[0].type === "category";
-		const value = o.series[0].data[${index}].value;
-		const [x, y] = horizontal
-			? [c.convertToPixel({ xAxisIndex: 0 }, value / 2), c.convertToPixel({ yAxisIndex: 0 }, ${index})]
-			: [c.convertToPixel({ xAxisIndex: 0 }, ${index}), c.convertToPixel({ yAxisIndex: 0 }, value / 2)];
-		const r = el.getBoundingClientRect();
-		return { x: r.x + x, y: r.y + y };
-	})()`;
-}
-
-/** Where a click on `target` lands, in viewport coordinates. */
-async function centreOf(cdp: Cdp, target: Target): Promise<Point> {
-	if (typeof target !== "string") {
-		return await cdp.evaluate<Point>(barCentre(target.bar.chart, target.bar.index));
-	}
+/** Where a click on the first element matching `target` lands, in viewport coordinates. */
+async function centreOf(cdp: Cdp, target: string): Promise<Point> {
 	const box = await boxOf(cdp, target);
 	return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
@@ -183,6 +171,15 @@ async function thumbAt(cdp: Cdp, selector: string, value: number): Promise<Point
 	};
 }
 
+/** The scroll position that puts the first element matching `selector` at the top of the viewport, as `scrollToTop` does. */
+async function scrollTopOf(cdp: Cdp, selector: string): Promise<number> {
+	const box = await boxOf(cdp, selector);
+	const [y, max] = await cdp.evaluate<[number, number]>(
+		"[scrollY, document.documentElement.scrollHeight - innerHeight]",
+	);
+	return Math.max(0, Math.min(max, y + box.y - TOP_MARGIN));
+}
+
 async function perform(cdp: Cdp, rec: Recorder, action: Action) {
 	const travel = "travel" in action ? (action.travel ?? DEFAULT_TRAVEL) : 0;
 	switch (action.do) {
@@ -192,6 +189,14 @@ async function perform(cdp: Cdp, rec: Recorder, action: Action) {
 		case "click":
 			await rec.travel(await centreOf(cdp, action.target), travel);
 			await rec.click();
+			await rec.hold(action.hold ?? DEFAULT_HOLD);
+			return;
+		case "hover":
+			await rec.travel(await centreOf(cdp, action.target), travel);
+			await rec.hold(action.hold ?? DEFAULT_HOLD);
+			return;
+		case "scroll":
+			await rec.scroll(await scrollTopOf(cdp, action.to), action.ms);
 			await rec.hold(action.hold ?? DEFAULT_HOLD);
 			return;
 		case "drag": {
@@ -216,7 +221,9 @@ export async function record(cdp: Cdp, clip: Clip, dir: string): Promise<Frame[]
 	if (clip.scrollTo) {
 		await scrollToTop(cdp, clip.scrollTo);
 	}
-	const region = await resolveRegion(cdp, clip.region);
+	const region = clip.region
+		? await resolveRegion(cdp, clip.region)
+		: { x: 0, y: 0, ...clip.viewport };
 	await cdp.evaluate(CURSOR_JS);
 	await settle(300);
 	const rec = new Recorder(cdp, dir, region, clip.width / (region.width * SCALE), clip.fps);

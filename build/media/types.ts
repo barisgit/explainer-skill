@@ -2,7 +2,7 @@
 
 export type Theme = "light" | "dark";
 
-/** Every output is written once per theme, `<name>-<theme>.webp`, so the README and the gallery can follow the viewer's. */
+/** Every output is written once per theme, `<name>-<theme>.webp`, so the README can follow the viewer's. */
 export const THEMES: readonly Theme[] = ["light", "dark"];
 
 export interface Size {
@@ -23,12 +23,13 @@ export interface Rect extends Size {
  */
 export type Action =
 	| { do: "wait"; ms: number }
-	| { do: "click"; target: Target; travel?: number; hold?: number }
+	| { do: "click"; target: string; travel?: number; hold?: number }
+	/** Moves the cursor onto the target and leaves it there, for what a page shows under the pointer. */
+	| { do: "hover"; target: string; travel?: number; hold?: number }
 	/** Presses a range input's thumb at the first value and drags it through the others, `ms` per leg. */
-	| { do: "drag"; selector: string; values: number[]; ms: number; travel?: number; hold?: number };
-
-/** What a click lands on: the centre of the first element matching a selector, or one bar of an ECharts bar chart. */
-export type Target = string | { bar: { chart: string; index: number } };
+	| { do: "drag"; selector: string; values: number[]; ms: number; travel?: number; hold?: number }
+	/** Scrolls the page over `ms` until the first element matching `to` is at the top of the viewport; the cursor is put away. */
+	| { do: "scroll"; to: string; ms: number; hold?: number };
 
 export const DEFAULT_TRAVEL = 600;
 export const DEFAULT_HOLD = 600;
@@ -48,7 +49,8 @@ export interface Clip {
 	viewport: Size;
 	/** Element to scroll to the top of the viewport before recording; the region is measured afterwards. */
 	scrollTo?: string;
-	region: Region;
+	/** The recorded area; left out, the whole viewport, which a clip with `scroll` actions wants. */
+	region?: Region;
 	/** Width of the encoded clip in pixels; up to twice the region's CSS width stays sharp. */
 	width: number;
 	/** Most frames per second; captures slower than this set the pace. */
@@ -63,5 +65,7 @@ export interface Clip {
 export interface Example {
 	/** Directory name under `examples/`; the page is `examples/<name>/index.html`. */
 	name: string;
+	/** Whether the README shows the headline and complete opening figure as a card. The hero's page needs none. */
+	card: boolean;
 	clips: Clip[];
 }

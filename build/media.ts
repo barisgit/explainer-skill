@@ -1,35 +1,35 @@
 /**
- * Regenerates the README and gallery media in `examples/media/` from the packed example pages:
- * a gallery thumbnail of each first screen, a hero collage of them, and animated WebP clips of interactions, each in
- * light and in dark (`<name>-light.webp`, `<name>-dark.webp`) so the README and the gallery can follow the viewer's theme.
+ * Regenerates the README's media in `examples/media/` from the packed example pages: the hero clip, a card of each other
+ * page's headline and complete opening figure, and animated WebP clips of interactions, each in light and in dark
+ * (`<name>-light.webp`, `<name>-dark.webp`) so the README follows the viewer's theme. The gallery index needs none: it
+ * draws the pages' own opening figures.
  *
- *   bun run media [--keep] [example ...]    all examples, or only the named ones (the hero needs all of them);
+ *   bun run media [--keep] [example ...]    all examples, or only the named ones;
  *                                           --keep leaves the captured frames in a temp directory for inspection
  *
  * Needs Chrome (see CHROME in AGENTS.md) and ffmpeg with libwebp_anim on PATH.
  *
- * Adding an example: append an entry to EXAMPLES; its page is `examples/<name>/index.html` and it gets a thumbnail
- * and a place in the hero. Adding a clip: append to that example's `clips`; it is written to `<example>-<clip name>-<theme>.webp`.
- * Actions play in order with a cursor dot; see `Action` in media/types.ts.
+ * Adding an example: append an entry to EXAMPLES; its page is `examples/<name>/index.html`. Adding a clip: append to that
+ * example's `clips`; it is written to `<example>-<clip name>-<theme>.webp`. Actions play in order with a cursor dot; see
+ * `Action` in media/types.ts.
  */
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { withPage } from "../skills/explainer/src/chrome.ts";
 import { record } from "./media/clip.ts";
-import { checkEncoders, encodeClip, encodeHero, encodeThumb, sizeOf } from "./media/encode.ts";
-import { renderHero } from "./media/hero.ts";
-import { open, screenshot } from "./media/page.ts";
+import { checkEncoders, encodeCard, encodeClip, sizeOf } from "./media/encode.ts";
+import { boxOf, open, screenshot } from "./media/page.ts";
 import { type Example, type Size, THEMES, type Theme } from "./media/types.ts";
 
 const VIEWPORT: Size = { width: 1440, height: 900 };
 /**
- * The window of the first screens the thumbnails and the hero show: the pages' 1056 px column with a narrow margin, so the
- * type is larger than at 1440 wide.
+ * The hero's window: GitHub shows a README 830 px wide at most, so a page 900 px wide is read there at nearly its own size
+ * rather than shrunk until only the headline survives.
  */
-const STILL: Size = { width: 1120, height: 840 };
-/** Gallery thumbnail width in image pixels: a two-column card at the gallery's 1056 px column, at 2x. */
-const THUMB_WIDTH = 1040;
+const HERO: Size = { width: 900, height: 620 };
+/** A card's window: enough width for the opening comparison, cropped below its figure rather than through it. */
+const CARD: Size = { width: 600, height: 1000 };
 /** A clip over this many bytes fails the run: GitHub is slow to show anything larger and the repository grows with each version. */
 const CLIP_LIMIT = 2_000_000;
 
@@ -41,85 +41,87 @@ const CLIP = {
 	quality: 75,
 } as const;
 
+/** The examples in the gallery's order. Each clip holds its last state long enough to be read before it loops. */
 const EXAMPLES: Example[] = [
 	{
+		name: "battery",
+		card: false,
+		clips: [
+			{
+				// The README's hero: the finding, the figure a reader moves, and the decision sent back as a reply.
+				name: "hero",
+				viewport: HERO,
+				width: 1320,
+				fps: 10,
+				quality: 70,
+				actions: [
+					{ do: "wait", ms: 2200 },
+					{ do: "scroll", to: "section:has(#battery)", ms: 900, hold: 500 },
+					{ do: "drag", selector: "#battery", values: [5, 10, 15], ms: 1300, hold: 1400 },
+					{ do: "scroll", to: "section:has(> fieldset[data-reply])", ms: 900, hold: 300 },
+					{ do: "click", target: "label:has(#size-5_20_kWh)", hold: 700 },
+					{ do: "click", target: ".reply-bar .btn.primary", hold: 2400 },
+				],
+			},
+		],
+	},
+	{
+		name: "echarts-compressed",
+		card: true,
+		clips: [
+			{
+				...CLIP,
+				name: "linked",
+				viewport: { width: 1440, height: 1100 },
+				scrollTo: "section:has(> .mermaid)",
+				region: { selector: "section:has(> .mermaid)", pad: 4 },
+				actions: [
+					{ do: "wait", ms: 600 },
+					{ do: "hover", target: 'section:has(> .mermaid) p [data-ref="atob"]', hold: 1300 },
+					{ do: "hover", target: 'section:has(> .mermaid) p [data-ref="inflate"]', hold: 1300 },
+					{ do: "hover", target: 'section:has(> .mermaid) p [data-ref="run"]', hold: 1500 },
+				],
+			},
+		],
+	},
+	{
+		name: "i2c-pull-ups",
+		card: true,
+		clips: [
+			{
+				...CLIP,
+				name: "values",
+				scrollTo: "section:has(#r-0)",
+				region: { selector: "section:has(#r-0)", pad: 4 },
+				actions: [
+					{ do: "wait", ms: 600 },
+					{ do: "click", target: "label:has(#r-14)", hold: 1500 },
+					{ do: "click", target: "label:has(#r-0)", hold: 1500 },
+					{ do: "click", target: "label:has(#r-6)", hold: 1500 },
+				],
+			},
+		],
+	},
+	{ name: "electricity-mix", card: true, clips: [] },
+	{ name: "node-modules", card: true, clips: [] },
+	{
 		name: "fourier-series",
+		card: true,
 		clips: [
 			{
 				...CLIP,
 				name: "terms",
-				scrollTo: ".fig",
-				region: { selector: ".fig", pad: 4 },
+				scrollTo: "section:has(#k)",
+				region: { selector: "section:has(#k)", pad: 4 },
 				actions: [
-					{ do: "wait", ms: 400 },
-					{ do: "click", target: "label.toggle" },
-					{ do: "drag", selector: "#terms", values: [3, 9], ms: 1400 },
-					{ do: "click", target: "label.toggle" },
-					{ do: "drag", selector: "#terms", values: [9, 40], ms: 2200, travel: 500 },
-					{ do: "wait", ms: 1000 },
-					{ do: "drag", selector: "#terms", values: [40, 3], ms: 1200, travel: 200 },
-					{ do: "wait", ms: 500 },
+					{ do: "wait", ms: 600 },
+					{ do: "drag", selector: "#k", values: [1, 9], ms: 1400 },
+					{ do: "drag", selector: "#k", values: [9, 200], ms: 2600, travel: 300, hold: 1500 },
 				],
 			},
 		],
 	},
-	{
-		name: "dijkstra",
-		clips: [
-			{
-				...CLIP,
-				name: "steps",
-				scrollTo: "#main",
-				region: { selector: "#main", pad: 4, height: 760 },
-				actions: [
-					{ do: "wait", ms: 400 },
-					{ do: "click", target: "label:has(input[name=graph][value=grid])" },
-					{ do: "click", target: "label:has(input[name=start][value=E])" },
-					{ do: "click", target: '#main [data-go="1"]', hold: 800 },
-					{ do: "click", target: '#main [data-go="1"]', travel: 100, hold: 800 },
-					{ do: "click", target: '#main [data-go="1"]', travel: 100, hold: 800 },
-					{ do: "click", target: '#main [data-go="1"]', travel: 100, hold: 800 },
-					{ do: "click", target: '#main [data-go="1"]', travel: 100, hold: 800 },
-					{ do: "click", target: '#main [data-go="1"]', travel: 100, hold: 1200 },
-				],
-			},
-		],
-	},
-	{
-		name: "electricity-mix",
-		clips: [
-			{
-				...CLIP,
-				name: "coal-ranking",
-				scrollTo: ".fig:has(#rank)",
-				region: { x: 160, y: 0, width: 1120, height: 700 },
-				actions: [
-					{ do: "wait", ms: 400 },
-					{ do: "click", target: "label:has(input[name=metric][value=twh])", hold: 1800 },
-					{ do: "click", target: { bar: { chart: "#rank", index: 0 } }, hold: 2200 },
-					{ do: "click", target: "[data-view=place] .back", hold: 1200 },
-				],
-			},
-		],
-	},
-	{
-		name: "password-hashing",
-		clips: [
-			{
-				...CLIP,
-				name: "presets",
-				scrollTo: ".fig",
-				region: { selector: ".fig", pad: 4, height: 700 },
-				actions: [
-					{ do: "wait", ms: 400 },
-					{ do: "click", target: "[data-preset=tiny]", hold: 1500 },
-					{ do: "click", target: "[data-preset=fips]", hold: 1500 },
-					{ do: "click", target: "[data-preset=noargon]", hold: 1500 },
-					{ do: "click", target: "[data-preset=small]", hold: 1200 },
-				],
-			},
-		],
-	},
+	{ name: "dijkstra", card: true, clips: [] },
 ];
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -135,33 +137,29 @@ function note(file: string, clip = false) {
 const pageUrl = (example: Example) =>
 	`file://${join(ROOT, "examples", example.name, "index.html")}`;
 
-/**
- * Screenshots the first screen of every example in `theme` and writes its gallery thumbnail; returns the PNGs, in
- * `examples` order, that the hero of that theme is built from.
- */
-async function stills(examples: Example[], theme: Theme, work: string): Promise<string[]> {
-	const pngs: string[] = [];
+/** Writes each card in `theme`, from the page's top to the end of its opening figure. */
+async function cards(examples: Example[], theme: Theme, work: string) {
+	const shown = examples.filter((example) => example.card);
+	if (shown.length === 0) {
+		return;
+	}
 	await withPage(async (cdp) => {
-		for (const example of examples) {
-			const png = join(work, `${example.name}-${theme}.png`);
-			await open(cdp, pageUrl(example), STILL, theme, true);
-			await screenshot(cdp, png);
-			const thumb = join(OUT, `${example.name}-thumb-${theme}.webp`);
-			await encodeThumb(png, THUMB_WIDTH, thumb);
-			note(thumb);
-			pngs.push(png);
+		for (const example of shown) {
+			const png = join(work, `${example.name}-card-${theme}.png`);
+			await open(cdp, pageUrl(example), CARD, theme, true);
+			const figure = await boxOf(cdp, "[data-overview] :is(.fig, .chart)");
+			const height = Math.ceil(figure.y + figure.height + 8);
+			if (height > CARD.height) {
+				throw new Error(
+					`${example.name}: opening figure ends below the ${CARD.height}px card window`,
+				);
+			}
+			await screenshot(cdp, png, { x: 0, y: 0, width: CARD.width, height });
+			const out = join(OUT, `${example.name}-card-${theme}.webp`);
+			await encodeCard(png, out);
+			note(out);
 		}
 	});
-	return pngs;
-}
-
-/** Writes the hero collage of the `tiles` PNGs, all of one theme. */
-async function hero(tiles: string[], theme: Theme, work: string) {
-	const png = join(work, `hero-${theme}.png`);
-	const out = join(OUT, `hero-${theme}.webp`);
-	await withPage((cdp) => renderHero(cdp, tiles, STILL, work, png));
-	await encodeHero(png, out);
-	note(out);
 }
 
 /** Records and encodes every clip of `example` in `theme`, each in a Chrome of its own because its page time is paused. */
@@ -198,17 +196,14 @@ async function main(args: string[]) {
 	const work = mkdtempSync(join(tmpdir(), "explainer-media-"));
 	try {
 		for (const theme of THEMES) {
-			const tiles = await stills(examples, theme, work);
+			await cards(examples, theme, work);
 			for (const example of examples) {
 				await clips(example, theme, work);
-			}
-			if (examples.length === EXAMPLES.length) {
-				await hero(tiles, theme, work);
 			}
 		}
 	} finally {
 		if (keep) {
-			console.log(`frames and stills kept in ${work}`);
+			console.log(`frames and cards kept in ${work}`);
 		} else {
 			rmSync(work, { recursive: true, force: true });
 		}

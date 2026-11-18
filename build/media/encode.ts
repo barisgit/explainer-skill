@@ -13,7 +13,7 @@ async function ffmpeg(args: string[]) {
 	}
 }
 
-/** The ffmpeg encoders the media needs: libwebp for the stills, libwebp_anim for the clips. */
+/** The ffmpeg encoders the media needs: libwebp for the cards, libwebp_anim for the clips. */
 const ENCODERS = ["libwebp", "libwebp_anim"];
 
 /**
@@ -80,28 +80,7 @@ export async function encodeClip(frames: Frame[], lastMs: number, quality: numbe
 	]);
 }
 
-/** Encodes one PNG as a lossy WebP with the `text` preset, which keeps small type clean, optionally through an ffmpeg filter. */
-async function encodeWebp(png: string, quality: number, out: string, filter?: string) {
-	await ffmpeg([
-		"-i",
-		png,
-		...(filter ? ["-vf", filter] : []),
-		"-c:v",
-		"libwebp",
-		"-preset",
-		"text",
-		"-quality",
-		String(quality),
-		out,
-	]);
-}
-
-/** Writes `png` as a WebP `width` pixels wide: a gallery thumbnail. */
-export async function encodeThumb(png: string, width: number, out: string) {
-	await encodeWebp(png, 85, out, `scale=${width}:-1:flags=lanczos`);
-}
-
-/** Writes the hero collage `png` as a WebP, keeping its transparent background. */
-export async function encodeHero(png: string, out: string) {
-	await encodeWebp(png, 90, out);
+/** Writes `png` as a lossy WebP with the `text` preset, which keeps small type clean: a README card. */
+export async function encodeCard(png: string, out: string) {
+	await ffmpeg(["-i", png, "-c:v", "libwebp", "-preset", "text", "-quality", "85", out]);
 }

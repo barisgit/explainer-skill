@@ -1,47 +1,70 @@
 ---
 title: Explainer examples
+contents: true
 ---
-import { Card } from "./card.tsx";
+import { Ask } from "./ask.tsx";
+import { prompts } from "./prompts.ts";
+import Battery from "./battery/opening.mdx";
+import * as battery from "./battery/model.ts";
+import Compressed from "./echarts-compressed/opening.mdx";
+import compressed from "./echarts-compressed/data.json";
+import Pullups from "./i2c-pull-ups/opening.mdx";
+import * as bus from "./i2c-pull-ups/bus.ts";
+import Electricity from "./electricity-mix/opening.mdx";
+import * as added from "./electricity-mix/facts.ts";
+import * as mix from "./electricity-mix/model.ts";
+import Modules from "./node-modules/opening.mdx";
+import * as modules from "./node-modules/model.ts";
+import Fourier from "./fourier-series/opening.mdx";
+import * as fourier from "./fourier-series/fourier.ts";
+import Dijkstra from "./dijkstra/opening.mdx";
+import * as paths from "./dijkstra/model.ts";
 import "./page.css";
 
-# Four pages an agent built with the explainer skill
+# Seven questions, each answered with a page
 
-Each one is a single HTML file that works offline. An agent wrote it in MDX from the skill's guide, `pack` made it self-contained, and `check` screenshotted it in light and dark at desktop and phone width.
+An agent wrote each page with [the explainer skill](https://github.com/barisgit/explainer-skill) to answer the question in quotes. Every page is one HTML file that opens offline.
 
-[Install the skill on GitHub](https://github.com/barisgit/explainer-skill) · [Page sources](https://github.com/barisgit/explainer-skill/tree/main/examples)
+**Install:** `npx skills add barisgit/explainer-skill`
 
-<section class="gallery" aria-label="Examples">
+<section class="entry">
+<Ask prompt={prompts.battery} />
+<h2 data-nav="A decision"><a href="battery/">The first 5 kWh pays for itself in <em>{battery.BLOCKS[0].years} years</em>. The second would take {battery.BLOCKS[1].years}.</a></h2>
+<Battery />
+</section>
 
-<Card name="fourier-series" alt="Fourier series study page: a square wave built from three sines, with a terms slider">
+<section class="entry">
+<Ask prompt={prompts.echarts} />
+<h2 data-nav="A code review"><a href="echarts-compressed/">Shipping ECharts compressed takes <em>{compressed.saved} KB</em> off every chart page and costs {Object.values(compressed.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms.</a></h2>
+<Compressed />
+</section>
 
-## Fourier series
+<section class="entry">
+<Ask prompt={prompts.i2c} />
+<h2 data-nav="An engineering page"><a href="i2c-pull-ups/">The {bus.N.found} pull-ups take <em>{bus.N.foundTr} ns</em> to raise the line. At 400 kHz the bus allows {bus.N.fastTr}.</a></h2>
+<Pullups />
+</section>
 
-Study page. Drag the terms slider to build a square wave, try each question before opening its answer, and find your own answers still there after a reload.
+<section class="entry">
+<Ask prompt={prompts.electricity} />
+<h2 data-nav="A data report"><a href="electricity-mix/">Wind and solar added <em>{mix.fmt(added.WS)} TWh</em> in {mix.Y1}. Total generation added {mix.fmt(added.TOTAL)}.</a></h2>
+<Electricity />
+</section>
 
-</Card>
+<section class="entry">
+<Ask prompt={prompts.modules} />
+<h2 data-nav="A drill-down over records"><a href="node-modules/">{modules.COUNT} packages installed for {modules.LISTED.length} listed; <em>{modules.HEAVY.size} of them</em> hold half the bytes.</a></h2>
+<Modules />
+</section>
 
-<Card name="dijkstra" alt="Dijkstra step-through: a weighted graph, the priority queue and the distance table">
+<section class="entry">
+<Ask prompt={prompts.fourier} />
+<h2 data-nav="A study page"><a href="fourier-series/">Add a thousand sines and the corner still overshoots by <em>{fourier.pct(fourier.overshoot(fourier.peak(fourier.THOUSAND)), 0)}</em>.</a></h2>
+<Fourier />
+</section>
 
-## Dijkstra's algorithm
-
-Step-through. Four maps and any start node, with the queue and distance table at each step, and what one negative edge breaks.
-
-</Card>
-
-<Card name="electricity-mix" alt="Electricity mix explorer: world generation by source from 2000 to 2024">
-
-## World electricity mix
-
-Data explorer. 223 places from Our World in Data: see how each source changed since 2000, rank who left coal fastest over a period you choose, and click a bar to open that country.
-
-</Card>
-
-<Card name="password-hashing" alt="Password hashing decision page: deployment presets, memory sliders and the OWASP setting that fits">
-
-## Choosing a password hash
-
-Decision page. Set memory, concurrent logins and FIPS needs, and see which OWASP setting fits, or that none does.
-
-</Card>
-
+<section class="entry">
+<Ask prompt={prompts.dijkstra} />
+<h2 data-nav="An algorithm"><a href="dijkstra/">One negative edge and Dijkstra answers <em>{paths.DIJKSTRA.dist[paths.TARGET]}</em> where the shortest path is {paths.BELLMAN.dist[paths.TARGET]}.</a></h2>
+<Dijkstra />
 </section>

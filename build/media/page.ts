@@ -7,7 +7,7 @@ import type { Rect, Region, Size, Theme } from "./types.ts";
 export const SCALE = 2;
 
 /** Room above an element that `scrollToTop` leaves, so a region padded by a few pixels stays inside the viewport. */
-const TOP_MARGIN = 16;
+export const TOP_MARGIN = 16;
 
 /**
  * Opens `url` in a fresh load at `viewport` with the colour scheme of `theme`. Local storage is emptied first because every
