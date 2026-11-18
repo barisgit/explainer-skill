@@ -2973,15 +2973,13 @@ dialog.reply-dialog[open] {
 	margin: 0 0 0.4rem;
 	color: var(--muted);
 }
+/* The finding is the way into its page, so it reads as a link at rest: the kit's quiet underline, ink on hover. */
 .entry h2 a {
-	color: inherit;
-	text-decoration: none;
-}
-.entry h2 a:hover,
-.entry h2 a:focus-visible {
-	text-decoration: underline;
 	text-decoration-thickness: 2px;
 	text-underline-offset: 0.15em;
+}
+.entry h2 a::after {
+	content: " \2192";
 }
 /* The finding's number stays on one line, as the kit keeps a headline's. */
 @media (min-width: 40rem) {
