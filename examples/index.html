@@ -1413,12 +1413,32 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input:focus-
 		flex-direction: column;
 	}
 }
-/* A Question's note: under the choices, as wide as a line of text wants. By attribute, so a page's own .note stays its own. */
+/* A Question's note fills the choices' column. By attribute, so a page's own .note stays its own. */
 fieldset[data-reply] > [data-note] {
 	display: block;
 	inline-size: 100%;
-	max-inline-size: 36rem;
 	margin-block-start: 0.625rem;
+}
+/* Kit writing fields grow from one line, wrap unbroken words, and scroll only once they take a substantial part of the screen. */
+textarea[data-grow] {
+	field-sizing: content;
+	min-inline-size: 0;
+	inline-size: 100%;
+	min-block-size: 2.25rem;
+	max-block-size: min(20rem, 40vh);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	overflow: auto;
+}
+/* Plain text copies made only for printing can wrap and break across sheets, unlike a textarea's internal scroll box. */
+[data-grow-print] {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+@media print {
+	textarea[data-grow]:has(+ [data-grow-print]) {
+		display: none;
+	}
 }
 /* Self-check (a Question with an answer): once the reader chooses, the right option is ringed in --ok, a wrong choice is ringed
    in --bad and struck through, the verdict says which in words, and the explanation opens. CSS alone, so a choice kit:keep.js
@@ -2841,7 +2861,6 @@ svg.has-lit [data-ref]:not(.is-lit) {
 .reply-pop textarea,
 .reply-note textarea {
 	inline-size: 100%;
-	min-block-size: 5rem;
 	padding: 0.5rem 0.625rem;
 	resize: vertical;
 	font: inherit;

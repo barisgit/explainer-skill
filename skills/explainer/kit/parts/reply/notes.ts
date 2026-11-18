@@ -43,6 +43,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	let hint: HTMLButtonElement | null = null;
 	let hintFromSelection = false;
 	let pop: HTMLElement | null = null;
+	let popSize: ResizeObserver | null = null;
 	const clearHint = () => {
 		hint?.remove();
 		hint = null;
@@ -51,6 +52,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	const closePop = () => {
 		const open = pop;
 		pop = null;
+		popSize?.disconnect();
+		popSize = null;
 		open?.remove();
 	};
 
@@ -99,6 +102,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	function showPop(popup: HTMLElement, at: DOMRect) {
 		document.body.append(popup);
 		position(popup, at);
+		popSize = new ResizeObserver(() => position(popup, at));
+		popSize.observe(popup);
 		pop = popup;
 	}
 
@@ -142,6 +147,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	function openNote(target: Target, at: DOMRect) {
 		closePop();
 		const text = h("textarea", {
+			rows: "1",
+			"data-grow": "",
 			"aria-label": kitText("note"),
 			placeholder: kitText("notePlaceholder"),
 		});

@@ -17,7 +17,8 @@
      checked   the value (or values) chosen to begin with
      recommended  the value (or values) you recommend: marked on its choice (kitLabels.recommended); the reply sends the
                bare option, with "(recommended)" when the reader's answer is the recommendation
-     note      a text box under the choices where the reader says why; the reply prints it under the answer
+     note      a full-width, multiline text box under the choices where the reader says why; it starts one line high and grows
+               up to a scrollable cap. Enter adds a line; the reply keeps those lines under the answer, and print shows them all
      answer    the right value: a self-check. Choosing marks the right option and a wrong choice, says Right or Wrong (also
                to a screen reader) and opens the explanation written inside the Question; it is not part of the reply and
                brings no Reply button
@@ -203,7 +204,7 @@ function Written({ name, legend, children }: QuestionBase) {
 			{...(selfCheck ? { class: "written self-check" } : { class: "written", "data-reply": "" })}
 		>
 			<legend id={`${id}-legend`}>{legend}</legend>
-			<textarea id={id} rows={3} aria-labelledby={`${id}-legend`} />
+			<textarea id={id} rows={1} data-grow="" aria-labelledby={`${id}-legend`} />
 			{selfCheck && (
 				<details class="answer">
 					<summary>{kitText("showAnswer")}</summary>

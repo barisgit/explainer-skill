@@ -186,7 +186,6 @@ svg.has-lit [data-ref]:not(.is-lit) {
 .reply-pop textarea,
 .reply-note textarea {
 	inline-size: 100%;
-	min-block-size: 5rem;
 	padding: 0.5rem 0.625rem;
 	resize: vertical;
 	font: inherit;

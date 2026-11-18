@@ -1413,12 +1413,32 @@ fieldset[data-reply] .compare tbody > tr > th > label:first-child > input:focus-
 		flex-direction: column;
 	}
 }
-/* A Question's note: under the choices, as wide as a line of text wants. By attribute, so a page's own .note stays its own. */
+/* A Question's note fills the choices' column. By attribute, so a page's own .note stays its own. */
 fieldset[data-reply] > [data-note] {
 	display: block;
 	inline-size: 100%;
-	max-inline-size: 36rem;
 	margin-block-start: 0.625rem;
+}
+/* Kit writing fields grow from one line, wrap unbroken words, and scroll only once they take a substantial part of the screen. */
+textarea[data-grow] {
+	field-sizing: content;
+	min-inline-size: 0;
+	inline-size: 100%;
+	min-block-size: 2.25rem;
+	max-block-size: min(20rem, 40vh);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	overflow: auto;
+}
+/* Plain text copies made only for printing can wrap and break across sheets, unlike a textarea's internal scroll box. */
+[data-grow-print] {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+@media print {
+	textarea[data-grow]:has(+ [data-grow-print]) {
+		display: none;
+	}
 }
 /* Self-check (a Question with an answer): once the reader chooses, the right option is ringed in --ok, a wrong choice is ringed
    in --bad and struck through, the verdict says which in words, and the explanation opens. CSS alone, so a choice kit:keep.js
@@ -2841,7 +2861,6 @@ svg.has-lit [data-ref]:not(.is-lit) {
 .reply-pop textarea,
 .reply-note textarea {
 	inline-size: 100%;
-	min-block-size: 5rem;
 	padding: 0.5rem 0.625rem;
 	resize: vertical;
 	font: inherit;
@@ -4454,7 +4473,100 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   }
 })();
 </script>
-<script>/* keep: what the reader entered in the page's controls, kept across reloads. pack includes it on a page with a control that has an id.
+<script>/* Keep's writing fields: print plain text so long answers can break across sheets; older browsers without field-sizing:
+   content get growth after typing, restoring, mounting or changing width. The theme owns the minimum, cap and wrapping. */
+(() => {
+  const selector = "textarea[data-grow]";
+  const native = CSS.supports("field-sizing", "content");
+  const widths = new WeakMap;
+  let printing = false;
+  function size(field) {
+    if (!field.getClientRects().length) {
+      return;
+    }
+    field.style.height = "auto";
+    const style = getComputedStyle(field);
+    const border = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+    field.style.height = `${field.scrollHeight + border}px`;
+  }
+  const resize = native ? null : new ResizeObserver((entries) => {
+    for (const { target, contentRect } of entries) {
+      if (target instanceof HTMLTextAreaElement && widths.get(target) !== contentRect.width) {
+        widths.set(target, contentRect.width);
+        size(target);
+      }
+    }
+  });
+  function mirror(field) {
+    if (!field.nextElementSibling?.matches("[data-grow-print]")) {
+      const copy = document.createElement("div");
+      copy.dataset.growPrint = "";
+      copy.textContent = field.value;
+      field.after(copy);
+    }
+  }
+  function track(field) {
+    if (!field.isConnected) {
+      resize?.unobserve(field);
+      widths.delete(field);
+      return;
+    }
+    if (printing) {
+      mirror(field);
+    }
+    if (resize) {
+      resize.observe(field);
+      size(field);
+    }
+  }
+  function fieldsIn(node) {
+    if (!(node instanceof Element)) {
+      return [];
+    }
+    return [
+      ...node instanceof HTMLTextAreaElement && node.matches(selector) ? [node] : [],
+      ...node.querySelectorAll(selector)
+    ];
+  }
+  const mounts = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of [...record.removedNodes, ...record.addedNodes]) {
+        for (const field of fieldsIn(node)) {
+          track(field);
+        }
+      }
+    }
+  });
+  const observe = () => mounts.observe(document.body, { childList: true, subtree: true });
+  const refresh = () => document.querySelectorAll(selector).forEach(track);
+  addEventListener("beforeprint", () => {
+    printing = true;
+    observe();
+    refresh();
+  });
+  addEventListener("afterprint", () => {
+    printing = false;
+    if (native) {
+      mounts.disconnect();
+    }
+    for (const copy of document.querySelectorAll("[data-grow-print]")) {
+      copy.remove();
+    }
+    refresh();
+  });
+  if (!native) {
+    document.addEventListener("input", (event) => {
+      if (event.target instanceof HTMLTextAreaElement && event.target.matches(selector)) {
+        size(event.target);
+      }
+    });
+    observe();
+    document.fonts.ready.then(refresh);
+    refresh();
+  }
+})();
+
+/* keep: what the reader entered in the page's controls, kept across reloads. pack includes it on a page with a control that has an id.
    Every text, textarea, radio, checkbox, select, range and number control that the reader moved off its default (what the markup
    says: value, checked, selected) is saved in localStorage under the page's own address and restored after the page's load
    handlers have run. Restored controls get input and change events, so the page's own listeners redraw charts and outputs; a
@@ -4499,7 +4611,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const isRadio = (c) => c.type === "radio";
   const isToggle = (c) => isRadio(c) || c.type === "checkbox";
   const isMultiSelect = (c) => c instanceof HTMLSelectElement && c.multiple;
-  const signature = (c) => clean(`${c.type}|${c.getAttribute("aria-label") || c.labels?.[0] && ownText(c.labels[0]) || c.closest(".field")?.firstElementChild?.textContent || c.name || "placeholder" in c && c.placeholder || ""}`);
+  const signature = (c) => clean(`${c.matches("textarea[data-note]") ? "text" : c.type}|${c.getAttribute("aria-label") || c.labels?.[0] && ownText(c.labels[0]) || c.closest(".field")?.firstElementChild?.textContent || c.name || "placeholder" in c && c.placeholder || ""}`);
   const storeKey = `explainer:${location.href.split(/[?#]/)[0]}`;
   const touched = new WeakSet;
   const defaults = new Map;

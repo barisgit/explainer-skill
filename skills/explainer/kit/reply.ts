@@ -166,7 +166,9 @@
 		if (shown && (c.type === "range" || c.type === "number")) {
 			return clean(shown);
 		}
-		return c.value.trim() ? quoted(c.value) : null;
+		const value =
+			c instanceof HTMLTextAreaElement ? c.value.trim().replaceAll('"', "'") : quoted(c.value);
+		return value || null;
 	}
 
 	/** The answer a group of controls (one radio group, one checkbox group, or a single control) currently gives; null = nothing chosen. */
@@ -280,7 +282,7 @@
 			a.value != null && !a.touched ? "default" : "",
 		].filter(Boolean);
 		return [
-			`- ${a.label}${/[?:]$/.test(a.label) ? "" : ":"} ${a.value ?? "no answer"}${marks.length ? ` (${marks.join(", ")})` : ""}`,
+			`- ${a.label}${/[?:]$/.test(a.label) ? "" : ":"} ${(a.value ?? "no answer").split("\n").join("\n  ")}${marks.length ? ` (${marks.join(", ")})` : ""}`,
 			...(a.note ? [`  Note: ${a.note.split("\n").join("\n  ")}`] : []),
 		].join("\n");
 	};
@@ -483,7 +485,7 @@
 	function renderDialog() {
 		const preview = h("pre", { class: "reply-md" }, markdown());
 		const rows = notes.map((n) => {
-			const text = h("textarea", { "aria-label": kitText("note") });
+			const text = h("textarea", { rows: "1", "data-grow": "", "aria-label": kitText("note") });
 			text.value = n.text;
 			text.addEventListener("input", () => {
 				n.text = text.value;

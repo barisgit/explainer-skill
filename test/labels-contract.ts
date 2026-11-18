@@ -166,7 +166,7 @@ async function records() {
 	expect("records search", search.getAttribute("aria-label") === L.recordsSearch && search.placeholder === L.recordsSearch);
 	expect("records count", $("output", block).textContent === L.recordsShown.replace("{shown}", "2").replace("{total}", "2"));
 	expect("records total and expand all", $(".total", block).firstElementChild.textContent === L.recordsTotal && $(".fold-all", block).textContent === L.expandAll);
-	const note = $("input[data-note]", block);
+	const note = $("textarea[data-note]", block);
 	expect("records note", note.placeholder === L.recordsNote && note.getAttribute("aria-label").startsWith(L.recordsNote));
 	const tabled = changed(block);
 	$(".toolbar .seg label:nth-child(2) input", block).click();
