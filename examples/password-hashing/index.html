@@ -2086,6 +2086,10 @@ details > :last-child:not(summary) {
 	line-height: 1.35;
 	text-decoration: none;
 }
+/* The rail and its narrow disclosure scroll: keep the ring inside a link's box, clear of their clips. */
+.toc a:focus-visible {
+	outline-offset: -2px;
+}
 .toc a:hover,
 .toc a:is([aria-current], .is-trail) {
 	color: var(--ink);

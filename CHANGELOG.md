@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Contents links keep their keyboard focus outline visible inside the scrolling rail and its expanded narrow layout.
+
 - Returning from a record preserves the list's view, sort, facets and search, including after previous/next or a reload. Without a reload, the unchanged list also keeps its scroll position.
 
 - Long URLs and unbroken prose wrap inside their column, including lists, captions, notes and non-scrolling table cells, without changing hyphenation or code fences.
