@@ -452,15 +452,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		const tile = { color: ink, textBorderWidth: 0, fontSize };
 		return {
 			...Object.fromEntries(LABELLED.map((type) => [type, label])),
-			treemap: {
-				label: tile,
-				upperLabel: tile,
-				breadcrumb: { show: false },
-				roam: false,
-				nodeClick: false,
-				color: [token("sunken")],
-				itemStyle: { borderColor: token("bg"), borderWidth: 1, gapWidth: 0 },
-			},
+			line: { ...label, endLabel: label.label },
 			grid: { __kitLegendRoom: true, outerBoundsMode: "same", outerBoundsContain: "axisLabel" },
 			color: [1, 2, 3, 4, 5, 6].map((i) => token(`c${i}`)),
 			backgroundColor: "transparent",
@@ -522,6 +514,15 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 				symbol: ["none", "none"],
 				lineStyle: { color: ink, type: [3, 3], width: 1 },
 				label: { ...label.label, fontWeight: 500 },
+			},
+			treemap: {
+				label: tile,
+				upperLabel: tile,
+				breadcrumb: { show: false },
+				roam: false,
+				nodeClick: false,
+				color: [token("sunken")],
+				itemStyle: { borderColor: token("bg"), borderWidth: 1, gapWidth: 0 },
 			},
 		};
 	}
