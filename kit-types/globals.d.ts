@@ -302,7 +302,11 @@ declare var ChartsOption: (env: {
 	 * The option with the kit's defaults by series place: line dashes per palette slot, a line between stacked bars, marker
 	 * labels on top, left of the markers `sides` names by series index (as markSides read them from the chart drawn).
 	 */
-	defaults(option: ChartOption, sides?: ReadonlyMap<number, ReadonlySet<number>>): ChartOption;
+	defaults(
+		option: ChartOption,
+		sides?: ReadonlyMap<number, ReadonlySet<number>>,
+		inherited?: ChartOption,
+	): ChartOption;
 	/** What defaults generates for the option, as text to compare: a change redraws the chart rather than patching it. */
 	styling(option: ChartOption): string;
 	/** Which vertical markers of a drawn chart stand past the middle of their axis, by series index; see defaults. */
@@ -310,7 +314,13 @@ declare var ChartsOption: (env: {
 };
 /** See ChartsOption's defaults (kit/parts/charts/defaults.ts). */
 declare var ChartsDefaults: {
-	defaults(option: ChartOption, sides?: ReadonlyMap<number, ReadonlySet<number>>): ChartOption;
+	/** ECharts component matching, shared by responsive defaults and saved-option updates. */
+	places(target: unknown[], patch: unknown[]): (number | undefined)[];
+	defaults(
+		option: ChartOption,
+		sides?: ReadonlyMap<number, ReadonlySet<number>>,
+		inherited?: ChartOption,
+	): ChartOption;
 	styling(option: ChartOption): string;
 	place(chart: unknown): ReadonlyMap<number, ReadonlySet<number>>;
 };

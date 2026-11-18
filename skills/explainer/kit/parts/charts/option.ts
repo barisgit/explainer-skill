@@ -436,6 +436,8 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		// No chrome: the labels say where values are, gridlines and ticks are off, and an axis line (on by ECharts' default only
 		// for category and time axes, as the baseline marks start from) is quiet. What an option turns back on keeps these colours.
 		const axis = {
+			// Rescaling places ticks at once: moving old ticks through the new labels reads as a glitch, not a change in the data.
+			animationDurationUpdate: 0,
 			axisLine: { lineStyle: { color: rule } },
 			axisTick: { show: false, lineStyle: { color: rule } },
 			axisLabel: { color: muted, fontSize },

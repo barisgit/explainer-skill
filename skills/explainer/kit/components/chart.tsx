@@ -16,6 +16,9 @@
    The accent's states, in itemStyle: solid { color: "var(--accent)" }; hollow { color: "var(--hollow)", borderColor:
      "var(--accent)", borderWidth: 1.5 }; hatch { color: "transparent", borderColor: "var(--hatch)", borderWidth: 1, decal:
      { symbol: "rect", symbolSize: 1, dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: -Math.PI / 4, color: "var(--hatch)" } }.
+   Treemap: one muted fill and page-toned tile borders; an item coloured "var(--accent)" takes --accent-ink for its label,
+     including responsive data and later updates. A label colour you set wins.
+   Rescaling places axis ticks at once while series still ease; an axis animationDurationUpdate of yours wins.
    Markers: markLine: { data: [{ xAxis: 16, name: "Payback" }], label: { formatter: "{b}" } } is a dashed ink line with its label
      on top beside it, whichever way the axis runs, left of the line past the axis' middle; { yAxis: 2 } runs across with its
      label above its end. A position, align or offset of yours wins. A title is set at the text size, its subtext as a label.
