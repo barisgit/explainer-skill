@@ -90,8 +90,9 @@ export function NoteField({
 	describedBy?: string;
 }) {
 	return (
-		<input
-			type="text"
+		<textarea
+			rows={1}
+			data-grow=""
 			class="note"
 			id={id}
 			value={value}

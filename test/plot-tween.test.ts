@@ -348,13 +348,21 @@ test("a choice restored on reload draws at once, even while its size settles", a
 		await cdp.load();
 		const seen = await drawnOnArrival(cdp);
 		const endpoints = [restoredSeries(3), restoredSeries(9)];
-		expect(seen.at(-1)).toBe(endpoints[1]);
-		expect(seen.every((data) => endpoints.includes(data))).toBe(true);
+		const arrival = JSON.stringify([...new Set(seen)]);
+		expect(seen.at(-1), arrival).toBe(endpoints[1]);
+		expect(
+			seen.every((data) => endpoints.includes(data)),
+			arrival,
+		).toBe(true);
 
 		// A positive control: the same observer must detect interpolated data after the reader acts.
 		await cdp.evaluate(`window.plotDraws = []; ${READER}; document.getElementById("n-0").click()`);
 		const moving = await drawnOnArrival(cdp);
-		expect(moving.at(-1)).toBe(endpoints[0]);
-		expect(moving.some((data) => !endpoints.includes(data))).toBe(true);
+		const changed = JSON.stringify([...new Set(moving)]);
+		expect(moving.at(-1), changed).toBe(endpoints[0]);
+		expect(
+			moving.some((data) => !endpoints.includes(data)),
+			changed,
+		).toBe(true);
 	});
 }, 30_000);

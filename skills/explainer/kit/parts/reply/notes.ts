@@ -43,6 +43,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	let hint: HTMLButtonElement | null = null;
 	let hintFromSelection = false;
 	let pop: HTMLElement | null = null;
+	let popSize: ResizeObserver | null = null;
 	const clearHint = () => {
 		hint?.remove();
 		hint = null;
@@ -51,31 +52,88 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	const closePop = () => {
 		const open = pop;
 		pop = null;
+		popSize?.disconnect();
+		popSize = null;
 		open?.remove();
 	};
 
-	/** A small button at a document position; clicking it opens the note editor for `target`, anchored under `at`. */
-	function showHint(label: string, x: number, y: number, target: Target, fromSelection: boolean) {
+	/** Keep an anchor in document coordinates, so growing an editor after a scroll still measures the same target. */
+	const documentRect = (at: DOMRect) =>
+		new DOMRect(at.x + scrollX, at.y + scrollY, at.width, at.height);
+
+	/** Above or below the target; if neither fits, scroll only the shorter feasible distance to make one fit. */
+	function vertical(at: DOMRect, height: number) {
+		const above = at.top - height - 6;
+		const below = at.bottom + 6;
+		if (above >= 8) {
+			return above;
+		}
+		if (below + height <= innerHeight - 8) {
+			return below;
+		}
+		const bottom = document.documentElement.scrollHeight - innerHeight;
+		const fit = [
+			{ top: above, delta: above - 8 },
+			{ top: below, delta: below + height + 8 - innerHeight },
+		]
+			.filter(({ delta }) => scrollY + delta >= 0 && scrollY + delta <= bottom)
+			.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta))[0];
+		if (!fit) {
+			return below;
+		}
+		const before = scrollY;
+		scrollBy(0, fit.delta);
+		return fit.top - (scrollY - before);
+	}
+
+	/** A measured overlay inside the page column and viewport: above the target, else beside, below, then clamped. */
+	function position(popup: HTMLElement, anchor: DOMRect) {
+		const at = new DOMRect(anchor.x - scrollX, anchor.y - scrollY, anchor.width, anchor.height);
+		const column = root.getBoundingClientRect();
+		const left = Math.max(8, column.left);
+		const right = Math.min(innerWidth - 8, column.right);
+		popup.style.maxWidth = `${Math.max(0, right - left)}px`;
+		popup.style.maxHeight = `${innerHeight - 16}px`;
+		const { width, height } = popup.getBoundingClientRect();
+		const clampX = (x: number) => Math.max(left, Math.min(x, right - width));
+		const clampY = (y: number) => Math.max(8, Math.min(y, innerHeight - height - 8));
+		let x = clampX(at.right - width);
+		let y = at.top - height - 6;
+		// Above keeps following prose clear; beside is useful for a selection at the very top of the screen.
+		if (y < 8) {
+			if (at.right + 6 + width <= right) {
+				x = at.right + 6;
+				y = at.bottom - height;
+			} else {
+				y = vertical(at, height);
+			}
+		}
+		popup.style.left = `${clampX(x) + scrollX}px`;
+		popup.style.top = `${clampY(y) + scrollY}px`;
+	}
+
+	/** Clicking the small button opens the note editor at the same target. */
+	function showHint(label: string, at: DOMRect, target: Target, fromSelection: boolean) {
 		clearHint();
 		hintFromSelection = fromSelection;
 		const button = h("button", { type: "button", class: "btn reply-ui reply-hint" }, label);
-		button.style.left = `${Math.max(8, Math.min(x, scrollX + innerWidth - 220))}px`;
-		button.style.top = `${y}px`;
+		const anchor = documentRect(at);
 		button.addEventListener("pointerdown", (e) => e.preventDefault()); // keeps the text selection alive until the click
 		button.addEventListener("click", () => {
-			const at = button.getBoundingClientRect();
 			clearHint();
-			openNote(target, at);
+			openNote(target, anchor);
 		});
 		document.body.append(button);
+		position(button, anchor);
 		hint = button;
 	}
 
-	/** Shows `popup` as the open pop, under `at` and inside the window's width. */
-	function showPop(popup: HTMLElement, at: DOMRect) {
+	/** Shows the editor or saved-note action around the original target's document-space anchor, not the hint button. */
+	function showPop(popup: HTMLElement, anchor: DOMRect) {
 		document.body.append(popup);
-		popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
-		popup.style.top = `${at.bottom + scrollY + 6}px`;
+		position(popup, anchor);
+		popSize = new ResizeObserver(() => position(popup, anchor));
+		popSize.observe(popup);
 		pop = popup;
 	}
 
@@ -119,6 +177,8 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	function openNote(target: Target, at: DOMRect) {
 		closePop();
 		const text = h("textarea", {
+			rows: "1",
+			"data-grow": "",
 			"aria-label": kitText("note"),
 			placeholder: kitText("notePlaceholder"),
 		});
@@ -251,13 +311,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 				return;
 			}
 			const rect = range.getBoundingClientRect();
-			showHint(
-				kitText("addNote"),
-				rect.left + scrollX,
-				rect.bottom + scrollY + 6,
-				{ quote, ...located(host) },
-				true,
-			);
+			showHint(kitText("addNote"), rect, { quote, ...located(host) }, true);
 		}, 200);
 	});
 
@@ -290,7 +344,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 			return;
 		}
 		const target = partTarget(part);
-		showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
+		showHint(`${kitText("noteOn")} “${target.part}”`, part.getBoundingClientRect(), target, false);
 	});
 	markTargets();
 	document.addEventListener("keydown", (e) => {
@@ -304,6 +358,6 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		) {
 			return;
 		}
-		openNote(partTarget(part), part.getBoundingClientRect());
+		openNote(partTarget(part), documentRect(part.getBoundingClientRect()));
 	});
 };

@@ -18,7 +18,7 @@ export const CB_GROWN = 200e-12;
 /** VIL(max) and VIH(min) as fractions of VDD (Table 10); rise time is counted between them (Table 11). */
 const LOW = 0.3;
 const HIGH = 0.7;
-/** VOL(max) at the rated sink current, VDD > 2 V (Table 10). */
+/** VOL(max) at the guaranteed sink current, VDD > 2 V (Table 10). */
 const VOL = 0.4;
 
 /** Rise time per unit RC: t(0.7 VDD) − t(0.3 VDD) of V = VDD (1 − e^(−t/RC)), which UM10204 rounds to 0.8473. */
@@ -62,7 +62,7 @@ export const ns = (t: number): number => Math.round(t * 1e9);
 /** Milliamperes to one decimal. */
 export const mA = (i: number): string => (i * 1e3).toFixed(1);
 
-/** How a value fares at 400 kHz: too slow for tr, too strong for the 3 mA sink, or fine. */
+/** How a value fares at 400 kHz assuming only the minimum guaranteed 3 mA sink at 0.4 V. */
 export const verdict = (r: number, cb = CB): "slow" | "strong" | "fits" =>
 	riseTime(r, cb) > FAST.tr ? "slow" : sink(r) > FAST.iol ? "strong" : "fits";
 
@@ -147,15 +147,15 @@ export const VALUES = Object.fromEntries(E12.map((r) => [String(r), short(r)]));
 
 /**
  * The strip figure for the picked value: every E12 value's rise time as a column on one scale against the 400 kHz limit,
- * the found 10 kΩ in accent and the values too strong for a 3 mA pin hatched; the readout gives the pick's sink current.
+ * the found 10 kΩ in accent and the values needing more than the guaranteed 3 mA sink hatched; the readout gives the pick's sink current.
  */
 export const stripFrame = (picked: string) => {
 	const r = Number(picked);
-	const rated = `${FAST.iol * 1e3} mA`;
+	const minimumSink = `${FAST.iol * 1e3} mA`;
 	const why = {
 		slow: `too slow for ${ns(FAST.tr)} ns`,
-		strong: `but a pin must sink ${mA(sink(r))} mA to hold it at ${VOL} V, over the ${rated} Fast-mode pins are rated for`,
-		fits: `and a pin holding it low sinks ${mA(sink(r))} mA of its ${rated}`,
+		strong: `but a pin must sink ${mA(sink(r))} mA to hold it at ${VOL} V, more than Fast-mode’s guaranteed minimum sink of ${minimumSink}`,
+		fits: `and needs ${mA(sink(r))} mA at ${VOL} V, within Fast-mode’s guaranteed minimum sink of ${minimumSink}`,
 	}[verdict(r)];
 	return {
 		plot: {
@@ -166,7 +166,7 @@ export const stripFrame = (picked: string) => {
 					data: E12.map((v) => ns(riseTime(v))),
 					fill: E12.map((v) => (v === FOUND ? "accent" : verdict(v) === "strong" ? "hatch" : "")),
 					// Names the hatch once, on the first hatched bar.
-					label: E12.map((_, i) => (i === 0 ? `over ${rated}` : "")),
+					label: E12.map((_, i) => (i === 0 ? `over ${minimumSink}` : "")),
 				},
 			],
 			marks: [{ y: ns(FAST.tr), label: `400 kHz: ${ns(FAST.tr)} ns` }],

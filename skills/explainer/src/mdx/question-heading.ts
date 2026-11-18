@@ -64,7 +64,7 @@ export async function nameFromHeadings(
 				});
 			},
 		})
-		.on("fieldset input[data-note]", {
+		.on("fieldset [data-note]", {
 			element(el) {
 				if (named !== undefined) {
 					el.setAttribute("aria-label", `${el.getAttribute("aria-label") ?? ""}: ${named}`);

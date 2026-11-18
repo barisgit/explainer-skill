@@ -1,5 +1,7 @@
 ---
 title: Which home battery size pays for itself
+labels:
+  recommended: Best fit
 ---
 import { Explore, Question, Table } from "kit";
 import Opening from "./opening.mdx";
@@ -19,9 +21,9 @@ That is what the house draws between the roof falling short in the evening and c
 
 <Explore label="A typical July day: what the roof makes, what the house uses, and what the battery moves to the evening" controls={[{ id: "battery", label: "Battery", range: [0, 15, 1], value: 5, format: { unit: "kWh" } }]} frame={july} height="clamp(20rem, 30vw, 26rem)" />
 
-## The second 5 kWh only works in {SECOND_SEASONS.join(" and ")}
+## The second 5 kWh mostly works in {SECOND_SEASONS.join(" and ")}
 
-In summer the first 5 kWh already carries the night, and in winter the roof hardly fills it. The second block takes over only on long nights after a sunny day.
+In summer the first 5 kWh usually carries the night, and in winter the roof hardly fills it. The second block takes over on longer nights after a sunny day.
 
 <Explore label="kWh the second and third 5 kWh blocks add to what the house gets from the battery, month by month" controls={[{ id: "month", label: "Month", choice: MONTHS, value: BUSIEST, axis: true }]} frame={months} />
 

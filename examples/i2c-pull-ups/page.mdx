@@ -48,11 +48,13 @@ $$
 \begin{aligned} t_r &= t_2 - t_1 = RC \ln\frac{0.7}{0.3} = 0.8473\,R\,C_b \\ &= 0.8473 \cdot 10\,\text{k}\Omega \cdot 100\,\text{pF} = 847\,\text{ns} \end{aligned}
 $$
 
-The bounds follow: $R_{max} = t_r / (0.8473\,C_b)$, which is {N.fastRMax} kΩ at 400 kHz, and $R_{min} = (V_{DD} - 0.4\,\text{V}) / I_{OL}$, which is {N.fastRMin} Ω for a 3 mA pin.
+The bounds follow: $R_{max} = t_r / (0.8473\,C_b)$, which is {N.fastRMax} kΩ at 400 kHz, and $R_{min} = (V_{DD} - 0.4\,\text{V}) / I_{OL}$, which is {N.fastRMin} Ω assuming only the minimum guaranteed sink of 3 mA at 0.4 V.
 
 ## The limits per mode
 
-<Table rows={LIMITS} cols={[{ head: "Mode", value: "name", note: "fSCL" }, { head: "Rise time, max", value: "tr", format: { unit: "ns" } }, { head: "Bus capacitance, max", value: "cb", format: { unit: "pF" } }, { head: "Sink current, min", value: "iol", format: { unit: "mA" } }, { head: "Pull-up, min at 3.3 V", value: "rMin", format: { unit: "Ω" } }, { head: "Pull-up, max at 100 pF", value: "rMax", format: { digits: 1, unit: "kΩ" } }]} />
+<Table rows={LIMITS} cols={[{ head: "Mode", value: "name", note: "fSCL" }, { head: "Rise time, max", value: "tr", format: { unit: "ns" } }, { head: "Bus capacitance, max", value: "cb", format: { unit: "pF" } }, { head: "Guaranteed sink at 0.4 V, min", value: "iol", format: { unit: "mA" } }, { head: "Pull-up, min at 3.3 V", value: "rMin", format: { unit: "Ω" } }, { head: "Pull-up, max at 100 pF", value: "rMax", format: { digits: 1, unit: "kΩ" } }]} />
+
+For this {N.cb} pF example, the bounds assume only the minimum guaranteed sink of 3 mA at 0.4 V. At the full 400 pF bus load, 400 kHz needs 6 mA at 0.6 V (UM10204 Table 10, footnote 4).
 
 <Question name="grown" legend={`A longer cable brings each line to ${N.grownCb} pF. What should the pull-ups be at 400 kHz?`} options={{ same: `${N.fix} still fits`, [N.grownHighCode]: N.grownHigh, none: "No standard value fits" }} answer={N.grownHighCode}>
 

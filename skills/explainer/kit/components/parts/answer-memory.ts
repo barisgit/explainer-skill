@@ -12,8 +12,15 @@ export type AnswerMemory = Map<string, string | boolean>;
 export function rememberAnswers(block: HTMLElement, memory: AnswerMemory): () => void {
 	const remember = (event: Event) => {
 		const answer = event.target instanceof Element ? event.target.closest("fieldset.answer") : null;
-		for (const input of answer?.querySelectorAll("input") ?? []) {
-			memory.set(input.id, input.type === "radio" ? input.checked : input.value);
+		for (const control of answer?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+			"input, textarea",
+		) ?? []) {
+			memory.set(
+				control.id,
+				control instanceof HTMLInputElement && control.type === "radio"
+					? control.checked
+					: control.value,
+			);
 		}
 	};
 	block.addEventListener("input", remember);

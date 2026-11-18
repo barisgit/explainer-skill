@@ -73,9 +73,10 @@
 	const isMultiSelect = (c: Control): c is HTMLSelectElement =>
 		c instanceof HTMLSelectElement && c.multiple;
 
+	// Note fields used to be text inputs: their ids and saved text still identify the same answer after the textarea upgrade.
 	const signature = (c: Control) =>
 		clean(
-			`${c.type}|${
+			`${c.matches("textarea[data-note]") ? "text" : c.type}|${
 				c.getAttribute("aria-label") ||
 				(c.labels?.[0] && ownText(c.labels[0])) ||
 				c.closest(".field")?.firstElementChild?.textContent ||

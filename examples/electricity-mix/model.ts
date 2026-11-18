@@ -1,5 +1,5 @@
 /* The electricity extract (data.json, written by extract.py) and every number the page shows, as pure functions of it.
-   Source: Our World in Data energy dataset (CC BY 4.0), electricity columns by Ember and the Energy Institute. */
+   Source: OWID legacy energy dataset, downloaded 2026-10-22; Ember is CC BY 4.0, the Energy Institute retains its own terms (see page.mdx). */
 import data from "./data.json";
 
 /** A place in the extract: OWID's reported total and one series per source, in TWh, one value per year; null where blank. */

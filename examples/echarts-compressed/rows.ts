@@ -5,14 +5,14 @@ export const alternatives = [
 	{
 		name: "deflate-raw in base64",
 		size: `${data.packed} KB`,
-		why: "Shipped: the smallest encoding every DecompressionStream reads.",
+		why: "Shipped: tied smallest for Chrome 103, Firefox 113 and Safari 16.4.",
 		state: "fit",
 	},
 	{ name: "gzip", size: `${data.gzip} KB`, why: "The same size as deflate-raw.", state: "out" },
 	{
 		name: "Brotli",
 		size: `${data.brotli} KB`,
-		why: "Smaller, but DecompressionStream reads it in few browsers.",
+		why: "Smaller, but DecompressionStream does not read it in those baseline versions.",
 		state: "out",
 	},
 	{

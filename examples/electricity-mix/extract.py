@@ -1,7 +1,7 @@
 """Builds data.json, the small extract the page imports (model.ts reads it), from OWID's owid-energy-data.csv.
 
 Usage: python3 extract.py owid-energy-data.csv
-Source: https://github.com/owid/energy-data (CC BY 4.0), electricity columns by Ember and the Energy Institute.
+Source: https://github.com/owid/energy-data; Ember is CC BY 4.0, the Energy Institute retains its own terms (see page.mdx).
 """
 import json
 import sys

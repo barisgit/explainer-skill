@@ -50,13 +50,13 @@ flowchart LR
 +		window.echartsReady,
 ```
 
-## Nothing measured beat deflate-raw
+## Deflate-raw ties for smallest on our browser baseline
 
 <Table rows={alternatives} state={(a) => a.state} cols={[{ head: "Alternative", value: "name" }, { head: "In the page", value: "size" }, { head: "Why", value: "why" }]} />
 
-## A browser without DecompressionStream keeps the drawn charts
+## A browser without deflate-raw support keeps the drawn charts
 
-Before Chrome 103, Firefox 113 and Safari 16.4 the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.
+The `deflate-raw` format needs Chrome 103, Firefox 113 or Safari 16.4. On older browsers the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.
 
 <section class="band">
 

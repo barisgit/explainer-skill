@@ -48,6 +48,10 @@ World electricity generation, change on the year before, in TWh. Source: Our Wor
 
 ## Sources
 
-Our World in Data, [energy dataset](https://github.com/owid/energy-data) (CC BY 4.0), electricity columns from [Ember](https://ember-energy.org/data/yearly-electricity-data/) and the [Energy Institute](https://www.energyinst.org/statistical-review/), 2000 to {Y1}. Figures are generation, not consumption, and each is the change from the year before, so weather moves them: a wet year lifts hydro. A blank cell counts as zero only where the other sources already add up to the reported total; countries without both years are left out of the counts.
+Our World in Data, [energy dataset](https://github.com/owid/energy-data): the legacy `owid-energy-data.csv` downloaded 22 October 2026, keeping 2000 to {Y1}; partial 2025 is left out. The upstream revision and provider editions were not recorded.
+
+The electricity columns come from [Ember, Yearly Electricity Data](https://ember-energy.org/data/yearly-electricity-data/) ([CC BY 4.0](https://ember-energy.org/creative-commons/)) and, for some places and years, the [Energy Institute, Statistical Review of World Energy](https://www.energyinst.org/statistical-review/). OWID's CC BY 4.0 covers its own contributions; third-party data retain their providers' terms. The Energy Institute's terms are its own, not CC BY: attribution is required and extensive reproduction needs its permission. Check the applicable terms before reusing this extract.
+
+Figures are generation, not consumption, and each is the change from the year before, so weather moves them: a wet year lifts hydro. A blank cell counts as zero only where the other sources already add up to the reported total; countries without both years are left out of the counts.
 
 <View name="place" records={places.data.map((p) => ({ id: p.id }))} render={PlaceView} back="All places" />
