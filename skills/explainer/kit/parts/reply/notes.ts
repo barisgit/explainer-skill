@@ -54,13 +54,34 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		open?.remove();
 	};
 
-	/** A small button at a document position; clicking it opens the note editor for `target`, anchored under `at`. */
-	function showHint(label: string, x: number, y: number, target: Target, fromSelection: boolean) {
+	/** A measured overlay inside the page column and viewport: beside the target, else above, below, then clamped. */
+	function position(popup: HTMLElement, at: DOMRect) {
+		const column = root.getBoundingClientRect();
+		const left = Math.max(8, column.left);
+		const right = Math.min(innerWidth - 8, column.right);
+		popup.style.maxWidth = `${Math.max(0, right - left)}px`;
+		popup.style.maxHeight = `${innerHeight - 16}px`;
+		const { width, height } = popup.getBoundingClientRect();
+		const clampX = (x: number) => Math.max(left, Math.min(x, right - width));
+		const clampY = (y: number) => Math.max(8, Math.min(y, innerHeight - height - 8));
+		let x = clampX(at.right - width);
+		let y = at.top - height - 6;
+		// Beside the selection keeps the following line clear even when there is no room above it.
+		if (at.right + 6 + width <= right) {
+			x = at.right + 6;
+			y = at.bottom - height;
+		} else if (y < 8) {
+			y = at.bottom + 6;
+		}
+		popup.style.left = `${clampX(x) + scrollX}px`;
+		popup.style.top = `${clampY(y) + scrollY}px`;
+	}
+
+	/** Clicking the small button opens the note editor at the same target. */
+	function showHint(label: string, at: DOMRect, target: Target, fromSelection: boolean) {
 		clearHint();
 		hintFromSelection = fromSelection;
 		const button = h("button", { type: "button", class: "btn reply-ui reply-hint" }, label);
-		button.style.left = `${Math.max(8, Math.min(x, scrollX + innerWidth - 220))}px`;
-		button.style.top = `${y}px`;
 		button.addEventListener("pointerdown", (e) => e.preventDefault()); // keeps the text selection alive until the click
 		button.addEventListener("click", () => {
 			const at = button.getBoundingClientRect();
@@ -68,14 +89,14 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 			openNote(target, at);
 		});
 		document.body.append(button);
+		position(button, at);
 		hint = button;
 	}
 
-	/** Shows `popup` as the open pop, under `at` and inside the window's width. */
+	/** Shows the editor or saved-note action using the hint's same bounds. */
 	function showPop(popup: HTMLElement, at: DOMRect) {
 		document.body.append(popup);
-		popup.style.left = `${Math.max(8, Math.min(at.left + scrollX, scrollX + innerWidth - popup.offsetWidth - 8))}px`;
-		popup.style.top = `${at.bottom + scrollY + 6}px`;
+		position(popup, at);
 		pop = popup;
 	}
 
@@ -251,13 +272,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 				return;
 			}
 			const rect = range.getBoundingClientRect();
-			showHint(
-				kitText("addNote"),
-				rect.left + scrollX,
-				rect.bottom + scrollY + 6,
-				{ quote, ...located(host) },
-				true,
-			);
+			showHint(kitText("addNote"), rect, { quote, ...located(host) }, true);
 		}, 200);
 	});
 
@@ -290,7 +305,12 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 			return;
 		}
 		const target = partTarget(part);
-		showHint(`${kitText("noteOn")} “${target.part}”`, e.pageX, e.pageY + 14, target, false);
+		showHint(
+			`${kitText("noteOn")} “${target.part}”`,
+			new DOMRect(e.clientX, e.clientY, 0, 0),
+			target,
+			false,
+		);
 	});
 	markTargets();
 	document.addEventListener("keydown", (e) => {

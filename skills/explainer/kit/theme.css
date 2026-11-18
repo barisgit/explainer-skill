@@ -148,6 +148,7 @@ svg.has-lit [data-ref]:not(.is-lit) {
 	gap: 0.5rem;
 }
 .reply-hint {
+	background: var(--surface);
 	box-shadow: 0 10px 24px -10px var(--lift);
 }
 /* A Clear button asking for its second press, in the reply bar or keep's own. */
@@ -160,6 +161,8 @@ svg.has-lit [data-ref]:not(.is-lit) {
 .reply-pop {
 	position: absolute;
 	z-index: 30;
+	--under: var(--surface);
+	overflow: auto;
 }
 .reply-pop {
 	display: grid;
