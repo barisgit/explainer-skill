@@ -84,8 +84,8 @@ window.ChartsDefaults = (() => {
 		});
 	}
 
-	const labelled = (s: Item): Item =>
-		s.type === "treemap" ? { ...s, data: accentLabels(s.data) } : s;
+	const labelled = (s: Item, type = s.type): Item =>
+		type === "treemap" && "data" in s ? { ...s, data: accentLabels(s.data) } : s;
 
 	/** `s` with what the kit generated (`extra`) under it: style objects merged key by key, other keys only where `s` has none. */
 	const styled = (s: Item, extra: Item): Item => ({
@@ -146,30 +146,79 @@ window.ChartsDefaults = (() => {
 		return { ...s, markLine: { ...markLine, data } };
 	}
 
-	/** A list of series with the kit's defaults; `over` is the list it overrides (a media option's over its baseOption's). */
+	type SeriesEntry = { s: unknown; base: Item; index: number };
+	const sameKey = (a: Item, b: Item, key: string) =>
+		a[key] != null && b[key] != null && String(a[key]) === String(b[key]);
+
+	/** Match overrides against the base in ECharts' normal-merge order: id, name, then the first free slot. */
+	function paired(list: unknown[], over: unknown[]): SeriesEntry[] {
+		const slots = over.filter(isObject);
+		const entries: SeriesEntry[] = list.map((s) => ({ s, base: {}, index: -1 }));
+		const used = new Set<number>();
+		const match = (accept: (s: Item, base: Item) => boolean) => {
+			for (const entry of entries) {
+				if (!isObject(entry.s) || entry.index >= 0) {
+					continue;
+				}
+				const s = entry.s;
+				const found = [...slots.entries()].find(
+					([index, base]) => !used.has(index) && accept(s, base),
+				);
+				if (found) {
+					const [index, base] = found;
+					Object.assign(entry, { index, base });
+					used.add(index);
+				}
+			}
+		};
+		match((s, base) => sameKey(s, base, "id"));
+		// Even an unnamed base series has an ECharts-generated id: a new explicit id cannot overwrite it by name or index.
+		match((s, base) => s.id == null && sameKey(s, base, "name"));
+		match((s) => s.id == null);
+		for (const entry of entries) {
+			if (isObject(entry.s) && entry.index < 0) {
+				entry.index = slots.length;
+				slots.push({});
+			}
+		}
+		return entries;
+	}
+
+	/** A list of series with the kit's defaults; `over` is the base series list for a media or timeline override. */
 	function series(list: unknown[], option: Item, sides: Sides, over?: unknown[]) {
-		return list.map((s, i) => {
+		const entries = over ? paired(list, over) : list.map((s, index) => ({ s, base: {}, index }));
+		return entries.map(({ s, base, index }) => {
 			if (!isObject(s)) {
 				return s;
 			}
 			if (!over) {
-				return marked(styled(labelled(s), generated(s, i)), option, sides.get(i) ?? new Set());
+				return marked(
+					styled(labelled(s), generated(s, index)),
+					option,
+					sides.get(index) ?? new Set(),
+				);
 			}
-			// An override: the kit's styling where it differs from what the base series gets, solid where a dash goes.
-			const base = isObject(over[i]) ? over[i] : {};
-			const was = generated(base, i);
-			const now = generated(
-				{
-					...base,
-					...s,
-					lineStyle: { ...objectAt(base, "lineStyle"), ...objectAt(s, "lineStyle") },
-				},
-				i,
-			);
-			const dropped =
-				"lineStyle" in was && !("lineStyle" in now) && !("type" in objectAt(s, "lineStyle"));
-			return styled(s, dropped ? { lineStyle: { type: "solid" } } : now);
+			return overridden(s, base, index);
 		});
+	}
+
+	/** Only the styling an override changes, including solid where the base had a generated dash. */
+	function overridden(s: Item, base: Item, index: number) {
+		const was = generated(base, index);
+		const now = generated(
+			{
+				...base,
+				...s,
+				lineStyle: { ...objectAt(base, "lineStyle"), ...objectAt(s, "lineStyle") },
+			},
+			index,
+		);
+		const dropped =
+			"lineStyle" in was && !("lineStyle" in now) && !("type" in objectAt(s, "lineStyle"));
+		return styled(
+			labelled(s, s.type ?? base.type),
+			dropped ? { lineStyle: { type: "solid" } } : now,
+		);
 	}
 
 	type Sides = ReadonlyMap<number, ReadonlySet<number>>;
@@ -190,15 +239,14 @@ window.ChartsDefaults = (() => {
 	 * options and media options. `sides` names, by series index, the markers whose labels go left of their line (see place).
 	 */
 	function defaults(option: ChartOption, sides: Sides = new Map()): ChartOption {
-		if (!isObject(option.baseOption)) {
-			return withSeries(option, option, sides);
-		}
-		const base = option.baseOption;
+		const explicit = isObject(option.baseOption);
+		const base = isObject(option.baseOption) ? option.baseOption : option;
 		const baseSeries = listOf(base.series) ?? [];
 		const over = (o: unknown) => (isObject(o) ? withSeries(o, base, sides, baseSeries) : o);
 		return {
-			...option,
-			baseOption: withSeries(base, base, sides),
+			...(explicit
+				? { ...option, baseOption: withSeries(base, base, sides) }
+				: withSeries(option, option, sides)),
 			...(Array.isArray(option.options) ? { options: option.options.map(over) } : {}),
 			...(Array.isArray(option.media)
 				? {
