@@ -299,32 +299,62 @@ const RESTORED = `import { Explore } from "kit";
 
 # Restored
 
-<Explore id="f" label="Lines" controls={[{ id: "n", label: "Terms", choice: ["1", "9"] }]} frame={(n) => ({ plot: { series: [{ data: Array.from({ length: 21 }, (_, i) => [i, Math.sin(i * Number(n))]) }] } })} />
+<Explore id="f" label="Lines" controls={[{ id: "n", label: "Terms", choice: ["3", "9"] }]} frame={(n) => ({ plot: { series: [{ data: Array.from({ length: 21 }, (_, i) => [i, i % Number(n)]) }] } })} />
 `;
 
-test("a choice restored on reload draws at once rather than moving on arrival", async () => {
+/** Capture what the live renderer draws, not pixel paths that also change as fonts and sizing settle. */
+const WATCH_DRAWS = `
+window.plotDraws = [];
+let factory;
+Object.defineProperty(window, "PlotDraw", {
+	get: () => factory,
+	set(value) {
+		factory = (...args) => {
+			const api = value(...args);
+			return { ...api, render(option, ...rest) {
+				window.plotDraws.push(JSON.stringify(option.series));
+				return api.render(option, ...rest);
+			} };
+		};
+	},
+});
+// Startup can redraw identical data at different sizes; that is not an animation of its option.
+addEventListener("load", () => {
+	setTimeout(() => document.querySelector("#f").style.width = "80%", 100);
+	setTimeout(() => document.querySelector("#f").style.width = "", 300);
+});
+`;
+
+/** Observe from before restoration through its first 700 ms, without settling away a possible arrival animation. */
+const drawnOnArrival = (cdp: Cdp) =>
+	cdp.evaluate<string[]>(
+		`(async () => {
+			const t0 = performance.now();
+			while (performance.now() - t0 < 700) await new Promise(requestAnimationFrame);
+			return window.plotDraws;
+		})()`,
+		true,
+	);
+
+const restoredSeries = (n: number) =>
+	JSON.stringify([{ data: Array.from({ length: 21 }, (_, i) => [i, i % n]) }]);
+
+test("a choice restored on reload draws at once, even while its size settles", async () => {
 	const output = await packedMdx(dir, "restored", RESTORED);
 	await inPage(output, async (cdp) => {
 		await cdp.evaluate(`document.getElementById("n-1").click(), ${FRAMES}`, true);
-		const target = await cdp.evaluate<string>(
-			`document.querySelector("#f .plot-area path.line").getAttribute("d")`,
-		);
 		await motion(cdp);
+		await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: WATCH_DRAWS });
 		await cdp.load();
-		const seen = await cdp.evaluate<string[]>(
-			`(async () => {
-				const seen = new Set();
-				const t0 = performance.now();
-				while (performance.now() - t0 < 700) {
-					await new Promise(requestAnimationFrame);
-					const d = document.querySelector("#f .plot-area path.line")?.getAttribute("d");
-					if (d) seen.add(d);
-				}
-				return [...seen];
-			})()`,
-			true,
-		);
-		expect(seen.at(-1)).toBe(target);
-		expect(seen.length).toBeLessThanOrEqual(2);
+		const seen = await drawnOnArrival(cdp);
+		const endpoints = [restoredSeries(3), restoredSeries(9)];
+		expect(seen.at(-1)).toBe(endpoints[1]);
+		expect(seen.every((data) => endpoints.includes(data))).toBe(true);
+
+		// A positive control: the same observer must detect interpolated data after the reader acts.
+		await cdp.evaluate(`window.plotDraws = []; ${READER}; document.getElementById("n-0").click()`);
+		const moving = await drawnOnArrival(cdp);
+		expect(moving.at(-1)).toBe(endpoints[0]);
+		expect(moving.some((data) => !endpoints.includes(data))).toBe(true);
 	});
 }, 30_000);
