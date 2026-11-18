@@ -310,3 +310,30 @@ test("a small drawing with a value subscript keeps 10 px text at every width, th
 
 	expect(await packAndRun(dir, "subscript", page)).toEqual([]);
 }, 30_000);
+
+test("a left-pin IC that fits a phone's column is wholly visible without an inset forcing it to scroll", async () => {
+	const source = `U1 ic MCU @0,0 right SDA=sda SCL=scl
+U2 ic Sensor SDA@U1.SDA 6,0 left SDA=sda SCL=scl
+R_SDA vbus sda 10k b@U1.SDA 2,-3 v
+R_SCL vbus scl 10k a@R_SDA.a 3,0 v
+C_SDA sda 0 100 pF a@U1.SDA 2,5 v
+C_SCL scl 0 100 pF a@C_SDA.a 3,0 v
+VDD port vbus 3.3 V @R_SDA.a -4,-2`;
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><pre class="schematic">${source}</pre></main>
+<script>${pageContract({
+		"the drawing fits without sideways scrolling": `(() => {
+			const block = document.querySelector(".schematic");
+			return block.scrollWidth <= block.clientWidth;
+		})()`,
+		"the viewBox includes the far side of the left-pin IC": `(() => {
+			const svg = document.querySelector(".schematic svg");
+			const body = svg.querySelector('[data-ref="U2"] > g');
+			const box = body.getBBox();
+			const at = body.transform.baseVal.consolidate().matrix;
+			const view = svg.viewBox.baseVal;
+			return at.e + box.x + box.width < view.x + view.width;
+		})()`,
+	})}</script></body></html>`;
+	expect(await packAndRun(dir, "left-pin-fit", page)).toEqual([]);
+}, 30_000);

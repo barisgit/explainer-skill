@@ -12,6 +12,8 @@ Linked parts now share a screen: `.beside` keeps a figure, diagram or code in vi
 
 ### Drawing fixes
 
+- Schematics use the full column width instead of losing 2rem to an inset. A drawing whose readable minimum fits a phone no longer needs sideways scrolling just to see its far edge; wider drawings still scroll.
+
 - Values printed inside a Plot’s hollow or hatched bars sit on a page-toned plate, so the pattern does not run through the value. The same drawing code runs at pack time and in the browser.
 
 ### Pages that may need a change

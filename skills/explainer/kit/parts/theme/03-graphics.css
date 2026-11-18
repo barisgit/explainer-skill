@@ -307,7 +307,7 @@
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
-	padding: 1.25rem 1rem;
+	padding: 1.25rem 0;
 	text-align: center;
 	overflow-x: auto;
 }
@@ -401,7 +401,7 @@
 .schematic {
 	display: block;
 	margin: 1.5rem 0;
-	padding: 1.25rem 1rem;
+	padding: 1.25rem 0;
 	text-align: center;
 	overflow-x: auto;
 }
