@@ -93,6 +93,8 @@ body {
 	color: var(--ink);
 	font: var(--size-text) / 1.55 var(--font);
 	text-wrap: pretty;
+	/* Emergency breaks keep URLs and other unbroken prose inside their column; pre keeps its own whitespace rules. */
+	overflow-wrap: break-word;
 	font-synthesis: none;
 	-webkit-font-smoothing: antialiased;
 }

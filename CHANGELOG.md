@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Long URLs and unbroken prose wrap inside their column, including lists, captions, notes and non-scrolling table cells, without changing hyphenation or code fences.
+
 Linked parts now share a screen: `.beside` keeps a figure, diagram or code in view while its text scrolls, a `Stepper` steps through a Mermaid diagram by naming its refs, an `Explore` frame sets states on the page's parts, and code fences are coloured at pack time with marks that link to the prose. Questions read as answers, with a recommended choice, a note and an answered count. The kit's look is plainer: a darker dark scheme, three type sizes, figures without panels, and one square control style. A long page asks for the contents rail with `contents: true`, and the masthead can carry the reader's next action. `check` tries the page's kit controls by itself, drags, prints the reply it would send, follows dead links and sweeps inner scrollers.
 
 ### Pack and check diagnostics

@@ -32,6 +32,8 @@
 	--rule: light-dark(#e0d9cd, #302b26);
 	--rule-strong: light-dark(#8f8574, #706759);
 	--accent: light-dark(#b93a05, #ff8a3d);
+	/* Links are ink with a quiet underline, so the accent keeps its one meaning; a page rule --link: var(--accent) brings it back. */
+	--link: var(--ink);
 	--accent-ink: light-dark(#fff, #1b1208);
 	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
 	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
@@ -98,6 +100,8 @@ body {
 	color: var(--ink);
 	font: var(--size-text) / 1.55 var(--font);
 	text-wrap: pretty;
+	/* Emergency breaks keep URLs and other unbroken prose inside their column; pre keeps its own whitespace rules. */
+	overflow-wrap: break-word;
 	font-synthesis: none;
 	-webkit-font-smoothing: antialiased;
 }
@@ -161,11 +165,13 @@ pre code {
 	}
 }
 a {
-	color: var(--accent);
+	color: var(--link);
+	text-decoration-color: var(--rule-strong);
 	text-decoration-thickness: 1px;
 	text-underline-offset: 0.2em;
 }
 a:hover {
+	text-decoration-color: currentcolor;
 	text-decoration-thickness: 2px;
 }
 b,
@@ -704,6 +710,15 @@ h3,
 .plot-strip.short label.thin::after {
 	content: none;
 }
+/* The picked label is always shown: plot.js moves its text in from the plot's edge and, past the plot's width, cuts it short. */
+.plot-strip label.bound > .full,
+.plot-strip label.bound::after {
+	max-inline-size: var(--room);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	translate: var(--shift) 0;
+}
 
 /* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,
    --_node-fill, ...), set here from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no
@@ -918,7 +933,7 @@ h3,
 
 /* theme part: control row, fields, segmented choice, toggle, inputs, buttons, playback, tabs. */
 /* One control style: square-ish, a 1px edge in --rule-strong (3:1 on every tone), the chosen or pressed state filled in ink, text
-   at the label's size. Links and focus rings keep the accent. */
+   at the label's size. Focus rings keep the accent, links the --link colour. */
 /* Controls: a row right above the figure it acts on. Field captions keep the case you write. */
 .controls {
 	display: flex;
@@ -1159,7 +1174,7 @@ output {
 	background: none;
 	border: 0;
 	padding: 0;
-	color: var(--accent);
+	color: var(--link);
 	cursor: pointer;
 	text-decoration: underline;
 	text-decoration-thickness: 1px;
@@ -1695,7 +1710,7 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	background: none;
 	border: 0;
 	padding: 0.25rem 0;
-	color: var(--accent);
+	color: var(--link);
 	font-size: var(--size-label);
 	font-weight: 500;
 	cursor: pointer;
@@ -2273,8 +2288,14 @@ details > :last-child:not(summary) {
 	font-weight: 400;
 	text-decoration: none;
 }
-.tree :where(.tree > a, details > a):hover > :first-child {
+/* A link row's label carries the quiet underline of a link (ink on hover), so the row reads as one to follow. */
+.tree :where(.tree > a, details > a) > :first-child {
 	text-decoration: underline;
+	text-decoration-color: var(--rule-strong);
+	text-underline-offset: 0.2em;
+}
+.tree :where(.tree > a, details > a):hover > :first-child {
+	text-decoration-color: currentcolor;
 }
 /* The head: the columns' names over the first row, in the numbers' size. */
 .tree > .tree-head {
@@ -2431,7 +2452,7 @@ details > :last-child:not(summary) {
 }
 
 /* Tree: the widths Records computes for its columns, all of them on wide screens and the numbers alone on phones (below). Rows
-   that link to their view keep the ink colour, so ninety links do not shout; the hover underline marks them. */
+   that link to their view keep the ink colour, so ninety links do not shout; the label's quiet underline marks them. */
 .records .tree {
 	--tree-cols: var(--records-cols);
 }
@@ -2638,7 +2659,7 @@ details > :last-child:not(summary) {
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions).
    Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
-     :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, links, focus, charts and diagrams follow it)
+     :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
    <html data-scheme="dark">; charts and diagrams follow it too.
    The accent has one meaning, the finding: the headline phrase (h1 em), and on a chart the series or bar the page is about
@@ -2675,7 +2696,7 @@ details > :last-child:not(summary) {
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).
-   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --accent-soft --ok --bad --warn --info --c1..--c6 --hollow --hatch --hatch-fill
+   Tokens: --bg --surface --sunken --ink --muted --rule --rule-strong --accent --link --accent-soft --ok --bad --warn --info --c1..--c6 --hollow --hatch --hatch-fill
    --font --mono;
    --size-headline --size-display --size-text --size-label --radius;
    --under is the tone under the current block (page, band or popover): give a label halo of your own stroke: var(--under).
@@ -2697,6 +2718,10 @@ details > :last-child:not(summary) {
 }
 :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 	opacity: 0.15;
+}
+/* Code stays readable (muted, 4.5:1 or near) where a step does not name its lines. */
+pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
+	opacity: 0.65;
 }
 [data-captions] {
 	margin: 0;
@@ -2890,7 +2915,8 @@ dialog.reply-dialog[open] {
 	pointer-events: none;
 }
 @media print {
-	:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
+	:is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]),
+	pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 		opacity: 1;
 	}
 	[data-live] [data-captions] > li:not(.is-now) {
