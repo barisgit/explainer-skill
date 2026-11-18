@@ -12,6 +12,7 @@ Linked parts now share a screen: `.beside` keeps a figure, diagram or code in vi
 
 ### Pages that may need a change
 
+- A row Question's long choice label now wraps inside the phone's sticky first column instead of running into its neighbour, before and after sideways scrolling. The sticky cell keeps the row's opaque ground and chosen tint.
 - Question notes are now full-width textareas: they start one line high, grow with wrapped text and newlines, then scroll at a screen-height cap. Written answers and selection-note editors grow the same way, with a fallback where `field-sizing: content` is unavailable. Reload keeps the grown note, including notes saved by older exports; reply preserves line breaks, and print shows the full text across sheets. Repack existing pages to get the fix.
 - The selection's Add note button now has an opaque surface in light and dark, and sits beside or above the selection when there is room instead of covering the next line. The button and note editor stay inside the page column and viewport, including on phones. Repack existing pages to get the fix.
 

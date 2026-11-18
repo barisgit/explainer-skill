@@ -389,3 +389,73 @@ export const frame = (k) => ({ readout: k });
 		expect(shown).toEqual([true, true]);
 	}, 30_000);
 });
+
+for (const scheme of ["light", "dark"]) {
+	test(`long row-choice labels wrap inside an opaque sticky name cell on phones (${scheme})`, async () => {
+		const output = await packedMdx(
+			dir,
+			`long-row-${scheme}`,
+			`import { Question } from "kit";
+
+# Plans
+
+<Question name="plan" legend="Choose a plan with a long description" rows={[{ name: "Comprehensive measurement and monitoring programme", desc: "A long detailed description covering deployment, monitoring, maintenance and operational constraints that require careful review.", cost: "1200 EUR annually including support" }, { name: "Small pilot programme", desc: "Start with a limited pilot and expand after collecting data.", cost: "300 EUR annually" }]} cols={[{ head: "Plan", value: "name" }, { head: "Description", value: "desc" }, { head: "Price and conditions", value: "cost" }]} recommended="Comprehensive measurement and monitoring programme" />
+`,
+		);
+		await inPage(
+			output,
+			async (cdp) => {
+				await cdp.send("Emulation.setEmulatedMedia", {
+					features: [{ name: "prefers-color-scheme", value: scheme }],
+				});
+				for (const selected of [false, true]) {
+					if (selected) {
+						await cdp.evaluate("document.querySelector('tbody input').click()");
+					}
+					for (const sideways of [false, true]) {
+						await cdp.evaluate(
+							`document.querySelector('.scroll').scrollLeft = ${sideways} ? 160 : 0`,
+						);
+						await cdp.evaluate(FRAMES, true);
+						const seen = await cdp.evaluate(`(() => {
+						const th = document.querySelector('tbody th');
+						const label = th.querySelector('label'), text = label.querySelector('span');
+						const box = th.getBoundingClientRect(), style = getComputedStyle(th);
+						const range = document.createRange(); range.selectNodeContents(text);
+						const lines = [...range.getClientRects()];
+						const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+						ctx.fillStyle = style.backgroundColor; ctx.fillRect(0, 0, 1, 1);
+						return {
+							contained: lines.every(line => line.right <= box.right - parseFloat(style.paddingRight) + 1),
+							wrapped: lines.length > 1,
+							opaque: ctx.getImageData(0, 0, 1, 1).data[3] === 255,
+							rowGround: style.backgroundColor === getComputedStyle(th.parentElement).backgroundColor,
+							sticky: style.position === 'sticky',
+							onTop: document.elementFromPoint(box.right - 3, box.top + 5)?.closest('th') === th,
+						};
+					})()`);
+						const { NOTE_SHOTS: folder } = process.env;
+						if (folder) {
+							const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", {
+								format: "png",
+							});
+							await Bun.write(
+								`${folder}/row-${scheme}-${selected}-${sideways}.png`,
+								Buffer.from(data, "base64"),
+							);
+						}
+						expect(seen).toEqual({
+							contained: true,
+							wrapped: true,
+							opaque: true,
+							rowGround: true,
+							sticky: true,
+							onTop: true,
+						});
+					}
+				}
+			},
+			{ width: 390, height: 844, mobile: true },
+		);
+	}, 30_000);
+}
