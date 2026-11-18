@@ -3015,7 +3015,8 @@ window.ChartsDefaults = (() => {
       };
     });
   }
-  const labelled = (s, type = s.type) => type === "treemap" && ("data" in s) ? { ...s, data: accentLabels(s.data) } : s;
+  const labelled = (s, base = {}) => (s.type ?? base.type) === "treemap" && ("data" in s) ? { ...s, data: accentLabels(s.data) } : s;
+  const treemapData = (s, base) => (s.type ?? (isObject(base) ? base.type : undefined)) === "treemap" ? s.data : null;
   const styled = (s, extra) => ({
     ...extra,
     ...s,
@@ -3051,57 +3052,56 @@ window.ChartsDefaults = (() => {
     });
     return { ...s, markLine: { ...markLine, data } };
   }
-  const sameKey = (a, b, key) => a[key] != null && b[key] != null && String(a[key]) === String(b[key]);
-  function paired(list, over) {
-    const slots = over.filter(isObject);
-    const entries = list.map((s) => ({ s, base: {}, index: -1 }));
-    const used = new Set;
-    const match = (accept) => {
-      for (const entry of entries) {
-        if (!isObject(entry.s) || entry.index >= 0) {
-          continue;
-        }
-        const s = entry.s;
-        const found = [...slots.entries()].find(([index, base]) => !used.has(index) && accept(s, base));
-        if (found) {
-          const [index, base] = found;
-          Object.assign(entry, { index, base });
-          used.add(index);
-        }
+  const keyOf = (item, key) => isObject(item) && item[key] != null ? String(item[key]) : undefined;
+  function places(target, patch) {
+    const taken = new Set;
+    const take = (find) => {
+      const index = target.findIndex((saved, i) => !taken.has(i) && find(saved, i));
+      if (index >= 0) {
+        taken.add(index);
       }
+      return index >= 0 ? index : undefined;
     };
-    match((s, base) => sameKey(s, base, "id"));
-    match((s, base) => s.id == null && sameKey(s, base, "name"));
-    match((s) => s.id == null);
-    for (const entry of entries) {
-      if (isObject(entry.s) && entry.index < 0) {
-        entry.index = slots.length;
-        slots.push({});
+    const at = patch.map((item) => {
+      const id = keyOf(item, "id");
+      return id === undefined ? undefined : take((saved) => keyOf(saved, "id") === id);
+    });
+    patch.forEach((item, index) => {
+      const name = keyOf(item, "name");
+      if (at[index] === undefined && keyOf(item, "id") === undefined && name !== undefined) {
+        at[index] = take((saved) => keyOf(saved, "name") === name);
       }
-    }
-    return entries;
+    });
+    patch.forEach((item, index) => {
+      if (item != null && at[index] === undefined && keyOf(item, "id") === undefined) {
+        at[index] = take(() => true);
+      }
+    });
+    return at;
   }
   function series(list, option, sides, over) {
-    const entries = over ? paired(list, over) : list.map((s, index) => ({ s, base: {}, index }));
-    return entries.map(({ s, base, index }) => {
+    const at = over ? places(over, list) : [];
+    let added = over?.length ?? 0;
+    return list.map((s, i) => {
       if (!isObject(s)) {
         return s;
       }
       if (!over) {
-        return marked(styled(labelled(s), generated(s, index)), option, sides.get(index) ?? new Set);
+        return marked(styled(labelled(s), generated(s, i)), option, sides.get(i) ?? new Set);
       }
-      return overridden(s, base, index);
+      return overridden(s, over[at[i] ?? -1], at[i] ?? added++);
     });
   }
-  function overridden(s, base, index) {
-    const was = generated(base, index);
+  function overridden(s, inherited, slot) {
+    const base = isObject(inherited) ? inherited : {};
+    const was = generated(base, slot);
     const now = generated({
       ...base,
       ...s,
       lineStyle: { ...objectAt(base, "lineStyle"), ...objectAt(s, "lineStyle") }
-    }, index);
+    }, slot);
     const dropped = "lineStyle" in was && !("lineStyle" in now) && !("type" in objectAt(s, "lineStyle"));
-    return styled(labelled(s, s.type ?? base.type), dropped ? { lineStyle: { type: "solid" } } : now);
+    return styled(labelled(s, base), dropped ? { lineStyle: { type: "solid" } } : now);
   }
   const listOf = (value) => Array.isArray(value) ? value : isObject(value) ? [value] : undefined;
   function withSeries(component, root, sides, over) {
@@ -3112,13 +3112,15 @@ window.ChartsDefaults = (() => {
     const done = series(list, root, sides, over);
     return { ...component, series: Array.isArray(component.series) ? done : done[0] };
   }
-  function defaults(option, sides = new Map) {
-    const explicit = isObject(option.baseOption);
-    const base = isObject(option.baseOption) ? option.baseOption : option;
+  const settings = (option) => isObject(option.baseOption) ? option.baseOption : option;
+  function defaults(option, sides = new Map, inherited) {
+    const parent = inherited && settings(inherited);
+    const base = isObject(option.baseOption) ? option.baseOption : parent ?? option;
     const baseSeries = listOf(base.series) ?? [];
     const over = (o) => isObject(o) ? withSeries(o, base, sides, baseSeries) : o;
     return {
-      ...explicit ? { ...option, baseOption: withSeries(base, base, sides) } : withSeries(option, option, sides),
+      ...isObject(option.baseOption) ? option : withSeries(option, base, sides, parent ? baseSeries : undefined),
+      ...isObject(option.baseOption) && { baseOption: withSeries(base, base, sides) },
       ...Array.isArray(option.options) ? { options: option.options.map(over) } : {},
       ...Array.isArray(option.media) ? {
         media: option.media.map((m) => isObject(m) && isObject(m.option) ? { ...m, option: over(m.option) } : m)
@@ -3127,8 +3129,18 @@ window.ChartsDefaults = (() => {
   }
   const styling = (option) => {
     const listed = (o) => isObject(o) ? listOf(o.series) ?? [] : [];
-    const root = isObject(option.baseOption) ? option.baseOption : option;
-    return JSON.stringify(listed(root).map((s, i) => isObject(s) ? [generated(s, i), s.markLine ?? null] : null));
+    const root = settings(option);
+    const base = listed(root);
+    const styles = (o) => {
+      const list = listed(o);
+      const at = places(base, list);
+      return list.map((s, i) => isObject(s) ? [generated(s, i), s.markLine ?? null, treemapData(s, base[at[i] ?? -1])] : null);
+    };
+    return JSON.stringify([
+      styles(root),
+      ...Array.isArray(option.options) ? option.options.map(styles) : [],
+      ...Array.isArray(option.media) ? option.media.map((m) => styles(isObject(m) ? m.option : null)) : []
+    ]);
   };
   function place(chart) {
     const sides = new Map;
@@ -3158,7 +3170,7 @@ window.ChartsDefaults = (() => {
     }
     return past;
   }
-  return { defaults, styling, place };
+  return { defaults, styling, place, places };
 })();
 
 /* Shared ECharts theme, layout and metrics. */
@@ -3423,6 +3435,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     const accentSoft = token("accent-soft");
     const fontSize = size();
     const axis = {
+      animationDurationUpdate: 0,
       axisLine: { lineStyle: { color: rule } },
       axisTick: { show: false, lineStyle: { color: rule } },
       axisLabel: { color: muted, fontSize },
@@ -3616,8 +3629,11 @@ window.ChartsOption = ({ color, lang, size, text }) => {
   });
   function merge(target, patch, topLevel = false) {
     if (topLevel && Array.isArray(target) && Array.isArray(patch)) {
-      const at = places(target, patch);
+      const at = window.ChartsDefaults.places(target, patch);
       patch.forEach((item, index) => {
+        if (item == null) {
+          return;
+        }
         const place = at[index];
         if (place === undefined) {
           target.push(item);
@@ -3636,6 +3652,10 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     return target;
   }
   function mergeOption(option, patch, replace) {
+    if (isObject(option.baseOption)) {
+      mergeBase(option, patch, replace);
+      return;
+    }
     for (const key of replace) {
       if (!(key in patch)) {
         delete option[key];
@@ -3645,44 +3665,24 @@ window.ChartsOption = ({ color, lang, size, text }) => {
       option[key] = key in option && !replace.includes(key) ? merge(option[key], value, Array.isArray(value)) : value;
     }
   }
+  function mergeBase(option, patch, replace) {
+    const { baseOption, media, options, ...root } = patch;
+    mergeOption(settings(option), { ...root, ...isObject(baseOption) ? baseOption : {} }, replace);
+    if (media !== undefined) {
+      option.media = media;
+    }
+    if (options !== undefined) {
+      option.options = options;
+    }
+  }
   function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
-  const copyObjects = (value) => isObject(value) ? Object.fromEntries(Object.entries(value).map(([key, v]) => [key, copyObjects(v)])) : value;
+  const copyObjects = (value) => Array.isArray(value) ? value.map(copyObjects) : isObject(value) ? Object.fromEntries(Object.entries(value).map(([key, v]) => [key, copyObjects(v)])) : value;
   function merged(option, patch, replace) {
-    const copy = Object.fromEntries(Object.entries(option).map(([key, v]) => [
-      key,
-      Array.isArray(v) ? v.map(copyObjects) : copyObjects(v)
-    ]));
+    const copy = Object.fromEntries(Object.entries(option).map(([key, v]) => [key, copyObjects(v)]));
     mergeOption(copy, patch, replace);
     return copy;
-  }
-  const keyOf = (item, key) => isObject(item) && item[key] != null ? String(item[key]) : undefined;
-  function places(target, patch) {
-    const taken = new Set;
-    const take = (find) => {
-      const index = target.findIndex((saved, i) => !taken.has(i) && find(saved, i));
-      if (index >= 0) {
-        taken.add(index);
-      }
-      return index >= 0 ? index : undefined;
-    };
-    const at = patch.map((item) => {
-      const id = keyOf(item, "id");
-      return id === undefined ? undefined : take((saved) => keyOf(saved, "id") === id);
-    });
-    patch.forEach((item, index) => {
-      const name = keyOf(item, "name");
-      if (at[index] === undefined && keyOf(item, "id") === undefined && name !== undefined) {
-        at[index] = take((saved) => keyOf(saved, "name") === name);
-      }
-    });
-    patch.forEach((item, index) => {
-      if (at[index] === undefined && keyOf(item, "id") === undefined) {
-        at[index] = take(() => true);
-      }
-    });
-    return at;
   }
   const modelOf = (chart, mainType, index) => chart.getModel().getComponent(mainType, index);
   const READER_STATE = {
@@ -3808,7 +3808,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
           return;
         }
         mergeOption(option, patch, replace);
-        chart?.setOption(resolveOption(patch));
+        chart?.setOption(resolveOption(defaults(patch, undefined, option)));
       }
     };
   }

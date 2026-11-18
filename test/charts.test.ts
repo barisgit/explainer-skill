@@ -1,5 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, statSync } from "node:fs";
+import { runKitPart } from "../skills/explainer/src/kit.ts";
+import { pageDrawer } from "../skills/explainer/src/mdx/draw.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import {
 	act,
@@ -838,3 +840,68 @@ test("a treemap's click does not zoom unless the author sets nodeClick", async (
 		expect([name, moved]).toEqual([name, name === "zoom"]);
 	}
 }, 60_000);
+
+const ACCENT_DATA = [{ name: "Finding", value: 4, itemStyle: { color: "var(--accent)" } }];
+
+test("treemap accent labels follow responsive, base and later data, without changing an author's colour", async () => {
+	const output = await packedMdx(dir, "treemap-overrides", WITH_CHART);
+	const result = await inPage(output, (cdp) =>
+		cdp.evaluate(
+			`(async () => {
+			${MADE}
+			const data = ${JSON.stringify(ACCENT_DATA)};
+			const base = { series: [{ type: "treemap", data: [{ name: "Muted", value: 1 }] }] };
+			const patch = { series: [{ data }] };
+			const cases = [
+				{ ...base, media: [{ query: { minWidth: 0 }, option: patch }] },
+				{ baseOption: base, media: [{ query: { minWidth: 0 }, option: patch }] },
+				{ baseOption: { series: [{ type: "treemap", data }] } },
+			];
+			const failures = [];
+			const check = (handle, name) => {
+				const model = handle.chart.getModel().getSeriesByIndex(0);
+				const node = model.getData().getItemModel(1);
+				const color = node.getModel("label").get("color");
+				const probe = document.createElement("i"); probe.style.color = "var(--accent-ink)"; document.body.append(probe);
+				if (color !== getComputedStyle(probe).color) failures.push(name + ": " + color);
+				probe.remove();
+			};
+			for (const [i, option] of cases.entries()) {
+				const handle = await quiet(() => made(option)); check(handle, "override " + i); handle.dispose();
+			}
+			const sparse = await made({ series: [{ id: "other", type: "pie", data: [1] }, { ...base.series[0], id: "tree" }], media: [{ query: { minWidth: 0 }, option: { series: [{ id: "tree", data }] } }] });
+			const sparseColor = sparse.chart.getOption().series[1].data[0].label?.color;
+			if (!sparseColor || sparseColor === "#fff") failures.push("sparse media missed label");
+			sparse.dispose();
+			const fromBase = await made({ baseOption: base });
+			fromBase.set(patch); check(fromBase, "root set after baseOption"); fromBase.dispose();
+			const handle = await made(base);
+			handle.set(patch); check(handle, "set data");
+			handle.set({ series: [{ data: [{ ...data[0], label: { color: "#123456" } }] }] });
+			if (handle.chart.getOption().series[0].data[0].label.color !== "#123456") failures.push("authored label lost");
+			handle.dispose(); return failures;
+		})()`,
+			true,
+		),
+	);
+	expect(result).toEqual([]);
+}, 30_000);
+
+test("pack draws accent label ink in media treemap data and defaults cover timeline options", () => {
+	const drawer = pageDrawer("en", []);
+	const base = { series: [{ type: "treemap", data: [{ name: "Muted", value: 1 }] }] };
+	const patch = { series: [{ data: ACCENT_DATA }] };
+	for (const option of [
+		{ ...base, media: [{ query: { minWidth: 0 }, option: patch }] },
+		{ baseOption: base, media: [{ query: { minWidth: 0 }, option: patch }] },
+	]) {
+		const drawn = drawer.chart(option, { classes: ["chart"], id: undefined, height: undefined });
+		expect(drawn).toContain("fill:var(--accent-ink)");
+	}
+	// Timeline is not bundled; its option still uses the same series traversal before ECharts sees it.
+	const defaults = runKitPart("charts/defaults.ts", "ChartsDefaults") as {
+		defaults(option: object): { options: { series: { data: { label: { color: string } }[] }[] }[] };
+	};
+	const result = defaults.defaults({ baseOption: base, options: [patch] });
+	expect(result.options[0]?.series[0]?.data[0]?.label.color).toBe("var(--accent-ink)");
+});

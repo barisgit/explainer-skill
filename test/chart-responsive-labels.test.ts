@@ -1,6 +1,10 @@
 /* A responsive treemap's replacement data needs the same accent-label contrast as its base data. */
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { runKitPart } from "../skills/explainer/src/kit.ts";
+import { packAndRun, scratch } from "./support.ts";
+
+const dir = scratch();
+afterAll(dir.cleanup);
 
 const kit = runKitPart("charts/defaults.ts", "ChartsDefaults") as {
 	defaults(option: object): object;
@@ -86,3 +90,28 @@ test("identity matches reserve base slots before unnamed overrides, and a new id
 		});
 	}
 });
+
+test("nullish series patches do not shift saved identities when a later update replays them", async () => {
+	const page = `<!doctype html><html><head>
+<link rel="stylesheet" href="kit:theme.css"></head><body><div class="chart" id="c"></div>
+<script src="kit:echarts.js"></script><script src="kit:charts.js"></script>
+<script>
+var contract = (async () => {
+	let handle;
+	const chart = await new Promise(done => {
+		handle = Charts.make(document.getElementById("c"), {
+			xAxis: { type: "category", data: ["a", "b", "c"] }, yAxis: {},
+			series: ["A", "B"].map(id => ({ id, type: "line", data: [1, 2, 3] }))
+		}, done);
+	});
+	handle.set({ series: [null, undefined] });
+	handle.set({ series: [{ id: "C", type: "line", data: [4, 5, 6] }] });
+	handle.set({ series: [{}, {}, { data: [7, 8, 9] }] });
+	const data = chart.getOption().series.map(s => [s.id, s.data]);
+	handle.dispose();
+	return JSON.stringify(data) === JSON.stringify([["A", [1,2,3]], ["B", [1,2,3]], ["C", [7,8,9]]])
+		? [] : ["saved series drifted from ECharts: " + JSON.stringify(data)];
+})();
+</script></body></html>`;
+	expect(await packAndRun(dir, "null-series", page)).toEqual([]);
+}, 30_000);
