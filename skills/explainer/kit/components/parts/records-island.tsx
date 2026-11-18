@@ -81,24 +81,40 @@ function syncHash(
 function useHash(
 	records: Records,
 	root: { current: HTMLElement | null },
+	state: RecordsState,
 	set: (s: RecordsState) => void,
 ) {
 	const ready = useRef(false);
+	const current = useRef(state);
+	current.current = state;
 	useEffect(() => {
+		let away = false;
+		const scroll = () => root.current?.scrollIntoView({ block: "start" });
+		const restore = (found: RecordsState, wasAway: boolean) => {
+			// The router restores overview scroll when returning to the unchanged list.
+			const returning = wasAway && records.writeHash(found) === records.writeHash(current.current);
+			set(found);
+			if (!returning) {
+				requestAnimationFrame(scroll);
+			}
+		};
 		const read = (event?: Event) => {
 			const hash = root.current ? Views.local(root.current) : null;
 			if (hash === null) {
+				away = true;
 				return;
 			}
+			const wasAway = away;
+			away = false;
 			if (event && hash === "") {
 				set(records.initial);
 				return;
 			}
 			const found = records.readHash(hash);
-			if (found) {
-				set(found);
-				requestAnimationFrame(() => root.current?.scrollIntoView({ block: "start" }));
+			if (!found) {
+				return;
 			}
+			restore(found, wasAway);
 		};
 		// The first read waits for the page's scripts: views.js, which loads after the islands, says which view is shown.
 		const start = () => {
@@ -170,7 +186,7 @@ export function RecordsIsland({ config }: { config: RecordsConfig }) {
 	const shown = useRef(vm);
 	shown.current = vm;
 
-	const ready = useHash(records, root, setState);
+	const ready = useHash(records, root, state, setState);
 	usePrint(setPrinting);
 	useRowKeys(root);
 	const answers = useMemo((): AnswerMemory => new Map(), []);
