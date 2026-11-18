@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0
 
 - Contents links keep their keyboard focus outline visible inside the scrolling rail and its expanded narrow layout.
 
