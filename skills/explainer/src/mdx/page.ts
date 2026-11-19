@@ -6,6 +6,7 @@ import { idUses, recordIdProblems } from "../ids.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
 import type { PlacedRecord } from "../ref-states.ts";
+import { endpointMeta } from "../reply/protocol.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
 import { CLIENT_LOAD_FIX, clientLoads } from "./client-loads.ts";
 import { holdsFence } from "./code.ts";
@@ -226,14 +227,21 @@ const islandData = (islands: Island[], modules: string[]): IslandData[] =>
 	}));
 
 /**
+ * The endpoint slot (protocol.ts) of a page that carries reply.js: the meta Send reads, naming the frontmatter replyTo or empty,
+ * which a server fills when it serves the page.
+ */
+const replyMeta = ({ replyTo }: Frontmatter, needed: Set<KitScript>) =>
+	needed.has("reply.js") ? [endpointMeta(replyTo ?? "")] : [];
+
+/**
  * The kit scripts the page needs: for the markup its HTML holds, the markup its client code (`scan`, bundle.ts's clientScan) can
- * write later, reply: true and contents: true.
+ * write later, reply: true or replyTo, and contents: true.
  */
 async function kitScripts(html: string, scan: string, front: Frontmatter): Promise<Set<KitScript>> {
 	return new Set([
 		...(await scriptsInHtml(html)),
 		...scriptsInCode(scan),
-		...(front.reply ? (["keep.js", "reply.js"] as const) : []),
+		...(front.reply || front.replyTo ? (["keep.js", "reply.js"] as const) : []),
 		...(front.contents ? (["views.js"] as const) : []),
 	]);
 }
@@ -305,6 +313,7 @@ export async function mdxPage(
 		"<head>",
 		'<meta charset="utf-8">',
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
+		...replyMeta(page.front, needed),
 		`<title>${escapeHtml(page.title ?? basename(path, extname(path)))}</title>`,
 		'<link rel="stylesheet" href="kit:theme.css">',
 		...(page.front.display ? ['<link rel="stylesheet" href="kit:display.css">'] : []),

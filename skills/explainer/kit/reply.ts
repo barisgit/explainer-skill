@@ -29,7 +29,12 @@
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
-   Read the current Markdown without copying or sending with window.ReplyNotes.markdown() or check --do reply.
+   Send: on a page with an endpoint (the frontmatter replyTo, or the page as serve serves it), the dialog also takes the reader's
+   name (optional, remembered in this browser) and has "Send reply", which posts { v: 1, id, reader?, reply: { markdown, notes,
+   answers } } there and says whether it was stored. Send clears nothing, and sending the same reply again stores it once. Without
+   one it copies only.
+   Read the current Markdown and the body Send would post without copying or sending with window.ReplyNotes.markdown() and .body(), or check
+   --do reply.
    Keeping (kit keep): the reader's answers and notes are kept across reloads. On a page with reply: true (pack marks its <main>
    data-asks-reply), a data-reply control or a note, the bar holds keep's Clear button as "Clear answers and notes" while anything
    is kept; confirmed, it also drops the notes. Otherwise keep's own Clear at the end of the page clears the answers.
@@ -42,7 +47,12 @@
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", noteSaved "Note saved."
    (announced, and over the saved note's toReply "Go to Reply"), and in the caption over a
    note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
-   "{answered} of {total} answered" (the bar's count, over the whole page). A key left out
+   "{answered} of {total} answered" (the bar's count, over the whole page); for Send, sendReply "Send reply", sending
+   "Sending…", sent "Sent.", sentChanged "Sent as it was when you pressed Send; send again to include
+   your changes since.", sendFailed "Send failed: {reason}. Your answers and notes are kept." (the server refused it: {reason} is
+   its answer), unconfirmed "Could not confirm delivery: {reason}. Send again: it is stored once."
+   ({reason}: the server's, unreachable "the server did not answer" or noReceipt "no receipt from the server") and
+   readerName "Your name (optional)". A key left out
    stays English. The reply Markdown stays English: it goes to the agent, and the reader's own words in it are as written.
    Reply flow adapted from visual-explainer's reply.js and ask.js by Nico Bailon (MIT, github.com/nicobailon/visual-explainer). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
@@ -74,6 +84,15 @@
 		figure: "figure",
 		page: "page",
 		answered: "{answered} of {total} answered",
+		sendReply: "Send reply",
+		sending: "Sending…",
+		sent: "Sent.",
+		sentChanged: "Sent as it was when you pressed Send; send again to include your changes since.",
+		sendFailed: "Send failed: {reason}. Your answers and notes are kept.",
+		unconfirmed: "Could not confirm delivery: {reason}. Send again: it is stored once.",
+		unreachable: "the server did not answer",
+		noReceipt: "no receipt from the server",
+		readerName: "Your name (optional)",
 	};
 	/** The page's text for `key`, else the English one. Read at each use, so kitLabels may be set after this script. */
 	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
@@ -315,6 +334,20 @@
 
 	window.ReplyNotes.markdown = markdown;
 
+	/** The reply as an envelope carries it: the Markdown, the notes and the answers, without the elements they came from. */
+	const replyContent = () => ({
+		markdown: markdown(),
+		notes: filledNotes().map(({ where, quote, part, text }) => ({
+			where,
+			...(quote === undefined ? {} : { quote }),
+			...(part === undefined ? {} : { part }),
+			text: text.trim(),
+		})),
+		answers: answers().map(({ host, ...answer }) => answer),
+	});
+	const sender = window.ReplySend({ kitText, h, reply: replyContent });
+	window.ReplyNotes.body = sender.body;
+
 	async function copy(text: string) {
 		try {
 			await navigator.clipboard.writeText(text);
@@ -334,18 +367,7 @@
 
 	/** Copies the reply and hands it to a host listening on the page or on a parent frame. */
 	async function deliver() {
-		const detail = {
-			title: title(),
-			page: file,
-			markdown: markdown(),
-			notes: filledNotes().map(({ where, quote, part, text }) => ({
-				where,
-				quote,
-				part,
-				text: text.trim(),
-			})),
-			answers: answers().map(({ host, ...answer }) => answer),
-		};
+		const detail = { title: title(), page: file, ...replyContent() };
 		document.dispatchEvent(new CustomEvent("reply", { detail }));
 		if (parent !== window) {
 			parent.postMessage({ type: "explainer:reply", ...detail }, "*");
@@ -482,6 +504,7 @@
 		return place.kind === "figure" ? `${kitText("figure")} “${place.name}”` : `§ ${place.name}`;
 	}
 
+	/** Draws the dialog for the reply as it is now. */
 	function renderDialog() {
 		const preview = h("pre", { class: "reply-md" }, markdown());
 		const rows = notes.map((n) => {
@@ -514,11 +537,12 @@
 			);
 		});
 		const status = h("span", { role: "status", class: "meta" });
-		const send = h(
+		const send = sender.controls(status);
+		const copyButton = h(
 			"button",
 			{
 				type: "button",
-				class: "btn primary",
+				class: send ? "btn reply-copy" : "btn primary reply-copy",
 				onclick: async () => {
 					status.textContent = await deliver();
 				},
@@ -537,8 +561,13 @@
 					kitText("close"),
 				),
 			),
-			h("div", { class: "reply-body" }, ...rows, preview),
-			h("footer", {}, status, send),
+			h("div", { class: "reply-body" }, ...rows, preview, ...(send ? [send.reader] : [])),
+			h(
+				"footer",
+				{},
+				status,
+				h("div", { class: "reply-buttons" }, copyButton, ...(send ? [send.button] : [])),
+			),
 		);
 	}
 	dialog.addEventListener("click", (e) => {

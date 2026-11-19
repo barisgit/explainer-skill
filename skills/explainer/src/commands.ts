@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
 import { CONTROL_BUDGET_MS, CONTROL_LIMIT } from "./control-sweep.ts";
 import { authorTsconfig, kitLabels, kitPath, leadingComment, pageFile } from "./kit.ts";
@@ -16,6 +16,9 @@ import { moduleTree, RECORDS_ANSWER_MODULE, scriptsInCode } from "./mdx/kit-scri
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
+import { UNSENDABLE } from "./reply/handler.ts";
+import { hasEndpointSlot, PAGE_ID } from "./reply/protocol.ts";
+import { serve } from "./reply/serve.ts";
 import { report } from "./report.ts";
 import { SCHEMATIC_DOC } from "./schematic/doc.ts";
 import { DRAG_FORM } from "./step-drag.ts";
@@ -399,6 +402,53 @@ export const COMMANDS: Record<string, Command> = {
 				console.log(report(out, shots, views, stepNotes, replies));
 			}
 			return ok ? 0 : 1;
+		},
+	},
+	serve: {
+		summary:
+			"Serve a packed page so its readers' replies come back here: the reply dialog gets Send beside Copy, each reply is printed as it arrives (a header line, then its Markdown indented two spaces) and kept as .md and .json in the data directory. The page needs a reply question or reply: true, packed with the current kit. The page keeps one URL, and a changed file is served as its next version, readers' unsent answers kept. A copy opened elsewhere (file://, email) sends to the replyTo URL it prints, written in the page's frontmatter.",
+		usage:
+			"serve <artifact.html> [--id <name>] [--port <n>] [--host <addr>] [--data <dir>] [--wait]",
+		flags: [
+			"--wait           print the next reply, then stop serving and exit",
+			"--id <name>      the page's id in its URL and replyTo (default: the file name, lowercase)",
+			"--port <n>       port to listen on (default 4747); keep it, since the URL is where saved answers live",
+			"--host <addr>    address to listen on (default 127.0.0.1, this machine only); 0.0.0.0 lets a team on the same network open the page. The API is anonymous: anyone who reaches it can read the page and post replies, so use it on a trusted network only",
+			"--data <dir>     where replies and versions are kept (default: replies/ beside the file)",
+		],
+		examples: [
+			"serve artifact.html",
+			"serve artifact.html --wait",
+			"serve plan.html --id plan --port 4800",
+			"serve plan.html --host 0.0.0.0",
+		],
+		run: async ([file], flags) => {
+			if (!file || !existsSync(file)) {
+				return usage("serve needs an existing packed file. Example: serve artifact.html");
+			}
+			const html = readFileSync(file, "utf8");
+			const unpacked = await kitReferences(html);
+			if (unpacked.length) {
+				return usage(
+					`${file} still references ${unpacked.join(", ")}: serve takes packed files. Run: pack page.mdx -o artifact.html`,
+				);
+			}
+			if (!hasEndpointSlot(html)) {
+				return usage(`${file}: ${UNSENDABLE}. Then: pack page.mdx -o ${basename(file)}`);
+			}
+			const id = flags.get("--id")?.[0] ?? basename(file, extname(file)).toLowerCase();
+			if (!PAGE_ID.test(id)) {
+				return usage(
+					`the page id "${id}" must be lowercase letters, digits, - or _ (up to 64): pass --id, such as --id plan`,
+				);
+			}
+			const port = Number(flags.get("--port")?.[0] ?? 4747);
+			if (!Number.isInteger(port) || port < 0 || port > 65535) {
+				return usage(`--port takes a port number, such as 4747, not "${flags.get("--port")?.[0]}"`);
+			}
+			const data = resolve(flags.get("--data")?.[0] ?? join(dirname(file), "replies"));
+			const host = flags.get("--host")?.[0] ?? "127.0.0.1";
+			return serve(resolve(file), { id, host, port, data, wait: flags.has("--wait") });
 		},
 	},
 };

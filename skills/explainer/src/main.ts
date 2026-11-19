@@ -17,7 +17,7 @@ ${Object.entries(COMMANDS)
 	.join("\n")}
 
 Start: ${CLI} kit
-Exit codes: 0 ok, 1 problems found (pack/check), 2 usage error. Run ${CLI} <command> --help for flags and examples.
+Exit codes: 0 ok, 1 problems found (pack/check) or no port (serve), 2 usage error. Run ${CLI} <command> --help for flags and examples.
 `;
 }
 

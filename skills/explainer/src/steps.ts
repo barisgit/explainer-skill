@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import type { Cdp } from "./cdp.ts";
 import { ELEMENT_NAME_JS, REGION_VISIBLE_JS, SETTLE_JS } from "./page-js.ts";
+import { MAX_BODY, parseEnvelope } from "./reply/protocol.ts";
 import { DRAG_FORM, dragStep, parseDrag } from "./step-drag.ts";
 import { beginHit } from "./step-hit.ts";
 
@@ -480,14 +481,39 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 	return missing && !result.problem ? { ...result, problem: `${step}: ${missing}` } : result;
 }
 
-/** Reads the kit's own builder without opening the dialog, copying or delivering a reply. */
+/** Why `body`, the text Send would post, would not be stored by a reply server: too large, not JSON, or not an envelope. */
+function bodyProblem(body: string): string | undefined {
+	const bytes = new TextEncoder().encode(body).length;
+	if (bytes > MAX_BODY) {
+		return `body: expected at most ${MAX_BODY} bytes, not ${bytes}`;
+	}
+	let value: unknown;
+	try {
+		value = JSON.parse(body);
+	} catch {
+		return "body: expected JSON";
+	}
+	const parsed = parseEnvelope(value);
+	return parsed.ok ? undefined : parsed.error;
+}
+
+/**
+ * Reads the kit's own builder without opening the dialog, copying or delivering a reply, and checks the body Send would post,
+ * the same text by the same builder, as a reply server reads it (an export from before Send has none to check).
+ */
 async function replyStep(cdp: Cdp): Promise<StepResult> {
-	const reply = await cdp.evaluate<string | null>("window.ReplyNotes?.markdown?.() ?? null");
-	return reply === null
-		? {
-				problem:
-					"reply: reply text is unavailable; pack the page with the current kit and a Question or reply: true",
-			}
+	const { reply, body } = await cdp.evaluate<{ reply: string | null; body: string | null }>(
+		"({ reply: window.ReplyNotes?.markdown?.() ?? null, body: window.ReplyNotes?.body?.() ?? null })",
+	);
+	if (reply === null) {
+		return {
+			problem:
+				"reply: reply text is unavailable; pack the page with the current kit and a Question or reply: true",
+		};
+	}
+	const problem = body === null ? undefined : bodyProblem(body);
+	return problem
+		? { reply, problem: `reply: the reply Send would post breaks the reply protocol: ${problem}` }
 		: { reply };
 }
 

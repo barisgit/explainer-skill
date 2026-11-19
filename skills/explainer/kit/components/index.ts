@@ -1,7 +1,8 @@
 /* page: how an .mdx page is written. It imports the kit's components from "kit": import { Chart, View } from "kit".
    Frontmatter: title (default: the text of the #), lang (default en), labels (the kit's own texts, English unless set: kit labels
    prints them all to translate and paste here; pack warns when lang is not English and they are missing), reply: true (the
-   reader's notes on a page without a reply Question or data-reply), contents: true (the contents rail of the page's sections, for
+   reader's notes on a page without a reply Question or data-reply), replyTo (the URL serve prints, so a copy opened from a file or
+   an email sends its reply back), contents: true (the contents rail of the page's sections, for
    a long page; views inside views get it anyway), scheme: light or dark (forces it; else the page follows the system),
    display: condensed (poster capitals for the # and ##: kit display).
    The # and the paragraph right under it are the masthead: the headline states the finding, the lede what it rests on. Each ##

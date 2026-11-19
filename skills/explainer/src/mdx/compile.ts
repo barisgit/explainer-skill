@@ -21,6 +21,8 @@ export interface Frontmatter {
 	scheme?: "light" | "dark";
 	/** Include reply.js (the reader's notes) on a page with no question. */
 	reply: boolean;
+	/** The URL the reply dialog's Send posts to (a `serve` endpoint); written into the page, which brings reply.js. */
+	replyTo?: string;
 	/** Give the page the contents rail of its sections (`<main data-contents>`), views or not. */
 	contents: boolean;
 	/** The display face for the headline and section headings (kit:display.css); unset, they are in the kit's text face. */
@@ -36,7 +38,7 @@ export interface CompiledMdx {
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const KEYS = "title, lang, labels, reply, contents, scheme, display";
+const KEYS = "title, lang, labels, reply, replyTo, contents, scheme, display";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
@@ -79,6 +81,28 @@ function frontmatterData(source: string, file: string): unknown {
 	}
 }
 
+/**
+ * The frontmatter `replyTo` as Frontmatter holds it: absent, or an absolute http(s) URL without credentials, written as the
+ * URL parser writes it, so the page posts exactly there whatever document it is opened as; anything else throws `fail`.
+ */
+function replyEndpoint(value: unknown, fail: (what: string) => PackError): { replyTo?: string } {
+	if (value === undefined) {
+		return {};
+	}
+	const url = typeof value === "string" && URL.canParse(value) ? new URL(value) : undefined;
+	if (!url || !/^https?:$/.test(url.protocol)) {
+		throw fail(
+			"replyTo must be the absolute http(s) URL replies are sent to, such as http://127.0.0.1:4747/api/pages/plan/replies (serve prints it)",
+		);
+	}
+	if (url.username || url.password) {
+		throw fail(
+			"replyTo must not carry a user name or password: every reader of the page would get them; write the URL without them",
+		);
+	}
+	return { replyTo: url.href };
+}
+
 /** Reads and checks the frontmatter; anything pack would ignore or misread fails with the key to fix. */
 function frontmatter(source: string, file: string): Frontmatter {
 	const data = frontmatterData(source, file);
@@ -91,6 +115,7 @@ function frontmatter(source: string, file: string): Frontmatter {
 		lang = "en",
 		labels,
 		reply = false,
+		replyTo,
 		contents = false,
 		scheme,
 		display,
@@ -126,6 +151,7 @@ function frontmatter(source: string, file: string): Frontmatter {
 		reply,
 		contents,
 		...(title === undefined ? {} : { title }),
+		...replyEndpoint(replyTo, fail),
 		...(kitTexts ? { labels: kitTexts } : {}),
 		...(scheme === undefined ? {} : { scheme }),
 		...(display === undefined ? {} : { display }),

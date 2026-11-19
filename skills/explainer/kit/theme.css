@@ -230,6 +230,46 @@ dialog.reply-dialog[open] {
 	margin: 0;
 	padding: 0.75rem 1rem;
 }
+/* The buttons stay whole and in view; a message (a server's long reason included) takes a row of its own when they leave too
+   little room beside them, and breaks anywhere rather than widen the footer. */
+.reply-dialog > footer {
+	flex-wrap: wrap;
+}
+.reply-dialog > footer > [role="status"] {
+	flex: 1 1 12rem;
+	min-inline-size: 0;
+	overflow-wrap: anywhere;
+}
+.reply-dialog > footer > [role="status"]:empty {
+	flex: 0 1 0;
+}
+/* The buttons keep together and to the end, wrapping onto rows of their own when long labels (a translation) leave too little
+   room, and a label wraps when one button alone is wider than the footer. */
+.reply-dialog > footer > .reply-buttons {
+	display: flex;
+	flex: 0 1 auto;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	min-inline-size: 0;
+	margin-inline-start: auto;
+}
+.reply-buttons > .btn {
+	min-inline-size: 0;
+	overflow-wrap: anywhere;
+}
+.reply-body > .reply-reader {
+	display: flex;
+}
+.reply-reader > input {
+	flex: 1 1 12rem;
+	padding: 0.375rem 0.625rem;
+	font: inherit;
+	color: var(--ink);
+	background: var(--bg);
+	border: 1px solid var(--rule-strong);
+	border-radius: var(--radius);
+}
 .reply-dialog h2 {
 	margin: 0;
 	max-inline-size: none;

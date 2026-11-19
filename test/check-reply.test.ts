@@ -87,3 +87,31 @@ test("check --do reply on an export without the reply API gives an actionable pr
 		"--do reply: reply text is unavailable; pack the page with the current kit and a Question or reply: true",
 	);
 }, 30_000);
+
+test("check --do reply fails when the body Send would post breaks the reply protocol", async () => {
+	const input = dir.write(
+		"drift.html",
+		PAGE.replace(
+			"</script></body>",
+			"addEventListener('load', () => { const body = ReplyNotes.body; ReplyNotes.body = () => JSON.stringify({ ...JSON.parse(body()), v: 2 }); });\n</script></body>",
+		),
+	);
+	const output = dir.path("drift.out.html");
+	expect((await packHtml(input, output)).error).toBe("");
+	const checked = await runCli([
+		"check",
+		output,
+		"--quick",
+		"--view",
+		"none",
+		"--do",
+		"reply",
+		"--out",
+		dir.path("drift"),
+		"--json",
+	]);
+	expect(checked.code).toBe(1);
+	expect(JSON.parse(checked.stdout).shots[0].problems).toContain(
+		"--do reply: the reply Send would post breaks the reply protocol: v: expected 1",
+	);
+}, 30_000);

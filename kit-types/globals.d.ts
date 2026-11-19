@@ -210,6 +210,47 @@ interface ReplyNotesOptions {
 	paused: () => boolean;
 }
 
+/** A note as a reply envelope carries it (skills/explainer/src/reply/protocol.ts; kit-types/reply-protocol.ts keeps them equal). */
+interface ReplyEnvelopeNote {
+	where: string;
+	quote?: string;
+	part?: string;
+	text: string;
+}
+
+/** An answer as a reply envelope carries it. */
+interface ReplyEnvelopeAnswer {
+	label: string;
+	value: string | null;
+	note: string;
+	touched: boolean;
+	recommended?: boolean;
+}
+
+/** What Send posts: the reply, one id per reply (a retry stores once) and the name the reader gave. */
+interface ReplyEnvelope {
+	v: 1;
+	id: string;
+	reader?: string;
+	reply: { markdown: string; notes: ReplyEnvelopeNote[]; answers: ReplyEnvelopeAnswer[] };
+}
+
+interface ReplySendOptions {
+	kitText: KitText<
+		| "sendReply"
+		| "sending"
+		| "sent"
+		| "sentChanged"
+		| "sendFailed"
+		| "unconfirmed"
+		| "unreachable"
+		| "noReceipt"
+		| "readerName"
+	>;
+	h: ReplyNotesOptions["h"];
+	reply: () => ReplyEnvelope["reply"];
+}
+
 /**
  * The page's texts for the kit's own controls, accessible names and messages, by key: pack sets it from the frontmatter `labels`,
  * whose keys `kit labels` lists. The kit scripts read it when they draw, never caching it, so it may be set after them.
@@ -252,6 +293,15 @@ declare var ReplyNotes: {
 	(options: ReplyNotesOptions): void;
 	/** Current reply Markdown, available once reply.js has initialized; no clipboard or host delivery. */
 	markdown?: () => string;
+	/** The request body (a ReplyEnvelope as JSON) Send would post now, available once reply.js has initialized; nothing is sent. */
+	body?: () => string;
+};
+/** reply.js's sending part (kit/parts/reply/send.ts): the request body, and the dialog's Send when the page has an endpoint. */
+declare var ReplySend: (options: ReplySendOptions) => {
+	/** What Send would post now, built as Send builds it. */
+	body(): string;
+	/** The name field and Send button, with Send's messages going to `status`; null without an endpoint. */
+	controls(status: HTMLElement): { reader: HTMLElement; button: HTMLButtonElement } | null;
 };
 declare var ViewsNav: (options: {
 	views: HTMLElement[];
