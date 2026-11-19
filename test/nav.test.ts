@@ -1,5 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import {
+	DESKTOP,
+	inPage,
 	kitScriptsIn,
 	packAndCheck,
 	packAndRun,
@@ -10,6 +12,7 @@ import {
 	runPacked,
 	SETTLED,
 	scratch,
+	until,
 } from "./support.ts";
 
 const dir = scratch();
@@ -416,6 +419,57 @@ var contract = settled.then(async () => {
 	expect(kitScriptsIn(output)).toContain("views");
 	expect(await runPacked(output)).toEqual([]);
 }, 30_000);
+
+test.each([
+	{ target: "a link", short: false },
+	{ target: "the empty space below the links", short: false },
+	{ target: "a link", short: true },
+])(
+	"wheel over $target in the contents rail (short window: $short)",
+	async ({ target, short }) => {
+		const output = await packedMdx(
+			dir,
+			"wheel",
+			LONG(4, "", "---\ncontents: true\nscheme: dark\n---\n\n"),
+		);
+		await inPage(
+			output,
+			async (cdp) => {
+				const onLink = target === "a link";
+				const point = await cdp.evaluate<{
+					x: number;
+					y: number;
+					linkHit: boolean;
+					overflows: boolean;
+				}>(`(() => {
+			const rail = document.querySelector('.toc');
+			const link = rail.querySelector('a');
+			const bounds = link.getBoundingClientRect();
+			const x = Math.round(bounds.left + bounds.width / 2);
+			const y = Math.round(${onLink} ? bounds.top + bounds.height / 2 : innerHeight - 40);
+			return { x, y, linkHit: document.elementFromPoint(x, y) === link, overflows: rail.scrollHeight > rail.clientHeight };
+		})()`);
+				expect(point.linkHit).toBe(onLink);
+				expect(point.overflows).toBe(short);
+				const railScroll = "document.querySelector('.toc').scrollTop";
+				expect(await cdp.evaluate(`[scrollY, ${railScroll}]`)).toEqual([0, 0]);
+				await cdp.send("Input.dispatchMouseEvent", {
+					type: "mouseWheel",
+					x: point.x,
+					y: point.y,
+					deltaX: 0,
+					deltaY: 32,
+				});
+				await until(cdp, `${short ? railScroll : "scrollY"} > 0`);
+				const [pageY, railY] = await cdp.evaluate<[number, number]>(`[scrollY, ${railScroll}]`);
+				expect(short ? railY : pageY).toBeGreaterThan(0);
+				expect(short ? pageY : railY).toBe(0);
+			},
+			{ ...DESKTOP, height: short ? 180 : DESKTOP.height },
+		);
+	},
+	30_000,
+);
 
 test("data-nav sections alone give no rail: pack brings no views.js for them, and views.js a fold brings draws none", async () => {
 	expect(kitScriptsIn(await packedMdx(dir, "five", LONG(5)))).not.toContain("views");

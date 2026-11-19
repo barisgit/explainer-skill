@@ -214,7 +214,6 @@
 		inline-size: 12.5rem;
 		padding-block: var(--page-top) 2rem;
 		overflow-y: auto;
-		overscroll-behavior: contain;
 		scrollbar-width: thin;
 	}
 	.toc-toggle {
