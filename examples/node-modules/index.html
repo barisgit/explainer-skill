@@ -3493,16 +3493,16 @@ window.ChartsOption = ({ color, lang, size, text }) => {
   const still = (option) => isObject(option.baseOption) ? { ...option, baseOption: { ...option.baseOption, animation: false } } : { ...option, animation: false };
   const ends = window.ChartsEnds({ isObject, size });
   const measureText = (base) => (text, font) => text === "国" ? { width: Number(/(\d+(?:\.\d+)?)px/.exec(font ?? "")?.[1] ?? 12) } : base(text, font);
-  function authoredLayout(option) {
+  function authoredLayout(option, gridKeys = ["height"]) {
     const component = (value, keys) => {
       if (Array.isArray(value)) {
         return value.map((item) => component(item, keys));
       }
-      return isObject(value) && keys.some((key) => (key in value)) ? { ...value, __kitLegendRoom: false } : value;
+      return isObject(value) && keys.some((key) => (key in value)) ? { ...value, __kitLegendRoom: !keys.some((key) => value[key] != null) } : value;
     };
     const result = { ...option };
     if ("grid" in result) {
-      result.grid = component(result.grid, ["top", "bottom", "height", "y", "y2"]);
+      result.grid = component(result.grid, gridKeys);
     }
     if ("legend" in result) {
       result.legend = component(result.legend, [
@@ -3525,7 +3525,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
       result.options = result.options.map((item) => isObject(item) ? authoredLayout(item) : item);
     }
     if (Array.isArray(result.media)) {
-      result.media = result.media.map((item) => isObject(item) && isObject(item.option) ? { ...item, option: authoredLayout(item.option) } : item);
+      result.media = result.media.map((item) => isObject(item) && isObject(item.option) ? { ...item, option: authoredLayout(item.option, ["top", "bottom", "height", "y", "y2"]) } : item);
     }
     return result;
   }
@@ -3549,6 +3549,14 @@ window.ChartsOption = ({ color, lang, size, text }) => {
       apply();
     };
     animation.on("frame", done);
+  }
+  function pixels(value, height) {
+    const text = String(value).trim();
+    const amount = Number.parseFloat(text);
+    if (typeof value === "number" || /^-?[\d.]+(px)?$/.test(text)) {
+      return Number.isFinite(amount) ? amount : undefined;
+    }
+    return /^-?[\d.]+%$/.test(text) ? amount * height / 100 : undefined;
   }
   function layout(instance) {
     const chart = instance;
@@ -3575,10 +3583,11 @@ window.ChartsOption = ({ color, lang, size, text }) => {
       if (!box.height) {
         return;
       }
-      const original = Number(grid.get("bottom"));
-      const bottom = Math.max(original, chart.getHeight() - box.y + 12);
-      if (bottom !== original) {
-        saved = original;
+      const written = grid.get("bottom");
+      const original = pixels(written, chart.getHeight());
+      const bottom = chart.getHeight() - box.y + 12;
+      if (original !== undefined && bottom > original) {
+        saved = written;
         setOption({ grid: { bottom } }, { silent: true });
       }
     };

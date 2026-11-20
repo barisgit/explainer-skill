@@ -25,7 +25,7 @@
    Formats: a formatter, valueFormatter or labelFormatter may be JSON: { digits: 1, unit: "min" }, { percent: true },
      { currency: "EUR", compact: true } (written for the page's lang), or one text per data item or tick: ["Low", "", "Peak"].
    Layout: one grid with one unpositioned horizontal legend reserves bottom room from ECharts’ rendered legend box, live and
-     in pack’s drawings. Explicit grid top/bottom/height or legend placement keeps your layout.
+     in pack’s drawings, also under your grid bottom when that is smaller. A grid height or legend placement keeps your layout.
      Write grid: { top, left, right, bottom } as padding; axis labels stay inside it, so margins of 8 to 24 px are enough.
      Do not write grid.containLabel: ECharts 6 logs a warning for it on every chart; check reports it. For a layout that changes
      with the width, write media: [{ query: { maxWidth: 639 }, option: { grid: { top: 112 } } }]; pack evaluates each drawn width.
