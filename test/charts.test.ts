@@ -53,6 +53,31 @@ test("colour tokens resolve where the chart is, so a block that sets its own acc
 	expect(await packAndRun(dir, "scoped", page)).toEqual([]);
 }, 30_000);
 
+test("a chart in a block with its own ink still remounts when the page's scheme changes", async () => {
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main><h1>Charts</h1><div style="--ink: #123456"><div class="chart" id="c"></div></div></main>
+<script src="kit:echarts.js"></script><script src="kit:charts.js"></script>
+<script>
+let mounts = 0;
+var contract = new Promise((found) => Charts.make(document.getElementById("c"), {
+	xAxis: { type: "category", data: ["a", "b"] },
+	yAxis: { type: "value" },
+	series: [{ type: "bar", data: [1, 2] }],
+}, () => {
+	mounts += 1;
+	const html = document.documentElement;
+	if (mounts === 1) {
+		html.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark";
+		setTimeout(() => {
+			html.dataset.scheme = html.dataset.scheme === "dark" ? "light" : "dark";
+			setTimeout(() => found(mounts === 3 ? [] : ["two scheme changes remounted the chart " + (mounts - 1) + " times"]), 500);
+		}, 500);
+	}
+}));
+</script></body></html>`;
+	expect(await packAndRun(dir, "scheme-own-ink", page, { widths: [DESKTOP] })).toEqual([]);
+}, 30_000);
+
 test("a wrapped horizontal legend leaves the grid clear on phones", async () => {
 	const page = PAGE.replace(
 		/var contract =[\s\S]*<\/script>/,

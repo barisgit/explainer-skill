@@ -33,9 +33,9 @@
 		}
 	}
 
-	/** Resolves `var(--name)` to the colour for the current scheme (light-dark() included). */
+	/** Resolves `var(--name)` on the page's root, for the current scheme (light-dark() included): what the scheme check reads. */
 	function color(name: string) {
-		placeProbe();
+		document.documentElement.append(probe);
 		probe.style.color = `var(--${name})`;
 		return getComputedStyle(probe).color;
 	}

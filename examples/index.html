@@ -3680,7 +3680,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     }
   }
   function color(name) {
-    placeProbe();
+    document.documentElement.append(probe);
     probe.style.color = `var(--${name})`;
     return getComputedStyle(probe).color;
   }
