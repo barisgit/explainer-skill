@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.14.0
 
 - Replies can come back by themselves: `serve artifact.html` serves the packed page at one URL, prints each reply as it arrives (`--wait`: the next one, then exits) and keeps it as `.md` and `.json` beside the page in `replies/`. A changed file is served as the next version, and readers' unsent answers carry over. The reply dialog then has the reader's name and Send beside Copy; Send says "Sent." only for the server's receipt (else that it failed, or that delivery could not be confirmed) and clears nothing; sending the same reply again stores it once. `serve` needs a page with a reply question or `reply: true`, packed with this version. `serve --host 0.0.0.0` lets a team on the same network open the page; the API is anonymous, so only on a trusted network. A copy opened from a file or an email sends to the frontmatter `replyTo`, the URL `serve` prints. Without either, the page copies only, as before.
 - `check --do reply` also checks the reply Send would post against the reply protocol.
