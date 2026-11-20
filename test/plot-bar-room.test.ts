@@ -59,6 +59,53 @@ test("a bar plot's marker rows are counted in the layout it is drawn in, also wh
 	}
 });
 
+test("stacked columns use the full plot width when their names fit inside (#261)", () => {
+	const option = {
+		categories: ["North", "South", "East"],
+		stack: true,
+		series: ["A", "B"].map((name, j) => ({ name, type: "bar", data: [3 + j, 4, 5 - j] })),
+	};
+	const svg = draw(option, 356, 288);
+	expect(
+		names(svg)
+			.filter((t) => t.inside)
+			.map((t) => t.text),
+	).toEqual(["A", "B"]);
+	expect(bars(svg)).toEqual(bars(draw({ ...option, legend: false }, 356, 288)));
+});
+
+test("a move between stacks cannot spend the destination categories' label space (#261)", () => {
+	const categories = ["North", "East", "South", "West", "Centre"];
+	const to = {
+		stack: true,
+		categories: categories.map((name) => ({ name, note: "Sites" })),
+		series: SERIES.map((name, j) => ({
+			name,
+			type: "bar",
+			data: categories.map((_, i) => 3 + ((i * 7 + j * 5) % 9)),
+		})),
+		y: { format: (v: number) => `${String(v).padStart(2, "0")} kg` },
+	};
+	const from = {
+		stack: to.stack,
+		categories: categories.slice(0, 3),
+		series: to.series.map((s) => ({ ...s, data: s.data.slice(0, 3) })),
+	};
+	for (const k of [0, 0.5, 1]) {
+		const svg = plotDraw.render(
+			between(from, to, k),
+			356,
+			280,
+			width,
+			[true, true, true],
+			to,
+			from,
+		);
+		const ticks = [...svg.matchAll(/<text class="cat"[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
+		expect(ticks, `move at ${k}`).toEqual(categories);
+	}
+});
+
 test("stacked columns keep a plot to draw when their names would take its width, and report the names (#190)", () => {
 	const option = {
 		categories: ["North", "South", "East"],
@@ -72,13 +119,13 @@ test("stacked columns keep a plot to draw when their names would take its width,
 	};
 	const svg = draw(option, 356, 288);
 	expect(bars(svg).length).toBe(6);
-	// With no clear spot left, each is drawn on its least bad one, which pack warns about.
-	expect(plotDraw.crowded().names.sort()).toEqual(["Gas boiler unit B", "Heat pump unit A"]);
+	// One name can wrap beside its segment; the other still has no clear spot and pack warns about it.
+	expect(plotDraw.crowded().names).toEqual(["Gas boiler unit B"]);
 	expect(
 		names(svg)
 			.map((t) => t.text)
-			.sort(),
-	).toEqual(["Gas boiler unit B", "Heat pump unit A"]);
+			.join(" "),
+	).toBe("Heat pump unit A Gas boiler unit B");
 });
 
 test("a grouped plot's bands for picking are where its categories are drawn, below the names' room (#190)", () => {

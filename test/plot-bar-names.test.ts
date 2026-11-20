@@ -199,6 +199,25 @@ test("named bars with no legend set carry their names on their bars at every wid
 	}
 });
 
+test("stacked column names leave room for all five category labels at 356 px (#261)", () => {
+	const svg = draw(CASES["stacked columns"], 356, 280);
+	const ticks = [...svg.matchAll(/<text x="[^>]+>([^<]+)<\/text>/g)].map((m) => m[1] ?? "");
+	expect(ticks.filter((text) => CATEGORIES.includes(text))).toEqual(CATEGORIES);
+	expectNamedBars(svg, [356, 280], "stacked columns");
+	expect(plotDraw.crowded().names).toEqual([]);
+});
+
+test("a half-width stack keeps only a small side gutter when it makes the names readable (#261)", () => {
+	const option = CASES["stacked columns"];
+	draw(option, 527, 280);
+	expect(plotDraw.crowded().names).toEqual([]);
+	const named = plotDraw.bands(option, 527, 280, width);
+	const plain = plotDraw.bands({ ...option, legend: false }, 527, 280, width);
+	const gutter = (plain?.end ?? 0) - (named?.end ?? 0);
+	expect(gutter).toBeGreaterThan(0);
+	expect(gutter).toBeLessThan(25);
+});
+
 test("an author's legend, a legend that is off and a picked key keep bar names off the bars (#190)", () => {
 	const option = CASES["grouped columns"];
 	expect(plotDraw.legendMarkup({ ...option, legend: true })).not.toBe("");

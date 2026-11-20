@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Named stacked columns keep the category labels that would fit without series names. They can wrap a name beside a stack without taking room the category labels need.
+
 ## v0.16.0
 
 - A ```` ```diff-python ```` fence (`diff-ts`, `diff-<any language pack colours>`) colours each line's code in that language, the old and new side each read as one listing, and every diff fence tints its inserted and deleted lines. `pack` fails on a `diff-<language>` it does not colour; it used to stay plain without a word. A wrapped diff line continues under its code, not under its `+` or `-`.
