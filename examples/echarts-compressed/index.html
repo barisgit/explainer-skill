@@ -2691,15 +2691,17 @@ details > :last-child:not(summary) {
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions).
-   Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
+   Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
+   (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
    <html data-scheme="dark">; charts and diagrams follow it too.
    The accent has one meaning, the finding: the headline phrase (h1 em), and on a chart the series or bar the page is about
    (color: "var(--accent)"). Series default to --c1..--c6, muted inks told apart by lightness, a line also by its dash, and best by
-   the names on them; keep each compared thing in the same one on every chart and view. A mark takes one of the accent's three
-   states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as a background),
-   for done, planned and estimated, say.
+   the names on them; keep each compared thing in the same one on every chart and view. Categories that are colours by nature
+   (energy sources, parties) take real hues: --c1..--c6 on :root, as light-dark() pairs like the accent. A mark takes one of the
+   accent's three states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as
+   a background), for done, planned and estimated, say.
    Classes: page masthead lede next meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
@@ -3115,6 +3117,11 @@ pre [data-ref].is-lit {
 	color: var(--bad);
 }
 }</style>
+<style>/* ECharts' own blue. */
+:root {
+	--accent: light-dark(#3a5bc7, #8aa8ff);
+}
+</style>
 </head>
 <body>
 <main class="page"><div data-overview><header class="masthead"><h1>Shipping <span class="cased">ECharts</span> compressed takes <em>513 KB</em> off every chart page and costs 31 ms.</h1><p class="lede">Commit 7d4f018 makes pack inline <code>kit/echarts.js</code> as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.</p></header><!--island:0--><div class="chart plot" style="block-size:clamp(10rem, 16vw, 14rem);" role="img" aria-label="ECharts in a chart page: 931 KB plain, 418 KB compressed"><ul class="plot-legend"></ul><div class="plot-area"><div class="chart-drawn" aria-hidden="true"><svg viewBox="0 0 1054 216"><text class="cat" x="153" y="52" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="69" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="153" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="170" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="212"/><rect class="bar" style="--c:var(--c1)" x="162" y="38" width="815.6" height="45.1"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="139" width="366.2" height="45.1"><title>Compressed: 418</title></rect><text class="value" x="983.6" y="60.5" dy="0.35em" text-anchor="start">931 KB</text><text class="value" x="534.2" y="161.5" dy="0.35em" text-anchor="start">418 KB</text></svg><svg viewBox="0 0 527 216" data-fit="half"><text class="cat" x="153" y="52" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="69" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="153" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="170" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="212"/><rect class="bar" style="--c:var(--c1)" x="162" y="38" width="324.9" height="45.1"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="139" width="145.9" height="45.1"><title>Compressed: 418</title></rect><text class="value inside" x="480.9" y="60.5" dy="0.35em" text-anchor="end" style="--c:var(--c1)">931 KB</text><text class="value" x="313.9" y="161.5" dy="0.35em" text-anchor="start">418 KB</text></svg><svg viewBox="0 0 356 152" data-fit="phone"><text class="cat" x="153" y="36" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="53" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="105" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="122" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="148"/><rect class="bar" style="--c:var(--c1)" x="162" y="29.1" width="165.7" height="30.8"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="98.1" width="74.4" height="30.8"><title>Compressed: 418</title></rect><text class="value inside" x="321.7" y="44.5" dy="0.35em" text-anchor="end" style="--c:var(--c1)">931 KB</text><text class="value" x="242.4" y="113.5" dy="0.35em" text-anchor="start">418 KB</text></svg></div></div></div><!--/island--><section><h2>Four files change, and the charts wait for <span class="cased">ECharts</span></h2><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090.761 98.35" width="100%" style="--mermaid-max: 1090px; --mermaid-min: 840px">

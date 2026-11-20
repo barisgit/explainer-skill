@@ -1,0 +1,4 @@
+/* Charge green: the battery and the solar it stores. */
+:root {
+	--accent: light-dark(#44700d, #9bd34a);
+}

@@ -1,5 +1,5 @@
 /* The numbers in the page's prose and its second and third figures, computed from the extract. */
-import { COUNTRIES, change, latest, SOURCES, WORLD } from "./model.ts";
+import { COUNTRIES, change, latest, SOURCES, type SourceId, WORLD } from "./model.ts";
 
 const step = latest(WORLD);
 if (!step) {
@@ -17,6 +17,18 @@ export const BY_SOURCE = SOURCES.flatMap((s) => {
 		? []
 		: [{ id: s.id, name: s.name, value: v, windSolar: s.id === "wind" || s.id === "solar" }];
 }).sort((a, b) => b.value - a.value);
+/** Each source's colour: the hues colours.css gives the six named ones, the rest muted. */
+export const HUES: Record<SourceId, string> = {
+	coal: "var(--c1)",
+	gas: "var(--c2)",
+	nuclear: "var(--c3)",
+	hydro: "var(--c4)",
+	wind: "var(--c5)",
+	solar: "var(--c6)",
+	oil: "var(--rule-strong)",
+	bio: "var(--rule-strong)",
+	other: "var(--rule-strong)",
+};
 export const OTHERS = BY_SOURCE.filter((s) => !s.windSolar);
 
 /** Countries whose coal generation fell or rose into the last year, and by how much in all. */

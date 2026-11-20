@@ -1,6 +1,37 @@
 /* One example: the question it answers, its finding as the link to the page, and that page's opening figure. */
 .entry {
 	padding-block-end: 2rem;
+	/* The kit derives these from --accent on :root; restated here, they follow the entry's own accent. */
+	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
+	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
+}
+/* Each entry in its page's colours, copied from examples/<name>/colours.css: a page sets them on :root, which here is shared. */
+.entry.battery {
+	--accent: light-dark(#44700d, #9bd34a);
+}
+.entry.echarts-compressed {
+	--accent: light-dark(#3a5bc7, #8aa8ff);
+}
+.entry.i2c-pull-ups {
+	--accent: light-dark(#0c6a85, #22d3ee);
+}
+.entry.electricity-mix {
+	--accent: light-dark(#2a7230, #6cd27a);
+	--c1: light-dark(#3d3a36, #b8b0a6);
+	--c2: light-dark(#b0500b, #fb923c);
+	--c3: light-dark(#7e3fbf, #c39bff);
+	--c4: light-dark(#23439c, #7f9dff);
+	--c5: light-dark(#0a7799, #59cfee);
+	--c6: light-dark(#8f6700, #f4c430);
+}
+.entry.node-modules {
+	--accent: light-dark(#c12a2a, #ff7070);
+}
+.entry.fourier-series {
+	--accent: light-dark(#b5177a, #ff7ccb);
+}
+.entry.dijkstra {
+	--accent: light-dark(#6d28d9, #b794ff);
 }
 .ask {
 	margin: 0 0 0.4rem;

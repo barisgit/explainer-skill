@@ -3,10 +3,11 @@ title: Is wind and solar replacing coal?
 ---
 import { Plot, Records, View } from "kit";
 import Opening from "./opening.mdx";
-import { BY_SOURCE, COAL, FELL, MOVERS, OTHERS, REST, ROSE, TOTAL, WS } from "./facts.ts";
+import { BY_SOURCE, COAL, HUES, FELL, MOVERS, OTHERS, REST, ROSE, TOTAL, WS } from "./facts.ts";
 import { fmt, signed, Y1 } from "./model.ts";
 import places from "./places.ts";
 import { PlaceView } from "./place.tsx";
+import "./colours.css";
 
 # Wind and solar added <em>{fmt(WS)} TWh</em> in {Y1}. Total generation added {fmt(TOTAL)}.
 
@@ -22,7 +23,10 @@ World electricity generation, change on the year before, in TWh. Source: Our Wor
 	option={{
 		horizontal: true,
 		categories: BY_SOURCE.map((s) => s.name),
-		series: [{ type: "bar", data: BY_SOURCE.map((s) => Math.round(s.value)), fill: BY_SOURCE.map((s) => (s.windSolar ? "accent" : "")), label: true }],
+		stack: true,
+		legend: false,
+		x: { labels: false },
+		series: BY_SOURCE.map((s) => ({ type: "bar", color: HUES[s.id], data: BY_SOURCE.map((o) => (o === s ? Math.round(s.value) : 0)), label: BY_SOURCE.map((o) => (o === s ? fmt(s.value) : "")) })),
 	}}
 />
 

@@ -27,43 +27,43 @@ An agent wrote each page with [the explainer skill](https://github.com/barisgit/
 
 **Install:** `npx skills add barisgit/explainer-skill`
 
-<section class="entry">
+<section class="entry battery">
 <Ask prompt={prompts.battery} />
 <h2 data-nav="A decision"><a href="battery/">The first 5 kWh pays for itself in <em>{battery.BLOCKS[0].years} years</em>. The second would take {battery.BLOCKS[1].years}.</a></h2>
 <Battery />
 </section>
 
-<section class="entry">
+<section class="entry echarts-compressed">
 <Ask prompt={prompts.echarts} />
 <h2 data-nav="A code review"><a href="echarts-compressed/">Shipping ECharts compressed takes <em>{compressed.saved} KB</em> off every chart page and costs {Object.values(compressed.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms.</a></h2>
 <Compressed />
 </section>
 
-<section class="entry">
+<section class="entry i2c-pull-ups">
 <Ask prompt={prompts.i2c} />
 <h2 data-nav="An engineering page"><a href="i2c-pull-ups/">The {bus.N.found} pull-ups take <em>{bus.N.foundTr} ns</em> to raise the line. At 400 kHz the bus allows {bus.N.fastTr}.</a></h2>
 <Pullups />
 </section>
 
-<section class="entry">
+<section class="entry electricity-mix">
 <Ask prompt={prompts.electricity} />
 <h2 data-nav="A data report"><a href="electricity-mix/">Wind and solar added <em>{mix.fmt(added.WS)} TWh</em> in {mix.Y1}. Total generation added {mix.fmt(added.TOTAL)}.</a></h2>
 <Electricity />
 </section>
 
-<section class="entry">
+<section class="entry node-modules">
 <Ask prompt={prompts.modules} />
 <h2 data-nav="A drill-down over records"><a href="node-modules/">{modules.COUNT} packages installed for {modules.LISTED.length} listed; <em>{modules.HEAVY.size} of them</em> hold half the bytes.</a></h2>
 <Modules />
 </section>
 
-<section class="entry">
+<section class="entry fourier-series">
 <Ask prompt={prompts.fourier} />
 <h2 data-nav="A study page"><a href="fourier-series/">Add a thousand sines and the corner still overshoots by <em>{fourier.pct(fourier.overshoot(fourier.peak(fourier.THOUSAND)), 0)}</em>.</a></h2>
 <Fourier />
 </section>
 
-<section class="entry">
+<section class="entry dijkstra">
 <Ask prompt={prompts.dijkstra} />
 <h2 data-nav="An algorithm"><a href="dijkstra/">One negative edge and Dijkstra answers <em>{paths.DIJKSTRA.dist[paths.TARGET]}</em> where the shortest path is {paths.BELLMAN.dist[paths.TARGET]}.</a></h2>
 <Dijkstra />

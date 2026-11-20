@@ -1,0 +1,4 @@
+/* ECharts' own blue. */
+:root {
+	--accent: light-dark(#3a5bc7, #8aa8ff);
+}

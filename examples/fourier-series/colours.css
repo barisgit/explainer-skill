@@ -1,0 +1,4 @@
+/* A signal trace in magenta. */
+:root {
+	--accent: light-dark(#b5177a, #ff7ccb);
+}

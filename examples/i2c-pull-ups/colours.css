@@ -1,0 +1,4 @@
+/* The cyan of an oscilloscope trace. */
+:root {
+	--accent: light-dark(#0c6a85, #22d3ee);
+}

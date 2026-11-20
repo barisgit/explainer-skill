@@ -1,0 +1,11 @@
+/* Wind and solar together are the finding, in green; each source keeps the hue charts of the power mix give it, in the
+   order of SOURCES (model.ts): coal, gas, nuclear, hydro, wind, solar. Oil, bioenergy and other renewables stay muted. */
+:root {
+	--accent: light-dark(#2a7230, #6cd27a);
+	--c1: light-dark(#3d3a36, #b8b0a6);
+	--c2: light-dark(#b0500b, #fb923c);
+	--c3: light-dark(#7e3fbf, #c39bff);
+	--c4: light-dark(#23439c, #7f9dff);
+	--c5: light-dark(#0a7799, #59cfee);
+	--c6: light-dark(#8f6700, #f4c430);
+}
