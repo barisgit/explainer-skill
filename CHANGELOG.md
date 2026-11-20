@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.15.0
 
 - The guide and `kit theme` now invite choosing the accent from the subject or a brand, as `light-dark()` pairs on `:root` (with `--accent-ink` when white text does not read on it), and real hues in `--c1`..`--c6` where categories are colours by nature (energy sources, teams, parties). One accent with one meaning per page still holds.
 - `check` warns when a colour token is too faint for its use, in either scheme: `--accent` as text on the page's tones (4.5:1), `--accent-ink` on the accent (4.5:1), and `--c1`..`--c6` as marks on `--bg` (3:1), also where an element sets its own accent. The warning names the token, scheme, element, the ratio and the colour it was measured on.
