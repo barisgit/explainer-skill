@@ -81,4 +81,11 @@ echarts.use([
 	UniversalTransition,
 ]);
 
+// ECharts adds an undefined timeline to baseOption before preprocessing, then diagnoses it as a missing component.
+echarts.registerPreprocessor((option) => {
+	if (option.timeline === undefined) {
+		delete option.timeline;
+	}
+});
+
 export { echarts };
