@@ -10,9 +10,24 @@ export type PlotDrawing = {
 		width: (s: unknown) => number,
 		shown: boolean[],
 		texts?: object,
+		from?: object,
 	): string;
 	legendMarkup(option: object): string;
-	markLines(option: object, W: number, H: number, width: (s: unknown) => number): number;
+	markLines(
+		option: object,
+		W: number,
+		H: number,
+		width: (s: unknown) => number,
+		texts?: object,
+		from?: object,
+	): number;
+	bands(
+		option: object,
+		W: number,
+		H: number,
+		width: (s: unknown) => number,
+		from?: object,
+	): { start: number; end: number; count: number; vertical: boolean } | undefined;
 	crowded(): { notes: string[]; names: string[]; arrows: string[] };
 };
 export const plotDrawAt = (size: number) =>

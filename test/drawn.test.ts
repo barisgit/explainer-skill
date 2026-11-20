@@ -650,7 +650,9 @@ test("a horizontal bar plot is as tall as its bars need, up to the tall 34rem, u
 
 <Plot id="tall" class="tall" label="Tall" option={${bars(3)}} />
 
-<Plot id="legend" label="Legend" option={{ categories: ["a", "b"], horizontal: true, series: [{ name: "First series", type: "bar", data: [1, 2] }, { name: "Second series", type: "bar", data: [2, 1] }] }} />
+<Plot id="named" label="Named" option={{ categories: ["a", "b"], horizontal: true, series: [{ name: "First series", type: "bar", data: [1, 2] }, { name: "Second series", type: "bar", data: [2, 1] }] }} />
+
+<Plot id="legend" label="Legend" option={{ categories: ["a", "b"], horizontal: true, legend: true, series: [{ name: "First series", type: "bar", data: [1, 2] }, { name: "Second series", type: "bar", data: [2, 1] }] }} />
 
 <Plot id="upright" label="Upright" option={{ categories: ["a", "b", "c"], series: [{ type: "bar", data: [1, 2, 3] }] }} />
 
@@ -669,7 +671,12 @@ test("a horizontal bar plot is as tall as its bars need, up to the tall 34rem, u
 	expect(viewBoxes(figures.get("given"))).toEqual(["1054x192", "527x192", "356x192"]);
 	expect(viewBoxes(figures.get("tall"))).toEqual(["1054x536", "527x536", "356x344"]);
 	expect(viewBoxes(figures.get("upright"))).toEqual(["1054x408", "527x408", "356x280"]);
-	// A legend wraps into rows by the width, which one height cannot follow: the plot keeps the theme's height.
+	// Bars side by side carry their names above the first row: a line each over the rows (#190, owner 2026-11-20).
+	expect(viewBoxes(figures.get("named"))).toEqual(["1054x182", "527x182", "356x182"]);
+	expect(readFileSync(path, "utf8")).toMatch(
+		/<div class="chart plot" id="named" style="block-size:11.875rem;?"/,
+	);
+	// A legend an author asks for wraps into rows by the width, which one height cannot follow: the plot keeps the theme's height.
 	expect(figures.get("legend")).toContain('viewBox="0 0 1054 ');
 	expect(readFileSync(path, "utf8")).toMatch(/<div class="chart plot" id="legend" role="img"/);
 	// The height takes the height prop's path, which the box gate sees, and no custom property sizes a figure.
@@ -683,7 +690,7 @@ test("a horizontal bar plot is as tall as its bars need, up to the tall 34rem, u
 	);
 	// A label that wraps into more lines on a phone than on a desktop has no one height to draw at: plot.js draws it.
 	expect(figures.get("wraps")).toBeUndefined();
-	await expectFitted(path, 9);
+	await expectFitted(path, 10);
 }, 60_000);
 
 test("no custom property sizes a figure out of pack's sight: a bar plot's height takes the height prop's path", async () => {

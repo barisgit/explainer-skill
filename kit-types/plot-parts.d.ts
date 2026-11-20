@@ -20,10 +20,10 @@ declare var PlotLegend: (env: {
 	pick: ReturnType<typeof PlotPick>;
 }) => {
 	/**
-	 * The legend's buttons for the named series, or "" when it is off, has one entry or the lines carry the names (atEnds); a bar
-	 * plot with a picked category has its key instead.
+	 * The legend's buttons for the named series, or "" when it is off, has one entry or the series carry their names on their
+	 * marks (onMarks); a bar plot with a picked category has its key instead.
 	 */
-	markup(option: PlotOption, atEnds: boolean): string;
+	markup(option: PlotOption, onMarks: boolean): string;
 	/** Per series: whether it is switched on, given the names switched off. */
 	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
 };
@@ -79,7 +79,10 @@ declare var PlotBarLabels: (env: PlotSvg & { size: () => number }) => {
 interface PlotEndName {
 	name: string;
 	series: string;
+	/** The path a name is tried beside along it: a line's points, or a stem series' dots. */
 	line: readonly PlotPx[];
+	/** The series' marks a name must be nearer than any other series': a line, or each stem. */
+	shapes: readonly (readonly PlotPx[])[];
 	at: { x: number; y: number };
 	colour: string;
 	dash: string;
@@ -103,9 +106,9 @@ declare var PlotEnds: (
 		wrap: (text: string, width: number, textWidth: (s: unknown) => number) => string[];
 	},
 ) => {
-	/** Whether the lines carry their names on the plot: never a legend in their place. */
-	fit(option: PlotOption): boolean;
-	/** The lines with text at their ends, with their index: name and value, or the value alone. */
+	/** Whether the series carry their names on their marks: never a legend in their place. */
+	onMarks(option: PlotOption): boolean;
+	/** The lines and stems with text at their ends, with their index: name and value, or the value alone. */
 	named(
 		option: PlotOption,
 		textWidth: (s: unknown) => number,
@@ -147,11 +150,10 @@ declare var PlotPick: (env: {
 		at: number,
 		named: readonly (readonly [PlotSeries, number, string])[],
 	): string;
-	/** Where a bar plot's categories lie along their axis in a layout whose marker labels take `rows` lines of `line` px on top. */
+	/** Where a bar plot's categories lie along their axis in the plot's box as drawn. */
 	bands(
 		option: PlotOption,
-		layout: { box: { L: number; R: number; T: number; B: number }; rows: number },
-		line: number,
+		box: { L: number; R: number; T: number; B: number },
 	): { start: number; end: number; count: number; vertical: boolean } | undefined;
 };
 /** What PlotBars draws in: the category axis, the value axis, the plot's box, the series switched on, the text's measure and texts. */
@@ -190,7 +192,39 @@ declare var PlotBars: (
 		series: readonly PlotSeries[],
 		option: PlotOption,
 		frame: PlotBarFrame,
-	): { rects: string; labels: string; boxes: PlotBox[] };
+	): { rects: string; labels: string; boxes: PlotBox[]; drawn: PlotBarDrawn[] };
+};
+/** A bar drawn: its series' and category's index, where it lies, its box (the one among the boxes bars take) and its value label's. */
+interface PlotBarDrawn {
+	series: number;
+	category: number;
+	bar: PlotBarGeometry;
+	box: PlotBox;
+	value?: PlotBox | undefined;
+}
+declare var PlotBarNames: (
+	env: PlotSvg & { place: PlotPlacer; wrap: ReturnType<typeof PlotMarks>["wrap"] },
+) => {
+	/**
+	 * Each named series' name on its bars, clear of the boxes `placed` (bars, values, markers' labels), which the names join, and
+	 * the series whose name found no readable place (crowded); a group's names stay below `ceiling`.
+	 */
+	names(
+		option: PlotOption,
+		drawn: readonly PlotBarDrawn[],
+		frame: PlotNoteFrame & { texts: PlotOption; ceiling?: number | undefined },
+		placed: PlotBox[],
+	): { markup: string; crowded: string[] };
+	/**
+	 * px the drawing must keep free for the names of bars side by side, above the plot past `top` (where the room left by the
+	 * labels on top ends) and right of the frame's R; none for other bar plots.
+	 */
+	room(
+		option: PlotOption,
+		drawn: readonly PlotBarDrawn[],
+		frame: PlotNoteFrame & { texts: PlotOption },
+		top: number,
+	): { top: number; right: number };
 };
 /** A step of a plot's tween: the option `k` of the way (0 to 1) from `from` to `to`, numbers moved where the shapes match. */
 declare var PlotTween: () => {
@@ -368,3 +402,43 @@ interface PlotMarkFrame {
 	/** Picks where a label across the plot goes, of the spots it may take; unset, the first. */
 	choose?: ((spots: PlotSpot[], placed: readonly PlotBox[]) => PlotSpot | undefined) | undefined;
 }
+/** What every axis has; a numeric axis also has its range, a category axis its names. at() and band are set by place(). */
+interface PlotAxisBase {
+	ticks: number[];
+	labels: string[];
+	name: string | undefined;
+	vertical: boolean;
+	at: (v: number) => number;
+	band: number;
+}
+interface PlotNumericAxis extends PlotAxisBase {
+	lo: number;
+	hi: number;
+	format: (v: number) => string;
+	names?: undefined;
+	notes?: undefined;
+}
+interface PlotCategoryAxis extends PlotAxisBase {
+	names: string[];
+	/** The categories' second lines, when one has one. */
+	notes: string[] | undefined;
+	/** The framed category's index (option.pick): the picked one, or the one a pointer previews. */
+	picked: number | undefined;
+}
+type PlotAxis = PlotNumericAxis | PlotCategoryAxis;
+declare var PlotAxes: (env: { formatter: ReturnType<typeof PlotFormat>["formatter"] }) => {
+	numericAxis(
+		spec: AxisSpec,
+		data: readonly [number, number],
+		length: number,
+		vertical: boolean,
+	): PlotNumericAxis;
+	categoryAxis(
+		spec: AxisSpec,
+		categories: PlotCategory[],
+		vertical: boolean,
+		picked: number | undefined,
+	): PlotCategoryAxis;
+	/** Gives the axis its pixel interval [a, b] and at(value), which maps a number, or a category index to its band centre. */
+	place(axis: PlotAxis, a: number, b: number): void;
+};

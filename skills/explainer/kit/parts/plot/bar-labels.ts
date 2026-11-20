@@ -25,17 +25,25 @@ window.PlotBarLabels = ({ svgText, size }) => {
 		return plate + svgText(cls, x, y, anchor, t, style);
 	}
 
-	/** Label of a stacked segment: centred when it fits, else none. */
-	function segmentLabel(t: string, bar: PlotBarGeometry, textWidth: (s: unknown) => number) {
+	/** Label of a stacked segment: centred when it fits, its box joining `room.placed`, else none. */
+	function segmentLabel(
+		t: string,
+		bar: PlotBarGeometry,
+		textWidth: (s: unknown) => number,
+		room: PlotBarRoom,
+	) {
 		const { horizontal, start, length, mid, each } = bar;
 		const tw = textWidth(t);
 		const fits = horizontal
 			? length >= tw + 10 && each >= size() + 2
 			: length >= size() + 6 && each >= tw + 6;
 		const centre = start + length / 2;
-		return fits
-			? onBarText(t, bar, horizontal ? centre : mid, horizontal ? mid : centre, "middle", tw)
-			: "";
+		if (!fits) {
+			return "";
+		}
+		const [x, y] = horizontal ? [centre, mid] : [mid, centre];
+		room.placed.push({ x0: x - tw / 2, x1: x + tw / 2, y0: y - size() / 2, y1: y + size() / 2 });
+		return onBarText(t, bar, x, y, "middle", tw);
 	}
 
 	/**
@@ -152,7 +160,7 @@ window.PlotBarLabels = ({ svgText, size }) => {
 		stack: boolean,
 		textWidth: (s: unknown) => number,
 		room: PlotBarRoom,
-	) => (stack ? segmentLabel(t, bar, textWidth) : endLabel(t, bar, textWidth, room));
+	) => (stack ? segmentLabel(t, bar, textWidth, room) : endLabel(t, bar, textWidth, room));
 
 	return { barLabel };
 };

@@ -81,17 +81,13 @@ window.PlotPick = ({ esc, formatter, labeller }) => {
 	}
 
 	/**
-	 * Where a bar plot's categories lie along their axis in a layout (the plot's box and the lines its marker labels take on top,
-	 * each `line` px): from `start` to `end` px, `count` equal bands, `vertical` when they run down the plot; undefined for a plot
-	 * without categories or too small to draw.
+	 * Where a bar plot's categories lie along their axis in the plot's box as drawn (below the marker labels on top and the room
+	 * kept for names): from `start` to `end` px, `count` equal bands, `vertical` when they run down the plot; undefined for a
+	 * plot without categories or too small to draw.
 	 */
-	function bands(
-		option: PlotOption,
-		{ box, rows }: { box: { L: number; R: number; T: number; B: number }; rows: number },
-		line: number,
-	) {
+	function bands(option: PlotOption, box: { L: number; R: number; T: number; B: number }) {
 		const count = option.categories?.length;
-		const [start, end] = option.horizontal ? [box.T + rows * line, box.B] : [box.L, box.R];
+		const [start, end] = option.horizontal ? [box.T, box.B] : [box.L, box.R];
 		return !count || end - start < 40
 			? undefined
 			: { start, end, count, vertical: Boolean(option.horizontal) };

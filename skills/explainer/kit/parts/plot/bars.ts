@@ -1,8 +1,8 @@
 /* plot bars: a bar plot's bars and their value labels, not referenced from pages: pack joins it in front of plot.js with draw.ts,
    which uses it. PlotBars({ svgLine, svgText, size, marks, esc, fill, colour, labeller, pick }) gives draw(series, option, frame): the
    bars of every series switched on, stacked or side by side, each cut where it leaves the axis, with the picked category's frame
-   (`rects`), their value labels (`labels`), a cut bar's always, placed by bar-labels.ts (PlotBarLabels), and the boxes both
-   take (`boxes`), which the markers' labels keep off. */
+   (`rects`), their value labels (`labels`), a cut bar's always, placed by bar-labels.ts (PlotBarLabels), the boxes both
+   take (`boxes`), which the markers' labels keep off, and each bar drawn (`drawn`), which bar-names.ts names. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller, pick }) => {
 	const { barLabel } = window.PlotBarLabels({ svgLine, svgText, size });
@@ -150,6 +150,7 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 		let rects = "";
 		const labelled: { t: string; bar: PlotBarGeometry }[] = [];
 		const boxes: PlotBox[] = [];
+		const drawn: PlotBarDrawn[] = [];
 		// The texts are those of where a move goes (ctx.texts), so they never change while the bars do.
 		const said = ctx.texts.series?.[j]?.data;
 		for (const [i, v] of s.data.entries()) {
@@ -158,17 +159,20 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 				const { rect, bar, format } = barRect(s, j, i, [v, shows], layout, option);
 				const t = format?.(shows, i, 0);
 				rects += rect;
-				boxes.push(barBox(bar));
+				const box = barBox(bar);
+				boxes.push(box);
+				drawn.push({ series: j, category: i, bar, box });
 				labelled.push(...(t ? [{ t, bar }] : []));
 			}
 		}
-		return { rects, labelled, boxes };
+		return { rects, labelled, boxes, drawn };
 	}
 
 	/**
 	 * Bars of every series switched on, stacked or side by side (`rects`, each with its title), and the value labels of the series
 	 * that ask for them and of the bars cut (`labels`), which are drawn over the markers' lines and kept off every other bar and
-	 * label; a cut segment of a stack is labelled at its end, as a bar side by side is. `boxes` are the bars' and the labels'.
+	 * label; a cut segment of a stack is labelled at its end, as a bar side by side is. `boxes` are the bars' and the labels',
+	 * `drawn` each bar with its series, category, box (one of `boxes`) and value label's box.
 	 */
 	function draw(series: readonly PlotSeries[], option: PlotOption, ctx: PlotBarFrame) {
 		const layout = barLayout(series, option, ctx);
@@ -181,9 +185,19 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 			bars: drawn.flatMap((b) => b.boxes),
 			placed: [] as PlotBox[],
 		};
+		// Each bar's value label, which its series' name is tied to past it.
+		const values = new Map<PlotBarGeometry, PlotBox>();
 		const labels = drawn
 			.flatMap((b) => b.labelled)
-			.map(({ t, bar }) => barLabel(t, bar, Boolean(option.stack) && !bar.cut, ctx.textWidth, room))
+			.map(({ t, bar }) => {
+				const before = room.placed.length;
+				const label = barLabel(t, bar, Boolean(option.stack) && !bar.cut, ctx.textWidth, room);
+				const value = room.placed[before];
+				if (value) {
+					values.set(bar, value);
+				}
+				return label;
+			})
 			.join("");
 		// Stacked segments touch: theme.css parts them by a line in the tone under the plot.
 		const stacked = option.stack && rects ? `<g class="stack">${rects}</g>` : rects;
@@ -192,7 +206,12 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 			Boolean(option.stack),
 			layout,
 		);
-		return { rects: stacked + picked, labels, boxes: [...room.bars, ...room.placed] };
+		return {
+			rects: stacked + picked,
+			labels,
+			boxes: [...room.bars, ...room.placed],
+			drawn: drawn.flatMap((b) => b.drawn).map((d) => ({ ...d, value: values.get(d.bar) })),
+		};
 	}
 
 	return { draw };

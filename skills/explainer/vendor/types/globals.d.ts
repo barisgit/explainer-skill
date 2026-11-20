@@ -404,7 +404,8 @@ declare var PlotDraw: (env: {
 }) => {
 	/**
 	 * The SVG content for the option at W x H pixels, with series i drawn when shown[i]; textWidth measures a label in px. Value
-	 * texts (bar and stem labels, bar titles) are written from `texts`, an option of the same series, where a move draws its steps.
+	 * texts (bar and stem labels, bar titles) are written from `texts`, an option of the same series, where a move draws its steps;
+	 * `from` is the option a move started from, whose bar names keep their room through it.
 	 */
 	render(
 		option: PlotOption,
@@ -413,6 +414,7 @@ declare var PlotDraw: (env: {
 		textWidth: (s: unknown) => number,
 		shown: boolean[],
 		texts?: PlotOption,
+		from?: PlotOption,
 	): string;
 	/**
 	 * The legend's buttons, or "" when it shows none (lines that carry their names on the plot never have one); button i switches
@@ -430,8 +432,15 @@ declare var PlotDraw: (env: {
 	): { start: number; end: number; count: number; vertical: boolean } | undefined;
 	/** Per series: whether it is switched on, given the names switched off. */
 	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
-	/** How many lines the markers' labels take on top of the plot at W x H, which push it down (render lays them out the same). */
-	markLines(option: PlotOption, W: number, H: number, textWidth: (s: unknown) => number): number;
+	/** How many lines the markers' labels take on top of the plot at W x H, which push it down, in the layout render draws. */
+	markLines(
+		option: PlotOption,
+		W: number,
+		H: number,
+		textWidth: (s: unknown) => number,
+		texts?: PlotOption,
+		from?: PlotOption,
+	): number;
 	/**
 	 * What the last render found no clear place for, each drawn on its least bad one: notes by their label, line names by their
 	 * series' name.

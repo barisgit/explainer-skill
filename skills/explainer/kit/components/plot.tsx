@@ -11,10 +11,10 @@
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour; the legend
                 shows a state every bar shares, else the series' colour). On a line: the area down to 0, true in a tint of its
                 colour or a state
-         name   named lines carry their names on the plot, never in a legend: at their ends, stacked with leaders where ends
-                crowd, else beside their own line along it; pack warns about a name with no clear place (shorten it, or add
-                height). With stems or bars, names go in the legend, whose entries switch the series on and off, a series
-                without a name toggling with the named one before it
+         name   names go on the marks, never in a legend: a line's at its end (stacked with leaders where ends crowd) else
+                beside it, a stem's beside its last dots, bars side by side stacked above one group (the last column, the first
+                row) with a leader to each bar, a stack's inside a segment or beside it. One named bar series gets none: the
+                label says it. pack warns about a name with no clear place (shorten it, or add height)
          label  prints exact values on the marks: true, a format as below, or one text per point or bar: ["½mA", "A", "½mA"];
                 a line prints its last point's after its name: "10 kΩ: 847 ns", wrapped, or left out past two lines. A bar plot
                 whose every bar prints its value (true or a format, side by side) leaves out its value axis, unless a marker on
@@ -37,15 +37,15 @@
               in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; numbers follow the page's lang, and format sets how:
               { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
-       legend true shows the legend, false hides it and the names at the ends; unset, it shows for two or more named series
-              unless all are lines
+       legend true shows the legend in place of the names, its entries switching the series on and off (a series without a
+              name toggling with the named one before it); false hides both
        pick   3 picks a bar plot's fourth category: its bars framed, and the legend becomes its key, each series' value there.
               An Explore choice with axis: true sets it and lets the reader pick
      label   the accessible name (role="img")
      class   more classes after "chart plot", e.g. "tall"
      height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them. Size a plot with this, not with CSS on .chart.
              Unset, a horizontal bar plot without a legend is 3.5rem a bar (25 px bars) up to the tall 34rem (thinner rows past it),
-             plus the lines its marker labels take; others the theme's height
+             plus the lines its marker labels and series names take; others the theme's height
    The plot fills the element at its pixel size and redraws on resize, so text stays at the label size from phone to desktop; light and dark switch
    with no redraw. pack draws it into the page first, so it shows with scripts off and in print, unless a page rule sizes its element or its
    legend wraps into rows pack cannot count. A new option moves the plot there from what it shows (bars grow, lines morph, the numbers
@@ -91,6 +91,8 @@ const X_NAME = 1.375;
 const Y_NAME = 1.125;
 /** rem of those value labels (21 px), which a bar plot may leave out (valueAxisOut in draw.ts, the same rule). */
 const VALUES = 1.3125;
+/** rem of a line of label text (17 px): bars side by side take one per named series for their names above the first row. */
+const NAME_LINE = 1.0625;
 const digits = (v: unknown) => String(v).replace(/\D/g, "").replace(/^0+/, "");
 /** Whether a horizontal bar plot leaves out its value axis's labels, as valueAxisOut in kit/parts/plot/draw.ts decides. */
 function valueAxisOut({ stack, series = [], marks = [], x }: PlotOption) {
@@ -106,20 +108,25 @@ function valueAxisOut({ stack, series = [], marks = [], x }: PlotOption) {
 }
 /**
  * The height of a horizontal bar plot by its bar count: rows of 3.5rem, up to the tall 34rem, past which the rows get thinner.
- * Other plots take the theme's height, and so does one with a legend, whose rows depend on the width.
+ * Bars side by side add a line for each series' name, stacked above the first row, past that cap too. Other plots take the
+ * theme's height, and so does one with a legend (legend: true or a pick), whose rows depend on the width.
  */
 function barsHeight(option: PlotOption) {
-	const { horizontal, categories, series = [], x, y, legend } = option;
-	const legendShown = legend !== false && series.filter((s) => s.name).length > 1;
-	if (!(horizontal && categories?.length) || legendShown) {
+	const { horizontal, categories, series = [], x, y, legend, pick, stack } = option;
+	const named = series.filter((s) => s.name).length;
+	// A pick shows its key in a legend row when it names a category, as plot.js's pickedAt reads it.
+	const picked = typeof pick === "number" && categories?.[pick] !== undefined;
+	if (!(horizontal && categories?.length) || (legend === true && named > 1) || picked) {
 		return undefined;
 	}
+	const names = legend === undefined && !stack && named > 1 ? named * NAME_LINE : 0;
 	const frame =
 		BAR_FRAME +
 		(x?.name ? X_NAME : 0) +
 		(y?.name ? Y_NAME : 0) -
 		(valueAxisOut(option) ? VALUES : 0);
-	return `${Math.min(categories.length * BAR_ROW + frame, MOST)}rem`;
+	// The names' lines come on top of the bars' height, capped or not, so they never take room from the bars.
+	return `${Math.min(categories.length * BAR_ROW + frame, MOST) + names}rem`;
 }
 
 /**

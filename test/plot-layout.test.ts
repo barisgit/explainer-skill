@@ -63,8 +63,9 @@ function blocks(svg: string, cls: string): Box[] {
 	}
 	return out.map(({ x: _, ...box }) => box);
 }
+/** Whether two boxes overlap by more than the 0.1 px the drawing rounds its coordinates to, twice. */
 const overlap = (a: Omit<Box, "text">, b: Omit<Box, "text">) =>
-	a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+	a.x0 < b.x1 - 0.2 && b.x0 < a.x1 - 0.2 && a.y0 < b.y1 - 0.2 && b.y0 < a.y1 - 0.2;
 /** Whether a line [x1, x2, y1, y2] passes through the box. */
 const struck = (b: Box, [x1 = 0, x2 = 0, y1 = 0, y2 = 0]: number[]) =>
 	x1 === x2

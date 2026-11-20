@@ -559,14 +559,14 @@ h3,
 .plot .value {
 	font-weight: 600;
 }
-/* A value inside its bar, or a note inside a solid area: near white on a dark colour, near black on a light one, read from the
-   colour (--c) where the browser reads colours so. */
-.plot :is(.value, .note).inside {
+/* A value or a series' name inside its bar, or a note inside a solid area: near white on a dark colour, near black on a light
+   one, read from the colour (--c) where the browser reads colours so. */
+.plot :is(.value, .note, .end).inside {
 	fill: var(--surface);
 	stroke: none;
 }
 @supports (color: oklch(from red l c h)) {
-	.plot :is(.value, .note).inside {
+	.plot :is(.value, .note, .end).inside {
 		fill: oklch(from var(--c) calc(0.2 + 0.785 * clamp(0, (0.58 - l) * 1000, 1)) 0 0);
 	}
 }
@@ -3533,6 +3533,88 @@ window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
   return { draw };
 };
 
+/* plot axes: a plot's axes, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it.
+   PlotAxes({ formatter }) gives a numeric axis over a data extent with its ticks and labels (numericAxis), a category axis
+   (categoryAxis), and place, which gives an axis its pixel interval. */
+window.PlotAxes = ({ formatter }) => {
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const unplaced = { at: (v) => v, band: 0 };
+  function niceStep(span, count) {
+    const raw = span / count;
+    const p = 10 ** Math.floor(Math.log10(raw));
+    const f = raw / p;
+    return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+  }
+  function steps(lo, hi, step) {
+    const ticks = [];
+    for (let k = Math.ceil(lo / step - 0.000000001);k * step <= hi + step * 0.000000001; k++) {
+      ticks.push(+(k * step).toFixed(10));
+    }
+    return ticks;
+  }
+  const spread = (lo, hi, n) => Array.from({ length: n }, (_, k) => lo + (hi - lo) * k / Math.max(1, n - 1));
+  function numericAxis(spec, data, length, vertical) {
+    const { lo, hi, step } = rangeOf(spec, data, length, vertical);
+    const format = formatter(spec.format);
+    const said = Array.isArray(spec.labels) ? spec.labels : undefined;
+    const ticks = said ? spread(lo, hi, said.length) : steps(lo, hi, step);
+    return {
+      lo,
+      hi,
+      ticks,
+      format,
+      labels: said ?? ticks.map((v) => spec.labels === false ? "" : format(v)),
+      name: spec.name,
+      vertical,
+      ...unplaced
+    };
+  }
+  function rangeOf(spec, [dataMin, dataMax], length, vertical) {
+    let lo = spec.min ?? dataMin;
+    let hi = spec.max ?? dataMax;
+    if (!(hi > lo)) {
+      lo -= 1;
+      hi += 1;
+    }
+    const count = clamp(Math.round(length / (vertical ? 48 : 80)), 2, 10);
+    const step = spec.step ?? niceStep(hi - lo, count);
+    const round = !Array.isArray(spec.labels);
+    if (spec.min == null && round) {
+      lo = Math.floor(lo / step + 0.000000001) * step;
+    }
+    if (spec.max == null && round) {
+      hi = Math.ceil(hi / step - 0.000000001) * step;
+    }
+    return { lo, hi, step };
+  }
+  function categoryAxis(spec, categories, vertical, picked) {
+    const names = categories.map((c) => typeof c === "string" ? c : c.name);
+    const notes = categories.map((c) => typeof c === "string" ? "" : c.note ?? "");
+    const labelled = spec.labels !== false;
+    return {
+      names,
+      notes: labelled && notes.some(Boolean) ? notes : undefined,
+      picked,
+      ticks: names.map((_, i) => i),
+      labels: names.map((name) => labelled ? String(name) : ""),
+      name: spec.name,
+      vertical,
+      ...unplaced
+    };
+  }
+  function place(axis, a, b) {
+    if (axis.names) {
+      const n = axis.names.length;
+      axis.at = (i) => a + (i + 0.5) * (b - a) / n;
+      axis.band = Math.abs(b - a) / n;
+    } else {
+      const { lo, hi } = axis;
+      axis.at = (v) => a + (clamp(v, lo, hi) - lo) / (hi - lo) * (b - a);
+    }
+  }
+  return { numericAxis, categoryAxis, place };
+};
+
 /* plot bar labels: a bar's value label, inside a stacked segment or at a side-by-side bar's end, not referenced from pages: pack
    joins it in front of plot.js with draw.ts, which uses it. PlotBarLabels({ svgLine, svgText, size }) gives barLabel(...), the
    label clear of the markers' lines, and moved across where it would sit on another bar or label; text is set at size() px. */
@@ -3545,12 +3627,17 @@ window.PlotBarLabels = ({ svgText, size }) => {
     const plate = bar.open ? `<rect class="value-ground" x="${px(x0 - 2)}" y="${px(y - size() / 2 - 2)}" width="${px(tw + 4)}" height="${px(size() + 4)}"/>` : "";
     return plate + svgText(cls, x, y, anchor, t, style);
   }
-  function segmentLabel(t, bar, textWidth) {
+  function segmentLabel(t, bar, textWidth, room) {
     const { horizontal, start, length, mid, each } = bar;
     const tw = textWidth(t);
     const fits = horizontal ? length >= tw + 10 && each >= size() + 2 : length >= size() + 6 && each >= tw + 6;
     const centre = start + length / 2;
-    return fits ? onBarText(t, bar, horizontal ? centre : mid, horizontal ? mid : centre, "middle", tw) : "";
+    if (!fits) {
+      return "";
+    }
+    const [x, y] = horizontal ? [centre, mid] : [mid, centre];
+    room.placed.push({ x0: x - tw / 2, x1: x + tw / 2, y0: y - size() / 2, y1: y + size() / 2 });
+    return onBarText(t, bar, x, y, "middle", tw);
   }
   function endSpot(reach, bar, crossing) {
     const { length, end, dir, bound } = bar;
@@ -3603,15 +3690,288 @@ window.PlotBarLabels = ({ svgText, size }) => {
     room.placed.push(box(shift));
     return valueText(t, bar, along, mid + shift, at, inside, tw);
   }
-  const barLabel = (t, bar, stack, textWidth, room) => stack ? segmentLabel(t, bar, textWidth) : endLabel(t, bar, textWidth, room);
+  const barLabel = (t, bar, stack, textWidth, room) => stack ? segmentLabel(t, bar, textWidth, room) : endLabel(t, bar, textWidth, room);
   return { barLabel };
+};
+
+/* plot bar names: the names a bar plot's series carry on their bars (a plot never falls back to a legend for them), not
+   referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotBarNames({ svgLine, svgText, place,
+   wrap }) gives names(...) and room(...). Bars side by side name their series on one group (the last column group, the first
+   row group), the names stacked in series order above it, each tied to its bar by a leader that crosses no other bar or name;
+   room says what the drawing must keep free for them above the plot and on its right. A stack's series are named inside one of
+   their segments, else past the stack's end, else beside a segment, placed as the end names and notes are (place.ts). names
+   also gives the series whose name found no readable place. */
+window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
+  const GAP = 7;
+  const CAP = 0.35;
+  const LEAD = 8;
+  const centred = (x, y, w, h) => ({
+    x0: x - w / 2,
+    x1: x + w / 2,
+    y0: y - h / 2,
+    y1: y + h / 2
+  });
+  function inside(name, { bar, box }, f) {
+    const w = f.textWidth(name);
+    const fits = bar.horizontal ? bar.length >= w + 10 && bar.each >= f.line : bar.length >= f.line + 6 && bar.each >= w + 6;
+    const [x, y] = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
+    return fits && !bar.open ? [{ box: centred(x, y, w, f.line), lines: [name], anchor: "middle", own: box, on: bar }] : [];
+  }
+  function pastEnd({ bar, box }, values) {
+    const row = (b) => bar.horizontal ? b.y0 < box.y1 && box.y0 < b.y1 : b.x0 < box.x1 && box.x0 < b.x1;
+    const along = (b, far) => {
+      const [lo, hi] = bar.horizontal ? [b.x0, b.x1] : [b.y0, b.y1];
+      return bar.dir > 0 === far ? hi : lo;
+    };
+    const own = values.filter((b) => {
+      const gap = bar.dir * (along(b, false) - bar.end);
+      return row(b) && gap >= -1 && gap <= 8;
+    });
+    const end = own.reduce((at, b) => bar.dir * (along(b, true) - at) > 0 ? along(b, true) : at, bar.end);
+    return end + bar.dir * GAP;
+  }
+  function pastRow(name, { bar, box }, from, f) {
+    const w = f.textWidth(name);
+    const x0 = bar.dir > 0 ? from : from - w;
+    const [half, cap] = [f.line / 2, (f.line - 4) * CAP];
+    const spot = { x0, x1: x0 + w, y0: bar.mid - half, y1: bar.mid + half };
+    const core = { ...spot, y0: bar.mid - cap, y1: bar.mid + cap };
+    return { box: spot, core, lines: [name], anchor: bar.dir > 0 ? "start" : "end", own: box };
+  }
+  function past(name, drawn, f, values) {
+    const { bar, box } = drawn;
+    const from = pastEnd(drawn, values);
+    if (bar.horizontal) {
+      return [pastRow(name, drawn, from, f)];
+    }
+    const layouts = [[name], wrap(name, place.longest(name, f), f.textWidth)];
+    const over = layouts.map((lines) => {
+      const w = Math.max(...lines.map(f.textWidth));
+      const h = lines.length * f.line;
+      const y0 = bar.dir < 0 ? from - h : from;
+      return {
+        box: { x0: bar.mid - w / 2, x1: bar.mid + w / 2, y0, y1: y0 + h },
+        lines,
+        anchor: "middle",
+        own: box
+      };
+    });
+    const at = [bar.mid, bar.end];
+    return [...over, ...place.pointSpots(name, at, f).map((spot) => ({ ...spot, own: box }))];
+  }
+  function beside(name, { bar, box }, f) {
+    const w = f.textWidth(name);
+    const h = f.line;
+    const [x, y] = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
+    const spots = bar.horizontal ? [
+      [centred(x, box.y0 - GAP - h / 2, w, h), "middle"],
+      [centred(x, box.y1 + GAP + h / 2, w, h), "middle"]
+    ] : [
+      [centred(box.x1 + GAP + w / 2, y, w, h), "start"],
+      [centred(box.x0 - GAP - w / 2, y, w, h), "end"]
+    ];
+    return spots.map(([b, anchor]) => ({ box: b, lines: [name], anchor, own: box }));
+  }
+  const toBox = ([x, y], b) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
+  function owns({ box }, mine, others) {
+    const middle = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
+    const own = Math.min(...mine.map((b) => toBox(middle, b)));
+    return others.every((b) => toBox(middle, b) > own);
+  }
+  function cost(spot, f, placed) {
+    const { x0, x1, y0, y1 } = spot.box;
+    const off = x0 < 0 || x1 > f.R + 0.5 || y0 < 0 || y1 > f.B + 0.5 ? 1000 : 0;
+    const near = spot.on ? placed.filter((b) => b !== spot.own) : placed;
+    return off + place.cost({ ...spot, box: spot.core ?? spot.box }, f, near);
+  }
+  function cheapest(spots, f, placed) {
+    let best;
+    let least = Number.POSITIVE_INFINITY;
+    for (const s of spots) {
+      const c = cost(s, f, placed);
+      if (c < least) {
+        [best, least] = [s, c];
+      }
+    }
+    return { best, least };
+  }
+  function choose(name, [mine, others], f, [placed, values]) {
+    const order = mine[0]?.bar.horizontal ? mine : [...mine].reverse();
+    const boxes = mine.map((d) => d.box);
+    const readable = (spots) => spots.filter((s) => s.leader || owns(s, boxes, others));
+    const stages = [
+      () => order.flatMap((d) => inside(name, d, f)),
+      () => readable(order.flatMap((d) => past(name, d, f, values))),
+      () => readable(order.flatMap((d) => beside(name, d, f)))
+    ];
+    const tried = [];
+    for (const stage of stages) {
+      tried.push(...stage());
+      const { best, least } = cheapest(tried, f, placed);
+      if (best && least < place.CLEAR) {
+        return { chosen: best, clear: true };
+      }
+    }
+    const fallback = [...tried, ...order.flatMap((d) => past(name, d, f, values))];
+    return { chosen: cheapest(fallback, f, placed).best, clear: false };
+  }
+  function tie([ax, ay], box) {
+    const [bx, by] = place.nearest(box, [ax, ay]);
+    const length = Math.hypot(bx - ax, by - ay) || 1;
+    const [ux, uy] = [(bx - ax) / length, (by - ay) / length];
+    const style = "--c:var(--rule-strong)";
+    return svgLine("leader", ax + ux * 2, bx - ux * 2, ay + uy * 2, by - uy * 2, style);
+  }
+  function spotText({ box, lines, anchor, on, leader }, line) {
+    const x = anchor === "start" ? box.x0 : anchor === "end" ? box.x1 : (box.x0 + box.x1) / 2;
+    const [cls, style] = on ? ["end inside", `--c:${on.colour}`] : ["end", ""];
+    const text = lines.map((t, k) => svgText(cls, x, box.y0 + line / 2 + k * line, anchor, t, style));
+    return (leader ? tie(leader, box) : "") + text.join("");
+  }
+  function namedSeries(option, texts) {
+    return (option.series ?? []).flatMap((s, j) => {
+      const name = texts.series?.[j]?.name ?? s.name;
+      return name && s.type === "bar" ? [{ name, j }] : [];
+    });
+  }
+  const groupAt = (option) => option.horizontal ? 0 : (option.categories?.length ?? 1) - 1;
+  const extent = (boxes) => ({
+    x0: Math.min(...boxes.map((b) => b.x0)),
+    x1: Math.max(...boxes.map((b) => b.x1)),
+    y0: Math.min(...boxes.map((b) => b.y0)),
+    y1: Math.max(...boxes.map((b) => b.y1))
+  });
+  const below = (at, lines, f) => Math.max(at, (f.ceiling ?? Number.NEGATIVE_INFINITY) + lines * f.line);
+  function boxFrom(x0, y0, name, f) {
+    const w = f.textWidth(name);
+    const left = f.ceiling === undefined ? x0 : Math.min(x0, f.R - w);
+    return { box: { x0: left, x1: left + w, y0, y1: y0 + f.line }, squeezed: left < x0 - 1 };
+  }
+  function overColumns(rows, near, f) {
+    const top = below(extent(near).y0 - LEAD, rows.length, f);
+    let last = Number.NEGATIVE_INFINITY;
+    return rows.map(({ name, d }, k) => {
+      const c = d.bar.mid;
+      const x0 = Math.max(c - Math.min(3, d.bar.each / 2), last + 4);
+      last = c;
+      const y0 = top - (rows.length - k) * f.line;
+      const { box, squeezed } = boxFrom(x0, y0, name, f);
+      return {
+        name,
+        box,
+        squeezed,
+        leader: [
+          [c, box.y1 - 1],
+          [c, (d.value && d.value.y1 <= d.box.y0 + 1 ? d.value : d.box).y0 - 2]
+        ]
+      };
+    });
+  }
+  function overRows(rows, near, f) {
+    const top = below(extent(near).y0 - GAP, rows.length, f);
+    let last = Number.NEGATIVE_INFINITY;
+    return rows.map(({ name, d }, k) => {
+      const mid = d.bar.mid;
+      const x0 = Math.max(last + 8, ...near.filter((b) => b.y0 < mid).map((b) => b.x1 + GAP));
+      last = x0;
+      const y0 = top - (rows.length - k) * f.line;
+      const { box, squeezed } = boxFrom(x0, y0, name, f);
+      const [lx, at] = [x0 + 3, Math.max(d.box.x1, d.value?.x1 ?? 0) + 2];
+      const leader = [
+        [lx, box.y1 - 1],
+        [lx, mid]
+      ];
+      return { name, box, squeezed, leader: lx - at > 2 ? [...leader, [at, mid]] : leader };
+    });
+  }
+  function onGroup(option, named, drawn, [values, f]) {
+    const group = drawn.filter((d) => d.category === groupAt(option));
+    const rows = named.flatMap(({ name, j }) => {
+      const d = group.find((g) => g.series === j);
+      return d ? [{ name, d }] : [];
+    });
+    const missing = named.filter(({ j }) => !group.some((g) => g.series === j));
+    if (!rows.length) {
+      return { spots: [], missing };
+    }
+    const span = extent(group.map((d) => d.box));
+    const horizontal = rows[0]?.d.bar.horizontal;
+    const across = (b) => horizontal ? b.y0 < span.y1 && span.y0 < b.y1 : b.x0 < span.x1 && span.x0 < b.x1;
+    const near = [...group.map((d) => d.box), ...values.filter(across)];
+    return { spots: (horizontal ? overRows : overColumns)(rows, near, f), missing };
+  }
+  const grouped = (option, named) => !option.stack && named.length > 1;
+  function room(option, drawn, f, top) {
+    const named = namedSeries(option, f.texts);
+    const values = drawn.flatMap((d) => d.value ? [d.value] : []);
+    const { spots } = grouped(option, named) ? onGroup(option, named, drawn, [values, f]) : { spots: [] };
+    if (!spots.length) {
+      return { top: 0, right: 0 };
+    }
+    const { x1, y0 } = extent(spots.map((s) => s.box));
+    return { top: Math.max(0, top - y0), right: Math.max(0, x1 - f.R) };
+  }
+  function broken(a, b, labels) {
+    const upright = a[0] === b[0];
+    const [p0, p1] = upright ? [a[1], b[1]] : [a[0], b[0]];
+    const [lo, hi] = [Math.min(p0, p1), Math.max(p0, p1)];
+    const cuts = labels.filter((l) => upright ? l.x0 <= a[0] && a[0] <= l.x1 : l.y0 <= a[1] && a[1] <= l.y1).map((l) => upright ? [l.y0 - 2, l.y1 + 2] : [l.x0 - 2, l.x1 + 2]).sort(([p = 0], [q = 0]) => p - q);
+    const pieces = [];
+    let from = lo;
+    for (const [p = 0, q = 0] of cuts) {
+      pieces.push([from, Math.min(p, hi)]);
+      from = Math.max(from, q);
+    }
+    pieces.push([from, hi]);
+    const at = (v) => upright ? [a[0], v] : [v, a[1]];
+    return pieces.filter(([p, q]) => q - p > 1).map(([p, q]) => [at(p), at(q)]);
+  }
+  function groupText({ name, box, leader }, line, labels) {
+    const style = "--c:var(--rule-strong)";
+    const segments = leader.slice(1).flatMap((b, i) => broken(leader[i] ?? b, b, labels).map(([p, q]) => svgLine("leader", p[0], q[0], p[1], q[1], style)));
+    return segments.join("") + svgText("end", box.x0, box.y0 + line / 2, "start", name);
+  }
+  function eachOnBars(named, drawn, f, [placed, values]) {
+    const crowded = [];
+    let markup = "";
+    for (const { name, j } of named) {
+      const mine = drawn.filter((d) => d.series === j);
+      const others = drawn.filter((d) => d.series !== j).map((d) => d.box);
+      const { chosen, clear } = choose(name, [mine, others], f, [placed, values]);
+      if (!clear) {
+        crowded.push(name);
+      }
+      if (chosen) {
+        placed.push(chosen.box);
+        markup += spotText(chosen, f.line);
+      }
+    }
+    return { markup, crowded };
+  }
+  function names(option, drawn, f, placed) {
+    const bars = new Set(drawn.map((d) => d.box));
+    const values = placed.filter((b) => !bars.has(b));
+    const named = namedSeries(option, f.texts);
+    if (!grouped(option, named)) {
+      return eachOnBars(named, drawn, f, [placed, values]);
+    }
+    const { spots, missing } = onGroup(option, named, drawn, [values, f]);
+    const crowded = spots.filter(({ box, squeezed }) => squeezed || box.y0 < 0 || place.cost({ box, lines: [], anchor: "start" }, f, placed) >= place.CLEAR);
+    placed.push(...spots.map((g) => g.box));
+    const rest = eachOnBars(missing, drawn, f, [placed, values]);
+    return {
+      markup: spots.map((g) => groupText(g, f.line, values)).join("") + rest.markup,
+      crowded: [...crowded.map((g) => g.name), ...missing.map((m) => m.name)]
+    };
+  }
+  return { names, room };
 };
 
 /* plot bars: a bar plot's bars and their value labels, not referenced from pages: pack joins it in front of plot.js with draw.ts,
    which uses it. PlotBars({ svgLine, svgText, size, marks, esc, fill, colour, labeller, pick }) gives draw(series, option, frame): the
    bars of every series switched on, stacked or side by side, each cut where it leaves the axis, with the picked category's frame
-   (`rects`), their value labels (`labels`), a cut bar's always, placed by bar-labels.ts (PlotBarLabels), and the boxes both
-   take (`boxes`), which the markers' labels keep off. */
+   (`rects`), their value labels (`labels`), a cut bar's always, placed by bar-labels.ts (PlotBarLabels), the boxes both
+   take (`boxes`), which the markers' labels keep off, and each bar drawn (`drawn`), which bar-names.ts names. */
 window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller, pick }) => {
   const { barLabel } = window.PlotBarLabels({ svgLine, svgText, size });
   const CUT = 10;
@@ -3688,6 +4048,7 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
     let rects = "";
     const labelled = [];
     const boxes = [];
+    const drawn = [];
     const said = ctx.texts.series?.[j]?.data;
     for (const [i, v] of s.data.entries()) {
       if (typeof v === "number" && Number.isFinite(v)) {
@@ -3695,11 +4056,13 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
         const { rect, bar, format } = barRect(s, j, i, [v, shows], layout, option);
         const t = format?.(shows, i, 0);
         rects += rect;
-        boxes.push(barBox(bar));
+        const box = barBox(bar);
+        boxes.push(box);
+        drawn.push({ series: j, category: i, bar, box });
         labelled.push(...t ? [{ t, bar }] : []);
       }
     }
-    return { rects, labelled, boxes };
+    return { rects, labelled, boxes, drawn };
   }
   function draw(series, option, ctx) {
     const layout = barLayout(series, option, ctx);
@@ -3710,32 +4073,47 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
       bars: drawn.flatMap((b) => b.boxes),
       placed: []
     };
-    const labels = drawn.flatMap((b) => b.labelled).map(({ t, bar }) => barLabel(t, bar, Boolean(option.stack) && !bar.cut, ctx.textWidth, room)).join("");
+    const values = new Map;
+    const labels = drawn.flatMap((b) => b.labelled).map(({ t, bar }) => {
+      const before = room.placed.length;
+      const label = barLabel(t, bar, Boolean(option.stack) && !bar.cut, ctx.textWidth, room);
+      const value = room.placed[before];
+      if (value) {
+        values.set(bar, value);
+      }
+      return label;
+    }).join("");
     const stacked = option.stack && rects ? `<g class="stack">${rects}</g>` : rects;
     const picked = pick.frame(series.filter((_, j) => ctx.shown[j]), Boolean(option.stack), layout);
-    return { rects: stacked + picked, labels, boxes: [...room.bars, ...room.placed] };
+    return {
+      rects: stacked + picked,
+      labels,
+      boxes: [...room.bars, ...room.placed],
+      drawn: drawn.flatMap((b) => b.drawn).map((d) => ({ ...d, value: values.get(d.bar) }))
+    };
   }
   return { draw };
 };
 
 /* plot draw: what kit:plot.js draws, not referenced from pages: pack joins it in front of plot.js, and runs it itself to draw each
    plot into the page (src/mdx/draw.ts). PlotDraw({ lang, size }) gives render(option, W, H, textWidth, shown), the SVG content,
-   legendMarkup(option), the legend's buttons (none when the lines carry their names), and
+   legendMarkup(option), the legend's buttons (none when the series carry their names on their marks), and
    switchedOn(series, off), which series the legend leaves on; numbers are written in lang(), text is set at size() px (the
    theme's --size-label), and textWidth measures a label at that size. Bars' and areas' states and markers are marks.ts's
    (PlotMarks), regions and notes areas.ts's (PlotAreas), bars and their value labels bars.ts's (PlotBars), the lines' ends
-   ends.ts's (PlotEnds), the legend legend.ts's (PlotLegend), a picked category's frame and key pick.ts's (PlotPick); end names
+   ends.ts's (PlotEnds), bar names bar-names.ts's (PlotBarNames), the axes axes.ts's (PlotAxes), the legend legend.ts's (PlotLegend), a picked category's frame and key pick.ts's (PlotPick); end names
    and notes are placed together by place.ts (PlotPlace), after the markers' labels. bands(option, W, H, textWidth) is where a
    bar plot's categories lie along their axis, for code that maps a click to one. */
 window.PlotDraw = ({ lang, size }) => {
   const SHORT = 6;
+  const NO_ROOM = { top: 0, right: 0 };
+  const NAME_SHARE = 0.4;
   let FONT = size();
   const PAD = 16;
   const GAP = 5;
   const lineHeight = () => FONT + 4;
   const DASHES = ["", "6 4", "1 4", "12 4", "6 4 1 4", "12 4 1 4"];
   const AUTHOR_DASH = "6 4";
-  const unplaced = { at: (v) => v, band: 0 };
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   const px = (v) => +v.toFixed(1);
@@ -3756,6 +4134,7 @@ window.PlotDraw = ({ lang, size }) => {
   const format = window.PlotFormat({ lang });
   const { formatter, labeller } = format;
   const pick = window.PlotPick({ esc, formatter, labeller });
+  const { numericAxis, categoryAxis, place } = window.PlotAxes({ formatter });
   const seriesColor = (s, i) => s.color ?? `var(--c${i % 6 + 1})`;
   const dashOf = (s, i) => s.dash !== undefined ? s.dash ? AUTHOR_DASH : "" : s.color ? "" : DASHES[i % 6] ?? "";
   const ends = window.PlotEnds({
@@ -3780,6 +4159,7 @@ window.PlotDraw = ({ lang, size }) => {
     labeller,
     pick
   });
+  const barNames = window.PlotBarNames({ svgLine, svgText, place: placer, wrap: marks.wrap });
   const legend = window.PlotLegend({
     swatch: marks.swatch,
     esc,
@@ -3800,83 +4180,10 @@ window.PlotDraw = ({ lang, size }) => {
     const readable = (m) => [m[key] ?? []].flat().every((v) => digits(m.label ?? "").includes(digits(v)));
     return !option.stack && (option.series ?? []).every(printed) && (option.marks ?? []).every(readable);
   }
-  function niceStep(span, count) {
-    const raw = span / count;
-    const p = 10 ** Math.floor(Math.log10(raw));
-    const f = raw / p;
-    return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
-  }
-  function steps(lo, hi, step) {
-    const ticks = [];
-    for (let k = Math.ceil(lo / step - 0.000000001);k * step <= hi + step * 0.000000001; k++) {
-      ticks.push(+(k * step).toFixed(10));
-    }
-    return ticks;
-  }
-  const spread = (lo, hi, n) => Array.from({ length: n }, (_, k) => lo + (hi - lo) * k / Math.max(1, n - 1));
-  function numericAxis(spec, data, length, vertical) {
-    const { lo, hi, step } = rangeOf(spec, data, length, vertical);
-    const format = formatter(spec.format);
-    const said = Array.isArray(spec.labels) ? spec.labels : undefined;
-    const ticks = said ? spread(lo, hi, said.length) : steps(lo, hi, step);
-    return {
-      lo,
-      hi,
-      ticks,
-      format,
-      labels: said ?? ticks.map((v) => spec.labels === false ? "" : format(v)),
-      name: spec.name,
-      vertical,
-      ...unplaced
-    };
-  }
-  function rangeOf(spec, [dataMin, dataMax], length, vertical) {
-    let lo = spec.min ?? dataMin;
-    let hi = spec.max ?? dataMax;
-    if (!(hi > lo)) {
-      lo -= 1;
-      hi += 1;
-    }
-    const count = clamp(Math.round(length / (vertical ? 48 : 80)), 2, 10);
-    const step = spec.step ?? niceStep(hi - lo, count);
-    const round = !Array.isArray(spec.labels);
-    if (spec.min == null && round) {
-      lo = Math.floor(lo / step + 0.000000001) * step;
-    }
-    if (spec.max == null && round) {
-      hi = Math.ceil(hi / step - 0.000000001) * step;
-    }
-    return { lo, hi, step };
-  }
-  function categoryAxis(spec, categories, vertical, picked) {
-    const names = categories.map((c) => typeof c === "string" ? c : c.name);
-    const notes = categories.map((c) => typeof c === "string" ? "" : c.note ?? "");
-    const labelled = spec.labels !== false;
-    return {
-      names,
-      notes: labelled && notes.some(Boolean) ? notes : undefined,
-      picked,
-      ticks: names.map((_, i) => i),
-      labels: names.map((name) => labelled ? String(name) : ""),
-      name: spec.name,
-      vertical,
-      ...unplaced
-    };
-  }
   const markedAt = (option, key, arrows) => (option.marks ?? []).flatMap((m) => [
     ...[m[key] ?? []].flat(),
     ...[m.at, ...arrows ? [m.from, m.to] : []].flatMap((p) => p ? [p[key === "x" ? 0 : 1]] : [])
   ]);
-  function place(axis, a, b) {
-    if (axis.names) {
-      const n = axis.names.length;
-      axis.at = (i) => a + (i + 0.5) * (b - a) / n;
-      axis.band = Math.abs(b - a) / n;
-    } else {
-      const { lo, hi } = axis;
-      axis.at = (v) => a + (clamp(v, lo, hi) - lo) / (hi - lo) * (b - a);
-    }
-  }
   function extent(series, k, marked) {
     const values = [...series.flatMap((s) => s.data.filter(finite).map((p) => p[k])), ...marked];
     return values.length ? [Math.min(...values), Math.max(...values)] : [0, 1];
@@ -3889,24 +4196,33 @@ window.PlotDraw = ({ lang, size }) => {
     const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2}`;
     return `<path class="line" style="${style}"${attr("stroke-dasharray", dashOf(s, i))} d="M${pts.join("L")}"/>`;
   }
-  function stemMark(s, i, { X, Y, ya, W, textWidth, texts }) {
+  function stemsOf(s, i, { X, Y, ya, W, textWidth, texts }) {
     const said = texts.series?.[i]?.data;
     const base = Y(clamp(0, ya.lo, ya.hi));
-    const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2.5}`;
     const format = labeller(s.label, ya.format, true);
-    return s.data.map((p, i) => {
+    return s.data.flatMap((p, k) => {
       if (!finite(p)) {
-        return "";
+        return [];
       }
-      const [x, y] = p;
-      const cx = X(x);
-      const cy = Y(y);
-      const [tx, ty] = said?.[i] ?? p;
-      const t = format?.(ty, i, tx);
-      const dot = `<circle class="dot" style="${style}" cx="${px(cx)}" cy="${px(cy)}" r="4.5"/>`;
+      const [cx, cy] = [X(p[0]), Y(p[1])];
+      const [tx, ty] = said?.[k] ?? p;
+      const t = format?.(ty, k, tx) ?? "";
       const half = t ? textWidth(t) / 2 : 0;
-      const at = cy <= base ? Math.max(cy - 14, FONT) : cy + 14;
-      const text = t ? svgText("value", clamp(cx, half + 4, W - half - 4), at, "middle", t) : "";
+      const value = {
+        t,
+        x: clamp(cx, half + 4, W - half - 4),
+        y: cy <= base ? Math.max(cy - 14, FONT) : cy + 14,
+        half
+      };
+      return [{ base, cx, cy, value }];
+    });
+  }
+  const stemValues = (series, ctx) => series.flatMap((s, i) => ctx.shown[i] && s.type === "stem" ? stemsOf(s, i, ctx).flatMap(({ value: { t, x, y, half } }) => t ? [{ x0: x - half, x1: x + half, y0: y - FONT / 2, y1: y + FONT / 2 }] : []) : []);
+  function stemMark(s, i, ctx) {
+    const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2.5}`;
+    return stemsOf(s, i, ctx).map(({ base, cx, cy, value: { t, x, y } }) => {
+      const dot = `<circle class="dot" style="${style}" cx="${px(cx)}" cy="${px(cy)}" r="4.5"/>`;
+      const text = t ? svgText("value", x, y, "middle", t) : "";
       return svgLine("stem", cx, cx, base, cy, style) + dot + text;
     }).join("");
   }
@@ -3982,7 +4298,7 @@ window.PlotDraw = ({ lang, size }) => {
       ya: numericAxis(option.y ?? {}, yRange, H, true)
     };
   }
-  function plotBox(xa, ya, W, H, textWidth, named) {
+  function plotBox([xa, ya], [W, H], textWidth, [named, stacked], right) {
     const yLabelWidth = Math.max(0, ...ya.labels.map(textWidth), ...(ya.notes ?? []).map(textWidth));
     const firstHalf = textWidth(xa.labels[0] ?? "") / 2;
     const lastHalf = textWidth(xa.labels.at(-1) ?? "") / 2;
@@ -3991,9 +4307,11 @@ window.PlotDraw = ({ lang, size }) => {
       const share = "lo" in xa ? Math.min(1, (x - xa.lo) / (xa.hi - xa.lo)) : 1;
       return share > 0 ? L + (W - ends.room(name, textWidth) - L) / share : W;
     });
+    const R = Math.min(W - Math.max(PAD, lastHalf + 4), ...reach);
+    const beside = Math.min(R, ...stacked.map((name) => W - ends.room(name, textWidth)));
     return {
       L,
-      R: Math.floor(Math.min(W - Math.max(PAD, lastHalf + 4), ...reach)),
+      R: Math.floor(Math.max(beside, R - (R - L) * NAME_SHARE) - right),
       T: ya.name ? FONT + 15 : 10,
       B: bottomAt(H, xa.name, Boolean(xa.notes), xa.labels.some(Boolean))
     };
@@ -4007,7 +4325,7 @@ window.PlotDraw = ({ lang, size }) => {
     Y: f.ya.names ? undefined : f.ya.at,
     line: lineHeight()
   });
-  function layoutOf(option, W, H, textWidth) {
+  function layoutOf(option, W, H, textWidth, extra = NO_ROOM) {
     FONT = size();
     const axes = option.categories ? barAxes(option, option.categories, W, H) : plotAxes(option, W, H);
     const { xa, ya } = axes;
@@ -4015,24 +4333,27 @@ window.PlotDraw = ({ lang, size }) => {
       name,
       x: s.data.filter(finite).at(-1)?.[0] ?? 0
     }));
-    const box = { ...plotBox(xa, ya, W, H, textWidth, named), textWidth };
+    const beside = option.categories && option.stack && !option.horizontal && ends.onMarks(option);
+    const stacked = (beside ? option.series ?? [] : []).flatMap((s) => s.name ? [s.name] : []);
+    const box = {
+      ...plotBox([xa, ya], [W, H], textWidth, [named, stacked], extra.right),
+      textWidth
+    };
     place(xa, box.L, box.R);
     return { axes, box, rows: marks.rows(option.marks ?? [], markFrame({ ...box, xa, ya, W })) };
   }
-  function render(option, W, H, textWidth, shown, texts = option) {
+  function render(option, W, H, textWidth, shown, texts = option, from) {
     const series = option.series ?? [];
     crowded = { notes: [], names: [], arrows: [] };
-    const laid = laidOut(option, W, H, textWidth, shown, texts);
-    if (!laid) {
+    const args = [W, H, textWidth, shown, texts];
+    const drawn = drawnLayout(option, args, from);
+    if (!drawn) {
       return "";
     }
-    const { axes, box, ctx } = laid;
+    const { laid } = drawn;
+    const { axes } = laid;
     if ("cat" in axes) {
-      const drawn = bars.draw(series, option, { ...ctx, cat: axes.cat, val: axes.val });
-      const frame = { ...ctx, line: lineHeight(), lines: [], fills: [] };
-      const choose = (spots, placed) => placer.cheapest(spots, frame, [...placed, ...drawn.boxes]);
-      const marked = marks.markers(option.marks ?? [], { ...markFrame(ctx), choose }, box.T - 6);
-      return drawAxes(ctx) + drawn.rects + marked.lines + drawn.labels + marked.labels;
+      return barPlot(option, args, drawn);
     }
     const going = texts === option ? undefined : laidOut(texts, W, H, textWidth, shown, texts);
     const goal = going && !("cat" in going.axes) ? labelled(texts, { ...going, ...going.axes }) : undefined;
@@ -4040,17 +4361,69 @@ window.PlotDraw = ({ lang, size }) => {
     crowded = { notes: noted.crowded, names: named.crowded, arrows: short(option, points) };
     return drawAxes(points) + noted.fills + pointMarks(series, points) + marked.lines + named.markup + marked.labels + noted.notes;
   }
-  function laidOut(option, W, H, textWidth, shown, texts) {
-    const { axes, box, rows } = layoutOf(option, W, H, textWidth);
+  function barsIn(option, { axes, ctx }, texts) {
+    const drawn = "cat" in axes ? bars.draw(option.series ?? [], option, { ...ctx, cat: axes.cat, val: axes.val }) : undefined;
+    const frame = { ...ctx, line: lineHeight(), lines: [], fills: [], R: ctx.W - 4, texts };
+    return { drawn, frame };
+  }
+  const ceilingOf = (T, extra) => Math.max(2, T - extra.top - 8);
+  const wider = (a, b) => b === NO_ROOM ? a : { top: Math.max(a.top, b.top), right: Math.max(a.right, b.right) };
+  function barRoom(geometry, [W, H, textWidth, shown, texts]) {
+    let room = NO_ROOM;
+    if (!ends.onMarks(texts) || texts.stack) {
+      return room;
+    }
+    let laid = laidOut(geometry, W, H, textWidth, shown, texts);
+    for (let k = 0;laid && k < 8; k++) {
+      const { drawn, frame } = barsIn(geometry, laid, texts);
+      const need = drawn && barNames.room(geometry, drawn.drawn, frame, ceilingOf(frame.T, room));
+      const next = need && grown(room, need, W);
+      if (!next) {
+        break;
+      }
+      laid = laidOut(geometry, W, H, textWidth, shown, texts, next);
+      room = laid ? next : room;
+    }
+    return room;
+  }
+  function grown(room, need, W) {
+    const right = Math.min(room.right + Math.ceil(need.right), Math.floor(W * NAME_SHARE));
+    return need.top < 1 && right === room.right ? undefined : { top: room.top + Math.ceil(need.top), right };
+  }
+  function drawnLayout(option, args, from) {
+    const [W, H, textWidth, shown, texts] = args;
+    const plain = laidOut(option, W, H, textWidth, shown, texts);
+    if (!(plain && ("cat" in plain.axes))) {
+      return plain && { laid: plain, room: NO_ROOM };
+    }
+    const room = from ? wider(barRoom(texts, args), barRoom(from, args)) : barRoom(texts, args);
+    const laid = room === NO_ROOM ? undefined : laidOut(option, W, H, textWidth, shown, texts, room);
+    return laid ? { laid, room } : { laid: plain, room: NO_ROOM };
+  }
+  function barPlot(option, args, { laid, room }) {
+    const texts = args[4];
+    const { drawn, frame } = barsIn(option, laid, texts);
+    if (!drawn) {
+      return "";
+    }
+    const nameFrame = { ...frame, ceiling: ceilingOf(frame.T, room) };
+    const choose = (spots, placed) => placer.cheapest(spots, frame, [...placed, ...drawn.boxes]);
+    const marked = marks.markers(option.marks ?? [], { ...markFrame(laid.ctx), choose }, laid.box.T - 6);
+    const named = ends.onMarks(texts) ? barNames.names(option, drawn.drawn, nameFrame, [...drawn.boxes, ...marked.boxes]) : { markup: "", crowded: [] };
+    crowded = { notes: [], names: named.crowded, arrows: [] };
+    return drawAxes(laid.ctx) + drawn.rects + marked.lines + drawn.labels + marked.labels + named.markup;
+  }
+  function laidOut(option, W, H, textWidth, shown, texts, extra = NO_ROOM) {
+    const { axes, box, rows } = layoutOf(option, W, H, textWidth, extra);
     const { xa, ya } = axes;
-    const T = box.T + rows * lineHeight();
+    const T = box.T + rows * lineHeight() + extra.top;
     const { L, R, B } = box;
     if (R - L < 40 || B - T < 40) {
       return;
     }
     place(ya, ya.names ? T : B, ya.names ? B : T);
     const ctx = { xa, ya, L, R, T, B, W, H, textWidth, shown, texts };
-    return { axes, box, ctx };
+    return { axes, box, ctx, rows };
   }
   const short = (option, { X, Y }) => (option.marks ?? []).flatMap(({ from, to, label }) => from && to && Math.hypot(X(to[0]) - X(from[0]), Y(to[1]) - Y(from[1])) < SHORT ? [label ?? `${JSON.stringify(from)} to ${JSON.stringify(to)}`] : []);
   function labelled(option, { xa, ya, box, ctx }, goal) {
@@ -4059,27 +4432,35 @@ window.PlotDraw = ({ lang, size }) => {
     const labelFrame = { ...frame, lines: placer.obstacles(option, frame), fills: [] };
     const choose = (spots, placed) => placer.cheapest(spots, labelFrame, placed);
     const marked = marks.markers(option.marks ?? [], { ...markFrame(points), choose }, box.T - 6);
-    const placed = [...marked.boxes];
+    const placed = [...marked.boxes, ...stemValues(option.series ?? [], points)];
     const named = ends.marks(option, points, { ...labelFrame, R: points.W - 2 }, placed);
     return { points, marked, named, noted: areas.draw(option, frame, placed, goal) };
   }
-  const legendMarkup = (option) => legend.markup(option, ends.fit(option));
+  const legendMarkup = (option) => legend.markup(option, ends.onMarks(option));
   return {
     render,
     legendMarkup,
     keyText: pick.keyText,
-    bands: (option, W, H, textWidth) => pick.bands(option, layoutOf(option, W, H, textWidth), lineHeight()),
+    bands(option, W, H, textWidth) {
+      const shown = (option.series ?? []).map(() => true);
+      const drawn = drawnLayout(option, [W, H, textWidth, shown, option]);
+      return drawn && pick.bands(option, drawn.laid.ctx);
+    },
     switchedOn: legend.switchedOn,
-    markLines: (option, W, H, textWidth) => layoutOf(option, W, H, textWidth).rows,
+    markLines(option, W, H, textWidth, texts = option, from) {
+      const shown = (option.series ?? []).map(() => true);
+      return drawnLayout(option, [W, H, textWidth, shown, texts], from)?.laid.rows ?? layoutOf(option, W, H, textWidth).rows;
+    },
     crowded: () => crowded
   };
 };
 
-/* plot ends: what a plot's lines say on themselves, their names (a plot never falls back to a legend for them) and a labelled
-   line's last value, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({
-   svgLine, svgText, size, place, format, colour, dash, wrap }) gives fit(option), whether the lines carry their names;
-   named(...), the lines with text at their ends; room(...), the room a name takes right of the plot; and marks(...), the texts
-   drawn, placed with the plot's other labels, and the series whose name found no clear place. */
+/* plot ends: what a plot's lines and stems say on themselves, their names (a plot never falls back to a legend for them) and a
+   labelled line's last value, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({
+   svgLine, svgText, size, place, format, colour, dash, wrap }) gives onMarks(option), whether the series carry their names on
+   their marks (bars too, which bar-names.ts names); named(...), the lines and stems with text at their ends; room(...), the room
+   a name takes right of the plot; and marks(...), the texts drawn, placed with the plot's other labels, and the series whose
+   name found no clear place. */
 window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }) => {
   const END_GAP = 6;
   const LEADER = 10;
@@ -4102,14 +4483,22 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
     return label && last && finite(last) ? label(last[1], k, last[0]) : "";
   }
   const nameAndValue = (option, s) => [s.name, lastValue(option, s)].filter(Boolean).join(": ");
-  function fits(option) {
+  const pointed = (s) => (s.type ?? "line") !== "bar";
+  function onMarks(option) {
     const named = (option.series ?? []).filter((s) => s.name);
-    return option.legend === undefined && !option.categories && named.length > 0 && named.every((s) => (s.type ?? "line") === "line");
+    const { pick: at, categories } = option;
+    if (option.legend !== undefined || typeof at === "number" && categories?.[at] !== undefined) {
+      return false;
+    }
+    return option.categories ? named.length > 1 : named.length > 0 && named.every(pointed);
   }
   function named(option, textWidth) {
-    const names = fits(option);
+    const names = onMarks(option);
     const fitted = (text) => text && wrapped(text, textWidth).length ? text : "";
     return (option.series ?? []).flatMap((s, i) => {
+      if (!pointed(s)) {
+        return [];
+      }
       const own = names && s.name;
       const kept = own ? fitted(nameAndValue(option, s)) || own : fitted(lastValue(option, s));
       return kept ? [{ s, i, name: kept }] : [];
@@ -4165,9 +4554,9 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
     }
     return least;
   }
-  function owns({ box }, line, others) {
+  function owns({ box }, mine, others) {
     const middle = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
-    const own = distance(middle, line);
+    const own = Math.min(...mine.map((shape) => distance(middle, shape)));
     return others.every((other) => distance(middle, other) > own);
   }
   function along(line, t) {
@@ -4194,7 +4583,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
     const x = anchor === "start" ? box.x0 : anchor === "end" ? box.x1 : (box.x0 + box.x1) / 2;
     return lines.map((t, k) => svgText("end", x, box.y0 + line / 2 + k * line, anchor, t)).join("");
   }
-  function spread(list, f, placed, lines) {
+  function spread(list, f, placed, shapes) {
     const ends = list.map((end) => {
       const x0 = end.at.x + END_GAP;
       return { end, y: end.at.y, x0, x1: x0 + LEADER + f.textWidth(end.name) };
@@ -4212,7 +4601,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
     const crowded = [];
     const markup = ends.map(({ end, y }) => {
       const first = classic(end, y, f);
-      const others = lines.filter((line) => line !== end.line);
+      const others = shapes.filter((mine) => mine !== end.shapes).flat();
       const { chosen, clear } = choose(end, first, others, f, placed);
       if (!clear) {
         crowded.push(end.series);
@@ -4223,7 +4612,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
     return { markup, crowded };
   }
   function choose(end, first, others, f, placed) {
-    const mine = (spots) => spots.filter((spot) => owns(spot, end.line, others));
+    const mine = (spots) => spots.filter((spot) => owns(spot, end.shapes, others));
     const inside = first.box.x1 <= f.R && first.box.y0 >= 0;
     const stages = [
       () => inside ? [first] : [],
@@ -4244,27 +4633,34 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
       clear: false
     };
   }
+  function shapesOf(s, X, Y, base) {
+    const path = s.data.filter(finite).map(([x, y]) => [X(x), Y(y)]);
+    const shapes = s.type === "stem" ? path.map(([x, y]) => [[x, base], [x, y]]) : [path];
+    return { path, shapes: path.length ? shapes : [] };
+  }
   function marks(option, { X, Y, shown, textWidth, texts = option }, f, placed) {
-    const lines = (option.series ?? []).map((s, i) => shown[i] && (s.type ?? "line") === "line" ? s.data.filter(finite).map(([x, y]) => [X(x), Y(y)]) : []);
-    const visible = lines.filter((line) => line.length);
+    const base = Math.min(Math.max(Y(0), f.T), f.B);
+    const drawn = (option.series ?? []).map((s, i) => shown[i] && pointed(s) ? shapesOf(s, X, Y, base) : { path: [], shapes: [] });
     const list = named(texts, textWidth).flatMap(({ s: said, i, name }) => {
       const s = option.series?.[i] ?? said;
-      const line = lines[i] ?? s.data.filter(finite).map(([x, y]) => [X(x), Y(y)]);
-      const last = line.at(-1);
+      const { path, shapes } = drawn[i] ?? shapesOf(s, X, Y, base);
+      const last = path.at(-1);
       return last && shown[i] ? [
         {
           name,
           series: s.name ?? name,
-          line,
+          line: path,
+          shapes,
           at: { x: last[0], y: last[1] },
           colour: colour(s, i),
           dash: dash(s, i)
         }
       ] : [];
     });
-    return spread(list, f, placed, visible);
+    const shapes = drawn.map((d) => d.shapes).filter((list) => list.length);
+    return spread(list, f, placed, shapes);
   }
-  return { fit: fits, named, room, marks };
+  return { onMarks, named, room, marks };
 };
 
 /* plot format: how kit:plot.js writes numbers, on axes and marks, in the page's lang; draw.ts (PlotDraw) takes it from
@@ -4318,7 +4714,7 @@ window.PlotFormat = ({ lang }) => {
 };
 
 /* plot legend: a plot's legend buttons, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses
-   it. PlotLegend({ swatch, esc, colour, dash, fill, pick }) gives markup(option, atEnds), the buttons or a picked category's
+   it. PlotLegend({ swatch, esc, colour, dash, fill, pick }) gives markup(option, onMarks), the buttons or a picked category's
    key, and switchedOn(series, off), which series the legend leaves on. */
 window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
   function swatchOf(s, i) {
@@ -4327,7 +4723,7 @@ window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
     const [state] = type === "bar" && states.size === 1 ? states : [undefined];
     return swatch(type, colour(s, i), type === "line" ? dash(s, i) : "", state);
   }
-  function markup(option, atEnds) {
+  function markup(option, onMarks) {
     const named = (option.series ?? []).map((s, i) => [s, i]).filter(([s]) => s.name);
     const at = pick.pickedAt(option);
     if (option.legend === false || named.length < (at === undefined ? 2 : 1)) {
@@ -4336,7 +4732,7 @@ window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
     if (at !== undefined) {
       return pick.key(option, at, named.map(([s, i]) => [s, i, swatchOf(s, i)]));
     }
-    if (atEnds) {
+    if (onMarks) {
       return "";
     }
     return named.map(([s, i]) => `<li><button type="button" data-i="${i}">${swatchOf(s, i)}${esc(s.name)}</button></li>`).join("");
@@ -4666,9 +5062,9 @@ window.PlotPick = ({ esc, formatter, labeller }) => {
       return `<li><button type="button" data-i="${i}">${swatch}${esc(s.name)}${v ? `<span class="v">${esc(v)}</span>` : ""}</button></li>`;
     }).join("")}`;
   }
-  function bands(option, { box, rows }, line) {
+  function bands(option, box) {
     const count = option.categories?.length;
-    const [start, end] = option.horizontal ? [box.T + rows * line, box.B] : [box.L, box.R];
+    const [start, end] = option.horizontal ? [box.T, box.B] : [box.L, box.R];
     return !count || end - start < 40 ? undefined : { start, end, count, vertical: Boolean(option.horizontal) };
   }
   return { pickedAt, frame, keyText, key, bands };
@@ -4793,7 +5189,12 @@ window.PlotPlace = ({ wrap }) => {
   }
   const finite = (p) => typeof p !== "number" && Number.isFinite(p[0]) && Number.isFinite(p[1]);
   function obstacles(option, { X, Y, L, R, T, B, shown }) {
-    const series = (option.series ?? []).flatMap((s, i) => shown[i] && (s.type ?? "line") === "line" ? [s.data.filter(finite).map(([x, y]) => [X(x), Y(y)])] : []);
+    const base = Math.min(Math.max(Y(0), T), B);
+    const series = (option.series ?? []).flatMap((s, i) => {
+      const points = shown[i] ? s.data.filter(finite).map(([x, y]) => [X(x), Y(y)]) : [];
+      const type = s.type ?? "line";
+      return type === "line" ? [points] : type === "stem" ? points.map(([x, y]) => [[x, base], [x, y < base ? y - 5 : y + 5]]) : [];
+    });
     const markers = (option.marks ?? []).flatMap((m) => [
       ...typeof m.x === "number" ? [[[X(m.x), T], [X(m.x), B]]] : [],
       ...typeof m.y === "number" ? [[[L, Y(m.y)], [R, Y(m.y)]]] : [],
@@ -5007,9 +5408,7 @@ window.PlotTween = () => {
          fill   a bar's state, from the accent: "accent" solid, "hollow" (tint in an accent outline), "hatch" (grey lines at 45
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour).
                 On a line: the area down to 0, true in a tint of its colour or a state
-         name   named lines carry their names at their ends, kept off the marks' lines and labels (a name spread off its
-                end tied to it by a leader), when the names are short (about 15 characters) and stack down the plot; else names go
-                in the legend, whose entries switch the series on and off, a series without a name toggling with the named one before it
+         name   names go on the marks, never in a legend (legend: true asks for one): as the Plot component says (kit Plot)
          label  prints exact values on the marks: true, a format as below, one text per point or bar (["A", "", "C"]),
                 or a function: line and stem (x, y, i) => text, bar (v, i) => text. A line prints its last point's after its
                 name at its end ("10 kΩ: 847 ns"), wrapped, or left out past two lines. A bar plot whose every bar prints its
@@ -5028,8 +5427,7 @@ window.PlotTween = () => {
               in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
-       legend true shows the legend, false hides it and the names at the ends; unset, it shows for two or more named series
-              unless all are lines
+       legend true shows the legend in place of the names on the marks, false hides both
        pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
               each named series' value there, as tall as the tallest category's key
      picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
@@ -5274,7 +5672,7 @@ window.PlotTween = () => {
   function make(el, initial, picker) {
     made.get(el)?.();
     let option = initial;
-    let shown = initial;
+    let [shown, from] = [initial, undefined];
     let drawn = false;
     const timer = { id: 0 };
     const { legend, area, svg } = partsIn(el);
@@ -5292,10 +5690,10 @@ window.PlotTween = () => {
       if (!W || !area.clientHeight) {
         return;
       }
-      el.style.setProperty("--plot-mark-lines", String(markLines(shown, W, area.clientHeight, textWidth)));
+      el.style.setProperty("--plot-mark-lines", String(markLines(shown, W, area.clientHeight, textWidth, option, from)));
       const H = area.clientHeight;
       svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-      svg.innerHTML = render(preview.look(shown), W, H, textWidth, switchedOn(shown.series ?? [], switches.off), option);
+      svg.innerHTML = render(preview.look(shown), W, H, textWidth, switchedOn(shown.series ?? [], switches.off), option, from);
       drawn = true;
       if (picker?.strip) {
         lineUp(picker.strip, option, W, H, textWidth);
@@ -5307,6 +5705,7 @@ window.PlotTween = () => {
     });
     const show = (step) => {
       shown = step;
+      from = step === option ? undefined : from;
       draw();
     };
     function finish() {
@@ -5319,6 +5718,7 @@ window.PlotTween = () => {
       if (still.matches || !drawn || !acted) {
         show(option);
       } else {
+        from = shown;
         tween(shown, option, show, timer);
       }
     }
@@ -5351,7 +5751,7 @@ window.PlotTween = () => {
   window.Plot = { make };
 })();
 </script>
-<script>(()=>{var ie=Object.defineProperty;var le=(e)=>e;function se(e,n){this[e]=le.bind(null,n)}var ue=(e,n)=>{for(var t in n)ie(e,t,{get:n[t],enumerable:!0,configurable:!0,set:se.bind(n,t)})};var mn={};ue(mn,{Plot:()=>Ue,plotPlace:()=>re});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var A,p,bn,_e,N,yn,wn,Pn,Y,V,T,xn,tn,Z,nn,Cn,B={},z=[],ce=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,U=Array.isArray;function C(e,n){for(var t in n)e[t]=n[t];return e}function on(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function w(e,n,t){var o,i,r,l={};for(r in n)r=="key"?o=n[r]:r=="ref"?i=n[r]:l[r]=n[r];if(arguments.length>2&&(l.children=arguments.length>3?A.call(arguments,2):t),typeof e=="function"&&e.defaultProps!=null)for(r in e.defaultProps)l[r]===void 0&&(l[r]=e.defaultProps[r]);return F(e,l,o,i,null)}function F(e,n,t,o,i){var r={type:e,props:n,key:t,ref:o,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:i==null?++bn:i,__i:-1,__u:0};return i==null&&p.vnode!=null&&p.vnode(r),r}function S(e){return e.children}function R(e,n){this.props=e,this.context=n}function O(e,n){if(n==null)return e.__?O(e.__,e.__i+1):null;for(var t;n<e.__k.length;n++)if((t=e.__k[n])!=null&&t.__e!=null)return t.__e;return typeof e.type=="function"?O(e):null}function ae(e){if(e.__P&&e.__d){var n=e.__v,t=n.__e,o=[],i=[],r=C({},n);r.__v=n.__v+1,p.vnode&&p.vnode(r),ln(e.__P,r,n,e.__n,e.__P.namespaceURI,32&n.__u?[t]:null,o,t==null?O(n):t,!!(32&n.__u),i),r.__v=n.__v,r.__.__k[r.__i]=r,Dn(o,r,i),n.__e=n.__=null,r.__e!=t&&Sn(r)}}function Sn(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(n){if(n!=null&&n.__e!=null)return e.__e=e.__c.base=n.__e}),Sn(e)}function en(e){(!e.__d&&(e.__d=!0)&&N.push(e)&&!q.__r++||yn!=p.debounceRendering)&&((yn=p.debounceRendering)||wn)(q)}function q(){try{for(var e,n=1;N.length;)N.length>n&&N.sort(Pn),e=N.shift(),n=N.length,ae(e)}finally{N.length=q.__r=0}}function Nn(e,n,t,o,i,r,l,_,c,u,f){var h,s,a,v,k,g,m=o&&o.__k||z,d=n.length;for(c=fe(t,n,m,c,d),h=0;h<d;h++)(a=t.__k[h])!=null&&(s=a.__i!=-1&&m[a.__i]||B,a.__i=h,g=ln(e,a,s,i,r,l,_,c,u,f),v=a.__e,a.ref&&s.ref!=a.ref&&(s.ref&&sn(s.ref,null,a),f.push(a.ref,a.__c||v,a)),k==null&&v!=null&&(k=v),4&a.__u?(c=Mn(a,c,e),s.__e&&(s.__e=null)):typeof a.type=="function"&&g!==void 0?c=g:v&&(c=v.nextSibling),a.__u&=-7);return t.__e=k,c}function fe(e,n,t,o,i){var r,l,_,c,u,f=t.length,h=f,s=0;for(e.__k=Array(i),r=0;r<i;r++)(l=n[r])!=null&&typeof l!="boolean"&&typeof l!="function"?(typeof l=="string"||typeof l=="number"||typeof l=="bigint"||l.constructor==String?l=e.__k[r]=F(null,l,null,null,null):U(l)?l=e.__k[r]=F(S,{children:l},null,null,null):l.constructor===void 0&&l.__b>0?l=e.__k[r]=F(l.type,l.props,l.key,l.ref?l.ref:null,l.__v):e.__k[r]=l,c=r+s,l.__=e,l.__b=e.__b+1,_=null,(u=l.__i=pe(l,t,c,h))!=-1&&(h--,(_=t[u])&&(_.__u|=2)),_==null||_.__v==null?(u==-1&&(i>f?s--:i<f&&s++),typeof l.type!="function"&&(l.__u|=4)):u!=c&&(u==c-1?s--:u==c+1?s++:(u>c?s--:s++,l.__u|=4))):e.__k[r]=null;if(h)for(r=0;r<f;r++)(_=t[r])!=null&&(2&_.__u)==0&&(_.__e==o&&(o=O(_)),En(_,_));return o}function Mn(e,n,t){var o,i;if(typeof e.type=="function"){for(o=e.__k,i=0;o&&i<o.length;i++)o[i]&&(o[i].__=e,n=Mn(o[i],n,t));return n}e.__e!=n&&(n&&e.type&&!n.parentNode&&(n=O(e)),n=t.insertBefore(e.__e,n||null));do n=n&&n.nextSibling;while(n!=null&&n.nodeType==8);return n}function rn(e,n){return n=n||[],e==null||typeof e=="boolean"||(U(e)?e.some(function(t){rn(t,n)}):n.push(e)),n}function pe(e,n,t,o){var i,r,l,{key:_,type:c}=e,u=n[t],f=u!=null&&(2&u.__u)==0;if(u===null&&_==null||f&&_==u.key&&c==u.type)return t;if(o>(f?1:0)){for(i=t-1,r=t+1;i>=0||r<n.length;)if((u=n[l=i>=0?i--:r++])!=null&&(2&u.__u)==0&&_==u.key&&c==u.type)return l}return-1}function gn(e,n,t){n[0]=="-"?e.setProperty(n,t==null?"":t):e[n]=t==null?"":typeof t!="number"||ce.test(n)?t:t+"px"}function I(e,n,t,o,i){var r,l;n:if(n=="style")if(typeof t=="string")e.style.cssText=t;else{if(typeof o=="string"&&(e.style.cssText=o=""),o)for(n in o)t&&n in t||gn(e.style,n,"");if(t)for(n in t)o&&t[n]==o[n]||gn(e.style,n,t[n])}else if(n[0]=="o"&&n[1]=="n")r=n!=(n=n.replace(xn,"$1")),l=n.toLowerCase(),n=l in e||n=="onFocusOut"||n=="onFocusIn"?l.slice(2):n.slice(2),e.l||(e.l={}),e.l[n+r]=t,t?o?t[T]=o[T]:(t[T]=tn,e.addEventListener(n,r?nn:Z,r)):e.removeEventListener(n,r?nn:Z,r);else{if(i=="http://www.w3.org/2000/svg")n=n.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(n!="width"&&n!="height"&&n!="href"&&n!="list"&&n!="form"&&n!="tabIndex"&&n!="download"&&n!="rowSpan"&&n!="colSpan"&&n!="role"&&n!="popover"&&n in e)try{e[n]=t==null?"":t;break n}catch(_){}typeof t=="function"||(t==null||t===!1&&n[4]!="-"?e.removeAttribute(n):e.setAttribute(n,n=="popover"&&t==1?"":t))}}function kn(e){return function(n){if(this.l){var t=this.l[n.type+e];if(n[V]==null)n[V]=tn++;else if(n[V]<t[T])return;return t(p.event?p.event(n):n)}}}function ln(e,n,t,o,i,r,l,_,c,u){var f,h,s,a,v,k,g,m,d,P,E,M,H,vn,j,X,x=n.type;if(n.constructor!==void 0)return null;128&t.__u&&(c=!!(32&t.__u),r=[_=n.__e=t.__e]),(f=p.__b)&&f(n);n:if(typeof x=="function"){h=l.length;try{if(d=n.props,P=x.prototype&&x.prototype.render,E=(f=x.contextType)&&o[f.__c],M=f?E?E.props.value:f.__:o,t.__c?m=(s=n.__c=t.__c).__=s.__E:(P?n.__c=s=new x(d,M):(n.__c=s=new R(d,M),s.constructor=x,s.render=he),E&&E.sub(s),s.state||(s.state={}),s.__n=o,a=s.__d=!0,s.__h=[],s._sb=[]),P&&s.__s==null&&(s.__s=s.state),P&&x.getDerivedStateFromProps!=null&&(s.__s==s.state&&(s.__s=C({},s.__s)),C(s.__s,x.getDerivedStateFromProps(d,s.__s))),v=s.props,k=s.state,s.__v=n,a)P&&x.getDerivedStateFromProps==null&&s.componentWillMount!=null&&s.componentWillMount(),P&&s.componentDidMount!=null&&s.__h.push(s.componentDidMount);else{if(P&&x.getDerivedStateFromProps==null&&d!==v&&s.componentWillReceiveProps!=null&&s.componentWillReceiveProps(d,M),n.__v==t.__v||!s.__e&&s.shouldComponentUpdate!=null&&s.shouldComponentUpdate(d,s.__s,M)===!1){n.__v!=t.__v&&(s.props=d,s.state=s.__s,s.__d=!1),n.__e=t.__e,n.__k=t.__k,n.__k.some(function(D){D&&(D.__=n)}),z.push.apply(s.__h,s._sb),s._sb=[],s.__h.length&&l.push(s),_=O(t);break n}s.componentWillUpdate!=null&&s.componentWillUpdate(d,s.__s,M),P&&s.componentDidUpdate!=null&&s.__h.push(function(){s.componentDidUpdate(v,k,g)})}if(s.context=M,s.props=d,s.__P=e,s.__e=!1,H=p.__r,vn=0,P)s.state=s.__s,s.__d=!1,H&&H(n),f=s.render(s.props,s.state,s.context),z.push.apply(s.__h,s._sb),s._sb=[];else do s.__d=!1,H&&H(n),f=s.render(s.props,s.state,s.context),s.state=s.__s;while(s.__d&&++vn<25);s.state=s.__s,s.getChildContext!=null&&(o=C(C({},o),s.getChildContext())),P&&!a&&s.getSnapshotBeforeUpdate!=null&&(g=s.getSnapshotBeforeUpdate(v,k)),j=f!=null&&f.type===S&&f.key==null?Rn(f.props.children):f,_=Nn(e,U(j)?j:[j],n,t,o,i,r,l,_,c,u),s.base=n.__e,n.__u&=-161,s.__h.length&&l.push(s),m&&(s.__E=s.__=null)}catch(D){if(l.length=h,n.__v=null,c||r!=null){if(D.then){for(n.__u|=c?160:128;_&&_.nodeType==8&&_.nextSibling;)_=_.nextSibling;r!=null&&(r[r.indexOf(_)]=null),n.__e=_}else if(r!=null)for(X=r.length;X--;)on(r[X])}else n.__e=t.__e;n.__k==null&&(n.__k=t.__k||[]),D.then||On(n),p.__e(D,n,t)}}else r==null&&n.__v==t.__v?(n.__k=t.__k,n.__e=t.__e):_=n.__e=de(t.__e,n,t,o,i,r,l,c,u);return(f=p.diffed)&&f(n),128&n.__u?void 0:_}function On(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(On))}function Dn(e,n,t){for(var o=0;o<t.length;o++)sn(t[o],t[++o],t[++o]);p.__c&&p.__c(n,e),e.some(function(i){try{e=i.__h,i.__h=[],e.some(function(r){r.call(i)})}catch(r){p.__e(r,i.__v)}})}function Rn(e){return typeof e!="object"||e==null||e.__b>0?e:U(e)?e.map(Rn):e.constructor!==void 0?null:C({},e)}function de(e,n,t,o,i,r,l,_,c){var u,f,h,s,a,v,k,g=t.props||B,{props:m,type:d}=n;if(d=="svg"?i="http://www.w3.org/2000/svg":d=="math"?i="http://www.w3.org/1998/Math/MathML":i||(i="http://www.w3.org/1999/xhtml"),r!=null){for(u=0;u<r.length;u++)if((a=r[u])&&"setAttribute"in a==!!d&&(d?a.localName==d:a.nodeType==3)){e=a,r[u]=null;break}}if(e==null){if(d==null)return document.createTextNode(m);e=document.createElementNS(i,d,m.is&&m),_&&(p.__m&&p.__m(n,r),_=!1),r=null}if(d==null)g===m||_&&e.data==m||(e.data=m);else{if(r=d=="textarea"&&m.defaultValue!=null?null:r&&A.call(e.childNodes),!_&&r!=null)for(g={},u=0;u<e.attributes.length;u++)g[(a=e.attributes[u]).name]=a.value;for(u in g)a=g[u],u=="dangerouslySetInnerHTML"?h=a:u=="children"||(u in m)||u=="value"&&("defaultValue"in m)||u=="checked"&&("defaultChecked"in m)||I(e,u,null,a,i);for(u in m)a=m[u],u=="children"?s=a:u=="dangerouslySetInnerHTML"?f=a:u=="value"?v=a:u=="checked"?k=a:_&&typeof a!="function"||g[u]===a||I(e,u,a,g[u],i);if(f)_||h&&(f.__html==h.__html||f.__html==e.innerHTML)||(e.innerHTML=f.__html),n.__k=[];else if(h&&(e.innerHTML=""),Nn(n.type=="template"?e.content:e,U(s)?s:[s],n,t,o,d=="foreignObject"?"http://www.w3.org/1999/xhtml":i,r,l,r?r[0]:t.__k&&O(t,0),_,c),r!=null)for(u=r.length;u--;)on(r[u]);_&&d!="textarea"||(u="value",d=="progress"&&v==null?e.removeAttribute("value"):v!=null&&(v!==e[u]||d=="progress"&&!v||d=="option"&&v!=g[u])&&I(e,u,v,g[u],i),u="checked",k!=null&&k!=e[u]&&I(e,u,k,g[u],i))}return e}function sn(e,n,t){try{if(typeof e=="function"){var o=typeof e.__u=="function";o&&e.__u(),o&&n==null||(e.__u=e(n))}else e.current=n}catch(i){p.__e(i,t)}}function En(e,n,t){var o,i;if(p.unmount&&p.unmount(e),(o=e.ref)&&(o.current&&o.current!=e.__e||sn(o,null,n)),(o=e.__c)!=null){if(o.componentWillUnmount)try{o.componentWillUnmount()}catch(r){p.__e(r,n)}o.base=o.__P=o.__n=null}if(o=e.__k)for(i=0;i<o.length;i++)o[i]&&En(o[i],n,t||typeof e.type!="function");t||on(e.__e),e.__c=e.__=e.__e=void 0}function he(e,n,t){return this.constructor(e,t)}function un(e,n,t){var o,i,r,l;n==document&&(n=document.documentElement),p.__&&p.__(e,n),i=(o=typeof t=="function")?null:t&&t.__k||n.__k,r=[],l=[],ln(n,e=(!o&&t||n).__k=w(S,null,[e]),i||B,B,n.namespaceURI,!o&&t?[t]:i?null:n.firstChild?A.call(n.childNodes):null,r,!o&&t?t:i?i.__e:n.firstChild,o,l),Dn(r,e,l),e.props.children=null}function _n(e,n){un(e,n,_n)}function Hn(e,n,t){var o,i,r,l,_=C({},e.props);for(r in e.type&&e.type.defaultProps&&(l=e.type.defaultProps),n)r=="key"?o=n[r]:r=="ref"?i=n[r]:_[r]=n[r]===void 0&&l!=null?l[r]:n[r];return arguments.length>2&&(_.children=arguments.length>3?A.call(arguments,2):t),F(e.type,_,o||e.key,i||e.ref,null)}function Tn(e){function n(t){var o,i;return this.getChildContext||(o=new Set,(i={})[n.__c]=this,this.getChildContext=function(){return i},this.componentWillUnmount=function(){o=null},this.shouldComponentUpdate=function(r){this.props.value!=r.value&&o.forEach(function(l){l.__e=!0,en(l)})},this.sub=function(r){o.add(r);var l=r.componentWillUnmount;r.componentWillUnmount=function(){o&&o.delete(r),l&&l.call(r)}}),t.children}return n.__c="__cC"+Cn++,n.__=e,n.Provider=n.__l=(n.Consumer=function(t,o){return t.children(o)}).contextType=n,n}A=z.slice,p={__e:function(e,n,t,o){for(var i,r,l;n=n.__;)if((i=n.__c)&&!i.__)try{if((r=i.constructor)&&r.getDerivedStateFromError!=null&&(i.setState(r.getDerivedStateFromError(e)),l=i.__d),i.componentDidCatch!=null&&(i.componentDidCatch(e,o||{}),l=i.__d),l)return i.__E=i}catch(_){e=_}throw e}},bn=0,_e=function(e){return e!=null&&e.constructor===void 0},R.prototype.setState=function(e,n){var t;t=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=C({},this.state),typeof e=="function"&&(e=e(C({},t),this.props)),e&&C(t,e),e!=null&&this.__v&&(n&&this._sb.push(n),en(this))},R.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),en(this))},R.prototype.render=S,N=[],wn=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,Pn=function(e,n){return e.__v.__b-n.__v.__b},q.__r=0,Y=Math.random().toString(8),V="__d"+Y,T="__a"+Y,xn=/(PointerCapture)$|Capture$/i,tn=0,Z=kn(!1),nn=kn(!0),Cn=0;/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var L,y,cn,Fn,G=0,Bn=[],b=p,{__b:An,__r:Un,diffed:Ln,__c:Wn,unmount:jn,__:In}=b;function fn(e,n){b.__h&&b.__h(y,e,G||n),G=0;var t=y.__H||(y.__H={__:[],__h:[]});return e>=t.__.length&&t.__.push({}),t.__[e]}function $n(e){return G=1,me(qn,e)}function me(e,n,t){var o=fn(L++,2);if(o.t=e,!o.__c&&(o.__=[t?t(n):qn(void 0,n),function(_){var c=o.__N?o.__N[0]:o.__[0],u=o.t(c,_);c!==u&&(o.__N=[u,o.__[1]],o.__c.setState({}))}],o.__c=y,!y.__f)){var i=function(_,c,u){if(!o.__c.__H)return!0;var f=!1,h=o.__c.props!==_;if(o.__c.__H.__.some(function(a){if(a.__N){f=!0;var v=a.__[0];a.__=a.__N,a.__N=void 0,v!==a.__[0]&&(h=!0)}}),r){var s=r.call(this,_,c,u);return f?s||h:s}return!f||h};y.__f=!0;var r=y.shouldComponentUpdate,l=y.componentWillUpdate;y.componentWillUpdate=function(_,c,u){if(this.__e){var f=r;r=void 0,i(_,c,u),r=f}l&&l.call(this,_,c,u)},y.shouldComponentUpdate=i}return o.__N||o.__}function pn(e,n){var t=fn(L++,3);!b.__s&&zn(t.__H,n)&&(t.__=e,t.u=n,y.__H.__h.push(t))}function W(e){return G=5,dn(function(){return{current:e}},[])}function dn(e,n){var t=fn(L++,7);return zn(t.__H,n)&&(t.__=e(),t.__H=n,t.__h=e),t.__}function ve(){for(var e;e=Bn.shift();){var n=e.__H;if(e.__P&&n)try{n.__h.some(J),n.__h.some(an),n.__h=[]}catch(t){n.__h=[],b.__e(t,e.__v)}}}b.__b=function(e){y=null,An&&An(e)},b.__=function(e,n){e&&n.__k&&n.__k.__m&&(e.__m=n.__k.__m),In&&In(e,n)},b.__r=function(e){Un&&Un(e),L=0;var n=(y=e.__c).__H;n&&(cn===y?(n.__h=[],y.__h=[],n.__.some(function(t){t.__N&&(t.__=t.__N),t.u=t.__N=void 0})):(n.__h.some(J),n.__h.some(an),n.__h=[],L=0)),cn=y},b.diffed=function(e){Ln&&Ln(e);var n=e.__c;n&&n.__H&&(n.__H.__h.length&&(Bn.push(n)!==1&&Fn===b.requestAnimationFrame||((Fn=b.requestAnimationFrame)||ye)(ve)),n.__H.__.some(function(t){t.u&&(t.__H=t.u,t.u=void 0)})),cn=y=null},b.__c=function(e,n){n.some(function(t){try{t.__h.some(J),t.__h=t.__h.filter(function(o){return!o.__||an(o)})}catch(o){n.some(function(i){i.__h&&(i.__h=[])}),n=[],b.__e(o,t.__v)}}),Wn&&Wn(e,n)},b.unmount=function(e){jn&&jn(e);var n,t=e.__c;t&&t.__H&&(t.__H.__.some(function(o){try{J(o)}catch(i){n=i}}),t.__H=void 0,n&&b.__e(n,t.__v))};var Vn=typeof requestAnimationFrame=="function";function ye(e){var n,t=function(){clearTimeout(o),Vn&&cancelAnimationFrame(n),setTimeout(e)},o=setTimeout(t,35);Vn&&(n=requestAnimationFrame(t))}function J(e){var n=y,t=e.__c;typeof t=="function"&&(e.__c=void 0,t()),y=n}function an(e){var n=y;e.__c=e.__(),y=n}function zn(e,n){return!e||e.length!==n.length||n.some(function(t,o){return t!==e[o]})}function qn(e,n){return typeof n=="function"?n(e):n}var K=Tn(void 0),Gn=()=>({name:"",sets:new Map}),Jn=new Map;function Kn(e){let n=Jn.get(e)??{name:e,sets:new Map};return Jn.set(e,n),n}var hn=(e,n)=>typeof e==="object"&&e!==null&&("type"in e)&&e.type===n;function ge(e,n){let t=rn(e),o=n?[w("a",{class:"back",href:"#"},n)]:[],i=0,r=t[0];if(hn(r,"h1")){o.push(r),i=1;for(let l=t[i];hn(l,"p");l=t[++i])o.push(l.props.class?l:Hn(l,{class:i===1?"lede":"meta"}))}return w(S,null,o.length>0&&w("div",{class:"view-head"},o),t.slice(i))}function Qn({render:e,record:n,back:t}){let[o]=$n(Gn),i=n===void 0?null:e({record:n});return w(K.Provider,{value:o},ge(hn(i,S)?i.props.children:i,t))}var ke=p.vnode;p.vnode=(e)=>{if(typeof e.type==="string"){let n=e.props;for(let t of Object.keys(n))if(t.startsWith("data-")&&n[t]===!0)n[t]=""}ke?.(e)};function be(e,n,t){for(let[o,i,r]of n??[]){let l=o.at(-1),_=o.slice(0,-1).reduce((c,u)=>c[u],e);if(l!==void 0)_[l]=t[i]?.[r]}return e}function we(e,n){let t=n.parentNode;if(!t)throw Error("island marker without a parent");let o=()=>{let r=[];for(let l=e.nextSibling;l&&l!==n;l=l.nextSibling)r.push(l);return r},i=(r)=>r;return{nodeType:1,parentNode:t,get firstChild(){return o()[0]??null},get childNodes(){return o()},contains:(r)=>o().some((l)=>r!==null&&l.contains(i(r))),insertBefore:(r,l)=>t.insertBefore(i(r),l?i(l):n),appendChild:(r)=>t.insertBefore(i(r),n),removeChild:(r)=>t.removeChild(i(r))}}function Pe(){let e=new Map,n=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),t=[];for(let o=n.nextNode();o;o=n.nextNode()){if(!(o instanceof Comment))continue;let i=/^(island|slot):(\d+)$/.exec(o.data);if(i)t.push({kind:i[1]==="slot"?"slot":"island",n:Number(i[2]),start:o});else if(o.data==="/island"||o.data==="/slot"){let r=t.pop();if(r)e.set(r.n,{...e.get(r.n),[r.kind]:[r.start,o]})}}return e}class Xn extends R{shouldComponentUpdate(){return!1}componentDidMount(){this.base.after(...this.props.nodes)}componentWillUnmount(){for(let e of this.props.nodes)e.remove()}render(){return""}}function xe([e,n]){let t=[];for(let o=e.nextSibling;o&&o!==n;o=o.nextSibling)t.push(o);e.replaceWith(document.createTextNode(""));for(let o of[...t,n])o.remove();return w(Xn,{nodes:t})}function Ce(e,n,t){let o=()=>Views.on(e,(i,r)=>un(w(Qn,{key:r,render:n,record:t.records[r],back:t.back}),i));if(document.readyState==="loading")addEventListener("DOMContentLoaded",o,{once:!0});else o()}function Yn(e){let n=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),t=Pe();for(let[o,{m:i,e:r,p:l,r:_,s:c,v:u}]of n.entries()){let f=be(l,_,e),h=e[i]?.[r],{island:s,slot:a}=t.get(o)??{};if(typeof h==="function"&&u!==void 0){Ce(u,h,f);continue}if(typeof h!=="function"||!s)throw Error(`island ${o} (${r}) is missing from the page`);let v=a?{...f,children:xe(a)}:f,k=w(h,v);_n(c===void 0?k:w(K.Provider,{value:Kn(c)},k),we(...s))}}var Q;function Zn(e){return{dangerouslySetInnerHTML:{__html:Q?e(Q):""}}}var ne=(e,n,t,o=!1)=>({classes:e.split(/\s+/).filter(Boolean),id:n,height:t,grows:o}),ee=(e,n)=>Q?Q.plotMarkLines(e,n):1;/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var Se=0;function te(e,n,t,o,i,r){n||(n={});var l,_,c=n;if("ref"in c)for(_ in c={},n)_=="ref"?l=n[_]:c[_]=n[_];var u={type:e,props:c,key:t,ref:l,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--Se,__i:-1,__u:0,__source:i,__self:r};if(typeof e=="function"&&(l=e.defaultProps))for(_ in l)c[_]===void 0&&(c[_]=l[_]);return p.vnode&&p.vnode(u),u}var Ne=3.5,Me=34,Oe=2.75,De=1.375,Re=1.125,Ee=1.3125,oe=(e)=>String(e).replace(/\D/g,"").replace(/^0+/,"");function He({stack:e,series:n=[],marks:t=[],x:o}){if(o?.labels!==void 0)return!o.labels;let i=(l)=>l.type==="bar"&&(l.label===!0||typeof l.label==="object"&&!Array.isArray(l.label)),r=(l)=>[l.x??[]].flat().every((_)=>oe(l.label??"").includes(oe(_)));return!e&&n.every(i)&&t.every(r)}function Te(e){let{horizontal:n,categories:t,series:o=[],x:i,y:r,legend:l}=e,_=l!==!1&&o.filter((u)=>u.name).length>1;if(!(n&&t?.length)||_)return;let c=Oe+(i?.name?De:0)+(r?.name?Re:0)-(He(e)?Ee:0);return`${Math.min(t.length*Ne+c,Me)}rem`}var Fe=(e,n)=>`calc(${e} + var(--plot-mark-lines, ${n}) * (var(--size-label) + 4px))`;function re(e,n,t,o){let i=n?`chart plot ${n}`:"chart plot",r=o||i.split(/\s+/).includes("tall")?void 0:Te(e),l=o??r;return{classes:i,sized:l,bars:r,place:ne(i,t,l,Boolean(r))}}var Ae=(e,n)=>({...e,...n,x:{...e.x,...n.x},y:{...e.y,...n.y}});function Ue({option:e,label:n,class:t,id:o,height:i,pick:r}){let l=W(null),_=W(r);_.current=r;let c=W(null),u=W(null),f=dn(()=>(u.current=u.current?Ae(u.current,e):e,u.current),[e]);pn(()=>{if(c.current)c.current.set(e);else if(l.current){let m=_.current&&{choose:(d)=>_.current?.choose(d),strip:_.current.strip?.current??null};c.current=window.Plot.make(l.current,e,m||void 0)}},[e]),pn(()=>()=>{c.current?.dispose(),c.current=null},[]);let{classes:h,place:s,sized:a,bars:v}=re(f,t,o,i),k=v&&f.marks?.some((m)=>m.x!==void 0&&!m.between&&m.label),g=a&&{blockSize:k?Fe(a,ee(e,s)):a};return te("div",{ref:l,class:h,id:o,style:g||void 0,role:"img","aria-label":n,...Zn((m)=>m.plot(e,s))})}Yn([mn]);})();
+<script>(()=>{var ie=Object.defineProperty;var le=(e)=>e;function se(e,n){this[e]=le.bind(null,n)}var ue=(e,n)=>{for(var t in n)ie(e,t,{get:n[t],enumerable:!0,configurable:!0,set:se.bind(n,t)})};var mn={};ue(mn,{Plot:()=>Ue,plotPlace:()=>re});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var F,p,bn,_e,S,yn,Pn,wn,Y,V,T,xn,tn,Z,nn,Cn,B={},z=[],ce=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,L=Array.isArray;function C(e,n){for(var t in n)e[t]=n[t];return e}function on(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function P(e,n,t){var o,i,r,l={};for(r in n)r=="key"?o=n[r]:r=="ref"?i=n[r]:l[r]=n[r];if(arguments.length>2&&(l.children=arguments.length>3?F.call(arguments,2):t),typeof e=="function"&&e.defaultProps!=null)for(r in e.defaultProps)l[r]===void 0&&(l[r]=e.defaultProps[r]);return A(e,l,o,i,null)}function A(e,n,t,o,i){var r={type:e,props:n,key:t,ref:o,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:i==null?++bn:i,__i:-1,__u:0};return i==null&&p.vnode!=null&&p.vnode(r),r}function N(e){return e.children}function E(e,n){this.props=e,this.context=n}function O(e,n){if(n==null)return e.__?O(e.__,e.__i+1):null;for(var t;n<e.__k.length;n++)if((t=e.__k[n])!=null&&t.__e!=null)return t.__e;return typeof e.type=="function"?O(e):null}function ae(e){if(e.__P&&e.__d){var n=e.__v,t=n.__e,o=[],i=[],r=C({},n);r.__v=n.__v+1,p.vnode&&p.vnode(r),ln(e.__P,r,n,e.__n,e.__P.namespaceURI,32&n.__u?[t]:null,o,t==null?O(n):t,!!(32&n.__u),i),r.__v=n.__v,r.__.__k[r.__i]=r,Dn(o,r,i),n.__e=n.__=null,r.__e!=t&&Nn(r)}}function Nn(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(n){if(n!=null&&n.__e!=null)return e.__e=e.__c.base=n.__e}),Nn(e)}function en(e){(!e.__d&&(e.__d=!0)&&S.push(e)&&!q.__r++||yn!=p.debounceRendering)&&((yn=p.debounceRendering)||Pn)(q)}function q(){try{for(var e,n=1;S.length;)S.length>n&&S.sort(wn),e=S.shift(),n=S.length,ae(e)}finally{S.length=q.__r=0}}function Sn(e,n,t,o,i,r,l,_,a,u,f){var d,s,c,v,k,g,m=o&&o.__k||z,h=n.length;for(a=fe(t,n,m,a,h),d=0;d<h;d++)(c=t.__k[d])!=null&&(s=c.__i!=-1&&m[c.__i]||B,c.__i=d,g=ln(e,c,s,i,r,l,_,a,u,f),v=c.__e,c.ref&&s.ref!=c.ref&&(s.ref&&sn(s.ref,null,c),f.push(c.ref,c.__c||v,c)),k==null&&v!=null&&(k=v),4&c.__u?(a=Mn(c,a,e),s.__e&&(s.__e=null)):typeof c.type=="function"&&g!==void 0?a=g:v&&(a=v.nextSibling),c.__u&=-7);return t.__e=k,a}function fe(e,n,t,o,i){var r,l,_,a,u,f=t.length,d=f,s=0;for(e.__k=Array(i),r=0;r<i;r++)(l=n[r])!=null&&typeof l!="boolean"&&typeof l!="function"?(typeof l=="string"||typeof l=="number"||typeof l=="bigint"||l.constructor==String?l=e.__k[r]=A(null,l,null,null,null):L(l)?l=e.__k[r]=A(N,{children:l},null,null,null):l.constructor===void 0&&l.__b>0?l=e.__k[r]=A(l.type,l.props,l.key,l.ref?l.ref:null,l.__v):e.__k[r]=l,a=r+s,l.__=e,l.__b=e.__b+1,_=null,(u=l.__i=pe(l,t,a,d))!=-1&&(d--,(_=t[u])&&(_.__u|=2)),_==null||_.__v==null?(u==-1&&(i>f?s--:i<f&&s++),typeof l.type!="function"&&(l.__u|=4)):u!=a&&(u==a-1?s--:u==a+1?s++:(u>a?s--:s++,l.__u|=4))):e.__k[r]=null;if(d)for(r=0;r<f;r++)(_=t[r])!=null&&(2&_.__u)==0&&(_.__e==o&&(o=O(_)),Rn(_,_));return o}function Mn(e,n,t){var o,i;if(typeof e.type=="function"){for(o=e.__k,i=0;o&&i<o.length;i++)o[i]&&(o[i].__=e,n=Mn(o[i],n,t));return n}e.__e!=n&&(n&&e.type&&!n.parentNode&&(n=O(e)),n=t.insertBefore(e.__e,n||null));do n=n&&n.nextSibling;while(n!=null&&n.nodeType==8);return n}function rn(e,n){return n=n||[],e==null||typeof e=="boolean"||(L(e)?e.some(function(t){rn(t,n)}):n.push(e)),n}function pe(e,n,t,o){var i,r,l,{key:_,type:a}=e,u=n[t],f=u!=null&&(2&u.__u)==0;if(u===null&&_==null||f&&_==u.key&&a==u.type)return t;if(o>(f?1:0)){for(i=t-1,r=t+1;i>=0||r<n.length;)if((u=n[l=i>=0?i--:r++])!=null&&(2&u.__u)==0&&_==u.key&&a==u.type)return l}return-1}function gn(e,n,t){n[0]=="-"?e.setProperty(n,t==null?"":t):e[n]=t==null?"":typeof t!="number"||ce.test(n)?t:t+"px"}function j(e,n,t,o,i){var r,l;n:if(n=="style")if(typeof t=="string")e.style.cssText=t;else{if(typeof o=="string"&&(e.style.cssText=o=""),o)for(n in o)t&&n in t||gn(e.style,n,"");if(t)for(n in t)o&&t[n]==o[n]||gn(e.style,n,t[n])}else if(n[0]=="o"&&n[1]=="n")r=n!=(n=n.replace(xn,"$1")),l=n.toLowerCase(),n=l in e||n=="onFocusOut"||n=="onFocusIn"?l.slice(2):n.slice(2),e.l||(e.l={}),e.l[n+r]=t,t?o?t[T]=o[T]:(t[T]=tn,e.addEventListener(n,r?nn:Z,r)):e.removeEventListener(n,r?nn:Z,r);else{if(i=="http://www.w3.org/2000/svg")n=n.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(n!="width"&&n!="height"&&n!="href"&&n!="list"&&n!="form"&&n!="tabIndex"&&n!="download"&&n!="rowSpan"&&n!="colSpan"&&n!="role"&&n!="popover"&&n in e)try{e[n]=t==null?"":t;break n}catch(_){}typeof t=="function"||(t==null||t===!1&&n[4]!="-"?e.removeAttribute(n):e.setAttribute(n,n=="popover"&&t==1?"":t))}}function kn(e){return function(n){if(this.l){var t=this.l[n.type+e];if(n[V]==null)n[V]=tn++;else if(n[V]<t[T])return;return t(p.event?p.event(n):n)}}}function ln(e,n,t,o,i,r,l,_,a,u){var f,d,s,c,v,k,g,m,h,w,R,M,H,vn,I,X,x=n.type;if(n.constructor!==void 0)return null;128&t.__u&&(a=!!(32&t.__u),r=[_=n.__e=t.__e]),(f=p.__b)&&f(n);n:if(typeof x=="function"){d=l.length;try{if(h=n.props,w=x.prototype&&x.prototype.render,R=(f=x.contextType)&&o[f.__c],M=f?R?R.props.value:f.__:o,t.__c?m=(s=n.__c=t.__c).__=s.__E:(w?n.__c=s=new x(h,M):(n.__c=s=new E(h,M),s.constructor=x,s.render=he),R&&R.sub(s),s.state||(s.state={}),s.__n=o,c=s.__d=!0,s.__h=[],s._sb=[]),w&&s.__s==null&&(s.__s=s.state),w&&x.getDerivedStateFromProps!=null&&(s.__s==s.state&&(s.__s=C({},s.__s)),C(s.__s,x.getDerivedStateFromProps(h,s.__s))),v=s.props,k=s.state,s.__v=n,c)w&&x.getDerivedStateFromProps==null&&s.componentWillMount!=null&&s.componentWillMount(),w&&s.componentDidMount!=null&&s.__h.push(s.componentDidMount);else{if(w&&x.getDerivedStateFromProps==null&&h!==v&&s.componentWillReceiveProps!=null&&s.componentWillReceiveProps(h,M),n.__v==t.__v||!s.__e&&s.shouldComponentUpdate!=null&&s.shouldComponentUpdate(h,s.__s,M)===!1){n.__v!=t.__v&&(s.props=h,s.state=s.__s,s.__d=!1),n.__e=t.__e,n.__k=t.__k,n.__k.some(function(D){D&&(D.__=n)}),z.push.apply(s.__h,s._sb),s._sb=[],s.__h.length&&l.push(s),_=O(t);break n}s.componentWillUpdate!=null&&s.componentWillUpdate(h,s.__s,M),w&&s.componentDidUpdate!=null&&s.__h.push(function(){s.componentDidUpdate(v,k,g)})}if(s.context=M,s.props=h,s.__P=e,s.__e=!1,H=p.__r,vn=0,w)s.state=s.__s,s.__d=!1,H&&H(n),f=s.render(s.props,s.state,s.context),z.push.apply(s.__h,s._sb),s._sb=[];else do s.__d=!1,H&&H(n),f=s.render(s.props,s.state,s.context),s.state=s.__s;while(s.__d&&++vn<25);s.state=s.__s,s.getChildContext!=null&&(o=C(C({},o),s.getChildContext())),w&&!c&&s.getSnapshotBeforeUpdate!=null&&(g=s.getSnapshotBeforeUpdate(v,k)),I=f!=null&&f.type===N&&f.key==null?En(f.props.children):f,_=Sn(e,L(I)?I:[I],n,t,o,i,r,l,_,a,u),s.base=n.__e,n.__u&=-161,s.__h.length&&l.push(s),m&&(s.__E=s.__=null)}catch(D){if(l.length=d,n.__v=null,a||r!=null){if(D.then){for(n.__u|=a?160:128;_&&_.nodeType==8&&_.nextSibling;)_=_.nextSibling;r!=null&&(r[r.indexOf(_)]=null),n.__e=_}else if(r!=null)for(X=r.length;X--;)on(r[X])}else n.__e=t.__e;n.__k==null&&(n.__k=t.__k||[]),D.then||On(n),p.__e(D,n,t)}}else r==null&&n.__v==t.__v?(n.__k=t.__k,n.__e=t.__e):_=n.__e=de(t.__e,n,t,o,i,r,l,a,u);return(f=p.diffed)&&f(n),128&n.__u?void 0:_}function On(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(On))}function Dn(e,n,t){for(var o=0;o<t.length;o++)sn(t[o],t[++o],t[++o]);p.__c&&p.__c(n,e),e.some(function(i){try{e=i.__h,i.__h=[],e.some(function(r){r.call(i)})}catch(r){p.__e(r,i.__v)}})}function En(e){return typeof e!="object"||e==null||e.__b>0?e:L(e)?e.map(En):e.constructor!==void 0?null:C({},e)}function de(e,n,t,o,i,r,l,_,a){var u,f,d,s,c,v,k,g=t.props||B,{props:m,type:h}=n;if(h=="svg"?i="http://www.w3.org/2000/svg":h=="math"?i="http://www.w3.org/1998/Math/MathML":i||(i="http://www.w3.org/1999/xhtml"),r!=null){for(u=0;u<r.length;u++)if((c=r[u])&&"setAttribute"in c==!!h&&(h?c.localName==h:c.nodeType==3)){e=c,r[u]=null;break}}if(e==null){if(h==null)return document.createTextNode(m);e=document.createElementNS(i,h,m.is&&m),_&&(p.__m&&p.__m(n,r),_=!1),r=null}if(h==null)g===m||_&&e.data==m||(e.data=m);else{if(r=h=="textarea"&&m.defaultValue!=null?null:r&&F.call(e.childNodes),!_&&r!=null)for(g={},u=0;u<e.attributes.length;u++)g[(c=e.attributes[u]).name]=c.value;for(u in g)c=g[u],u=="dangerouslySetInnerHTML"?d=c:u=="children"||(u in m)||u=="value"&&("defaultValue"in m)||u=="checked"&&("defaultChecked"in m)||j(e,u,null,c,i);for(u in m)c=m[u],u=="children"?s=c:u=="dangerouslySetInnerHTML"?f=c:u=="value"?v=c:u=="checked"?k=c:_&&typeof c!="function"||g[u]===c||j(e,u,c,g[u],i);if(f)_||d&&(f.__html==d.__html||f.__html==e.innerHTML)||(e.innerHTML=f.__html),n.__k=[];else if(d&&(e.innerHTML=""),Sn(n.type=="template"?e.content:e,L(s)?s:[s],n,t,o,h=="foreignObject"?"http://www.w3.org/1999/xhtml":i,r,l,r?r[0]:t.__k&&O(t,0),_,a),r!=null)for(u=r.length;u--;)on(r[u]);_&&h!="textarea"||(u="value",h=="progress"&&v==null?e.removeAttribute("value"):v!=null&&(v!==e[u]||h=="progress"&&!v||h=="option"&&v!=g[u])&&j(e,u,v,g[u],i),u="checked",k!=null&&k!=e[u]&&j(e,u,k,g[u],i))}return e}function sn(e,n,t){try{if(typeof e=="function"){var o=typeof e.__u=="function";o&&e.__u(),o&&n==null||(e.__u=e(n))}else e.current=n}catch(i){p.__e(i,t)}}function Rn(e,n,t){var o,i;if(p.unmount&&p.unmount(e),(o=e.ref)&&(o.current&&o.current!=e.__e||sn(o,null,n)),(o=e.__c)!=null){if(o.componentWillUnmount)try{o.componentWillUnmount()}catch(r){p.__e(r,n)}o.base=o.__P=o.__n=null}if(o=e.__k)for(i=0;i<o.length;i++)o[i]&&Rn(o[i],n,t||typeof e.type!="function");t||on(e.__e),e.__c=e.__=e.__e=void 0}function he(e,n,t){return this.constructor(e,t)}function un(e,n,t){var o,i,r,l;n==document&&(n=document.documentElement),p.__&&p.__(e,n),i=(o=typeof t=="function")?null:t&&t.__k||n.__k,r=[],l=[],ln(n,e=(!o&&t||n).__k=P(N,null,[e]),i||B,B,n.namespaceURI,!o&&t?[t]:i?null:n.firstChild?F.call(n.childNodes):null,r,!o&&t?t:i?i.__e:n.firstChild,o,l),Dn(r,e,l),e.props.children=null}function _n(e,n){un(e,n,_n)}function Hn(e,n,t){var o,i,r,l,_=C({},e.props);for(r in e.type&&e.type.defaultProps&&(l=e.type.defaultProps),n)r=="key"?o=n[r]:r=="ref"?i=n[r]:_[r]=n[r]===void 0&&l!=null?l[r]:n[r];return arguments.length>2&&(_.children=arguments.length>3?F.call(arguments,2):t),A(e.type,_,o||e.key,i||e.ref,null)}function Tn(e){function n(t){var o,i;return this.getChildContext||(o=new Set,(i={})[n.__c]=this,this.getChildContext=function(){return i},this.componentWillUnmount=function(){o=null},this.shouldComponentUpdate=function(r){this.props.value!=r.value&&o.forEach(function(l){l.__e=!0,en(l)})},this.sub=function(r){o.add(r);var l=r.componentWillUnmount;r.componentWillUnmount=function(){o&&o.delete(r),l&&l.call(r)}}),t.children}return n.__c="__cC"+Cn++,n.__=e,n.Provider=n.__l=(n.Consumer=function(t,o){return t.children(o)}).contextType=n,n}F=z.slice,p={__e:function(e,n,t,o){for(var i,r,l;n=n.__;)if((i=n.__c)&&!i.__)try{if((r=i.constructor)&&r.getDerivedStateFromError!=null&&(i.setState(r.getDerivedStateFromError(e)),l=i.__d),i.componentDidCatch!=null&&(i.componentDidCatch(e,o||{}),l=i.__d),l)return i.__E=i}catch(_){e=_}throw e}},bn=0,_e=function(e){return e!=null&&e.constructor===void 0},E.prototype.setState=function(e,n){var t;t=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=C({},this.state),typeof e=="function"&&(e=e(C({},t),this.props)),e&&C(t,e),e!=null&&this.__v&&(n&&this._sb.push(n),en(this))},E.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),en(this))},E.prototype.render=N,S=[],Pn=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,wn=function(e,n){return e.__v.__b-n.__v.__b},q.__r=0,Y=Math.random().toString(8),V="__d"+Y,T="__a"+Y,xn=/(PointerCapture)$|Capture$/i,tn=0,Z=kn(!1),nn=kn(!0),Cn=0;/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var U,y,cn,An,G=0,Bn=[],b=p,{__b:Fn,__r:Ln,diffed:Un,__c:Wn,unmount:In,__:jn}=b;function fn(e,n){b.__h&&b.__h(y,e,G||n),G=0;var t=y.__H||(y.__H={__:[],__h:[]});return e>=t.__.length&&t.__.push({}),t.__[e]}function $n(e){return G=1,me(qn,e)}function me(e,n,t){var o=fn(U++,2);if(o.t=e,!o.__c&&(o.__=[t?t(n):qn(void 0,n),function(_){var a=o.__N?o.__N[0]:o.__[0],u=o.t(a,_);a!==u&&(o.__N=[u,o.__[1]],o.__c.setState({}))}],o.__c=y,!y.__f)){var i=function(_,a,u){if(!o.__c.__H)return!0;var f=!1,d=o.__c.props!==_;if(o.__c.__H.__.some(function(c){if(c.__N){f=!0;var v=c.__[0];c.__=c.__N,c.__N=void 0,v!==c.__[0]&&(d=!0)}}),r){var s=r.call(this,_,a,u);return f?s||d:s}return!f||d};y.__f=!0;var r=y.shouldComponentUpdate,l=y.componentWillUpdate;y.componentWillUpdate=function(_,a,u){if(this.__e){var f=r;r=void 0,i(_,a,u),r=f}l&&l.call(this,_,a,u)},y.shouldComponentUpdate=i}return o.__N||o.__}function pn(e,n){var t=fn(U++,3);!b.__s&&zn(t.__H,n)&&(t.__=e,t.u=n,y.__H.__h.push(t))}function W(e){return G=5,dn(function(){return{current:e}},[])}function dn(e,n){var t=fn(U++,7);return zn(t.__H,n)&&(t.__=e(),t.__H=n,t.__h=e),t.__}function ve(){for(var e;e=Bn.shift();){var n=e.__H;if(e.__P&&n)try{n.__h.some(J),n.__h.some(an),n.__h=[]}catch(t){n.__h=[],b.__e(t,e.__v)}}}b.__b=function(e){y=null,Fn&&Fn(e)},b.__=function(e,n){e&&n.__k&&n.__k.__m&&(e.__m=n.__k.__m),jn&&jn(e,n)},b.__r=function(e){Ln&&Ln(e),U=0;var n=(y=e.__c).__H;n&&(cn===y?(n.__h=[],y.__h=[],n.__.some(function(t){t.__N&&(t.__=t.__N),t.u=t.__N=void 0})):(n.__h.some(J),n.__h.some(an),n.__h=[],U=0)),cn=y},b.diffed=function(e){Un&&Un(e);var n=e.__c;n&&n.__H&&(n.__H.__h.length&&(Bn.push(n)!==1&&An===b.requestAnimationFrame||((An=b.requestAnimationFrame)||ye)(ve)),n.__H.__.some(function(t){t.u&&(t.__H=t.u,t.u=void 0)})),cn=y=null},b.__c=function(e,n){n.some(function(t){try{t.__h.some(J),t.__h=t.__h.filter(function(o){return!o.__||an(o)})}catch(o){n.some(function(i){i.__h&&(i.__h=[])}),n=[],b.__e(o,t.__v)}}),Wn&&Wn(e,n)},b.unmount=function(e){In&&In(e);var n,t=e.__c;t&&t.__H&&(t.__H.__.some(function(o){try{J(o)}catch(i){n=i}}),t.__H=void 0,n&&b.__e(n,t.__v))};var Vn=typeof requestAnimationFrame=="function";function ye(e){var n,t=function(){clearTimeout(o),Vn&&cancelAnimationFrame(n),setTimeout(e)},o=setTimeout(t,35);Vn&&(n=requestAnimationFrame(t))}function J(e){var n=y,t=e.__c;typeof t=="function"&&(e.__c=void 0,t()),y=n}function an(e){var n=y;e.__c=e.__(),y=n}function zn(e,n){return!e||e.length!==n.length||n.some(function(t,o){return t!==e[o]})}function qn(e,n){return typeof n=="function"?n(e):n}var K=Tn(void 0),Gn=()=>({name:"",sets:new Map}),Jn=new Map;function Kn(e){let n=Jn.get(e)??{name:e,sets:new Map};return Jn.set(e,n),n}var hn=(e,n)=>typeof e==="object"&&e!==null&&("type"in e)&&e.type===n;function ge(e,n){let t=rn(e),o=n?[P("a",{class:"back",href:"#"},n)]:[],i=0,r=t[0];if(hn(r,"h1")){o.push(r),i=1;for(let l=t[i];hn(l,"p");l=t[++i])o.push(l.props.class?l:Hn(l,{class:i===1?"lede":"meta"}))}return P(N,null,o.length>0&&P("div",{class:"view-head"},o),t.slice(i))}function Qn({render:e,record:n,back:t}){let[o]=$n(Gn),i=n===void 0?null:e({record:n});return P(K.Provider,{value:o},ge(hn(i,N)?i.props.children:i,t))}var ke=p.vnode;p.vnode=(e)=>{if(typeof e.type==="string"){let n=e.props;for(let t of Object.keys(n))if(t.startsWith("data-")&&n[t]===!0)n[t]=""}ke?.(e)};function be(e,n,t){for(let[o,i,r]of n??[]){let l=o.at(-1),_=o.slice(0,-1).reduce((a,u)=>a[u],e);if(l!==void 0)_[l]=t[i]?.[r]}return e}function Pe(e,n){let t=n.parentNode;if(!t)throw Error("island marker without a parent");let o=()=>{let r=[];for(let l=e.nextSibling;l&&l!==n;l=l.nextSibling)r.push(l);return r},i=(r)=>r;return{nodeType:1,parentNode:t,get firstChild(){return o()[0]??null},get childNodes(){return o()},contains:(r)=>o().some((l)=>r!==null&&l.contains(i(r))),insertBefore:(r,l)=>t.insertBefore(i(r),l?i(l):n),appendChild:(r)=>t.insertBefore(i(r),n),removeChild:(r)=>t.removeChild(i(r))}}function we(){let e=new Map,n=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),t=[];for(let o=n.nextNode();o;o=n.nextNode()){if(!(o instanceof Comment))continue;let i=/^(island|slot):(\d+)$/.exec(o.data);if(i)t.push({kind:i[1]==="slot"?"slot":"island",n:Number(i[2]),start:o});else if(o.data==="/island"||o.data==="/slot"){let r=t.pop();if(r)e.set(r.n,{...e.get(r.n),[r.kind]:[r.start,o]})}}return e}class Xn extends E{shouldComponentUpdate(){return!1}componentDidMount(){this.base.after(...this.props.nodes)}componentWillUnmount(){for(let e of this.props.nodes)e.remove()}render(){return""}}function xe([e,n]){let t=[];for(let o=e.nextSibling;o&&o!==n;o=o.nextSibling)t.push(o);e.replaceWith(document.createTextNode(""));for(let o of[...t,n])o.remove();return P(Xn,{nodes:t})}function Ce(e,n,t){let o=()=>Views.on(e,(i,r)=>un(P(Qn,{key:r,render:n,record:t.records[r],back:t.back}),i));if(document.readyState==="loading")addEventListener("DOMContentLoaded",o,{once:!0});else o()}function Yn(e){let n=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),t=we();for(let[o,{m:i,e:r,p:l,r:_,s:a,v:u}]of n.entries()){let f=be(l,_,e),d=e[i]?.[r],{island:s,slot:c}=t.get(o)??{};if(typeof d==="function"&&u!==void 0){Ce(u,d,f);continue}if(typeof d!=="function"||!s)throw Error(`island ${o} (${r}) is missing from the page`);let v=c?{...f,children:xe(c)}:f,k=P(d,v);_n(a===void 0?k:P(K.Provider,{value:Kn(a)},k),Pe(...s))}}var Q;function Zn(e){return{dangerouslySetInnerHTML:{__html:Q?e(Q):""}}}var ne=(e,n,t,o=!1)=>({classes:e.split(/\s+/).filter(Boolean),id:n,height:t,grows:o}),ee=(e,n)=>Q?Q.plotMarkLines(e,n):1;/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var Ne=0;function te(e,n,t,o,i,r){n||(n={});var l,_,a=n;if("ref"in a)for(_ in a={},n)_=="ref"?l=n[_]:a[_]=n[_];var u={type:e,props:a,key:t,ref:l,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--Ne,__i:-1,__u:0,__source:i,__self:r};if(typeof e=="function"&&(l=e.defaultProps))for(_ in l)a[_]===void 0&&(a[_]=l[_]);return p.vnode&&p.vnode(u),u}var Se=3.5,Me=34,Oe=2.75,De=1.375,Ee=1.125,Re=1.3125,He=1.0625,oe=(e)=>String(e).replace(/\D/g,"").replace(/^0+/,"");function Te({stack:e,series:n=[],marks:t=[],x:o}){if(o?.labels!==void 0)return!o.labels;let i=(l)=>l.type==="bar"&&(l.label===!0||typeof l.label==="object"&&!Array.isArray(l.label)),r=(l)=>[l.x??[]].flat().every((_)=>oe(l.label??"").includes(oe(_)));return!e&&n.every(i)&&t.every(r)}function Ae(e){let{horizontal:n,categories:t,series:o=[],x:i,y:r,legend:l,pick:_,stack:a}=e,u=o.filter((c)=>c.name).length,f=typeof _==="number"&&t?.[_]!==void 0;if(!(n&&t?.length)||l===!0&&u>1||f)return;let d=l===void 0&&!a&&u>1?u*He:0,s=Oe+(i?.name?De:0)+(r?.name?Ee:0)-(Te(e)?Re:0);return`${Math.min(t.length*Se+s,Me)+d}rem`}var Fe=(e,n)=>`calc(${e} + var(--plot-mark-lines, ${n}) * (var(--size-label) + 4px))`;function re(e,n,t,o){let i=n?`chart plot ${n}`:"chart plot",r=o||i.split(/\s+/).includes("tall")?void 0:Ae(e),l=o??r;return{classes:i,sized:l,bars:r,place:ne(i,t,l,Boolean(r))}}var Le=(e,n)=>({...e,...n,x:{...e.x,...n.x},y:{...e.y,...n.y}});function Ue({option:e,label:n,class:t,id:o,height:i,pick:r}){let l=W(null),_=W(r);_.current=r;let a=W(null),u=W(null),f=dn(()=>(u.current=u.current?Le(u.current,e):e,u.current),[e]);pn(()=>{if(a.current)a.current.set(e);else if(l.current){let m=_.current&&{choose:(h)=>_.current?.choose(h),strip:_.current.strip?.current??null};a.current=window.Plot.make(l.current,e,m||void 0)}},[e]),pn(()=>()=>{a.current?.dispose(),a.current=null},[]);let{classes:d,place:s,sized:c,bars:v}=re(f,t,o,i),k=v&&f.marks?.some((m)=>m.x!==void 0&&!m.between&&m.label),g=c&&{blockSize:k?Fe(c,ee(e,s)):c};return te("div",{ref:l,class:d,id:o,style:g||void 0,role:"img","aria-label":n,...Zn((m)=>m.plot(e,s))})}Yn([mn]);})();
 </script>
 <script>/* link: linked highlighting: elements sharing a data-ref light up together on hover, focus and click; Mermaid node ids are refs. pack includes it for data-ref.
    Elements that share a data-ref light up together (class is-lit) while one of them is hovered, focused or clicked:

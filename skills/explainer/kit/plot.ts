@@ -14,9 +14,7 @@
          fill   a bar's state, from the accent: "accent" solid, "hollow" (tint in an accent outline), "hatch" (grey lines at 45
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour).
                 On a line: the area down to 0, true in a tint of its colour or a state
-         name   named lines carry their names at their ends, kept off the marks' lines and labels (a name spread off its
-                end tied to it by a leader), when the names are short (about 15 characters) and stack down the plot; else names go
-                in the legend, whose entries switch the series on and off, a series without a name toggling with the named one before it
+         name   names go on the marks, never in a legend (legend: true asks for one): as the Plot component says (kit Plot)
          label  prints exact values on the marks: true, a format as below, one text per point or bar (["A", "", "C"]),
                 or a function: line and stem (x, y, i) => text, bar (v, i) => text. A line prints its last point's after its
                 name at its end ("10 kΩ: 847 ns"), wrapped, or left out past two lines. A bar plot whose every bar prints its
@@ -35,8 +33,7 @@
               in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; format writes the tick labels and values, in the page's lang:
               { digits: 1, unit: "kHz" }, { percent: true }, { currency: "EUR", compact: true }, or a function (v) => text.
-       legend true shows the legend, false hides it and the names at the ends; unset, it shows for two or more named series
-              unless all are lines
+       legend true shows the legend in place of the names on the marks, false hides both
        pick   a bar plot's picked category, by index: its bars framed in ink, and the legend is its key, the category's name over
               each named series' value there, as tall as the tallest category's key
      picker  { choose(i), strip }: a click on a bar plot's category i calls choose(i); strip, an element under the plot (a row of
@@ -386,8 +383,8 @@
 	function make(el: HTMLElement, initial: PlotOption, picker?: PlotPicker) {
 		made.get(el)?.(); // a view handler that runs again replaces the plot instead of stacking observers
 		let option = initial;
-		// What is drawn: the option, or a step of the tween towards it.
-		let shown = initial;
+		// What is drawn: the option, or a step of the tween towards it, which started from `from`.
+		let [shown, from]: [PlotOption, PlotOption | undefined] = [initial, undefined];
 		let drawn = false;
 		const timer = { id: 0 };
 		// The plot is drawn at the element's size.
@@ -419,7 +416,7 @@
 			// calc(... var(--plot-mark-lines) ...)), so its rows keep their size; any other plot takes them from its own height.
 			el.style.setProperty(
 				"--plot-mark-lines",
-				String(markLines(shown, W, area.clientHeight, textWidth)),
+				String(markLines(shown, W, area.clientHeight, textWidth, option, from)),
 			);
 			const H = area.clientHeight;
 			svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -430,6 +427,7 @@
 				textWidth,
 				switchedOn(shown.series ?? [], switches.off),
 				option,
+				from,
 			);
 			drawn = true;
 			if (picker?.strip) {
@@ -445,6 +443,7 @@
 
 		const show = (step: PlotOption) => {
 			shown = step;
+			from = step === option ? undefined : from; // a move's room is kept until it arrives
 			draw();
 		};
 		/** Ends a move and a preview where the pick is: for print, and when the reader turns motion off. */
@@ -463,6 +462,7 @@
 			if (still.matches || !drawn || !acted) {
 				show(option);
 			} else {
+				from = shown;
 				tween(shown, option, show, timer);
 			}
 		}

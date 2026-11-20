@@ -181,13 +181,19 @@ window.PlotPlace = ({ wrap }) => {
 	const finite = (p: number | PlotPoint): p is PlotPoint =>
 		typeof p !== "number" && Number.isFinite(p[0]) && Number.isFinite(p[1]);
 
-	/** The lines labels keep clear of: every line series switched on, the markers' lines and the arrows' shafts. */
+	/** The lines labels keep clear of: every line and stem (with its dot) switched on, the markers' lines and the arrows' shafts. */
 	function obstacles(option: PlotOption, { X, Y, L, R, T, B, shown }: PlotAreaFrame) {
-		const series = (option.series ?? []).flatMap((s, i) =>
-			shown[i] && (s.type ?? "line") === "line"
-				? [s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)])]
-				: [],
-		);
+		const base = Math.min(Math.max(Y(0), T), B);
+		const series = (option.series ?? []).flatMap((s, i) => {
+			const points = shown[i] ? s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)]) : [];
+			const type = s.type ?? "line";
+			return type === "line"
+				? [points]
+				: type === "stem"
+					? // A stem runs on through its dot (r 4.5), which a label keeps off as well.
+						points.map(([x, y]) => [[x, base] as const, [x, y < base ? y - 5 : y + 5] as const])
+					: [];
+		});
 		const markers = (option.marks ?? []).flatMap((m): PlotPx[][] => [
 			...(typeof m.x === "number" ? [[[X(m.x), T] as const, [X(m.x), B] as const]] : []),
 			...(typeof m.y === "number" ? [[[L, Y(m.y)] as const, [R, Y(m.y)] as const]] : []),

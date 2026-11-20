@@ -272,6 +272,7 @@ test("a bar series' legend swatch shows its state when every bar shares it, and 
 	const legend = (fill: string[]) =>
 		plotDraw.legendMarkup({
 			categories: ["a", "b"],
+			legend: true,
 			series: [
 				{ name: "Estimated", type: "bar", data: [1, 2], fill },
 				{ name: "Measured", type: "bar", data: [2, 1] },
@@ -368,11 +369,12 @@ test("a series switched off in the legend shows again when the legend gives way 
 <script src="kit:plot.js"></script>
 <script>
 const plot = Plot.make(document.getElementById("p"), {
+	legend: true,
 	series: [{ name: "A", type: "stem", data: [[0, 1]] }, { name: "B", data: [[0, 0], [1, 2]] }],
 });
 var contract = document.fonts.ready.then(() => {
 	document.querySelector("#p .plot-legend button").click();
-	plot.set({ series: [{ name: "A", data: [[0, 1], [1, 1]] }, { name: "B", data: [[0, 0], [1, 2]] }] });
+	plot.set({ legend: undefined, series: [{ name: "A", data: [[0, 1], [1, 1]] }, { name: "B", data: [[0, 0], [1, 2]] }] });
 	const lines = document.querySelectorAll("#p svg .line").length;
 	const legend = document.querySelectorAll("#p .plot-legend button").length;
 	return lines === 2 && legend === 0 ? [] : [lines + " lines drawn and " + legend + " legend buttons, not 2 and 0"];

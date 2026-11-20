@@ -1,5 +1,5 @@
 /* plot legend: a plot's legend buttons, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses
-   it. PlotLegend({ swatch, esc, colour, dash, fill, pick }) gives markup(option, atEnds), the buttons or a picked category's
+   it. PlotLegend({ swatch, esc, colour, dash, fill, pick }) gives markup(option, onMarks), the buttons or a picked category's
    key, and switchedOn(series, off), which series the legend leaves on. */
 window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
 	/**
@@ -14,11 +14,11 @@ window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
 	}
 
 	/**
-	 * Legend buttons for the named series, or "" when the legend is off, has fewer than two entries or the names sit at the line
-	 * ends (`atEnds`). A bar plot with a picked category has its key instead, from one named series: the category's name, then
-	 * each series' value there after its name.
+	 * Legend buttons for the named series, or "" when the legend is off, has fewer than two entries or the names sit on the marks
+	 * (`onMarks`). A bar plot with a picked category has its key instead, from one named series: the category's name, then each
+	 * series' value there after its name.
 	 */
-	function markup(option: PlotOption, atEnds: boolean) {
+	function markup(option: PlotOption, onMarks: boolean) {
 		const named = (option.series ?? []).map((s, i) => [s, i] as const).filter(([s]) => s.name);
 		const at = pick.pickedAt(option);
 		if (option.legend === false || named.length < (at === undefined ? 2 : 1)) {
@@ -31,7 +31,7 @@ window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
 				named.map(([s, i]) => [s, i, swatchOf(s, i)] as const),
 			);
 		}
-		if (atEnds) {
+		if (onMarks) {
 			return "";
 		}
 		return named

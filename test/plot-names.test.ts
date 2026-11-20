@@ -41,13 +41,17 @@ test("several named lines with no legend set carry their names at their ends, sp
 	for (const t of ends) {
 		expect(t.x + width(t.text)).toBeLessThanOrEqual(600);
 	}
-	// The author's legend wins, and so does one that is off; stems or bars keep the legend.
+	// The author's legend wins, and so does one that is off; a stem among the lines carries its name too (#190, owner 2026-11-20).
 	expect(plotDraw.legendMarkup({ ...option, legend: true })).not.toBe("");
 	expect(texts(draw({ ...option, legend: true } as never), "end")).toEqual([]);
 	expect(texts(draw({ ...option, legend: false } as never), "end")).toEqual([]);
 	const mixed = { series: [...option.series, { name: "Peaks", type: "stem", data: [[0.5, 1]] }] };
-	expect(plotDraw.legendMarkup(mixed)).not.toBe("");
-	expect(texts(draw(mixed), "end")).toEqual([]);
+	expect(plotDraw.legendMarkup(mixed)).toBe("");
+	expect(
+		texts(draw(mixed), "end")
+			.map((t) => t.text)
+			.sort(),
+	).toEqual(["Also rising", "Flat", "Peaks", "Rising"]);
 });
 
 /** Each line's points as drawn, in series order. */

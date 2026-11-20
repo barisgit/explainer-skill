@@ -136,14 +136,14 @@
 .plot .value {
 	font-weight: 600;
 }
-/* A value inside its bar, or a note inside a solid area: near white on a dark colour, near black on a light one, read from the
-   colour (--c) where the browser reads colours so. */
-.plot :is(.value, .note).inside {
+/* A value or a series' name inside its bar, or a note inside a solid area: near white on a dark colour, near black on a light
+   one, read from the colour (--c) where the browser reads colours so. */
+.plot :is(.value, .note, .end).inside {
 	fill: var(--surface);
 	stroke: none;
 }
 @supports (color: oklch(from red l c h)) {
-	.plot :is(.value, .note).inside {
+	.plot :is(.value, .note, .end).inside {
 		fill: oklch(from var(--c) calc(0.2 + 0.785 * clamp(0, (0.58 - l) * 1000, 1)) 0 0);
 	}
 }

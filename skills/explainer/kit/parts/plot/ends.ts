@@ -1,8 +1,9 @@
-/* plot ends: what a plot's lines say on themselves, their names (a plot never falls back to a legend for them) and a labelled
-   line's last value, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({
-   svgLine, svgText, size, place, format, colour, dash, wrap }) gives fit(option), whether the lines carry their names;
-   named(...), the lines with text at their ends; room(...), the room a name takes right of the plot; and marks(...), the texts
-   drawn, placed with the plot's other labels, and the series whose name found no clear place. */
+/* plot ends: what a plot's lines and stems say on themselves, their names (a plot never falls back to a legend for them) and a
+   labelled line's last value, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({
+   svgLine, svgText, size, place, format, colour, dash, wrap }) gives onMarks(option), whether the series carry their names on
+   their marks (bars too, which bar-names.ts names); named(...), the lines and stems with text at their ends; room(...), the room
+   a name takes right of the plot; and marks(...), the texts drawn, placed with the plot's other labels, and the series whose
+   name found no clear place. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }) => {
 	const END_GAP = 6; // px between a line's end and its name
@@ -42,29 +43,35 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 	const nameAndValue = (option: PlotOption, s: PlotSeries) =>
 		[s.name, lastValue(option, s)].filter(Boolean).join(": ");
 
+	const pointed = (s: PlotSeries) => (s.type ?? "line") !== "bar";
 	/**
-	 * Whether the series carry their names on their lines rather than in a legend: one or more have a name, every named one is a
-	 * line, and the author left the legend unset (legend: true keeps the legend, false shows neither). Neither the names' length
-	 * nor the plot's size decides it: names that crowd are placed apart on the plot, never moved into a legend.
+	 * Whether the series carry their names on their marks rather than in a legend: the author left the legend unset (legend: true
+	 * keeps the legend, false shows neither) and picked no category (whose key stays), and one or more lines or stems have a
+	 * name, or two or more bar series (one is the plot's own subject, which its label says). Neither the names' length nor the
+	 * plot's size decides it: names that crowd are placed apart on the plot, never moved into a legend.
 	 */
-	function fits(option: PlotOption) {
+	function onMarks(option: PlotOption) {
 		const named = (option.series ?? []).filter((s) => s.name);
-		return (
-			option.legend === undefined &&
-			!option.categories &&
-			named.length > 0 &&
-			named.every((s) => (s.type ?? "line") === "line")
-		);
+		const { pick: at, categories } = option;
+		// A pick that names a category shows its key (pick.ts pickedAt): any other is no pick.
+		if (option.legend !== undefined || (typeof at === "number" && categories?.[at] !== undefined)) {
+			return false;
+		}
+		return option.categories ? named.length > 1 : named.length > 0 && named.every(pointed);
 	}
 
 	/**
-	 * The lines that carry text on them, with their index: name and value when the lines carry their names, else the value alone.
+	 * The lines and stems that carry text at their ends, with their index: name and value when the series carry their names, else
+	 * a line's value alone.
 	 * The value is left out when the text would take more than two lines of MOST; a name is never left out.
 	 */
 	function named(option: PlotOption, textWidth: (s: unknown) => number) {
-		const names = fits(option);
+		const names = onMarks(option);
 		const fitted = (text: string) => (text && wrapped(text, textWidth).length ? text : "");
 		return (option.series ?? []).flatMap((s, i) => {
+			if (!pointed(s)) {
+				return [];
+			}
 			const own = names && s.name;
 			const kept = own ? fitted(nameAndValue(option, s)) || own : fitted(lastValue(option, s));
 			return kept ? [{ s, i, name: kept }] : [];
@@ -131,14 +138,17 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 		return least;
 	}
 
-	/** Whether a spot's middle lies nearer its own line than any other line (`others`), so the name reads as that line's. */
+	/**
+	 * Whether a spot's middle lies nearer its own series' marks (`mine`: a line, or each stem) than any other series' (`others`),
+	 * so the name reads as that series'.
+	 */
 	function owns(
 		{ box }: PlotSpot,
-		line: readonly PlotPx[],
+		mine: readonly (readonly PlotPx[])[],
 		others: readonly (readonly PlotPx[])[],
 	) {
 		const middle: PlotPx = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
-		const own = distance(middle, line);
+		const own = Math.min(...mine.map((shape) => distance(middle, shape)));
 		return others.every((other) => distance(middle, other) > own);
 	}
 
@@ -180,13 +190,14 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 	 * spread apart, in order from the top, and kept above the plot's bottom edge; a name moved off its line's end sits a leader
 	 * further right, the leader drawn from the end in its line's colour and dash. A name there that would cross a line or touch a
 	 * label placed before it (`placed`, which it joins) takes the spot beside its end, else along its line, that crosses and
-	 * touches least instead, as a note does, where it is nearer its own line than any other switched on (`lines`). `crowded` names the series no spot was clear for, each drawn on its least bad one.
+	 * touches least instead, as a note does, where it is nearer its own marks than any other series' switched on (`shapes`, by
+	 * series). `crowded` names the series no spot was clear for, each drawn on its least bad one.
 	 */
 	function spread(
 		list: readonly PlotEndName[],
 		f: PlotNoteFrame,
 		placed: PlotBox[],
-		lines: readonly (readonly PlotPx[])[],
+		shapes: readonly (readonly (readonly PlotPx[])[])[],
 	) {
 		const ends = list
 			.map((end) => {
@@ -210,7 +221,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 		const markup = ends
 			.map(({ end, y }) => {
 				const first = classic(end, y, f);
-				const others = lines.filter((line) => line !== end.line);
+				const others = shapes.filter((mine) => mine !== end.shapes).flat();
 				const { chosen, clear } = choose(end, first, others, f, placed);
 				if (!clear) {
 					crowded.push(end.series);
@@ -234,7 +245,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 		f: PlotNoteFrame,
 		placed: readonly PlotBox[],
 	): { chosen: PlotSpot; clear: boolean } {
-		const mine = (spots: PlotSpot[]) => spots.filter((spot) => owns(spot, end.line, others));
+		const mine = (spots: PlotSpot[]) => spots.filter((spot) => owns(spot, end.shapes, others));
 		// A name past the frame's right edge, or stacked up past the drawing's top, is not drawn there.
 		const inside = first.box.x1 <= f.R && first.box.y0 >= 0;
 		const stages = [
@@ -258,8 +269,24 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 	}
 
 	/**
-	 * The text on the lines switched on (`shown`), X and Y mapping data to px, placed by spread. The texts are those of `texts`,
-	 * where a move is going, so they never change while the lines do.
+	 * A series' marks in px: a line's points as one shape, or each stem from the baseline at `base` to its dot; and the path a
+	 * name is tried beside along it (the line, or the stems' dots in turn).
+	 */
+	function shapesOf(
+		s: PlotSeries,
+		X: (v: number) => number,
+		Y: (v: number) => number,
+		base: number,
+	) {
+		const path = s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)]);
+		const shapes =
+			s.type === "stem" ? path.map(([x, y]) => [[x, base] as const, [x, y] as const]) : [path];
+		return { path, shapes: path.length ? shapes : [] };
+	}
+
+	/**
+	 * The text on the lines and stems switched on (`shown`), X and Y mapping data to px, placed by spread. The texts are those of
+	 * `texts`, where a move is going, so they never change while the marks do.
 	 */
 	function marks(
 		option: PlotOption,
@@ -267,23 +294,23 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 		f: PlotNoteFrame,
 		placed: PlotBox[],
 	) {
-		// Every line switched on, named or not: a name reads as its own line's only when nearer it than any of them.
-		const lines = (option.series ?? []).map((s, i) =>
-			shown[i] && (s.type ?? "line") === "line"
-				? s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)])
-				: [],
+		// Stems stand on 0, or on the plot's edge where 0 is off it.
+		const base = Math.min(Math.max(Y(0), f.T), f.B);
+		// Every line and stem switched on, named or not: a name reads as its own series' only when nearer it than any of them.
+		const drawn = (option.series ?? []).map((s, i) =>
+			shown[i] && pointed(s) ? shapesOf(s, X, Y, base) : { path: [], shapes: [] },
 		);
-		const visible = lines.filter((line) => line.length);
 		const list = named(texts, textWidth).flatMap(({ s: said, i, name }): PlotEndName[] => {
 			const s = option.series?.[i] ?? said;
-			const line = lines[i] ?? s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)]);
-			const last = line.at(-1);
+			const { path, shapes } = drawn[i] ?? shapesOf(s, X, Y, base);
+			const last = path.at(-1);
 			return last && shown[i]
 				? [
 						{
 							name,
 							series: s.name ?? name,
-							line,
+							line: path,
+							shapes,
 							at: { x: last[0], y: last[1] },
 							colour: colour(s, i),
 							dash: dash(s, i),
@@ -291,8 +318,9 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 					]
 				: [];
 		});
-		return spread(list, f, placed, visible);
+		const shapes = drawn.map((d) => d.shapes).filter((list) => list.length);
+		return spread(list, f, placed, shapes);
 	}
 
-	return { fit: fits, named, room, marks };
+	return { onMarks, named, room, marks };
 };

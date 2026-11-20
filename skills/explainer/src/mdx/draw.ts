@@ -474,7 +474,7 @@ const crowdedWarnings = ({ notes, names, arrows }: PlotCrowded, width: number) =
 	),
 	...names.map(
 		(name) =>
-			`Plot line "${name}" finds no clear place for its name at ${width} px wide and has it drawn over a line, a label or the plot's edge: shorten the name, or give the plot more height.`,
+			`Plot series "${name}" finds no clear place for its name at ${width} px wide and has it drawn over a mark, a label or the plot's edge: shorten the name, or give the plot more room.`,
 	),
 ];
 
@@ -597,7 +597,15 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	return {
 		validateChart,
 		warnings: () => [...warnings],
-		plotMarkLines: (option: Option, place: Place) => markRows(option, place)[0] ?? 0,
+		// Counting rows runs the page's formatters, as drawing does: one that needs the browser leaves the plot to plot.js, which
+		// sets the rows it draws.
+		plotMarkLines: (option: Option, place: Place) => {
+			try {
+				return markRows(option, place)[0] ?? 0;
+			} catch {
+				return 0;
+			}
+		},
 		chart(option: Option, place: Place) {
 			// Validate before the optional drawing: an absent SVG must not hide an unsupported series.
 			validateChart(option);
