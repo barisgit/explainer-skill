@@ -11,9 +11,10 @@
                 degrees), for the whole series or one per bar: ["accent", "hollow", "hatch"] ("" keeps the series' colour; the legend
                 shows a state every bar shares, else the series' colour). On a line: the area down to 0, true in a tint of its
                 colour or a state
-         name   named lines carry their names at their ends, kept off the marks' lines and labels, when the names are short
-                (about 15 characters) and stack down the plot; else names go in the legend, whose entries switch the series
-                on and off, a series without a name toggling with the named one before it
+         name   named lines carry their names on the plot, never in a legend: at their ends, stacked with leaders where ends
+                crowd, else beside their own line along it; pack warns about a name with no clear place (shorten it, or add
+                height). With stems or bars, names go in the legend, whose entries switch the series on and off, a series
+                without a name toggling with the named one before it
          label  prints exact values on the marks: true, a format as below, or one text per point or bar: ["½mA", "A", "½mA"];
                 a line prints its last point's after its name: "10 kΩ: 847 ns", wrapped, or left out past two lines. A bar plot
                 whose every bar prints its value (true or a format, side by side) leaves out its value axis, unless a marker on

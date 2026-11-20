@@ -1,6 +1,6 @@
 /* plot draw: what kit:plot.js draws, not referenced from pages: pack joins it in front of plot.js, and runs it itself to draw each
    plot into the page (src/mdx/draw.ts). PlotDraw({ lang, size }) gives render(option, W, H, textWidth, shown), the SVG content,
-   legendMarkup(option, textWidth, H), the legend's buttons (none when names sit at the line ends of an H px high area), and
+   legendMarkup(option), the legend's buttons (none when the lines carry their names), and
    switchedOn(series, off), which series the legend leaves on; numbers are written in lang(), text is set at size() px (the
    theme's --size-label), and textWidth measures a label at that size. Bars' and areas' states and markers are marks.ts's
    (PlotMarks), regions and notes areas.ts's (PlotAreas), bars and their value labels bars.ts's (PlotBars), the lines' ends
@@ -90,8 +90,8 @@ window.PlotDraw = ({ lang, size }) => {
 		area: marks.area,
 		place: placer,
 	});
-	/** The notes the last render found no clear place for. */
-	let crowded: string[] = [];
+	/** What the last render found no clear place for: notes by label, line names by series. */
+	let crowded: { notes: string[]; names: string[] } = { notes: [], names: [] };
 	const format = window.PlotFormat({ lang });
 	const { formatter, labeller } = format;
 	const pick = window.PlotPick({ esc, formatter, labeller });
@@ -137,14 +137,6 @@ window.PlotDraw = ({ lang, size }) => {
 	 */
 	const bottomAt = (H: number, xName: unknown, notes = false, labelled = true) =>
 		Math.floor(H - (labelled ? GAP + FONT + 8 : 4) - (xName ? 22 : 0) - (notes ? lineHeight() : 0));
-	/** A line or stem plot's bottom edge in a drawing H px high, its x labels left out when its x axis says so. */
-	const pointBottom = (option: PlotOption, H: number) =>
-		bottomAt(H, option.x?.name, false, option.x?.labels !== false);
-	/** Whether names sit at the line ends, and which lines carry text there, in a drawing H px high (PlotEnds). */
-	const namesAtEnds = (option: PlotOption, textWidth: TextWidth, H: number) =>
-		ends.fit(option, textWidth, pointBottom(option, H));
-	const endNamed = (option: PlotOption, textWidth: TextWidth, H: number) =>
-		ends.named(option, textWidth, pointBottom(option, H));
 	/** A number's digits, without sign, point or leading zeros: what a label that writes it holds in some format. */
 	const digits = (v: unknown) => String(v).replace(/\D/g, "").replace(/^0+/, "");
 	/**
@@ -502,7 +494,7 @@ window.PlotDraw = ({ lang, size }) => {
 			? barAxes(option, option.categories, W, H)
 			: plotAxes(option, W, H);
 		const { xa, ya } = axes;
-		const named = endNamed(option, textWidth, H).map(({ s, name }) => ({
+		const named = ends.named(option, textWidth).map(({ s, name }) => ({
 			name,
 			x: s.data.filter(finite).at(-1)?.[0] ?? 0,
 		}));
@@ -524,7 +516,7 @@ window.PlotDraw = ({ lang, size }) => {
 		texts = option,
 	) {
 		const series = option.series ?? [];
-		crowded = [];
+		crowded = { notes: [], names: [] };
 		const laid = laidOut(option, W, H, textWidth, shown, texts);
 		if (!laid) {
 			return "";
@@ -548,13 +540,13 @@ window.PlotDraw = ({ lang, size }) => {
 			{ ...laid, ...axes },
 			goal?.noted.placed,
 		);
-		crowded = noted.crowded;
+		crowded = { notes: noted.crowded, names: named.crowded };
 		return (
 			drawAxes(points) +
 			noted.fills +
 			pointMarks(series, points) +
 			marked.lines +
-			named +
+			named.markup +
 			marked.labels +
 			noted.notes
 		);
@@ -601,16 +593,12 @@ window.PlotDraw = ({ lang, size }) => {
 			placer.cheapest(spots, labelFrame, placed);
 		const marked = marks.markers(option.marks ?? [], { ...markFrame(points), choose }, box.T - 6);
 		const placed = [...marked.boxes];
-		const bottom = pointBottom(option, points.H);
-		const named = ends.marks(option, points, bottom, { ...labelFrame, R: points.W - 2 }, placed);
+		const named = ends.marks(option, points, { ...labelFrame, R: points.W - 2 }, placed);
 		return { points, marked, named, noted: areas.draw(option, frame, placed, goal) };
 	}
 
-	/** Legend buttons for the named series, or "" when names sit at the line ends of a drawing H px high (see PlotLegend). */
-	function legendMarkup(option: PlotOption, textWidth: TextWidth, H: number) {
-		FONT = size();
-		return legend.markup(option, namesAtEnds(option, textWidth, H));
-	}
+	/** Legend buttons for the named series, or "" when the lines carry their names (see PlotLegend). */
+	const legendMarkup = (option: PlotOption) => legend.markup(option, ends.fit(option));
 
 	return {
 		render,

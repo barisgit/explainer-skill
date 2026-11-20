@@ -119,116 +119,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 			? { ...option, baseOption: { ...option.baseOption, animation: false } }
 			: { ...option, animation: false };
 
-	/** px: ECharts' gap between a line's end and its end label, and the room kept past the label. */
-	const END_DISTANCE = 8;
-	const END_MARGIN = 8;
-	/** px: a label's line with its halo. */
-	const endLine = () => size() + 2;
-	// What the kit cannot see the names' size or place through: a text style of the author's, zoom, and anything but one plain grid.
-	const ROOT_ONLY = [
-		"legend",
-		"baseOption",
-		"options",
-		"media",
-		"textStyle",
-		"dataZoom",
-		"dataset",
-	];
-	// A grid bound the kit leaves to the author keeps a legend from its room (see layout), so names could not give way to one.
-	const VERTICAL_BOUNDS = ["top", "bottom", "height"];
-	const SERIES_ONLY = [
-		"endLabel",
-		"labelLayout",
-		"coordinateSystem",
-		"xAxisIndex",
-		"yAxisIndex",
-		"encode",
-	];
-
-	/** Whether an axis may clip a line, which puts its end label where the line meets the edge: an author's min or max. */
-	const clips = (axis: Record<string, unknown>) => "min" in axis || "max" in axis;
-	/** Whether the axis runs left to right along the bottom, as end labels need: one axis, not reversed or clipping. */
-	const leftToRight = (axis: unknown) => isObject(axis) && !axis.inverse && !clips(axis);
-
-	/** Whether the option is one the kit puts names at the line ends of; see endNames. */
-	function namesFit(option: ChartOption, series: unknown[]) {
-		const { grid = {}, xAxis, yAxis } = option;
-		return (
-			isObject(grid) &&
-			series.filter((s) => isObject(s) && typeof s.name === "string" && s.name).length > 1 &&
-			series.every(
-				(s) =>
-					isObject(s) && !SERIES_ONLY.some((key) => key in s) && (!s.name || s.type === "line"),
-			) &&
-			(grid.right === undefined || typeof grid.right === "number") &&
-			!VERTICAL_BOUNDS.some((key) => key in grid) &&
-			leftToRight(xAxis) &&
-			isObject(yAxis) &&
-			!clips(yAxis) &&
-			yAxis.type !== "category" &&
-			yAxis.type !== "time"
-		);
-	}
-
-	/**
-	 * For an option whose named lines carry their names at their ends, the option so (`named`) and, for a size where two names
-	 * would end less than a line apart (crowded), the option with a legend in their place (`legend`); else undefined. It applies
-	 * when the option has no legend, its series are two or more named lines with no end label or label layout of their own, on
-	 * one grid with no top, bottom or height of the author's, a left-to-right x axis (not reversed) and a value or log y axis,
-	 * neither with a min or max that could clip a line, and nothing sets the names' text (a textStyle) or moves their ends
-	 * (dataZoom, a dataset, encode). The grid keeps room on its right for the longest name, measured by `width` at the label size.
-	 */
-	function endNames(
-		option: ChartOption,
-		width: (text: string) => number,
-	): { named: ChartOption; legend: ChartOption } | undefined {
-		const { series, grid = {} } = option;
-		if (
-			!(Array.isArray(series) && isObject(grid)) ||
-			ROOT_ONLY.some((key) => key in option) ||
-			!namesFit(option, series)
-		) {
-			return undefined;
-		}
-		const names = series.flatMap((s) => (isObject(s) && s.name ? [String(s.name)] : []));
-		const room = Math.max(...names.map(width)) + END_DISTANCE + END_MARGIN;
-		const end = { endLabel: { show: true, formatter: "{a}", valueAnimation: false } };
-		return {
-			named: {
-				...option,
-				grid: { ...grid, right: Math.max(Number(grid.right ?? 0), Math.ceil(room)) },
-				series: series.map((s) => (isObject(s) && s.name ? { ...s, ...end } : s)),
-			},
-			legend: { ...option, legend: {} },
-		};
-	}
-
-	/** The live model of a line series, as far as crowded reads it; ECharts declares no public type for it. */
-	interface EndSeries {
-		get(path: string[]): unknown;
-		getData(): { getLayout(key: "points"): ArrayLike<number> | undefined };
-	}
-	/**
-	 * Whether two of the chart's end labels sit less than a line apart, read from where ECharts anchors them: each line's last
-	 * point that is not empty. ECharts would shift such labels off their lines, so the legend names them instead.
-	 */
-	function crowded(chart: unknown) {
-		const ends: number[] = [];
-		(chart as { getModel(): { eachSeries(fn: (s: EndSeries) => void): void } })
-			.getModel()
-			.eachSeries((s) => {
-				const points = s.get(["endLabel", "show"]) ? s.getData().getLayout("points") : undefined;
-				for (let i = (points?.length ?? 0) - 2; points && i >= 0; i -= 2) {
-					const [x, y] = [points[i], points[i + 1]];
-					if (Number.isFinite(x) && Number.isFinite(y)) {
-						ends.push(y as number);
-						break;
-					}
-				}
-			});
-		ends.sort((a, b) => a - b);
-		return ends.some((y, i) => i > 0 && y - (ends[i - 1] as number) < endLine());
-	}
+	const ends = window.ChartsEnds({ isObject, size });
 
 	type TextMeasure = (text: string, font?: string) => { width: number };
 	/**
@@ -536,8 +427,9 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		measureText,
 		still,
 		settings,
-		endNames,
-		crowded,
+		endNames: ends.endNames,
+		unnamed: ends.unnamed,
+		spreadEnds: ends.spreadEnds,
 		defaults: window.ChartsDefaults.defaults,
 		styling: window.ChartsDefaults.styling,
 		markSides: window.ChartsDefaults.place,

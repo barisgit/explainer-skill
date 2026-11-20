@@ -20,7 +20,7 @@ declare var PlotLegend: (env: {
 	pick: ReturnType<typeof PlotPick>;
 }) => {
 	/**
-	 * The legend's buttons for the named series, or "" when it is off, has one entry or the names sit at the ends (atEnds); a bar
+	 * The legend's buttons for the named series, or "" when it is off, has one entry or the lines carry the names (atEnds); a bar
 	 * plot with a picked category has its key instead.
 	 */
 	markup(option: PlotOption, atEnds: boolean): string;
@@ -72,9 +72,14 @@ declare var PlotBarLabels: (env: PlotSvg & { size: () => number }) => {
 		room: PlotBarRoom,
 	): string;
 };
-/** A line's name at its end: the line's last point, colour and dash ("" for none), which a leader to a moved name takes. */
+/**
+ * A line's text at its end: the series' name (which pack names when it finds no clear place), the line in px, its last point,
+ * colour and dash ("" for none), which a leader to a moved name takes.
+ */
 interface PlotEndName {
 	name: string;
+	series: string;
+	line: readonly PlotPx[];
 	at: { x: number; y: number };
 	colour: string;
 	dash: string;
@@ -98,24 +103,25 @@ declare var PlotEnds: (
 		wrap: (text: string, width: number, textWidth: (s: unknown) => number) => string[];
 	},
 ) => {
-	/** Whether the names go at the line ends, above a plot whose bottom edge is `bottom` px down. */
-	fit(option: PlotOption, textWidth: (s: unknown) => number, bottom: number): boolean;
+	/** Whether the lines carry their names on the plot: never a legend in their place. */
+	fit(option: PlotOption): boolean;
 	/** The lines with text at their ends, with their index: name and value, or the value alone. */
 	named(
 		option: PlotOption,
 		textWidth: (s: unknown) => number,
-		bottom: number,
 	): { s: PlotSeries; i: number; name: string }[];
 	/** px a name takes right of the plot. */
 	room(name: string, textWidth: (s: unknown) => number): number;
-	/** The texts drawn, spread apart in the frame, clear of the boxes `placed`, which they join. */
+	/**
+	 * The texts drawn, spread apart in the frame, clear of the boxes `placed`, which they join, and the series whose name found
+	 * no clear place (crowded).
+	 */
 	marks(
 		option: PlotOption,
 		map: PlotEndMap,
-		bottom: number,
 		frame: PlotNoteFrame,
 		placed: PlotBox[],
-	): string;
+	): { markup: string; crowded: string[] };
 };
 /** Where a bar plot's picked category lies: the category axis's pick and band centres, the value axis's mapping, the bars' thickness. */
 interface PlotPickedBars {

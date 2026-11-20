@@ -339,15 +339,23 @@ declare var ChartsOption: (env: {
 	/** Where ECharts reads an option's root settings and components: its baseOption when it has one, else the option. */
 	settings(option: ChartOption): ChartOption;
 	/**
-	 * For an option whose named lines carry their names at their ends: the option so, and the option with a legend for a size
-	 * where the names crowd; else undefined. width measures a label at the label size.
+	 * For an option whose named lines carry their names at their ends: the option so (never with a legend in their place); else
+	 * undefined. width measures a label at the label size.
 	 */
-	endNames(
-		option: ChartOption,
-		width: (text: string) => number,
-	): { named: ChartOption; legend: ChartOption } | undefined;
-	/** Whether two of a drawn chart's end labels sit less than a line apart, on a live or SSR ECharts instance. */
-	crowded(chart: unknown): boolean;
+	endNames(option: ChartOption, width: (text: string) => number): ChartOption | undefined;
+	/**
+	 * Why the option's two or more named lines, with no legend and no end labels of the author's, cannot carry their names at
+	 * their ends ("its dataZoom", "a reversed x axis"), or undefined when they carry names.
+	 */
+	unnamed(option: ChartOption): string | undefined;
+	/**
+	 * Spread kit-generated end names about their ends inside the grid, a line apart where they fit. The patch changes only
+	 * those offsets (every resets prior offsets on resize); unclear lists names that cannot fit or move over half a line.
+	 */
+	spreadEnds(
+		chart: unknown,
+		every?: boolean,
+	): { patch: ChartOption | undefined; unclear: string[] };
 	/**
 	 * The option with the kit's defaults by series place: line dashes per palette slot, a line between stacked bars, marker
 	 * labels on top, left of the markers `sides` names by series index (as markSides read them from the chart drawn).
@@ -362,6 +370,11 @@ declare var ChartsOption: (env: {
 	/** Which vertical markers of a drawn chart stand past the middle of their axis, by series index; see defaults. */
 	markSides(chart: unknown): ReadonlyMap<number, ReadonlySet<number>>;
 };
+/** See ChartsOption's endNames, unnamed and spreadEnds (kit/parts/charts/ends.ts). */
+declare var ChartsEnds: (env: {
+	isObject: (value: unknown) => value is Record<string, unknown>;
+	size: () => number;
+}) => Pick<ReturnType<typeof ChartsOption>, "endNames" | "unnamed" | "spreadEnds">;
 /** See ChartsOption's defaults (kit/parts/charts/defaults.ts). */
 declare var ChartsDefaults: {
 	/** ECharts component matching, shared by responsive defaults and saved-option updates. */
@@ -393,10 +406,10 @@ declare var PlotDraw: (env: {
 		texts?: PlotOption,
 	): string;
 	/**
-	 * The legend's buttons, or "" when it shows none (names at the line ends of an H px high area with no legend take its place);
-	 * button i switches series i; textWidth measures a label in px.
+	 * The legend's buttons, or "" when it shows none (lines that carry their names on the plot never have one); button i switches
+	 * series i.
 	 */
-	legendMarkup(option: PlotOption, textWidth: (s: unknown) => number, H: number): string;
+	legendMarkup(option: PlotOption): string;
 	/** Each named series' value in category i, as the key writes it: "bought 403 kWh, sold 12 kWh". */
 	keyText(option: PlotOption, i: number): string;
 	/** Where a bar plot's categories lie along their axis at W x H (px), or undefined without categories or room. */
@@ -410,8 +423,11 @@ declare var PlotDraw: (env: {
 	switchedOn(series: PlotSeries[], off: Set<string | undefined>): boolean[];
 	/** How many lines the markers' labels take on top of the plot at W x H, which push it down (render lays them out the same). */
 	markLines(option: PlotOption, W: number, H: number, textWidth: (s: unknown) => number): number;
-	/** The notes the last render found no clear place for, each drawn on its least bad one. */
-	crowded(): string[];
+	/**
+	 * What the last render found no clear place for, each drawn on its least bad one: notes by their label, line names by their
+	 * series' name.
+	 */
+	crowded(): { notes: string[]; names: string[] };
 };
 
 /** A mark's value text from its value, its index in the series and, for a stem, its x. */

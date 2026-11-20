@@ -33,11 +33,9 @@ interface ChartsOption {
 	layout(chart: unknown): void;
 	measureText(base: typeof measureText): typeof measureText;
 	still(option: Option): Option;
-	endNames(
-		option: Option,
-		width: (text: string) => number,
-	): { named: Option; legend: Option } | undefined;
-	crowded(chart: unknown): boolean;
+	endNames(option: Option, width: (text: string) => number): Option | undefined;
+	unnamed(option: Option): string | undefined;
+	spreadEnds(chart: unknown): { patch: Option | undefined; unclear: string[] };
 	defaults(option: Option, sides?: ReadonlyMap<number, ReadonlySet<number>>): Option;
 	markSides(chart: unknown): ReadonlyMap<number, ReadonlySet<number>>;
 }
@@ -57,10 +55,10 @@ interface PlotDraw {
 		width: (s: unknown) => number,
 		shown: boolean[],
 	): string;
-	legendMarkup(option: Option, textWidth: (s: unknown) => number, H: number): string;
+	legendMarkup(option: Option): string;
 	switchedOn(series: unknown[], off: Set<string | undefined>): boolean[];
 	markLines(option: Option, W: number, H: number, textWidth: (s: unknown) => number): number;
-	crowded(): string[];
+	crowded(): { notes: string[]; names: string[] };
 }
 type PlotDrawPart = (env: { lang: () => string; size: () => number }) => PlotDraw;
 
@@ -272,8 +270,8 @@ function markerSides(option: Option, theme: Option, charts: ChartsOption) {
 }
 
 /**
- * One chart's SVG at a size, as ECharts draws it without animation, with the option it drew: `fallback` (resolved) in place of
- * `option` where its names at the line ends crowd, as kit/charts.ts draws a live chart.
+ * One chart's SVG at a size, as ECharts draws it without animation, its names at the line ends moved apart where they crowd as
+ * kit/charts.ts moves a live chart's, with the series whose name that leaves off its end (unclear).
  */
 function chartSvg(
 	option: Option,
@@ -281,17 +279,19 @@ function chartSvg(
 	width: number,
 	height: number,
 	charts: ChartsOption,
-	fallback?: Option,
-): { svg: string; legends: number[]; option: Option } | undefined {
+	spreads: boolean,
+): { svg: string; legends: number[]; unclear: string[] } | undefined {
 	const renderer = loadEcharts();
 	renderer.setPlatformAPI({ measureText: charts.measureText(measureText) });
 	const chart = renderer.init(null, theme, { renderer: "svg", ssr: true, width, height });
 	try {
 		charts.layout(chart);
 		quietly(() => chart.setOption(charts.still(option)));
-		const drawn = fallback && charts.crowded(chart) ? fallback : option;
-		if (drawn !== option) {
-			quietly(() => chart.setOption(charts.still(drawn), { notMerge: true }));
+		const { patch, unclear } = spreads
+			? charts.spreadEnds(chart)
+			: { patch: undefined, unclear: [] };
+		if (patch) {
+			quietly(() => chart.setOption(patch));
 		}
 		const legends = legendHeights(chart);
 		if (!legends) {
@@ -302,7 +302,7 @@ function chartSvg(
 		const known = [...svg.matchAll(/<text\b[^>]*>([^<]*)<\/text>/g)].every((match) =>
 			[...unescapeHtml(match[1] ?? "")].every((char) => geistAdvance(char, 400) !== undefined),
 		);
-		return known ? { svg, legends, option: drawn } : undefined;
+		return known ? { svg, legends, unclear } : undefined;
 	} finally {
 		// A live instance keeps an animation timer, which would keep pack from exiting.
 		chart.dispose();
@@ -403,13 +403,15 @@ function titled(option: Option): boolean {
 	);
 }
 
-/** What draws a chart's copies: its option and fallback resolved, the theme, and the stand-ins' paints. */
+/** What draws a chart's copies: its option resolved, the theme, the stand-ins' paints, and where its warnings go. */
 interface ChartHow {
 	option: Option;
 	theme: Option;
 	charts: ChartsOption;
-	fallback: Option | undefined;
 	paintOf: Parameters<typeof kitSvg>[2];
+	warn: (warning: string) => void;
+	/** Whether the kit put the names at the line ends, so it spreads those that crowd; an author's own end labels stay put. */
+	spreads: boolean;
 }
 
 /**
@@ -417,18 +419,23 @@ interface ChartHow {
  * copy is shown at.
  */
 function chartCopy(copy: Copy, height: number, how: ChartHow): string | undefined {
-	const { option, theme, charts, fallback, paintOf } = how;
-	const drawing = chartSvg(option, theme, copy.width, height, charts, fallback);
+	const { option, theme, charts, paintOf, warn, spreads } = how;
+	const drawing = chartSvg(option, theme, copy.width, height, charts, spreads);
 	if (!drawing) {
 		return undefined;
 	}
-	const widths = legendWidths(drawing.option, height, copy.shown, copy.fit === "");
+	for (const name of drawing.unclear) {
+		warn(
+			`Chart line "${name}" ends too near another line for its name to stay at its end at ${copy.width} px wide: give the chart more height, or end the lines further apart.`,
+		);
+	}
+	const widths = legendWidths(option, height, copy.shown, copy.fit === "");
 	// With no legend or media transitions, there is no width-sensitive legend geometry to certify.
 	const stable =
 		(drawing.legends.length === 0 && widths.length === 2) ||
 		widths.every((width) => {
 			const sample =
-				width === copy.width ? drawing : chartSvg(option, theme, width, height, charts, fallback);
+				width === copy.width ? drawing : chartSvg(option, theme, width, height, charts, spreads);
 			return (
 				sample !== undefined && JSON.stringify(sample.legends) === JSON.stringify(drawing.legends)
 			);
@@ -436,12 +443,38 @@ function chartCopy(copy: Copy, height: number, how: ChartHow): string | undefine
 	return stable ? kitSvg(drawing.svg, svgTag(copy, height), paintOf) : undefined;
 }
 
-/** What pack says about the notes a plot drawn `width` px wide found no clear place for. */
-const crowdedWarnings = (notes: string[], width: number) =>
-	notes.map(
+/** What pack says about the notes and line names a plot drawn `width` px wide found no clear place for. */
+const crowdedWarnings = ({ notes, names }: { notes: string[]; names: string[] }, width: number) => [
+	...notes.map(
 		(note) =>
 			`Plot note "${note}" finds no clear place at ${width} px wide and is drawn over a line, a label or the plot's edge: shorten it, or anchor it where the plot has room.`,
+	),
+	...names.map(
+		(name) =>
+			`Plot line "${name}" finds no clear place for its name at ${width} px wide and has it drawn over a line, a label or the plot's edge: shorten the name, or give the plot more height.`,
+	),
+];
+
+/** What pack says of a Chart's named lines that nothing would name, neither their ends nor a legend, drawn or not: why. */
+function unnamedLines(part: ChartsOptionPart, option: Option): string | undefined {
+	const why = part({
+		color: (c) => c,
+		lang: () => "en",
+		size: () => LABEL,
+		text: () => TEXT,
+	}).unnamed(option);
+	// The series of a baseOption are the chart's, as unnamed reads them.
+	const { baseOption } = option;
+	const based =
+		baseOption && typeof baseOption === "object" ? { ...baseOption, ...option } : option;
+	const series: unknown[] = Array.isArray(based.series) ? based.series : [];
+	const names = series.flatMap((s) =>
+		s && typeof s === "object" && "name" in s && s.name ? [`"${String(s.name)}"`] : [],
 	);
+	return why
+		? `Chart lines ${names.join(", ")} carry no names: ${why} keeps the kit from putting them at the line ends. Leave it out, or give the chart a legend.`
+		: undefined;
+}
 
 /** The drawer pack renders a page in `lang` with (kit/components/parts/drawn.ts's Drawer). */
 export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
@@ -466,7 +499,7 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		size: () => LABEL,
 	});
 	const width = (s: unknown) => textWidth(String(s), LABEL, 500);
-	/** What pack says about the figures it drew: the notes a plot found no clear place for, by the copy's width. */
+	/** What pack says about the figures it drew: the notes and names found no clear place for, by the copy's width. */
 	const warnings = new Set<string>();
 	/** The lines a plot's markers' labels take on top in each copy, laid out as plot.js lays them out at the copy's width. */
 	const markRows = (option: Option, place: Place) => {
@@ -476,6 +509,10 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		);
 	};
 	const drawChart = orNothing((option: Option, place: Place) => {
+		const unnamed = unnamedLines(chartsOption, option);
+		if (unnamed) {
+			warnings.add(unnamed);
+		}
 		const heights = heightsOf(place, titled(option));
 		const colours = chartColours(option, loadEcharts().ownColors);
 		if (!(heights && colours)) {
@@ -485,13 +522,12 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const { color, paintOf } = standIns(colours);
 		const charts = chartsOption({ color, lang: () => lang, size: () => LABEL, text: () => TEXT });
 		const theme = charts.theme({ under: color("var(--under)"), font: FONT, animation: false });
-		// Names at the line ends are measured as ECharts measures a label, at the label size. They crowd or not by a copy's height
-		// alone.
+		// Names at the line ends are measured as ECharts measures a label, at the label size.
 		const kept = charts.defaults(option, markerSides(option, theme, charts));
 		const ends = charts.endNames(kept, (text) => measureText(text, `${LABEL}px`).width);
-		const resolved = charts.resolveOption(ends ? ends.named : kept);
-		const fallback = ends && charts.resolveOption(ends.legend);
-		const how = { option: resolved, theme, charts, fallback, paintOf };
+		const resolved = charts.resolveOption(ends ?? kept);
+		const warn = (warning: string) => warnings.add(warning);
+		const how = { option: resolved, theme, charts, paintOf, warn, spreads: Boolean(ends) };
 		const copies = COPIES.map((copy, i) => chartCopy(copy, heights[i] as number, how));
 		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 	});
@@ -503,23 +539,14 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		if (!heights) {
 			return "";
 		}
-		// Names at the line ends take the legend's place where they fit the area's height with no legend, so the copies can
-		// differ; one legend is drawn for all of them, so a plot whose copies differ is left to plot.js.
-		const legends = new Set(
-			heights.map((height) => plots.legendMarkup(option, width, height - LEGEND.top)),
-		);
-		const [markup = ""] = legends;
-		if (legends.size > 1) {
-			return "";
-		}
 		// Every series starts switched on; plot.js marks its buttons so as it draws.
-		const legend = markup.replace(/<button /g, '<button aria-pressed="true" ');
+		const legend = plots.legendMarkup(option).replace(/<button /g, '<button aria-pressed="true" ');
 		const items = legendItems(legend);
 		// A picked category's key keeps the room of the tallest category's key, as plot.js keeps it, so a pick or a preview never
 		// moves the plot: the drawing holds only where that room is the picked key's own.
 		const { pick, categories } = option;
 		const keys = (pick === undefined || !Array.isArray(categories) ? [] : categories).map((_, at) =>
-			legendItems(plots.legendMarkup({ ...option, pick: at }, width, 0)),
+			legendItems(plots.legendMarkup({ ...option, pick: at })),
 		);
 		const shown = plots.switchedOn(option.series ?? [], new Set());
 		const copies = COPIES.map((copy, i) => {

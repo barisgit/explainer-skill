@@ -180,11 +180,7 @@ test("one named line carries its name at its end, and a label alone puts its las
 	expect(boxes(named, "end").map((b) => b.text)).toEqual(["Change nothing"]);
 	const valued = render({ series: [{ data, label: { unit: "min" } }] }, 600, 300);
 	expect(boxes(valued, "end").map((b) => b.text)).toEqual(["4\u00a0min"]);
-	const legend = plotDraw.legendMarkup(
-		{ legend: false, series: [{ name: "Wait", data }] },
-		geist,
-		300,
-	);
+	const legend = plotDraw.legendMarkup({ legend: false, series: [{ name: "Wait", data }] });
 	expect(legend).toBe("");
 	expect(
 		boxes(render({ legend: false, series: [{ name: "Wait", data }] }, 600, 300), "end"),

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Line names are never moved into a legend any more. A `Plot`'s named lines keep their names on the plot at every width: stacked at the ends with leaders, else beside their own line. A `Chart`'s crowded end names move apart about their ends. `pack` warns, naming the line and width, where a name finds no clear place: shorten it, add height, or end the lines further apart. A legend you set, the picked key and the legend of stems and bars stay.
+- A `Chart`'s named lines keep their names at their ends beside your own grid bounds (`grid: { bottom: 24 }`) and an axis `min` or `max` that holds every point; these used to leave the lines with no names at all. Where the kit still cannot name them (zoom, a dataset, an explicit grid `width`, a reversed or second axis, a `textStyle`), `pack` says so: leave that out, or set a legend.
+
 ## v0.15.0
 
 - The guide and `kit theme` now invite choosing the accent from the subject or a brand, as `light-dark()` pairs on `:root` (with `--accent-ink` when white text does not read on it), and real hues in `--c1`..`--c6` where categories are colours by nature (energy sources, teams, parties). One accent with one meaning per page still holds.

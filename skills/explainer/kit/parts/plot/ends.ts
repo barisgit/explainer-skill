@@ -1,13 +1,15 @@
-/* plot ends: what a plot's lines say at their ends, their names in place of a legend and a labelled line's last value, not
-   referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({ svgLine, svgText, size,
-   place, format, colour, dash, wrap }) gives fit(...), whether the names go at the ends; named(...), the lines with text there;
-   room(...), the room a name takes right of the plot; and marks(...), the texts drawn, placed with the plot's other labels. */
+/* plot ends: what a plot's lines say on themselves, their names (a plot never falls back to a legend for them) and a labelled
+   line's last value, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({
+   svgLine, svgText, size, place, format, colour, dash, wrap }) gives fit(option), whether the lines carry their names;
+   named(...), the lines with text at their ends; room(...), the room a name takes right of the plot; and marks(...), the texts
+   drawn, placed with the plot's other labels, and the series whose name found no clear place. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }) => {
 	const END_GAP = 6; // px between a line's end and its name
 	const LEADER = 10; // px more for a name moved off its line's end, which a leader ties to it
-	// Names at the line ends fit when, in the narrowest figure the kit lays out (288 px), they leave the plot 55% of it, and when
-	// they stack a line of text apart down the plot; else the legend names them.
+	const ALONG = 8; // points along a line a name with no room at its end is tried beside
+	// A name takes the room right of the plot when, in the narrowest figure the kit lays out (288 px), it leaves the plot 55% of
+	// it; a longer one goes beside its end or along its line.
 	const NARROWEST = 288;
 	const NAMES_SHARE = 0.45;
 	const step = () => size() + 3; // px between the names' lines
@@ -41,35 +43,31 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 		[s.name, lastValue(option, s)].filter(Boolean).join(": ");
 
 	/**
-	 * Whether the series carry their names at their line ends in place of a legend, above a plot whose bottom edge is `bottom` px
-	 * down: two or more have a name, every named one is a line, each name fits the narrowest figure's share (NAMES_SHARE), all
-	 * stack a line apart above the bottom edge, and the author left the legend unset (legend: true keeps the legend, false shows
-	 * neither). The width never decides it, so one legend serves a copy over all the widths it is shown at.
+	 * Whether the series carry their names on their lines rather than in a legend: one or more have a name, every named one is a
+	 * line, and the author left the legend unset (legend: true keeps the legend, false shows neither). Neither the names' length
+	 * nor the plot's size decides it: names that crowd are placed apart on the plot, never moved into a legend.
 	 */
-	function fits(option: PlotOption, textWidth: (s: unknown) => number, bottom: number) {
+	function fits(option: PlotOption) {
 		const named = (option.series ?? []).filter((s) => s.name);
 		return (
 			option.legend === undefined &&
 			!option.categories &&
 			named.length > 0 &&
-			(named.length - 1) * step() <= bottom - size() / 2 &&
-			named.every(
-				(s) =>
-					(s.type ?? "line") === "line" &&
-					across(textWidth(nameAndValue(option, s))) <= NARROWEST * NAMES_SHARE,
-			)
+			named.every((s) => (s.type ?? "line") === "line")
 		);
 	}
 
 	/**
-	 * The lines that carry text at their ends, with their index: name and value when names fit there, else the value alone, left
-	 * out when it takes more than two lines of MOST.
+	 * The lines that carry text on them, with their index: name and value when the lines carry their names, else the value alone.
+	 * The value is left out when the text would take more than two lines of MOST; a name is never left out.
 	 */
-	function named(option: PlotOption, textWidth: (s: unknown) => number, bottom: number) {
-		const names = fits(option, textWidth, bottom);
+	function named(option: PlotOption, textWidth: (s: unknown) => number) {
+		const names = fits(option);
+		const fitted = (text: string) => (text && wrapped(text, textWidth).length ? text : "");
 		return (option.series ?? []).flatMap((s, i) => {
-			const name = names && s.name ? nameAndValue(option, s) : lastValue(option, s);
-			return name && wrapped(name, textWidth).length ? [{ s, i, name }] : [];
+			const own = names && s.name;
+			const kept = own ? fitted(nameAndValue(option, s)) || own : fitted(lastValue(option, s));
+			return kept ? [{ s, i, name: kept }] : [];
 		});
 	}
 
@@ -100,7 +98,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 			[name],
 			...(cut > 0 ? [[name.slice(0, cut + 1), name.slice(cut + 2)]] : []),
 			wrapped(name, f.textWidth),
-		];
+		].filter((lines) => lines.length);
 		return layouts.flatMap((lines) => {
 			const w = Math.max(...lines.map(f.textWidth));
 			const h = lines.length * f.line;
@@ -120,6 +118,57 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 		});
 	}
 
+	/** px from a point to a polyline. */
+	function distance([x, y]: PlotPx, line: readonly PlotPx[]) {
+		let least = Number.POSITIVE_INFINITY;
+		for (const [i, [x1, y1]] of line.entries()) {
+			const [x2, y2] = line[i + 1] ?? [x1, y1];
+			const [dx, dy] = [x2 - x1, y2 - y1];
+			const along = dx || dy ? ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy) : 0;
+			const t = Math.min(Math.max(along, 0), 1);
+			least = Math.min(least, Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)));
+		}
+		return least;
+	}
+
+	/** Whether a spot's middle lies nearer its own line than any other line (`others`), so the name reads as that line's. */
+	function owns(
+		{ box }: PlotSpot,
+		line: readonly PlotPx[],
+		others: readonly (readonly PlotPx[])[],
+	) {
+		const middle: PlotPx = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
+		const own = distance(middle, line);
+		return others.every((other) => distance(middle, other) > own);
+	}
+
+	/** The point a fraction `t` of the way along a polyline in px, by its drawn length, so a line of two points has a middle too. */
+	function along(line: readonly PlotPx[], t: number): PlotPx | undefined {
+		const lengths = line.slice(1).map((q, i) => {
+			const p = line[i] as PlotPx;
+			return Math.hypot(q[0] - p[0], q[1] - p[1]);
+		});
+		let left = t * lengths.reduce((sum, l) => sum + l, 0);
+		for (const [i, l] of lengths.entries()) {
+			const [p, q] = [line[i], line[i + 1]] as [PlotPx, PlotPx];
+			if (left <= l) {
+				const u = l ? left / l : 0;
+				return [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
+			}
+			left -= l;
+		}
+		return line.at(-1);
+	}
+
+	/**
+	 * The spots beside points along a line, from its end back (ALONG of them, evenly along its drawn length), each wrapped as a
+	 * note's, for a name that has no room at its end.
+	 */
+	function alongSpots({ name, line }: PlotEndName, f: PlotNoteFrame) {
+		const points = Array.from({ length: ALONG }, (_, k) => along(line, (ALONG - k) / (ALONG + 1)));
+		return points.flatMap((p) => (p ? place.pointSpots(name, p, f).filter((s) => !s.leader) : []));
+	}
+
 	/** A spot's lines of text, one <text> a line. */
 	function spotText({ box, lines, anchor }: PlotSpot, line: number) {
 		const x = anchor === "start" ? box.x0 : anchor === "end" ? box.x1 : (box.x0 + box.x1) / 2;
@@ -128,11 +177,17 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 
 	/**
 	 * Each name just past its line's last point. Names closer than a line of text apart, and sharing some of their width, are
-	 * spread apart, in order from the top, and kept above the plot's bottom edge; a name moved off its line's end sits a leader further right, the leader drawn from
-	 * the end in its line's colour and dash. A name there that would cross a line or touch a label placed before it (`placed`,
-	 * which it joins) takes the spot beside its end that crosses and touches least instead, as a note does.
+	 * spread apart, in order from the top, and kept above the plot's bottom edge; a name moved off its line's end sits a leader
+	 * further right, the leader drawn from the end in its line's colour and dash. A name there that would cross a line or touch a
+	 * label placed before it (`placed`, which it joins) takes the spot beside its end, else along its line, that crosses and
+	 * touches least instead, as a note does, where it is nearer its own line than any other switched on (`lines`). `crowded` names the series no spot was clear for, each drawn on its least bad one.
 	 */
-	function spread(list: readonly PlotEndName[], f: PlotNoteFrame, placed: PlotBox[]) {
+	function spread(
+		list: readonly PlotEndName[],
+		f: PlotNoteFrame,
+		placed: PlotBox[],
+		lines: readonly (readonly PlotPx[])[],
+	) {
 		const ends = list
 			.map((end) => {
 				const x0 = end.at.x + END_GAP;
@@ -151,38 +206,92 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
 			const below = ends.slice(k + 1).filter(sharing(end));
 			end.y = Math.min(end.y, f.B, ...below.map((other) => other.y - step()));
 		}
-		return ends
+		const crowded: string[] = [];
+		const markup = ends
 			.map(({ end, y }) => {
 				const first = classic(end, y, f);
-				const beside = besideSpots(end, f);
-				// A name past the frame's right edge is not drawn there.
-				const spots = first.box.x1 <= f.R ? [first, ...beside] : beside;
-				const chosen = place.cheapest(spots, f, placed) ?? first;
+				const others = lines.filter((line) => line !== end.line);
+				const { chosen, clear } = choose(end, first, others, f, placed);
+				if (!clear) {
+					crowded.push(end.series);
+				}
 				placed.push(chosen.box);
 				return chosen === first ? first.markup : spotText(chosen, f.line);
 			})
 			.join("");
+		return { markup, crowded };
 	}
 
 	/**
-	 * The text at the ends of the lines switched on (`shown`), X and Y mapping data to px, placed by spread. The texts are those
-	 * of `texts`, where a move is going, so they never change while the lines do.
+	 * Where a name goes: its stacked spot at the end (`first`), else beside its end, else along its line, the later spots tried
+	 * only when no earlier one is clear, and beside or along only where the name reads as its own line's. A name with no clear
+	 * spot takes its least bad one inside the frame, and `clear` is false.
+	 */
+	function choose(
+		end: PlotEndName,
+		first: ReturnType<typeof classic>,
+		others: readonly (readonly PlotPx[])[],
+		f: PlotNoteFrame,
+		placed: readonly PlotBox[],
+	): { chosen: PlotSpot; clear: boolean } {
+		const mine = (spots: PlotSpot[]) => spots.filter((spot) => owns(spot, end.line, others));
+		// A name past the frame's right edge, or stacked up past the drawing's top, is not drawn there.
+		const inside = first.box.x1 <= f.R && first.box.y0 >= 0;
+		const stages = [
+			() => (inside ? [first] : []),
+			() => mine(besideSpots(end, f)),
+			() => mine(alongSpots(end, f)),
+		];
+		const tried: PlotSpot[] = [];
+		let best: PlotSpot | undefined;
+		for (const stage of stages) {
+			tried.push(...stage());
+			best = place.cheapest(tried, f, placed);
+			if (best && place.cost(best, f, placed) < place.CLEAR) {
+				return { chosen: best, clear: true };
+			}
+		}
+		return {
+			chosen: best ?? place.cheapest(besideSpots(end, f), f, placed) ?? first,
+			clear: false,
+		};
+	}
+
+	/**
+	 * The text on the lines switched on (`shown`), X and Y mapping data to px, placed by spread. The texts are those of `texts`,
+	 * where a move is going, so they never change while the lines do.
 	 */
 	function marks(
 		option: PlotOption,
 		{ X, Y, shown, textWidth, texts = option }: PlotEndMap,
-		bottom: number,
 		f: PlotNoteFrame,
 		placed: PlotBox[],
 	) {
-		const list = named(texts, textWidth, bottom).flatMap(({ s: said, i, name }) => {
+		// Every line switched on, named or not: a name reads as its own line's only when nearer it than any of them.
+		const lines = (option.series ?? []).map((s, i) =>
+			shown[i] && (s.type ?? "line") === "line"
+				? s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)])
+				: [],
+		);
+		const visible = lines.filter((line) => line.length);
+		const list = named(texts, textWidth).flatMap(({ s: said, i, name }): PlotEndName[] => {
 			const s = option.series?.[i] ?? said;
-			const last = s.data.filter(finite).at(-1);
+			const line = lines[i] ?? s.data.filter(finite).map(([x, y]): PlotPx => [X(x), Y(y)]);
+			const last = line.at(-1);
 			return last && shown[i]
-				? [{ name, at: { x: X(last[0]), y: Y(last[1]) }, colour: colour(s, i), dash: dash(s, i) }]
+				? [
+						{
+							name,
+							series: s.name ?? name,
+							line,
+							at: { x: last[0], y: last[1] },
+							colour: colour(s, i),
+							dash: dash(s, i),
+						},
+					]
 				: [];
 		});
-		return spread(list, f, placed);
+		return spread(list, f, placed, visible);
 	}
 
 	return { fit: fits, named, room, marks };

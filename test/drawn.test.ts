@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { runKitPart } from "../skills/explainer/src/kit.ts";
 import { pageDrawer } from "../skills/explainer/src/mdx/draw.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
 import { withTestPage } from "./browser.ts";
@@ -715,45 +714,6 @@ import "./bar-rule.css";
 	expect(heights).toEqual([212, 416, 416]);
 }, 30_000);
 
-/** kit/parts/charts/option.ts as pack runs it, with colours passed through and labels 7 px a character. */
-const chartsOption = (
-	runKitPart("charts/option.ts", "ChartsOption") as (env: {
-		color: (c: string) => string;
-		lang: () => string;
-	}) => { endNames(option: object, width: (text: string) => number): object | undefined }
-)({ color: (c) => c, lang: () => "en" });
-const TWO_LINES = {
-	xAxis: { type: "category", data: ["a", "b"] },
-	yAxis: {},
-	series: [
-		{ name: "One", type: "line", data: [0, 1] },
-		{ name: "Two", type: "line", data: [1, 0] },
-	],
-};
-
-test("names at the line ends only where the kit knows their text and nothing lays labels out", () => {
-	const ends = (option: object) => chartsOption.endNames(option, (t) => t.length * 7) !== undefined;
-	expect(ends(TWO_LINES)).toBe(true);
-	const series = (extra: object) => TWO_LINES.series.map((s) => ({ ...s, ...extra }));
-	// An authored labelLayout, as an object or a function, would move or keep the names where the kit cannot see.
-	expect(ends({ ...TWO_LINES, series: series({ labelLayout: { hideOverlap: true } }) })).toBe(
-		false,
-	);
-	expect(ends({ ...TWO_LINES, series: series({ labelLayout: () => ({}) }) })).toBe(false);
-	// Room is measured at ECharts' 12 px label: a text style of the author's sizes the names otherwise.
-	expect(ends({ ...TWO_LINES, textStyle: { fontSize: 32 } })).toBe(false);
-	// Vertical grid bounds of the author's leave a legend no room, so the names could not give way to one.
-	expect(ends({ ...TWO_LINES, grid: { bottom: 8 } })).toBe(false);
-	expect(ends({ ...TWO_LINES, grid: { right: 24 } })).toBe(true);
-	// An axis min or max can clip a line, which puts its name where the line meets the edge rather than at its last point.
-	expect(ends({ ...TWO_LINES, xAxis: { ...TWO_LINES.xAxis, max: 0.5 } })).toBe(false);
-	expect(ends({ ...TWO_LINES, yAxis: { min: 0.2 } })).toBe(false);
-	// Zoom moves the ends as the reader zooms.
-	expect(ends({ ...TWO_LINES, dataZoom: [{ type: "inside" }] })).toBe(false);
-	// A reversed x axis puts the ends on the left.
-	expect(ends({ ...TWO_LINES, xAxis: { ...TWO_LINES.xAxis, inverse: true } })).toBe(false);
-});
-
 /** Page expression: the series names in chart #id as drawn (scripts off) or live, by text, as boxes relative to the element. */
 const DRAWN_ENDS = (id: string) => `(() => {
 	const svg = [...document.querySelectorAll("#${id} .chart-drawn > svg")].find((s) => s.getBoundingClientRect().width > 0);
@@ -772,13 +732,26 @@ const LIVE_ENDS = (id: string) => `(() => {
 	}));
 })()`;
 
+/** The crowded chart's names stay at their lines' ends, apart, in its drawing (`drawn`) as live. */
+function expectCrowdApart(live: Record<string, number[]>, drawn: Record<string, number[]>) {
+	expect(Object.keys(live).sort()).toEqual(["Also rising", "Flat", "Rising"]);
+	const { Rising: rising = [], "Also rising": also = [] } = live;
+	expect(Math.abs((rising[1] ?? 0) - (also[1] ?? 0))).toBeGreaterThanOrEqual(12);
+	expect(Math.abs((rising[0] ?? 0) - (also[0] ?? 0))).toBeLessThanOrEqual(1);
+	for (const [name, box] of Object.entries(live)) {
+		for (const [k, v] of box.entries()) {
+			expect(Math.abs((drawn[name]?.[k] ?? -99) - v), name).toBeLessThanOrEqual(2);
+		}
+	}
+}
+
 test("a Chart's several named lines with no legend carry their names at their ends, inside it and drawn as live", async () => {
 	const lines = `series: [{ name: "Rising", type: "line", data: [0, 1, 3] }, { name: "Also rising", type: "line", data: [1, 1.5, 2] }, { name: "Flat", type: "line", data: [0, 0, 0] }]`;
 	const drawer = pageDrawer("en", []);
 	const place = { classes: ["chart"], id: undefined, height: undefined };
 	const axes = `xAxis: { type: "category", data: ["a", "b", "c"] }, yAxis: {}`;
-	// Lines that end at one value: their names would sit on each other, so the legend names them.
-	const crowd = `series: [{ name: "Rising", type: "line", data: [0, 1, 2] }, { name: "Also rising", type: "line", data: [1, 1.5, 2] }, { name: "Flat", type: "line", data: [2, 2, 2] }]`;
+	// Two lines that end at one value: their names would sit on each other, so each moves half a line apart, never into a legend.
+	const crowd = `series: [{ name: "Rising", type: "line", data: [0, 1, 2] }, { name: "Also rising", type: "line", data: [1, 1.5, 2] }, { name: "Flat", type: "line", data: [0, 0, 0] }]`;
 	const option = (extra: string) => new Function(`return { ${axes}, ${lines}${extra} }`)();
 	// A legend the author shows or hides, or an end label of their own, keeps the chart as they wrote it.
 	expect(drawer.chart(option(""), place)).toContain(">Also rising</text>");
@@ -807,19 +780,17 @@ test("a Chart's several named lines with no legend carry their names at their en
 			true,
 		);
 	});
-	const lives = await inPage(path, (cdp) =>
-		cdp.evaluate<{ ends: Record<string, number[]>; crowd: Record<string, number[]> }>(
+	const [lives, legendShown] = await inPage(path, async (cdp) => [
+		await cdp.evaluate<{ ends: Record<string, number[]>; crowd: Record<string, number[]> }>(
 			`({ ends: ${LIVE_ENDS("ends")}, crowd: ${LIVE_ENDS("crowd")} })`,
 		),
-	);
+		await cdp.evaluate<boolean>(
+			`(echarts.getInstanceByDom(document.getElementById("crowd")).getOption().legend ?? []).length > 0`,
+		),
+	]);
 	expect(Object.keys(drawn.ends).sort()).toEqual(["Also rising", "Flat", "Rising"]);
-	// The crowded chart's names are a legend's row, in its drawing as live.
-	const crowded = Object.values(lives.crowd);
-	expect(crowded).toHaveLength(3);
-	expect(new Set(crowded.map(([, y]) => y)).size).toBe(1);
-	for (const [name, box] of Object.entries(lives.crowd)) {
-		expect(Math.abs((drawn.crowd[name]?.[1] ?? -99) - (box[1] ?? 0))).toBeLessThanOrEqual(4);
-	}
+	expect(legendShown).toBe(false);
+	expectCrowdApart(lives.crowd, drawn.crowd);
 	const live = lives.ends;
 	// ECharts' own text boxes (a 12 px line); the DOM's add the font's whole ascent and descent.
 	const boxes = Object.values(live);

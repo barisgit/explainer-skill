@@ -133,116 +133,6 @@ test("a plot's axes carry labels and one quiet baseline at zero, with no gridlin
 	expect(bars).toContain(">A<");
 });
 
-test("several named lines with no legend set carry their names at their ends, spread apart and inside the plot", () => {
-	const option = {
-		series: [
-			{
-				name: "Rising",
-				data: [
-					[0, 0],
-					[1, 2],
-				],
-			},
-			{
-				name: "Also rising",
-				data: [
-					[0, 1],
-					[1, 2],
-				],
-			},
-			{
-				name: "Flat",
-				data: [
-					[0, 1],
-					[1, 1],
-				],
-			},
-		],
-	};
-	const svg = draw(option);
-	const ends = texts(svg, "end");
-	expect(plotDraw.legendMarkup(option, width, 300)).toBe("");
-	expect(ends.map((t) => t.text).sort()).toEqual(["Also rising", "Flat", "Rising"]);
-	const ys = ends.map((t) => t.y).sort((a, b) => a - b);
-	expect(ys.slice(1).every((y, i) => y - (ys[i] ?? 0) >= 13)).toBe(true);
-	for (const t of ends) {
-		expect(t.x + width(t.text)).toBeLessThanOrEqual(600);
-	}
-	// The author's legend wins, and so does one that is off; stems or bars keep the legend.
-	expect(plotDraw.legendMarkup({ ...option, legend: true }, width, 300)).not.toBe("");
-	expect(texts(draw({ ...option, legend: true } as never), "end")).toEqual([]);
-	expect(texts(draw({ ...option, legend: false } as never), "end")).toEqual([]);
-	const mixed = { series: [...option.series, { name: "Peaks", type: "stem", data: [[0.5, 1]] }] };
-	expect(plotDraw.legendMarkup(mixed, width, 300)).not.toBe("");
-	expect(texts(draw(mixed), "end")).toEqual([]);
-});
-
-test("names go to the line ends only when they fit a phone figure across and down; otherwise the legend shows", () => {
-	const lines = (names: string[]) => ({
-		series: names.map((name, i) => ({
-			name,
-			data: [
-				[0, i],
-				[1, i + 1],
-			],
-		})),
-	});
-	// Two names of about 305 px would leave a 356 px figure no plot: the legend names them, and the plot still draws.
-	const long = lines(["A".repeat(44), "B".repeat(44)]);
-	expect(plotDraw.legendMarkup(long, width, 300)).not.toBe("");
-	expect(texts(draw(long, 356, 280), "end")).toEqual([]);
-	expect(draw(long, 356, 280)).toContain('class="line"');
-	// Names within 45% of the narrowest figure (129.6 px with their gap, leader room and margin) still sit at the ends.
-	const fits = lines(["A".repeat(15), "B".repeat(15)]);
-	expect(plotDraw.legendMarkup(fits, width, 300)).toBe("");
-	expect(plotDraw.legendMarkup(lines(["A".repeat(16), "B"]), width, 300)).not.toBe("");
-	// More names than the plot's height can stack, 16 px apart, take the legend.
-	const many = lines(Array.from({ length: 17 }, (_, i) => `n${i}`));
-	expect(plotDraw.legendMarkup(many, width, 280)).not.toBe("");
-	expect(texts(draw(many, 356, 280), "end")).toEqual([]);
-	const ten = lines(Array.from({ length: 10 }, (_, i) => `n${i}`));
-	const svg = draw(ten, 356, 280);
-	expect(texts(svg, "end")).toHaveLength(10);
-	for (const t of texts(svg, "end")) {
-		expect(t.y).toBeGreaterThanOrEqual(0);
-		expect(t.y).toBeLessThanOrEqual(280);
-	}
-});
-
-test("a name moved off its line's end is tied to it by a leader; one that stays needs none", () => {
-	const svg = draw({
-		series: [
-			{
-				name: "Up",
-				data: [
-					[0, 0],
-					[1, 2],
-				],
-			},
-			{
-				name: "Also up",
-				data: [
-					[0, 1],
-					[1, 2],
-				],
-			},
-			{
-				name: "Down",
-				data: [
-					[0, 2],
-					[1, 0],
-				],
-			},
-		],
-	});
-	// "Up" and "Also up" end at one point: one of them moves and gets a leader from that point; "Down" keeps its place.
-	expect(lines(svg, "leader")).toHaveLength(1);
-	const [leader] = lines(svg, "leader");
-	const moved = texts(svg, "end").find((t) => Math.abs(t.y - (leader?.[3] ?? 0)) < 0.5);
-	expect(moved).toBeDefined();
-	expect(leader?.[2]).not.toBe(leader?.[3]);
-});
-
 test("horizontal bars are 25 px in 56 px rows (#190)", () => {
 	// 10 px above the rows and 26 below them: three rows of 56 px.
 	const svg = plotDraw.render(
@@ -380,17 +270,13 @@ test("a category may carry a muted second line under its name (#190)", () => {
 
 test("a bar series' legend swatch shows its state when every bar shares it, and the series' colour when they differ (#190)", () => {
 	const legend = (fill: string[]) =>
-		plotDraw.legendMarkup(
-			{
-				categories: ["a", "b"],
-				series: [
-					{ name: "Estimated", type: "bar", data: [1, 2], fill },
-					{ name: "Measured", type: "bar", data: [2, 1] },
-				],
-			},
-			width,
-			300,
-		);
+		plotDraw.legendMarkup({
+			categories: ["a", "b"],
+			series: [
+				{ name: "Estimated", type: "bar", data: [1, 2], fill },
+				{ name: "Measured", type: "bar", data: [2, 1] },
+			],
+		});
 	expect(legend(["hatch", "hatch"])).toContain('<i class="bar hatch"');
 	expect(legend(["accent", "accent"])).toContain('<i class="bar" style="--c:var(--accent)');
 	const mixed = legend(["accent", "hatch"]);
@@ -475,25 +361,6 @@ test("live, a narrow bar plot grows by its marker label's lines and keeps its 56
 	expect(state.height).toBeCloseTo(8 + 56 + 36 + state.lines * 17, 0);
 	expect(state.stroke).toEqual([state.under, "1px"]);
 }, 30_000);
-
-test("names at the line ends that a short figure cannot stack give way to the legend", () => {
-	const ten = {
-		series: Array.from({ length: 10 }, (_, i) => ({
-			name: `n${i}`,
-			data: [
-				[0, i],
-				[1, 0],
-			],
-		})),
-	};
-	// 160 px leaves 134 px for ten names a line apart: the legend names them, and every name drawn stays in the figure.
-	expect(plotDraw.legendMarkup(ten, width, 160)).not.toBe("");
-	expect(texts(draw(ten, 600, 160), "end")).toEqual([]);
-	expect(plotDraw.legendMarkup(ten, width, 300)).toBe("");
-	for (const t of texts(draw(ten, 600, 300), "end")) {
-		expect(t.y).toBeGreaterThanOrEqual(6);
-	}
-});
 
 test("a series switched off in the legend shows again when the legend gives way to names at the ends", async () => {
 	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">

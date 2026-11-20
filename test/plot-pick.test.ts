@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { shortTexts } from "../skills/explainer/kit/components/parts/short-texts.ts";
 import { withTestPage } from "./browser.ts";
-import { draw, plotDraw, rects, texts, width } from "./plot-draw.ts";
+import { draw, plotDraw, rects, texts } from "./plot-draw.ts";
 import { inPage, packedMdx, scratch } from "./support.ts";
 
 const dir = scratch();
@@ -34,15 +34,15 @@ test("a picked category is framed, its name in ink, and the legend is its key: i
 	expect(texts(svg, "picked").map((t) => t.text)).toEqual(["Mar"]);
 	expect(rects(draw(year), "picked")).toEqual([]);
 
-	const key = plotDraw.legendMarkup(picked, width, 300);
+	const key = plotDraw.legendMarkup(picked);
 	expect(key).toContain('<li class="key-head">Mar</li>');
 	expect(key).toContain('from the roof<span class="v">160\u00a0kWh</span>');
 	expect(key).toContain('bought<span class="v">200\u00a0kWh</span>');
 	// One named series is enough for a key.
-	expect(plotDraw.legendMarkup({ ...picked, series: [year.series[0]] }, width, 300)).toContain(
+	expect(plotDraw.legendMarkup({ ...picked, series: [year.series[0]] })).toContain(
 		'<span class="v">160',
 	);
-	expect(plotDraw.legendMarkup({ ...picked, legend: false }, width, 300)).toBe("");
+	expect(plotDraw.legendMarkup({ ...picked, legend: false })).toBe("");
 });
 
 test("labels: false leaves an axis's tick labels out and gives their room to the plot", () => {
@@ -127,7 +127,7 @@ test("a key keeps a bar's value when its series labels the bars with texts of th
 		pick: 0,
 		series: year.series.map((s, i) => (i ? { ...s, label: ["over 3 mA", "", "", ""] } : s)),
 	};
-	const key = plotDraw.legendMarkup(option, width, 300);
+	const key = plotDraw.legendMarkup(option);
 	expect(key).toContain('bought<span class="v">400\u00a0kWh</span>');
 });
 

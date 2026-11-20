@@ -326,7 +326,7 @@
 	 * neither a pick nor a preview moves the plot under it or runs into it; "" for a plot with no key. Measured once per option
 	 * and width, and again while fonts load.
 	 */
-	function keyRoomOf(legend: HTMLElement, textWidth: Measure) {
+	function keyRoomOf(legend: HTMLElement) {
 		let seen: { option: PlotOption; width: number; room: string } | undefined;
 		function tallest(option: PlotOption, width: number) {
 			if (option.pick === undefined || !option.categories) {
@@ -341,7 +341,7 @@
 			});
 			legend.after(ruler);
 			const heights = option.categories.map((_, pick) => {
-				ruler.innerHTML = legendMarkup({ ...option, pick }, textWidth, 0);
+				ruler.innerHTML = legendMarkup({ ...option, pick });
 				return ruler.getBoundingClientRect().height;
 			});
 			ruler.remove();
@@ -404,16 +404,12 @@
 		const font = () =>
 			`500 ${parseFloat(getComputedStyle(legend).fontSize)}px ${getComputedStyle(el).fontFamily}`;
 		const textWidth: Measure = (s) => measure(font(), s);
-		const room = keyRoomOf(legend, textWidth);
-
-		/** The plot area's height with no legend buttons: the legend's top padding is all that stays above it. */
-		const bareHeight = () =>
-			area.clientHeight + legend.offsetHeight - parseFloat(getComputedStyle(legend).paddingTop);
+		const room = keyRoomOf(legend);
 
 		function draw() {
 			size = parseFloat(getComputedStyle(legend).fontSize);
 			// The legend (or key) is for where the plot is going.
-			switches.write(legendMarkup(preview.look(option), textWidth, bareHeight()));
+			switches.write(legendMarkup(preview.look(option)));
 			legend.style.minBlockSize = room(option);
 			const W = area.clientWidth;
 			if (!W || !area.clientHeight) {

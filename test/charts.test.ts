@@ -728,7 +728,7 @@ test("names at the line ends follow updates: a legend or one named line takes th
 	expect(await packAndRun(dir, "end-labels", page)).toEqual([]);
 }, 30_000);
 
-test("names that would end less than a line apart give way to the legend, decided again when the chart's height changes", async () => {
+test("names that would end less than a line apart move apart at their ends, never into a legend, spread again when the chart's height changes (#190)", async () => {
 	const page = PAGE.replace(
 		'<div class="chart" id="c">',
 		'<div class="chart" id="c" style="height:160px">',
@@ -737,18 +737,24 @@ test("names that would end less than a line apart give way to the legend, decide
 		`const line = (name, data) => ({ name, type: "line", data });
 		const named = (chart) => chart.getOption().series.filter((s) => s.endLabel?.show).length;
 		const legends = (chart) => (chart.getOption().legend ?? []).length;
+		const offsets = (chart) => chart.getOption().series.map((s) => s.endLabel?.offset?.[1] ?? 0);
 		const el = document.getElementById("c");
 		var contract = new Promise((done) => {
 			// Ends 1 apart on an axis of 0 to 10: about 8 px in a 160 px chart, over 40 px in a 600 px one.
-			Charts.make(el, {
+			const handle = Charts.make(el, {
 				xAxis: { type: "category", data: ["a", "b"] }, yAxis: {},
 				series: [line("One", [0, 5]), line("Two", [10, 6])],
 			}, (chart) => {
 				const found = [];
-				if (named(chart) !== 0 || legends(chart) !== 1) found.push("crowded: " + named(chart) + " end labels, " + legends(chart) + " legends");
+				// "Two" ends above "One": it moves up and "One" down, by half of what they lack of a line each.
+				const [one, two] = offsets(chart);
+				if (named(chart) !== 2 || legends(chart) !== 0 || !(one > 0 && two < 0)) found.push("crowded: " + named(chart) + " end labels, " + legends(chart) + " legends, offsets " + [one, two]);
 				el.style.height = "600px";
+				// A saved-option redraw arrives before ResizeObserver updates the renderer's height.
+				handle.set({ title: { text: "Updated", show: false } });
+				if (chart.getHeight() !== 160) found.push("redraw did not precede the resize");
 				setTimeout(() => {
-					if (named(chart) !== 2 || legends(chart) !== 0) found.push("taller: " + named(chart) + " end labels, " + legends(chart) + " legends");
+					if (chart.getHeight() !== 600 || named(chart) !== 2 || legends(chart) !== 0 || offsets(chart).some((v) => v !== 0)) found.push("taller: " + chart.getHeight() + " px, " + named(chart) + " end labels, " + legends(chart) + " legends, offsets " + offsets(chart));
 					done(found);
 				}, 300);
 			});
@@ -756,6 +762,51 @@ test("names that would end less than a line apart give way to the legend, decide
 		</script></body></html>`,
 	);
 	expect(await packAndRun(dir, "crowded-ends", page)).toEqual([]);
+}, 30_000);
+
+test("names at the line ends spread again when only the chart's width changes, since ECharts samples a line by its width, keeping what setup added (#190)", async () => {
+	const page = PAGE.replace(
+		'<div class="chart" id="c">',
+		'<div class="chart" id="c" style="height:400px;width:326px">',
+	).replace(
+		/var contract =[\s\S]*<\/script>/,
+		`const apart = (chart) => chart.getOption().series.slice(0, 2).map((s) => s.endLabel?.offset?.[1] ?? 0).join(",");
+		const ownOffset = (chart) => chart.getOption().series.find((s) => s.id === "author").endLabel.offset.join(",");
+		const el = document.getElementById("c");
+		const after = (ms) => new Promise((go) => setTimeout(go, ms));
+		// "Peak" ends on 30 points at 10 after 19,970 at 0, averaged in buckets as wide as the plot is narrow: about 10 when
+		// the chart is wide and the buckets small, far less when it is narrow. "Level" ends at 10, so only wide do they crowd.
+		const peak = Array.from({ length: 20000 }, (_, i) => (i >= 19970 ? 10 : 0));
+		var contract = new Promise((done) => {
+			Charts.make(el, {
+				xAxis: { type: "category" }, yAxis: { max: 12 },
+				series: [
+					{ name: "Peak", type: "line", sampling: "average", data: peak },
+					{ name: "Level", type: "line", data: peak.map(() => 10) },
+				],
+			}, async (chart) => {
+				const found = [];
+				// What setup adds stays through every resize.
+				chart.setOption({ title: { text: "kept" }, series: [
+					{ id: "author", name: "Level", type: "line", data: [1, 2], endLabel: { show: true, offset: [25, 70] } },
+				] });
+				const narrow = apart(chart);
+				el.style.width = "1200px";
+				await after(300);
+				const wide = apart(chart);
+				if (ownOffset(chart) !== "25,70") found.push("setup's offset after widening: " + ownOffset(chart));
+				el.style.width = "326px";
+				await after(300);
+				const again = apart(chart);
+				if (narrow !== "0,0" || wide === "0,0" || again !== "0,0") found.push("offsets narrow " + narrow + ", wide " + wide + ", narrow again " + again);
+				if (ownOffset(chart) !== "25,70") found.push("setup's offset after narrowing: " + ownOffset(chart));
+				if (chart.getOption().title?.[0]?.text !== "kept") found.push("setup's title lost on resize");
+				done(found);
+			});
+		});
+		</script></body></html>`,
+	);
+	expect(await packAndRun(dir, "width-ends", page)).toEqual([]);
 }, 30_000);
 
 test("a patch that brings a second named line keeps the reader's zoom and visualMap range", async () => {
@@ -788,29 +839,6 @@ test("a patch that brings a second named line keeps the reader's zoom and visual
 		</script></body></html>`,
 	);
 	expect(await packAndRun(dir, "ends-keep-state", page)).toEqual([]);
-}, 30_000);
-
-test("a series the reader hid in the legend that stands in for crowded names stays hidden across a redraw", async () => {
-	const page = PAGE.replace(
-		'<div class="chart" id="c">',
-		'<div class="chart" id="c" style="height:160px">',
-	).replace(
-		/var contract =[\s\S]*<\/script>/,
-		`const line = (name, data) => ({ name, type: "line", data });
-		var contract = new Promise((done) => {
-			const handle = Charts.make(document.getElementById("c"), {
-				xAxis: { type: "category", data: ["a", "b"] }, yAxis: {},
-				series: [line("One", [0, 5]), line("Two", [10, 5.5])],
-			}, (chart) => {
-				chart.dispatchAction({ type: "legendUnSelect", name: "One" });
-				handle.set({ series: [line("One", [0, 5]), line("Two", [10, 5.4])] });
-				const selected = chart.getOption().legend?.[0]?.selected ?? {};
-				done(selected.One === false ? [] : ["One after a redraw: " + JSON.stringify(selected)]);
-			});
-		});
-		</script></body></html>`,
-	);
-	expect(await packAndRun(dir, "fallback-hidden", page)).toEqual([]);
 }, 30_000);
 
 const TREEMAP = `import { Chart } from "kit";

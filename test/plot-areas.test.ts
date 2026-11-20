@@ -433,7 +433,7 @@ test("the July fixture's notes keep clear of its lines, of each other and of eve
 	] as const) {
 		const svg = plotDraw.render(JULY, W, H, geist, [true, true]);
 		expect(unclear(svg, W, H)).toEqual([]);
-		expect(plotDraw.crowded()).toEqual([]);
+		expect(plotDraw.crowded().notes).toEqual([]);
 	}
 });
 
@@ -450,7 +450,7 @@ test("a note with no clear place is reported, never drawn over another text sile
 		[326, 160],
 	] as const) {
 		const svg = render(six, W, H);
-		const crowded = plotDraw.crowded();
+		const crowded = plotDraw.crowded().notes;
 		// A note line drawn where it is not clear belongs to a note reported crowded.
 		const silent = unclear(svg, W, H).filter(
 			(line) => !crowded.some((label) => label.includes(line.replace(/ at \d+ px$/, ""))),
@@ -465,7 +465,7 @@ test("a note with no clear place is reported, never drawn over another text sile
 		326,
 		288,
 	);
-	expect(plotDraw.crowded()).toEqual([
+	expect(plotDraw.crowded().notes).toEqual([
 		"Donaudampfschifffahrtsgesellschaftskapitänswitwenrentenversicherung",
 	]);
 });

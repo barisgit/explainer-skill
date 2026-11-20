@@ -11,9 +11,9 @@ export type PlotDrawing = {
 		shown: boolean[],
 		texts?: object,
 	): string;
-	legendMarkup(option: object, textWidth: (s: unknown) => number, H: number): string;
+	legendMarkup(option: object): string;
 	markLines(option: object, W: number, H: number, width: (s: unknown) => number): number;
-	crowded(): string[];
+	crowded(): { notes: string[]; names: string[] };
 };
 export const plotDrawAt = (size: number) =>
 	(

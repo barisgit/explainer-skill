@@ -66,7 +66,7 @@
 		still,
 		settings,
 		endNames,
-		crowded,
+		spreadEnds,
 		defaults,
 		styling,
 		markSides,
@@ -90,8 +90,8 @@
 	});
 
 	/**
-	 * The option with its lines' names at their ends, and with a legend in their place, when the kit names them so; see endNames.
-	 * Names are measured at the label size of the chart being drawn (`sizing`).
+	 * The option with its lines' names at their ends, when the kit names them so; see endNames. Names are measured at the label
+	 * size of the chart being drawn (`sizing`).
 	 */
 	const ends = (option: ChartOption) =>
 		endNames(option, (text) => {
@@ -104,34 +104,30 @@
 
 	/**
 	 * Draws the saved option on the chart (`prepare` resolves it for setOption) with the kit's defaults, its marker labels on
-	 * the side with room (drawn again once the axes say where that is), and its names at the line ends unless they crowd at the
-	 * chart's size, when the legend names them, with the series the reader hid in it (`selected`) still hidden; pack draws each
-	 * copy by the same rule (src/mdx/draw.ts). Returns whether that legend shows.
+	 * the side with room (drawn again once the axes say where that is), and its names at the line ends, those that crowd at the
+	 * chart's size moved apart there (spreadEnds), never into a legend; pack draws each copy by the same rule (src/mdx/draw.ts).
 	 */
 	function show(
 		chart: ECharts,
 		option: ChartOption,
 		prepare: (option: ChartOption) => ChartOption,
-		selected: unknown,
 		how?: { notMerge: true },
 	) {
 		const draw = (sides?: ReturnType<typeof markSides>) => {
 			const kept = defaults(option, sides);
 			const named = ends(kept);
-			chart.setOption(prepare(named ? named.named : kept), how);
+			chart.setOption(prepare(named ?? kept), how);
 			return named;
 		};
-		let both = draw();
+		let named = draw();
 		const sides = markSides(chart);
 		if (sides.size) {
-			both = draw(sides);
+			named = draw(sides);
 		}
-		if (!(both && crowded(chart))) {
-			return false;
+		const { patch } = named ? spreadEnds(chart) : { patch: undefined };
+		if (patch) {
+			chart.setOption(patch);
 		}
-		const legend = { ...both.legend, legend: selected ? { selected } : {} };
-		chart.setOption(prepare(legend), { notMerge: true });
-		return true;
 	}
 
 	/** The ECharts theme for a chart on `el`, whose --under (the tone under it) changes by block: page, band, popover. */
@@ -317,31 +313,23 @@
 		let chart: ECharts | null = null;
 		// False once disposed: a font load still pending must not mount it again.
 		let live = true;
-		// The height names at the line ends were last fitted at: they crowd or not by the plot's height alone.
-		let drawnHeight = 0;
-		// Whether the legend that stands in for crowded names shows, and which series the reader switched in it: the saved option
-		// has no legend to keep them in. With no legend, nothing could switch a series back on, so they are forgotten.
-		let standIn = false;
-		let selected: unknown;
-		const keepStandIn = (on: ECharts) => {
-			const [shown] = standIn
-				? ((on.getOption() as { legend?: { selected?: unknown }[] }).legend ?? [])
-				: [];
-			selected = shown?.selected;
-		};
+		// The size names at the line ends were last spread at: where the lines end depends on both, since ECharts samples a
+		// line by its width.
+		let drawnSize = "";
+		// A saved-option redraw can happen before ResizeObserver updates the renderer's size.
+		const sizeOf = (on: ECharts) => `${on.getWidth()}x${on.getHeight()}`;
 		const mount = () => {
 			// Nothing animates on arrival: the first draw takes the place of pack's drawing, or of this chart before the scheme
 			// changed, as it stands, and only the updates after it animate.
 			if (chart) {
-				keepStandIn(chart);
 				chart.dispose();
 			}
 			sizing = el;
 			const look = theme(el);
 			chart = echarts.init(el, look);
 			layout(chart);
-			standIn = show(chart, option, (o) => resolveOption(still(o)), selected);
-			drawnHeight = el.clientHeight;
+			show(chart, option, (o) => resolveOption(still(o)));
+			drawnSize = sizeOf(chart);
 			chart.setOption({ animation: Boolean(settings(option).animation ?? look.animation) });
 			el.querySelector(":scope > .chart-drawn")?.remove();
 			setup?.(chart);
@@ -353,13 +341,12 @@
 		 */
 		const redraw = (on: ECharts, patch?: () => void) => {
 			keepReaderState(option, on);
-			keepStandIn(on);
 			patch?.();
 			// An open axis tooltip retains data from series the redraw can remove.
 			on.dispatchAction({ type: "hideTip" });
 			sizing = el;
-			standIn = show(on, option, resolveOption, selected, { notMerge: true });
-			drawnHeight = el.clientHeight;
+			show(on, option, resolveOption, { notMerge: true });
+			drawnSize = sizeOf(on);
 		};
 		// Canvas text needs the web font loaded before the first draw, and ECharts to exist.
 		const fontReady = Promise.all([
@@ -368,6 +355,20 @@
 				.catch(() => []),
 			window.echartsReady,
 		]);
+		/**
+		 * Spreads the kit's end names again for a new renderer size, resetting former offsets without changing setup's labels.
+		 */
+		const respread = (on: ECharts) => {
+			const size = sizeOf(on);
+			if (size === drawnSize) {
+				return;
+			}
+			const { patch } = spreadEnds(on, true);
+			if (patch) {
+				on.setOption(patch);
+			}
+			drawnSize = size;
+		};
 		const resizer = new ResizeObserver(() => {
 			if (!el.clientWidth) {
 				return;
@@ -375,9 +376,7 @@
 			if (chart) {
 				chart.resize();
 				sizing = el;
-				if (el.clientHeight !== drawnHeight && ends(option)) {
-					redraw(chart);
-				}
+				respread(chart);
 			} else {
 				void fontReady.then(() => live && !chart && el.clientWidth && mount());
 			}
