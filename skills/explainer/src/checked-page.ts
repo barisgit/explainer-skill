@@ -1,4 +1,5 @@
 import type { Cdp, ExceptionDetails } from "./cdp.ts";
+import { FIGURE_TEXT_JS, type FigureText } from "./figure-text.ts";
 import { LINKS_JS, type LinkReport, missingLinkFiles } from "./link-probes.ts";
 import { TIMERS_JS, TIMERS_URL } from "./page-js.ts";
 import { PAGE_JS, type PageReport } from "./page-probes.ts";
@@ -103,6 +104,26 @@ export class CheckedPage {
 			warnings: page.warnings,
 			scrolls: page.scrolls.map((s) => `scrolls sideways: ${s}`),
 		};
+	}
+
+	/**
+	 * The text of the figures pack drew, as a reader sees them before the kit scripts run: loads the page with its scripts off,
+	 * once its fonts are in. Leaves the tab on that load, so `open` must follow before anything else reads the page.
+	 */
+	async drawnFigureText(): Promise<FigureText[]> {
+		await this.cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		try {
+			await this.cdp.load(this.url);
+			await this.cdp.evaluate("document.fonts.ready.then(() => undefined)", true);
+			return await this.cdp.evaluate<FigureText[]>(FIGURE_TEXT_JS(true));
+		} finally {
+			await this.cdp.send("Emulation.setScriptExecutionDisabled", { value: false });
+		}
+	}
+
+	/** The text of the figures the kit scripts drew as SVG (a Plot) on the page as it is now. */
+	liveFigureText(): Promise<FigureText[]> {
+		return this.cdp.evaluate<FigureText[]>(FIGURE_TEXT_JS(false));
 	}
 
 	/** Checks each captured document state, not every control-sweep reload of that same document. */

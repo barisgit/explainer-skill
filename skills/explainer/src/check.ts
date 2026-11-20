@@ -5,6 +5,7 @@ import { CheckedPage, type Screen } from "./checked-page.ts";
 import { withPage } from "./chrome.ts";
 import { CONTRAST_JS } from "./contrast.ts";
 import { sweepControls } from "./control-sweep.ts";
+import { type FigureText, figureTextWarnings } from "./figure-text.ts";
 import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
 import { DISCOVER_JS, FIRST_SCREEN_JS, LINKED_JS, STEPPERS_JS, SWEEP_JS } from "./page-probes.ts";
@@ -34,7 +35,8 @@ export interface ElementShot {
  * `view` is the hash of a drill-down view ("" for the overview); `first` describes the first viewport, taken before any step (overview only).
  * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
- * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
+ * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, text of a drawn figure
+ * crossing its box or other text (FIGURE_TEXT_JS, light theme), a stepper whose steps
  * change only its captions, linked parts more than a screen apart (desktop width), a colour token under the contrast its use needs
  * (CONTRAST_JS, desktop width), an incomplete scroll sweep, visible fixed elements omitted from a full-page PNG).
  */
@@ -151,16 +153,29 @@ interface Run {
 	where: string;
 }
 
-/** Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. */
-async function capture(run: Run, png: string, screen: Screen, view = ""): Promise<string[]> {
+/**
+ * Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. `drawn`: what the overview's
+ * script-free load found in pack's drawings, reported with the live figures' text so a figure that shows the same is named once.
+ */
+async function capture(
+	run: Run,
+	png: string,
+	screen: Screen,
+	view = "",
+	drawn: FigureText[] = [],
+): Promise<string[]> {
 	const page = await run.page.inspect(screen);
 	const links = await run.page.inspectLinks();
+	// Where text sits is the same in both themes.
+	const live = screen.theme === THEMES[0] ? await run.page.liveFigureText() : [];
+	const figures = figureTextWarnings(screen.vp.width, drawn, live);
 	const cdp = run.page.cdp;
 	const { data, omitted } = await fullPageScreenshot(cdp, screen.vp.width);
 	writeFileSync(png, Buffer.from(data, "base64"));
 	const inspect = view ? "open this view to inspect them" : "use --do shot:<css> to capture them";
 	return [
 		...page.warnings,
+		...figures,
 		...links,
 		...(omitted.length ? [`${OMITTED_FIXED_WARNING}: ${omitted.join(", ")}; ${inspect}`] : []),
 		...page.scrolls,
@@ -258,6 +273,8 @@ async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name, vp } = screen;
 	const { opts } = run;
 	run.where = `at ${theme} ${name}, overview`;
+	// Pack's drawings, views' included, on a load of their own before the page's: where text sits is the same in both themes.
+	const drawn = theme === THEMES[0] ? await run.page.drawnFigureText() : [];
 	await run.page.open();
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
 	const firstPass = theme === THEMES[0] && name === "desktop";
@@ -270,7 +287,11 @@ async function shootOverview(run: Run, screen: Screen) {
 	const linkedWarnings = firstPass ? await run.page.cdp.evaluate<string[]>(LINKED_JS) : [];
 	const elements = await runSteps(run, screen);
 	const png = overviewPng(run, screen);
-	const warnings = [...stepperWarnings, ...linkedWarnings, ...(await capture(run, png, screen))];
+	const warnings = [
+		...stepperWarnings,
+		...linkedWarnings,
+		...(await capture(run, png, screen, "", drawn)),
+	];
 	const problems = [...run.page.problems];
 	if (firstPass && !opts.quick && !opts.steps.length) {
 		run.where += ", kit control sweep";
@@ -402,7 +423,7 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
  * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
  * Reports as problems console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
- * missing viewport meta, tall diagrams and charts, steppers that change only their captions, linked parts more than a screen apart
+ * missing viewport meta, tall diagrams and charts, figure text crossing its box or other text (FIGURE_TEXT_JS, light theme), steppers that change only their captions, linked parts more than a screen apart
  * (LINKED_JS, light desktop only), colour tokens under the contrast their use needs (CONTRAST_JS, desktop) and incomplete scroll sweeps. Reduced motion is emulated so animations are
  * finished in the shots.
  * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed

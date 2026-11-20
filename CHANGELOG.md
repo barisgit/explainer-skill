@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `check` warns when text inside a `Chart` or `Plot` crosses the figure's edge (a label cut off on a phone) or overlaps other text (a legend over the axis labels, tick labels run together), at desktop and phone width, naming the figure and quoting the texts. A `Chart` is measured as `pack` drew it, a `Plot` as drawn and live.
 - A `Chart`'s legend keeps its room under your own `grid: { bottom }` or `top`: the larger of your bottom and the legend's room is used, so the legend no longer covers the x-axis labels. A grid `height`, a legend position or grid bounds in a `media` option you set still win.
 
 ## v0.16.0
