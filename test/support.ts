@@ -15,6 +15,7 @@ export const SKILL_DIR = join(import.meta.dir, "..", "skills", "explainer");
 
 export interface CliResult {
 	code: number;
+	signal: NodeJS.Signals | number | null;
 	stdout: string;
 	stderr: string;
 }
@@ -30,7 +31,7 @@ export async function runCli(args: string[]): Promise<CliResult> {
 		new Response(proc.stderr).text(),
 		proc.exited,
 	]);
-	return { code, stdout, stderr };
+	return { code, signal: proc.signalCode, stdout, stderr };
 }
 
 /** What packHtml made of a page: `error` is the PackError's message (empty when it packed), `warnings` what pack would print. */

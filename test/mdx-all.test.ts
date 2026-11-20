@@ -19,8 +19,9 @@ test.each(["page", "sl"])(
 		expect(packed.code).toBe(0);
 
 		const checked = await runCli(["check", output, "--out", dir.path(name)]);
-		expect(checked.code, checked.stderr).toBe(0);
-		expect(checked.stdout).toContain("Verdict: ok, 0 problems");
+		const diagnostic = `check exit ${checked.code}, signal ${checked.signal ?? "none"}\nstdout: ${JSON.stringify(checked.stdout)}\nstderr: ${JSON.stringify(checked.stderr)}`;
+		expect(checked.code, diagnostic).toBe(0);
+		expect(checked.stdout, diagnostic).toContain("Verdict: ok, 0 problems");
 	},
 	120_000,
 );
