@@ -55,7 +55,8 @@ export function Item({ record }: { record: { id: string } }) {
 `;
 
 /**
- * Page code listing each token class whose contrast is under 4.5:1 on the code's background or on lit code, in light and dark,
+ * Page code listing each token class whose contrast is under 4.5:1 on the code's background, on lit code and on a diff's
+ * inserted and deleted lines, in light and dark,
  * with the prose term focused so the marked code is lit; colours are read back as sRGB through a canvas.
  */
 const LOW_CONTRAST = `(() => {
@@ -71,7 +72,8 @@ const LOW_CONTRAST = `(() => {
 				for (const scheme of ["light", "dark"]) {
 					document.documentElement.dataset.scheme = scheme;
 					const under = getComputedStyle(code.parentElement).backgroundColor;
-					const backgrounds = { unlit: rgb(under), lit: rgb(under, getComputedStyle(lit).backgroundColor) };
+					const tint = (kind) => { const line = code.appendChild(Object.assign(document.createElement("span"), { className: "code-line code-" + kind })); const fill = getComputedStyle(line).backgroundColor; line.remove(); return rgb(under, fill); };
+					const backgrounds = { unlit: rgb(under), lit: rgb(under, getComputedStyle(lit).backgroundColor), inserted: tint("inserted"), deleted: tint("deleted") };
 					for (const kind of ["comment", "keyword", "string", "number", "function", "type", "inserted", "deleted"]) {
 						const probe = code.appendChild(Object.assign(document.createElement("span"), { className: "tok-" + kind }));
 						const ink = rgb(getComputedStyle(probe).color);
@@ -163,6 +165,7 @@ describe("code fences", () => {
 	test.each([
 		['```ts ref:call="api.cal1"', 'code.mdx:3: ref:call: the code has no "api.cal1"'],
 		["```ts title=run.ts", 'code.mdx:3: pack does not read "title=run.ts"'],
+		["```diff-brainfuck", 'code.mdx:3: pack colours no "brainfuck" in diff-brainfuck'],
 		[
 			'```ts ref:call="api.call" ref:run="call("',
 			'code.mdx:3: ref:run overlaps another mark at "call("',
@@ -180,7 +183,7 @@ describe("code fences", () => {
 		expect(await runPacked(output, { media: "print", widths: [DESKTOP] })).toEqual([]);
 	}, 30_000);
 
-	test("keep every token class readable on the code and on lit code, in light and dark", async () => {
+	test("keep every token class readable on the code, on lit code and on a diff's changed lines, in light and dark", async () => {
 		const output = await packedMdx(dir, "contrast", PAGE);
 		const low = await inPage(output, (cdp) => cdp.evaluate<string[]>(LOW_CONTRAST));
 		expect(low).toEqual([]);
@@ -199,4 +202,69 @@ describe("code fences", () => {
 		);
 		expect(linked).toEqual([]);
 	}, 30_000);
+});
+
+describe("diff fences", () => {
+	test("bring their stylesheet when every line is a change", async () => {
+		const html = readFileSync(
+			await packedMdx(dir, "changes", "# Changes\n\n```diff-ts\n+const a = 1;\n```\n"),
+			"utf8",
+		);
+		expect(codeOf(html)).toContain('class="code-line code-inserted"');
+		expect(html).toContain(".code-inserted {");
+		expect(html).toContain(".tok-keyword {");
+	});
+
+	test("read a hunk's lines by its counts and each hunk's sides apart", async () => {
+		const diff = [
+			"@@ -1 +1,2 @@",
+			"---count;",
+			"+++count;",
+			'+doc = """',
+			"@@ -9,0 +10 @@ def later():",
+			"+    return 42",
+		].join("\n");
+		const html = readFileSync(
+			await packedMdx(dir, "hunks", `# Hunks\n\n\`\`\`diff-python\n${diff}\n\`\`\`\n`),
+			"utf8",
+		);
+		expect(html).toContain(
+			'<span class="code-line code-deleted" style="--indent:2;"><span class="tok-deleted">-</span>--count;</span>',
+		);
+		expect(html).toContain('<span class="tok-inserted">+</span>++count;</span>');
+		expect(html).toContain(
+			'<span class="tok-keyword">return</span> <span class="tok-number">42</span>',
+		);
+	});
+
+	test("colour a diff's code in the language it names, each side as one listing, and tint its changed lines (#262)", async () => {
+		const diff = [
+			"--- a/run.py",
+			"@@ -1,3 +1,3 @@",
+			" def run(api):",
+			'-    """Old docstring',
+			'-    over two lines."""',
+			"+\treturn api.call(42)",
+		].join("\n");
+		const page = `# Diff\n\n\`\`\`diff-python\n${diff}\n\`\`\`\n\n\`\`\`diff\n+plain\n\`\`\`\n`;
+		const html = readFileSync(await packedMdx(dir, "diff", page), "utf8");
+		const [python = "", plain = ""] = [
+			...html.matchAll(/<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/g),
+		].map((match) => match[1]);
+		expect(textOf(python)).toBe(`${diff}\n`);
+		expect(python).toContain('<span class="code-line">--- a/run.py</span>');
+		expect(python).toContain(
+			'<span class="code-line" style="--indent:2;"> <span class="tok-keyword">def</span> <span class="tok-function">run</span>(api):</span>',
+		);
+		expect(python).toContain(
+			'<span class="code-line code-deleted" style="--indent:6;"><span class="tok-deleted">-</span><span class="tok-string">    over two lines.&quot;&quot;&quot;</span></span>',
+		);
+		expect(python).toContain(
+			'<span class="code-line code-inserted" style="--indent:2;"><span class="tok-inserted">+</span>\t<span class="tok-keyword">return</span>',
+		);
+		expect(plain).toBe(
+			'<span class="code-line code-inserted" style="--indent:2;"><span class="tok-inserted">+plain</span></span>\n',
+		);
+		expect(html).toContain(".code-inserted {");
+	});
 });

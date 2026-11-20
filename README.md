@@ -142,7 +142,7 @@ flowchart TD
 | `Table` | A fixed comparison computed from data; a Markdown table gets the same look |
 | ```` ```mermaid ```` | Flowchart, state, sequence, class, ER and xychart drawn at pack time, with number tags the text can point at |
 | ```` ```schematic ```` | A circuit from a netlist: the wiring stated is the wiring drawn |
-| ```` ```ts ````, ```` ```diff ```` … | Code coloured at pack time, with marks that link to the prose |
+| ```` ```ts ````, ```` ```diff-ts ```` … | Code coloured at pack time, with marks that link to the prose |
 | `$…$` | TeX drawn as MathML, no script |
 | `data-ref` | Prose, table rows, diagram parts and marked code that share a name light up together; `.beside` keeps a figure in view while its text scrolls |
 | Frontmatter | `contents: true` for a contents rail, `display: condensed` for poster headings, `reply: true` for notes, `lang` and `labels` for a page in another language |

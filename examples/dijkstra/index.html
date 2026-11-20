@@ -3018,6 +3018,8 @@ dialog.reply-dialog[open] {
 /* code: code fences coloured when you pack, in light and dark: no script ships, and only a page with a fence carries this file.
    ```ts, tsx, js, json, sh, python, c, vhdl, css, html, diff, yaml, sql, rust, go and other common languages are coloured; any
    other stays plain.
+   A ```diff fence tints its inserted and deleted lines; ```diff-python (diff-ts, diff-<any language above>) also colours the code
+   after each +, - or space as that language. pack fails on a diff-<language> it does not colour.
    A mark after the language links code with the prose that shares its ref (kit link): ref:name="text" wraps every place the
    fence writes that text in <span data-ref="name">.
      ```ts ref:call="api.call"
@@ -3041,6 +3043,23 @@ dialog.reply-dialog[open] {
 		padding-inline-start: calc(var(--indent, 0) * 1ch + 2ch);
 		text-indent: calc(var(--indent, 0) * -1ch - 2ch);
 	}
+}
+
+/* A diff's inserted and deleted lines are tinted across the listing: the code takes the width of its longest line, at least the
+   pre's, and each marked line all of it. */
+pre > code:has(> .code-inserted, > .code-deleted) {
+	display: inline-block;
+	min-inline-size: 100%;
+}
+.code-inserted,
+.code-deleted {
+	min-inline-size: 100%;
+}
+.code-inserted {
+	background: color-mix(in oklab, var(--ok) 9%, transparent);
+}
+.code-deleted {
+	background: color-mix(in oklab, var(--bad) 9%, transparent);
 }
 
 /* Lit code keeps the light tint every lit part has, which leaves the tokens readable, and an accent ring that shows on --sunken. */

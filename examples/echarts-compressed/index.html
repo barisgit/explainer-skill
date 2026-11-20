@@ -3069,6 +3069,8 @@ h2:not(.minor > h2, dialog h2) {
 /* code: code fences coloured when you pack, in light and dark: no script ships, and only a page with a fence carries this file.
    ```ts, tsx, js, json, sh, python, c, vhdl, css, html, diff, yaml, sql, rust, go and other common languages are coloured; any
    other stays plain.
+   A ```diff fence tints its inserted and deleted lines; ```diff-python (diff-ts, diff-<any language above>) also colours the code
+   after each +, - or space as that language. pack fails on a diff-<language> it does not colour.
    A mark after the language links code with the prose that shares its ref (kit link): ref:name="text" wraps every place the
    fence writes that text in <span data-ref="name">.
      ```ts ref:call="api.call"
@@ -3092,6 +3094,23 @@ h2:not(.minor > h2, dialog h2) {
 		padding-inline-start: calc(var(--indent, 0) * 1ch + 2ch);
 		text-indent: calc(var(--indent, 0) * -1ch - 2ch);
 	}
+}
+
+/* A diff's inserted and deleted lines are tinted across the listing: the code takes the width of its longest line, at least the
+   pre's, and each marked line all of it. */
+pre > code:has(> .code-inserted, > .code-deleted) {
+	display: inline-block;
+	min-inline-size: 100%;
+}
+.code-inserted,
+.code-deleted {
+	min-inline-size: 100%;
+}
+.code-inserted {
+	background: color-mix(in oklab, var(--ok) 9%, transparent);
+}
+.code-deleted {
+	background: color-mix(in oklab, var(--bad) 9%, transparent);
 }
 
 /* Lit code keeps the light tint every lit part has, which leaves the tokens readable, and an accent ring that shows on --sunken. */
@@ -3262,22 +3281,22 @@ pre [data-ref].is-lit {
   </g>
   <text x="104.33500000000001" y="579.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">charts mount</text>
 </g>
-</svg></div><p><span data-ref="file" data-tag="">1</span> <code>pack</code> writes the deflated bytes into the script's <code>data-deflate</code>. A loader decodes them <span data-ref="atob" data-tag="">2</span>, inflates them <span data-ref="inflate" data-tag="">3</span> and runs the result <span data-ref="run" data-tag="">4</span>. <span data-ref="mount" data-tag="">5</span> <code>charts.js</code> mounts a chart once <code>echartsReady</code> has resolved.</p><pre><code class="language-diff"><span class="code-line">--- skills/explainer/src/kit.ts</span>
-<span class="code-line"><span class="tok-inserted">+		deflate: </span><span data-ref="file"><span class="tok-inserted">deflateRawSync</span></span><span class="tok-inserted">(text.slice(header.length), { level: 9 }).toString(&quot;base64&quot;),</span></span>
+</svg></div><p><span data-ref="file" data-tag="">1</span> <code>pack</code> writes the deflated bytes into the script's <code>data-deflate</code>. A loader decodes them <span data-ref="atob" data-tag="">2</span>, inflates them <span data-ref="inflate" data-tag="">3</span> and runs the result <span data-ref="run" data-tag="">4</span>. <span data-ref="mount" data-tag="">5</span> <code>charts.js</code> mounts a chart once <code>echartsReady</code> has resolved.</p><pre><code class="language-diff-ts"><span class="code-line">--- skills/explainer/src/kit.ts</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		deflate: <span data-ref="file"><span class="tok-function">deflateRawSync</span></span>(text.<span class="tok-function">slice</span>(header.length), { level: <span class="tok-number">9</span> }).<span class="tok-function">toString</span>(<span class="tok-string">&quot;base64&quot;</span>),</span>
 <span class="code-line">--- skills/explainer/src/pack.ts</span>
-<span class="code-line"><span class="tok-deleted">-	`&lt;script${type ? ` type=&quot;${type}&quot;` : &quot;&quot;}>${safeScript(readKitText(path))}&lt;/script>`,</span></span>
-<span class="code-line"><span class="tok-inserted">+	`&lt;script${type ? ` type=&quot;${type}&quot;` : &quot;&quot;}${deflate ? ` </span><span data-ref="file"><span class="tok-inserted">data-deflate</span></span><span class="tok-inserted">=&quot;${deflate}&quot;` : &quot;&quot;}>${safeScript(text)}&lt;/script>`,</span></span>
-</code></pre><pre><code class="language-diff"><span class="code-line">--- skills/explainer/kit/unpack.ts (new)</span>
-<span class="code-line"><span class="tok-inserted">+		const bytes = Uint8Array.from(</span><span data-ref="atob"><span class="tok-inserted">atob(packed)</span></span><span class="tok-inserted">, (char) => char.charCodeAt(0));</span></span>
-<span class="code-line"><span class="tok-inserted">+		const inflated = new Blob([bytes]).stream().pipeThrough(new </span><span data-ref="inflate"><span class="tok-inserted">DecompressionStream</span></span><span class="tok-inserted">(&quot;deflate-raw&quot;));</span></span>
-<span class="code-line"><span class="tok-inserted">+		const script = document.createElement(&quot;script&quot;);</span></span>
-<span class="code-line"><span class="tok-inserted">+		script.text = await new Response(inflated).text();</span></span>
-<span class="code-line"><span class="tok-inserted">+		</span><span data-ref="run"><span class="tok-inserted">document.head.append(script)</span></span><span class="tok-inserted">;</span></span>
-<span class="code-line"><span class="tok-inserted">+	window.echartsReady = unpack();</span></span>
-</code></pre><pre><code class="language-diff"><span class="code-line">--- skills/explainer/kit/charts.ts</span>
-<span class="code-line"><span class="tok-deleted">-	if (!window.echarts) {</span></span>
-<span class="code-line"><span class="tok-inserted">+	if (!(window.echarts || </span><span data-ref="mount"><span class="tok-inserted">window.echartsReady</span></span><span class="tok-inserted">)) {</span></span>
-<span class="code-line"><span class="tok-inserted">+		</span><span data-ref="mount"><span class="tok-inserted">window.echartsReady</span></span><span class="tok-inserted">,</span></span>
+<span class="code-line code-deleted" style="--indent:2;"><span class="tok-deleted">-</span>	<span class="tok-string">`&lt;script</span>${type ? <span class="tok-string">` type=&quot;</span>${<span class="tok-keyword">type</span>}<span class="tok-string">&quot;`</span> : <span class="tok-string">&quot;&quot;</span>}<span class="tok-string">></span>${<span class="tok-function">safeScript</span>(<span class="tok-function">readKitText</span>(path))}<span class="tok-string">&lt;/script>`</span>,</span>
+<span class="code-line code-inserted" style="--indent:2;"><span class="tok-inserted">+</span>	<span class="tok-string">`&lt;script</span>${type ? <span class="tok-string">` type=&quot;</span>${<span class="tok-keyword">type</span>}<span class="tok-string">&quot;`</span> : <span class="tok-string">&quot;&quot;</span>}${deflate ? <span class="tok-string">` </span><span data-ref="file"><span class="tok-string">data-deflate</span></span><span class="tok-string">=&quot;</span>${deflate}<span class="tok-string">&quot;`</span> : <span class="tok-string">&quot;&quot;</span>}<span class="tok-string">></span>${<span class="tok-function">safeScript</span>(text)}<span class="tok-string">&lt;/script>`</span>,</span>
+</code></pre><pre><code class="language-diff-ts"><span class="code-line">--- skills/explainer/kit/unpack.ts (new)</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		<span class="tok-keyword">const</span> bytes = Uint8Array.<span class="tok-function">from</span>(<span data-ref="atob"><span class="tok-function">atob</span>(packed)</span>, (char) => char.<span class="tok-function">charCodeAt</span>(<span class="tok-number">0</span>));</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		<span class="tok-keyword">const</span> inflated = <span class="tok-keyword">new</span> <span class="tok-type">Blob</span>([bytes]).<span class="tok-function">stream</span>().<span class="tok-function">pipeThrough</span>(<span class="tok-keyword">new</span> <span data-ref="inflate"><span class="tok-type">DecompressionStream</span></span>(<span class="tok-string">&quot;deflate-raw&quot;</span>));</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		<span class="tok-keyword">const</span> script = document.<span class="tok-function">createElement</span>(<span class="tok-string">&quot;script&quot;</span>);</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		script.text = <span class="tok-keyword">await</span> <span class="tok-keyword">new</span> <span class="tok-type">Response</span>(inflated).<span class="tok-function">text</span>();</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		<span data-ref="run">document.head.<span class="tok-function">append</span>(script)</span>;</span>
+<span class="code-line code-inserted" style="--indent:2;"><span class="tok-inserted">+</span>	window.echartsReady = <span class="tok-function">unpack</span>();</span>
+</code></pre><pre><code class="language-diff-ts"><span class="code-line">--- skills/explainer/kit/charts.ts</span>
+<span class="code-line code-deleted" style="--indent:2;"><span class="tok-deleted">-</span>	<span class="tok-keyword">if</span> (!window.echarts) {</span>
+<span class="code-line code-inserted" style="--indent:2;"><span class="tok-inserted">+</span>	<span class="tok-keyword">if</span> (!(window.echarts || <span data-ref="mount">window.echartsReady</span>)) {</span>
+<span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		<span data-ref="mount">window.echartsReady</span>,</span>
 </code></pre></section><section><h2>Deflate-raw ties for smallest on our browser baseline</h2><div class="scroll"><table class="compare"><thead><tr><th>Alternative</th><th>In the page</th><th>Why</th></tr></thead><tbody><tr data-state="fit"><th scope="row">deflate-raw in base64</th><td data-label="In the page">418 KB</td><td data-label="Why">Shipped: tied smallest for Chrome 103, Firefox 113 and Safari 16.4.</td></tr><tr data-state="out"><th scope="row">gzip</th><td data-label="In the page">418 KB</td><td data-label="Why">The same size as deflate-raw.</td></tr><tr data-state="out"><th scope="row">Brotli</th><td data-label="In the page">344 KB</td><td data-label="Why">Smaller, but DecompressionStream does not read it in those baseline versions.</td></tr><tr data-state="out"><th scope="row">Bytes as Latin-1 text</th><td data-label="In the page">470 KB</td><td data-label="Why">Larger than base64 once the page is UTF-8.</td></tr><tr data-state="out"><th scope="row">Island bundle, plain</th><td data-label="In the page">60 to 300 KB</td><td data-label="Why">Must run before the views and steps scripts; waiting to unpack would delay them.</td></tr><tr data-state="out"><th scope="row">CSS, plain</th><td data-label="In the page"></td><td data-label="Why">CSS cannot wait for a script.</td></tr></tbody></table></div></section><section><h2>A browser without deflate-raw support keeps the drawn charts</h2><p>The <code>deflate-raw</code> format needs Chrome 103, Firefox 113 or Safari 16.4. On older browsers the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.</p></section><section class="band"><h2>Approve shipping <span class="cased">ECharts</span> compressed?</h2><fieldset data-reply aria-label="Approve shipping ECharts compressed?"><div class="seg"><label><input type="radio" name="verdict" value="approve" id="verdict-approve"/><span data-recommended="Recommended">Approve</span></label><label><input type="radio" name="verdict" value="changes" id="verdict-changes"/><span>Request changes</span></label><label><input type="radio" name="verdict" value="ask" id="verdict-ask"/><span>Ask a question</span></label></div><textarea rows="1" data-grow class="note" id="verdict.note" data-note aria-label="Note: Approve shipping ECharts compressed?" placeholder="Note for the agent"></textarea></fieldset></section></div></main>
 <script type="application/json" id="explainer-islands">[{"m":0,"e":"Plot","p":{"label":"ECharts in a chart page: 931 KB plain, 418 KB compressed","height":"clamp(10rem, 16vw, 14rem)","option":{"horizontal":true,"categories":[{"name":"Plain","note":"kit/echarts.js"},{"name":"Compressed","note":"deflate-raw in base64"}],"series":[{"type":"bar","data":[931,418],"fill":["","accent"],"label":{"unit":"KB"}}],"x":{"min":0}}}}]</script>
 <script>/* plot areas: the areas a plot fills and the notes it writes on itself, not referenced from pages: pack joins it in front of

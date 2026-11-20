@@ -26,7 +26,7 @@ flowchart LR
 
 <span data-ref="file">1</span> `pack` writes the deflated bytes into the script's `data-deflate`. A loader decodes them <span data-ref="atob">2</span>, inflates them <span data-ref="inflate">3</span> and runs the result <span data-ref="run">4</span>. <span data-ref="mount">5</span> `charts.js` mounts a chart once `echartsReady` has resolved.
 
-```diff ref:file="deflateRawSync" ref:file='data-deflate'
+```diff-ts ref:file="deflateRawSync" ref:file='data-deflate'
 --- skills/explainer/src/kit.ts
 +		deflate: deflateRawSync(text.slice(header.length), { level: 9 }).toString("base64"),
 --- skills/explainer/src/pack.ts
@@ -34,7 +34,7 @@ flowchart LR
 +	`<script${type ? ` type="${type}"` : ""}${deflate ? ` data-deflate="${deflate}"` : ""}>${safeScript(text)}</script>`,
 ```
 
-```diff ref:atob="atob(packed)" ref:inflate="DecompressionStream" ref:run="document.head.append(script)"
+```diff-ts ref:atob="atob(packed)" ref:inflate="DecompressionStream" ref:run="document.head.append(script)"
 --- skills/explainer/kit/unpack.ts (new)
 +		const bytes = Uint8Array.from(atob(packed), (char) => char.charCodeAt(0));
 +		const inflated = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
@@ -44,7 +44,7 @@ flowchart LR
 +	window.echartsReady = unpack();
 ```
 
-```diff ref:mount="window.echartsReady"
+```diff-ts ref:mount="window.echartsReady"
 --- skills/explainer/kit/charts.ts
 -	if (!window.echarts) {
 +	if (!(window.echarts || window.echartsReady)) {
