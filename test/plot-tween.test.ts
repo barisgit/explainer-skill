@@ -306,28 +306,29 @@ const RESTORED = `import { Explore } from "kit";
 const WATCH_DRAWS = `
 window.plotDraws = [];
 let factory;
+let resizeQueued = false;
 Object.defineProperty(window, "PlotDraw", {
 	get: () => factory,
 	set(value) {
 		factory = (...args) => {
 			const api = value(...args);
-			return { ...api, render(option, ...rest) {
-				window.plotDraws.push(JSON.stringify(option.series));
-				return api.render(option, ...rest);
+			return { ...api, render(option, width, ...rest) {
+				window.plotDraws.push({ data: JSON.stringify(option.series), width });
+				if (!resizeQueued) {
+					resizeQueued = true;
+					// Change the layout after a live draw, not after a guess at how long startup takes.
+					requestAnimationFrame(() => { document.querySelector("#f").style.width = "80%"; });
+				}
+				return api.render(option, width, ...rest);
 			} };
 		};
 	},
-});
-// Startup can redraw identical data at different sizes; that is not an animation of its option.
-addEventListener("load", () => {
-	setTimeout(() => document.querySelector("#f").style.width = "80%", 100);
-	setTimeout(() => document.querySelector("#f").style.width = "", 300);
 });
 `;
 
 /** Observe from before restoration through its first 700 ms, without settling away a possible arrival animation. */
 const drawnOnArrival = (cdp: Cdp) =>
-	cdp.evaluate<string[]>(
+	cdp.evaluate<{ data: string; width: number }[]>(
 		`(async () => {
 			const t0 = performance.now();
 			while (performance.now() - t0 < 700) await new Promise(requestAnimationFrame);
@@ -348,20 +349,21 @@ test("a choice restored on reload draws at once, even while its size settles", a
 		await cdp.load();
 		const seen = await drawnOnArrival(cdp);
 		const endpoints = [restoredSeries(3), restoredSeries(9)];
-		const arrival = JSON.stringify([...new Set(seen)]);
-		expect(seen.at(-1), arrival).toBe(endpoints[1]);
+		const arrival = JSON.stringify(seen);
+		expect(new Set(seen.map(({ width }) => width)).size, arrival).toBeGreaterThan(1);
+		expect(seen.at(-1)?.data, arrival).toBe(endpoints[1]);
 		expect(
-			seen.every((data) => endpoints.includes(data)),
+			seen.every(({ data }) => endpoints.includes(data)),
 			arrival,
 		).toBe(true);
 
 		// A positive control: the same observer must detect interpolated data after the reader acts.
 		await cdp.evaluate(`window.plotDraws = []; ${READER}; document.getElementById("n-0").click()`);
 		const moving = await drawnOnArrival(cdp);
-		const changed = JSON.stringify([...new Set(moving)]);
-		expect(moving.at(-1), changed).toBe(endpoints[0]);
+		const changed = JSON.stringify(moving);
+		expect(moving.at(-1)?.data, changed).toBe(endpoints[0]);
 		expect(
-			moving.some((data) => !endpoints.includes(data)),
+			moving.some(({ data }) => !endpoints.includes(data)),
 			changed,
 		).toBe(true);
 	});
