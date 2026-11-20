@@ -98,19 +98,24 @@ window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
 
 	/** The name beside a stacked segment, level with its middle: right and left of a column, over and under a bar in a row. */
 	function beside(name: string, { bar, box }: PlotBarDrawn, f: PlotNoteFrame): Spot[] {
-		const w = f.textWidth(name);
-		const h = f.line;
 		const [x, y] = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
-		const spots: [PlotBox, PlotSpot["anchor"]][] = bar.horizontal
-			? [
-					[centred(x, box.y0 - GAP - h / 2, w, h), "middle"],
-					[centred(x, box.y1 + GAP + h / 2, w, h), "middle"],
-				]
-			: [
-					[centred(box.x1 + GAP + w / 2, y, w, h), "start"],
-					[centred(box.x0 - GAP - w / 2, y, w, h), "end"],
-				];
-		return spots.map(([b, anchor]) => ({ box: b, lines: [name], anchor, own: box }));
+		if (bar.horizontal) {
+			const w = f.textWidth(name);
+			const h = f.line;
+			return [centred(x, box.y0 - GAP - h / 2, w, h), centred(x, box.y1 + GAP + h / 2, w, h)].map(
+				(b) => ({ box: b, lines: [name], anchor: "middle", own: box }),
+			);
+		}
+		const wrapped = wrap(name, place.longest(name, f), f.textWidth);
+		return (wrapped.length > 1 ? [[name], wrapped] : [[name]]).flatMap((lines): Spot[] => {
+			const w = Math.max(...lines.map(f.textWidth));
+			const h = f.line * lines.length;
+			const mid = Math.min(Math.max(y, h / 2), f.B - h / 2);
+			return [
+				{ box: centred(box.x1 + GAP + w / 2, mid, w, h), lines, anchor: "start", own: box },
+				{ box: centred(box.x0 - GAP - w / 2, mid, w, h), lines, anchor: "end", own: box },
+			];
+		});
 	}
 
 	/** px from a point to a box, 0 inside it. */
@@ -344,6 +349,27 @@ window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
 		return { top: Math.max(0, top - y0), right: Math.max(0, x1 - f.R) };
 	}
 
+	/** Try small gutters first and keep one only if it places more names without crowding one that already fit. */
+	function sideRoom(limit: number, crowdedAt: (right: number) => string[] | undefined) {
+		const plain = limit ? crowdedAt(0) : undefined;
+		if (!plain?.length) {
+			return 0;
+		}
+		let best = 0;
+		let remaining = plain.length;
+		for (let trial = 8; ; trial *= 2) {
+			const right = Math.min(limit, trial);
+			const crowded = crowdedAt(right);
+			if (crowded && crowded.length < remaining && crowded.every((name) => plain.includes(name))) {
+				best = right;
+				remaining = crowded.length;
+			}
+			if (remaining === 0 || right === limit) {
+				return best;
+			}
+		}
+	}
+
 	/**
 	 * The pieces of a level or upright segment from a to b left once it breaks 2 px around each of `labels` it passes, as text
 	 * written over the leader would hide it.
@@ -438,5 +464,5 @@ window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
 		};
 	}
 
-	return { names, room };
+	return { names, room, sideRoom };
 };

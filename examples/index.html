@@ -4376,6 +4376,48 @@ window.PlotAxes = ({ formatter }) => {
   return { numericAxis, categoryAxis, place };
 };
 
+/* Plot axis labels: draws placed axes and tells the layout how much width a category axis needs to retain its tick labels. */
+window.PlotAxisLabels = ({ svgText, svgLine, size, pad, gap }) => {
+  const labelSpacing = (axis, textWidth) => axis.vertical ? size() + 6 : Math.max(...axis.labels.map(textWidth), ...(axis.notes ?? []).map(textWidth)) + 12;
+  function labelEvery(axis, textWidth) {
+    const [first, second] = axis.ticks;
+    if (first === undefined || second === undefined) {
+      return 1;
+    }
+    const step = axis.band || Math.abs(axis.at(second) - axis.at(first));
+    return Math.ceil(labelSpacing(axis, textWidth) / step);
+  }
+  const tickClass = (axis, i, picked) => axis.names && picked === i ? "picked" : axis.notes ? "cat" : "";
+  function tickLabel(axis, t, i, every, { L, B, picked }) {
+    const p = axis.at(t);
+    const text = i % every === 0 ? axis.labels[i] : undefined;
+    if (!text) {
+      return "";
+    }
+    const note = axis.notes?.[i] ?? "";
+    const cls = tickClass(axis, i, picked);
+    const line = axis.notes ? size() + 4 : 0;
+    const [x, y, anchor] = axis.vertical ? [L - gap - 4, p - line / 2, "end"] : [p, B + gap + 3 + size() / 2, "middle"];
+    return svgText(cls, x, y, anchor, text) + (note ? svgText("note", x, y + line, anchor, note) : "");
+  }
+  function draw(ctx) {
+    const { xa, ya, L, R, T, B, H, textWidth } = ctx;
+    let out = "";
+    for (const axis of [xa, ya]) {
+      const every = labelEvery(axis, textWidth);
+      out += axis.ticks.map((t, i) => tickLabel(axis, t, i, every, ctx)).join("");
+    }
+    out += ya.names ? svgLine("axis", xa.at(0), xa.at(0), T, B) : svgLine("axis", L, R, ya.at(0), ya.at(0));
+    out += xa.name ? svgText("name", R, H - size() / 2 - 2, "end", xa.name) : "";
+    out += ya.name ? svgText("name", pad, size() / 2 + 3, "start", ya.name) : "";
+    return out;
+  }
+  function labelSpan(axis, textWidth) {
+    return axis.band && axis.ticks.length > 1 && axis.labels.some(Boolean) ? labelSpacing(axis, textWidth) * axis.ticks.length / labelEvery(axis, textWidth) : 0;
+  }
+  return { labelSpan, draw };
+};
+
 /* plot bar labels: a bar's value label, inside a stacked segment or at a side-by-side bar's end, not referenced from pages: pack
    joins it in front of plot.js with draw.ts, which uses it. PlotBarLabels({ svgLine, svgText, size }) gives barLabel(...), the
    label clear of the markers' lines, and moved across where it would sit on another bar or label; text is set at size() px. */
@@ -4521,17 +4563,22 @@ window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
     return [...over, ...place.pointSpots(name, at, f).map((spot) => ({ ...spot, own: box }))];
   }
   function beside(name, { bar, box }, f) {
-    const w = f.textWidth(name);
-    const h = f.line;
     const [x, y] = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
-    const spots = bar.horizontal ? [
-      [centred(x, box.y0 - GAP - h / 2, w, h), "middle"],
-      [centred(x, box.y1 + GAP + h / 2, w, h), "middle"]
-    ] : [
-      [centred(box.x1 + GAP + w / 2, y, w, h), "start"],
-      [centred(box.x0 - GAP - w / 2, y, w, h), "end"]
-    ];
-    return spots.map(([b, anchor]) => ({ box: b, lines: [name], anchor, own: box }));
+    if (bar.horizontal) {
+      const w = f.textWidth(name);
+      const h = f.line;
+      return [centred(x, box.y0 - GAP - h / 2, w, h), centred(x, box.y1 + GAP + h / 2, w, h)].map((b) => ({ box: b, lines: [name], anchor: "middle", own: box }));
+    }
+    const wrapped = wrap(name, place.longest(name, f), f.textWidth);
+    return (wrapped.length > 1 ? [[name], wrapped] : [[name]]).flatMap((lines) => {
+      const w = Math.max(...lines.map(f.textWidth));
+      const h = f.line * lines.length;
+      const mid = Math.min(Math.max(y, h / 2), f.B - h / 2);
+      return [
+        { box: centred(box.x1 + GAP + w / 2, mid, w, h), lines, anchor: "start", own: box },
+        { box: centred(box.x0 - GAP - w / 2, mid, w, h), lines, anchor: "end", own: box }
+      ];
+    });
   }
   const toBox = ([x, y], b) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
   function owns({ box }, mine, others) {
@@ -4672,6 +4719,25 @@ window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
     const { x1, y0 } = extent(spots.map((s) => s.box));
     return { top: Math.max(0, top - y0), right: Math.max(0, x1 - f.R) };
   }
+  function sideRoom(limit, crowdedAt) {
+    const plain = limit ? crowdedAt(0) : undefined;
+    if (!plain?.length) {
+      return 0;
+    }
+    let best = 0;
+    let remaining = plain.length;
+    for (let trial = 8;; trial *= 2) {
+      const right = Math.min(limit, trial);
+      const crowded = crowdedAt(right);
+      if (crowded && crowded.length < remaining && crowded.every((name) => plain.includes(name))) {
+        best = right;
+        remaining = crowded.length;
+      }
+      if (remaining === 0 || right === limit) {
+        return best;
+      }
+    }
+  }
   function broken(a, b, labels) {
     const upright = a[0] === b[0];
     const [p0, p1] = upright ? [a[1], b[1]] : [a[0], b[0]];
@@ -4725,7 +4791,7 @@ window.PlotBarNames = ({ svgLine, svgText, place, wrap }) => {
       crowded: [...crowded.map((g) => g.name), ...missing.map((m) => m.name)]
     };
   }
-  return { names, room };
+  return { names, room, sideRoom };
 };
 
 /* plot bars: a bar plot's bars and their value labels, not referenced from pages: pack joins it in front of plot.js with draw.ts,
@@ -4896,6 +4962,14 @@ window.PlotDraw = ({ lang, size }) => {
   const { formatter, labeller } = format;
   const pick = window.PlotPick({ esc, formatter, labeller });
   const { numericAxis, categoryAxis, place } = window.PlotAxes({ formatter });
+  const axisLabels = window.PlotAxisLabels({
+    svgLine,
+    svgText,
+    size: () => FONT,
+    pad: PAD,
+    gap: GAP
+  });
+  const drawAxes = (ctx) => axisLabels.draw({ ...ctx, picked: pick.pickedAt(ctx.texts) });
   const seriesColor = (s, i) => s.color ?? `var(--c${i % 6 + 1})`;
   const dashOf = (s, i) => s.dash !== undefined ? s.dash ? AUTHOR_DASH : "" : s.color ? "" : DASHES[i % 6] ?? "";
   const ends = window.PlotEnds({
@@ -4987,40 +5061,6 @@ window.PlotDraw = ({ lang, size }) => {
       return svgLine("stem", cx, cx, base, cy, style) + dot + text;
     }).join("");
   }
-  function labelEvery(axis, textWidth) {
-    const [first, second] = axis.ticks;
-    if (first === undefined || second === undefined) {
-      return 1;
-    }
-    const gap = Math.abs(axis.at(second) - axis.at(first));
-    const room = axis.vertical ? FONT + 6 : Math.max(...axis.labels.map(textWidth), ...(axis.notes ?? []).map(textWidth)) + 12;
-    return Math.ceil(room / gap);
-  }
-  const tickClass = (axis, i, texts) => axis.names && pick.pickedAt(texts) === i ? "picked" : axis.notes ? "cat" : "";
-  function tickLabel(axis, t, i, every, { L, B, texts }) {
-    const p = axis.at(t);
-    const text = i % every === 0 ? axis.labels[i] : undefined;
-    if (!text) {
-      return "";
-    }
-    const note = axis.notes?.[i] ?? "";
-    const cls = tickClass(axis, i, texts);
-    const line = axis.notes ? lineHeight() : 0;
-    const [x, y, anchor] = axis.vertical ? [L - GAP - 4, p - line / 2, "end"] : [p, B + GAP + 3 + FONT / 2, "middle"];
-    return svgText(cls, x, y, anchor, text) + (note ? svgText("note", x, y + line, anchor, note) : "");
-  }
-  function drawAxes(ctx) {
-    const { xa, ya, L, R, T, B, H, textWidth } = ctx;
-    let out = "";
-    for (const axis of [xa, ya]) {
-      const every = labelEvery(axis, textWidth);
-      out += axis.ticks.map((t, i) => tickLabel(axis, t, i, every, ctx)).join("");
-    }
-    out += ya.names ? svgLine("axis", xa.at(0), xa.at(0), T, B) : svgLine("axis", L, R, ya.at(0), ya.at(0));
-    out += xa.name ? svgText("name", R, H - FONT / 2 - 2, "end", xa.name) : "";
-    out += ya.name ? svgText("name", PAD, FONT / 2 + 3, "start", ya.name) : "";
-    return out;
-  }
   function barAxes(option, categories, W, H) {
     const series = option.series ?? [];
     const cols = categories.map((_, i) => series.map((s) => {
@@ -5059,7 +5099,7 @@ window.PlotDraw = ({ lang, size }) => {
       ya: numericAxis(option.y ?? {}, yRange, H, true)
     };
   }
-  function plotBox([xa, ya], [W, H], textWidth, [named, stacked], right) {
+  function plotBox([xa, ya], [W, H], textWidth, named, right) {
     const yLabelWidth = Math.max(0, ...ya.labels.map(textWidth), ...(ya.notes ?? []).map(textWidth));
     const firstHalf = textWidth(xa.labels[0] ?? "") / 2;
     const lastHalf = textWidth(xa.labels.at(-1) ?? "") / 2;
@@ -5069,10 +5109,9 @@ window.PlotDraw = ({ lang, size }) => {
       return share > 0 ? L + (W - ends.room(name, textWidth) - L) / share : W;
     });
     const R = Math.min(W - Math.max(PAD, lastHalf + 4), ...reach);
-    const beside = Math.min(R, ...stacked.map((name) => W - ends.room(name, textWidth)));
     return {
       L,
-      R: Math.floor(Math.max(beside, R - (R - L) * NAME_SHARE) - right),
+      R: Math.floor(R - right),
       T: ya.name ? FONT + 15 : 10,
       B: bottomAt(H, xa.name, Boolean(xa.notes), xa.labels.some(Boolean))
     };
@@ -5094,10 +5133,8 @@ window.PlotDraw = ({ lang, size }) => {
       name,
       x: s.data.filter(finite).at(-1)?.[0] ?? 0
     }));
-    const beside = option.categories && option.stack && !option.horizontal && ends.onMarks(option);
-    const stacked = (beside ? option.series ?? [] : []).flatMap((s) => s.name ? [s.name] : []);
     const box = {
-      ...plotBox([xa, ya], [W, H], textWidth, [named, stacked], extra.right),
+      ...plotBox([xa, ya], [W, H], textWidth, named, extra.right),
       textWidth
     };
     place(xa, box.L, box.R);
@@ -5131,7 +5168,10 @@ window.PlotDraw = ({ lang, size }) => {
   const wider = (a, b) => b === NO_ROOM ? a : { top: Math.max(a.top, b.top), right: Math.max(a.right, b.right) };
   function barRoom(geometry, [W, H, textWidth, shown, texts]) {
     let room = NO_ROOM;
-    if (!ends.onMarks(texts) || texts.stack) {
+    if (geometry.stack) {
+      return stackRoom(geometry, [W, H, textWidth, shown, texts]);
+    }
+    if (!ends.onMarks(texts)) {
       return room;
     }
     let laid = laidOut(geometry, W, H, textWidth, shown, texts);
@@ -5151,26 +5191,52 @@ window.PlotDraw = ({ lang, size }) => {
     const right = Math.min(room.right + Math.ceil(need.right), Math.floor(W * NAME_SHARE));
     return need.top < 1 && right === room.right ? undefined : { top: room.top + Math.ceil(need.top), right };
   }
+  function stackSlack({ ctx: { xa, L, R, textWidth } }) {
+    const span = R - L;
+    return Math.max(0, Math.floor(Math.min(span - axisLabels.labelSpan(xa, textWidth), span * NAME_SHARE)));
+  }
+  function stackRoom(option, [W, H, textWidth, shown, texts]) {
+    const plain = laidOut(option, W, H, textWidth, shown, texts);
+    if (!plain || !ends.onMarks(texts) || option.horizontal) {
+      return NO_ROOM;
+    }
+    const right = barNames.sideRoom(stackSlack(plain), (right) => {
+      const room = { top: 0, right };
+      const laid = right ? laidOut(option, W, H, textWidth, shown, texts, room) : plain;
+      return laid && decoratedBars(option, laid, texts, room)?.named.crowded;
+    });
+    return right ? { top: 0, right } : NO_ROOM;
+  }
   function drawnLayout(option, args, from) {
     const [W, H, textWidth, shown, texts] = args;
     const plain = laidOut(option, W, H, textWidth, shown, texts);
     if (!(plain && ("cat" in plain.axes))) {
       return plain && { laid: plain, room: NO_ROOM };
     }
-    const room = from ? wider(barRoom(texts, args), barRoom(from, args)) : barRoom(texts, args);
+    const end = barRoom(texts, args);
+    const sameLayout = from && Boolean(from.stack) === Boolean(texts.stack) && (!from.stack || Boolean(from.horizontal) === Boolean(texts.horizontal));
+    const reserved = sameLayout ? wider(end, barRoom(from, args)) : end;
+    const room = option.stack && !option.horizontal && reserved.right ? { ...reserved, right: Math.min(reserved.right, stackSlack(plain)) } : reserved;
     const laid = room === NO_ROOM ? undefined : laidOut(option, W, H, textWidth, shown, texts, room);
     return laid ? { laid, room } : { laid: plain, room: NO_ROOM };
   }
-  function barPlot(option, args, { laid, room }) {
-    const texts = args[4];
+  function decoratedBars(option, laid, texts, room) {
     const { drawn, frame } = barsIn(option, laid, texts);
     if (!drawn) {
-      return "";
+      return;
     }
     const nameFrame = { ...frame, ceiling: ceilingOf(frame.T, room) };
     const choose = (spots, placed) => placer.cheapest(spots, frame, [...placed, ...drawn.boxes]);
     const marked = marks.markers(option.marks ?? [], { ...markFrame(laid.ctx), choose }, laid.box.T - 6);
     const named = ends.onMarks(texts) ? barNames.names(option, drawn.drawn, nameFrame, [...drawn.boxes, ...marked.boxes]) : { markup: "", crowded: [] };
+    return { drawn, marked, named };
+  }
+  function barPlot(option, args, { laid, room }) {
+    const parts = decoratedBars(option, laid, args[4], room);
+    if (!parts) {
+      return "";
+    }
+    const { drawn, marked, named } = parts;
     crowded = { notes: [], names: named.crowded, arrows: [] };
     return drawAxes(laid.ctx) + drawn.rects + marked.lines + drawn.labels + marked.labels + named.markup;
   }
@@ -5209,6 +5275,9 @@ window.PlotDraw = ({ lang, size }) => {
     },
     switchedOn: legend.switchedOn,
     markLines(option, W, H, textWidth, texts = option, from) {
+      if (!option.marks?.length) {
+        return 0;
+      }
       const shown = (option.series ?? []).map(() => true);
       return drawnLayout(option, [W, H, textWidth, shown, texts], from)?.laid.rows ?? layoutOf(option, W, H, textWidth).rows;
     },
