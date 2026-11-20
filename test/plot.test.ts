@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import type { Cdp } from "../skills/explainer/src/cdp.ts";
 import { draw, lines, plotDraw, plotDrawAt, rects, texts, width } from "./plot-draw.ts";
 import {
 	act,
@@ -361,6 +362,63 @@ test("live, a narrow bar plot grows by its marker label's lines and keeps its 56
 	// The legend's 8 px, 10 above the row and 26 below it, and the label's lines.
 	expect(state.height).toBeCloseTo(8 + 56 + 36 + state.lines * 17, 0);
 	expect(state.stroke).toEqual([state.under, "1px"]);
+}, 30_000);
+
+/** Reads the Plot's image and legend as Chrome exposes them, and checks that the buttons are not image descendants in HTML. */
+async function expectPlotAccessibility(cdp: Cdp) {
+	expect(
+		await cdp.evaluate(
+			`document.querySelector("#lines .plot-legend button").closest('[role="img"]') === null`,
+		),
+	).toBe(true);
+	const { nodes } = await cdp.send<{
+		nodes: { ignored: boolean; role?: { value: string }; name?: { value: string } }[];
+	}>("Accessibility.getFullAXTree");
+	const names = (role: string) =>
+		nodes.filter((n) => !n.ignored && n.role?.value === role).map((n) => n.name?.value);
+	expect(names("image")).toContain("Two lines");
+	expect(names("button")).toEqual(expect.arrayContaining(["Rising", "Flat"]));
+}
+
+test("Plot exposes the named drawing and keyboard-operable legend as separate AX nodes (#241)", async () => {
+	const output = await packedMdx(
+		dir,
+		"legend-accessibility",
+		`import { Plot } from "kit";
+
+# Plot legend
+
+<Plot id="lines" label="Two lines" option={{ legend: true, series: [{ name: "Rising", data: [[0, 0], [1, 2]] }, { name: "Flat", data: [[0, 1], [1, 1]] }] }} />
+`,
+	);
+	await inPage(output, async (cdp) => {
+		await expectPlotAccessibility(cdp);
+		const press = async (key: string, code: string, keyCode: number) => {
+			for (const type of ["rawKeyDown", "keyUp"]) {
+				await cdp.send("Input.dispatchKeyEvent", {
+					type,
+					key,
+					code,
+					windowsVirtualKeyCode: keyCode,
+				});
+			}
+		};
+		await press("Tab", "Tab", 9);
+		const state = () =>
+			cdp.evaluate(`[
+			document.activeElement.textContent.trim(),
+			document.activeElement.getAttribute("aria-pressed"),
+			document.querySelectorAll("#lines .plot-area path.line").length,
+		]`);
+		expect(await state()).toEqual(["Rising", "true", 2]);
+		await press(" ", "Space", 32);
+		expect(await state()).toEqual(["Rising", "false", 1]);
+		await press("Tab", "Tab", 9);
+		expect(await state()).toEqual(["Flat", "true", 1]);
+		await cdp.send("Emulation.setScriptExecutionDisabled", { value: true });
+		await cdp.load(`file://${output}`);
+		await expectPlotAccessibility(cdp);
+	});
 }, 30_000);
 
 test("a series switched off in the legend shows again when the legend gives way to names at the ends", async () => {
