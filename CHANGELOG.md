@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.16.0
 
 - A ```` ```diff-python ```` fence (`diff-ts`, `diff-<any language pack colours>`) colours each line's code in that language, the old and new side each read as one listing, and every diff fence tints its inserted and deleted lines. `pack` fails on a `diff-<language>` it does not colour; it used to stay plain without a word. A wrapped diff line continues under its code, not under its `+` or `-`.
 - `Plot` marks take an arrow, `{ from: [x, y], to: [x, y], label }`, anchored to data: for a change the reader should follow, such as a peak moving. Labels keep off it and its label is placed as a note; it moves with the plot. In an `Explore`, `pack` warns about a short arrow, a crowded note or name, or unnamed lines in each frame it checks, naming the frame.
