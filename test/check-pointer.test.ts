@@ -172,6 +172,48 @@ test.each(["", "requestAnimationFrame(() => location.href = this.href); return f
 	30_000,
 );
 
+test("a native click reports and closes its new window, but leaves other pages and _self alone (#227)", async () => {
+	const file = dir.write(
+		"window-open.html",
+		`<!doctype html><button id="popup" onclick="window.open('about:blank', 'self'); openUnrelated('')" style="position:fixed;left:20px;top:20px;width:80px;height:40px">Popup</button>
+		<button id="same" onclick="window.open('about:blank', '_self')" style="position:fixed;left:120px;top:20px;width:80px;height:40px">Same page</button>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		await cdp.send("Runtime.addBinding", { name: "openUnrelated" });
+		let unrelated: Promise<{ targetId: string }> | undefined;
+		cdp.on("Runtime.bindingCalled", ({ name }) => {
+			if (name === "openUnrelated") {
+				unrelated = cdp.send("Target.createTarget", { url: "about:blank", background: true });
+			}
+		});
+		const targets = async () =>
+			(
+				await cdp.send<{ targetInfos: { targetId: string; type: string }[] }>("Target.getTargets")
+			).targetInfos
+				.filter(({ type }) => type === "page")
+				.map(({ targetId }) => targetId)
+				.sort();
+		const before = await targets();
+		const popup = await runStep(cdp, "click:60,40", () => "unused");
+		expect(popup.note).toContain("hit button#popup");
+		expect(popup.problem).toContain("opened a new window");
+		if (!unrelated) {
+			throw new Error("the click did not request an unrelated background target");
+		}
+		const surviving = [...before, (await unrelated).targetId].sort();
+		expect(await targets()).toEqual(surviving);
+		const same = await runStep(cdp, "click:160,40", () => "unused");
+		expect(same.problem).toBeUndefined();
+		expect(same.note).toContain("hit button#same");
+		expect(await cdp.evaluate("location.href")).toBe("about:blank");
+		expect(await targets()).toEqual(surviving);
+		expect(page.problems).toEqual([]);
+	});
+}, 30_000);
+
 test("an observed click keeps its hit note beside a settle failure in JSON and text", async () => {
 	const file = dir.path("unsettled.html");
 	const packed = await packHtml(
