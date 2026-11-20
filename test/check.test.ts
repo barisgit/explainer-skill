@@ -208,9 +208,16 @@ test("check names a fix for tiny diagram text, and takes a diagram held at its r
 	// Held at 341 px: wider than the block's 326 px content box, narrower than its 358 px box with padding.
 	const padded =
 		"sequenceDiagram\n  participant B as Report generation service\n  participant S as Server\n  B->>S: request\n  S-->>B: response";
+	const wide = "R1 supply rail 1k @0,0\nR2 rail 0 2k @100,0 v\nP1 port supply IN @-5,0";
+	const wideMermaid = `sequenceDiagram\n${Array.from({ length: 8 }, (_, n) => `  participant P${n} as Report generation service ${n}`).join("\n")}\n  P0->>P7: request`;
+	const beside = (drawing: string) => `<div class="beside"><p>Details</p>${drawing}</div>`;
 	const body = `<div id="hand"><svg viewBox="0 0 1200 100" width="100%"><text x="10" y="50" font-size="14">Hand-built label</text></svg></div>
 <pre class="mermaid" id="held">${sequence}</pre><pre class="mermaid" id="squeezed">${sequence}</pre>
-<pre class="mermaid" id="padded">${padded}</pre>`;
+<pre class="mermaid" id="padded">${padded}</pre>
+${beside(`<figure><pre class="schematic" id="circuit">${wide}</pre></figure>`)}
+${beside(`<pre class="mermaid" id="sequence">${wideMermaid}</pre>`)}
+${beside('<pre class="schematic" id="fitting">R1 nc nc 1k @0,0</pre>')}
+<pre class="schematic" id="full-width">${wide}</pre>`;
 	const input = dir.write(
 		"tiny.html",
 		`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css"><style>#squeezed > svg { min-width: 0; }</style></head><body><main class="page"><h1>Probe</h1>${body}</main></body></html>`,
@@ -229,6 +236,15 @@ test("check names a fix for tiny diagram text, and takes a diagram held at its r
 	);
 	expect(result.stdout).not.toContain("div#held");
 	expect(result.stdout).not.toContain("div#padded");
+	for (const diagram of ["div#circuit.schematic", "div#sequence.mermaid"]) {
+		const findings = result.stdout
+			.split("\n")
+			.filter((line) => line.includes(`scrolls sideways: ${diagram}`));
+		expect(findings).toHaveLength(1);
+		expect(result.stdout).toContain(`${findings[0]}\n         at: light desktop\n`);
+	}
+	expect(result.stdout).not.toContain("div#fitting");
+	expect(result.stdout).not.toContain("div#full-width");
 }, 30_000);
 
 test("check starts every load with empty page storage, so neither one shot's state nor what the old page writes while leaving reaches the next", async () => {
@@ -326,18 +342,23 @@ test("check stops stepping a stepper once it changes, and says so when its time 
 	expect(result.stdout).not.toContain("figure#redrawn");
 }, 60_000);
 
-test("check warns once per data-ref and per stepper whose linked parts are more than a screen apart, not about parts beside a pinned figure", async () => {
+test("check groups distant refs by the places they link, keeps stepper warnings, and allows parts beside a pinned figure", async () => {
+	const cards = ["input", "power", "output", "return"];
+	const notes = ["load", "bias"];
 	const prose = (n: number) =>
 		"<p>Filler text that pushes the next part further down the page.</p>".repeat(n);
 	const source = dir.write(
 		"linked.html",
 		`<!doctype html><html><head>${VIEWPORT}<link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><h1>Linked</h1>
-<p>The <span data-ref="far">first</span> and <span data-ref="far">second</span> mention, and a <span data-ref="near">near</span> one.</p>
+<p id="mentions">The <span data-ref="far">first</span> and <span data-ref="far">second</span> mention, and a <span data-ref="near">near</span> one.</p>
 <p>Its <span data-ref="near">partner</span> is right under it.</p>
-<p>Call <code data-ref="code">hash</code> with its <code data-ref="code">salt</code>.</p>
+<p id="call">Call <code data-ref="code">hash</code> with its <code data-ref="code">salt</code>.</p>
+<ul id="cards">${cards.map((ref) => `<li data-ref="${ref}">${ref}</li>`).join("")}</ul>
+<div id="notes">${notes.map((ref) => `<p data-ref="${ref}">${ref}</p>`).join("")}</div>
 <figure class="fig" id="reach" data-stepper><p>A short picture</p><ol data-captions><li data-refs="distant">One</li><li>Two</li></ol></figure>
 ${prose(60)}
-<div data-ref="far">The far part</div>
+<div id="far-part" data-ref="far">The far part</div>
+<figure id="system"><svg viewBox="0 0 100 60">${[...cards, ...notes].map((ref, i) => `<rect data-ref="${ref}" x="${i * 10}" width="8" height="20" />`).join("")}</svg></figure>
 <pre><code><span data-ref="code">hash</span>(password, <span data-ref="code">salt</span>)</code></pre>
 <div class="beside"><div>${prose(60)}<p>The <span data-ref="pinned">pinned part</span> stays in view.</p></div>
 <figure class="fig"><svg viewBox="0 0 100 60"><rect data-ref="pinned" width="40" height="20" /></svg></figure></div>
@@ -353,16 +374,25 @@ ${prose(60)}
 	const result = await checkQuick(packed);
 
 	expect(result.code).toBe(0);
-	expect(result.stdout.match(/data-ref "far"/g)).toHaveLength(1);
+	expect(result.stdout.match(/data-ref \("far"\)/g)).toHaveLength(1);
 	expect(result.stdout).toContain(
-		'data-ref "far" links parts more than a screen apart at 1440x900; out of sight of every partner: span "first", span "second", div "The far part". A reader pointing at one cannot see the other',
+		'1 data-ref ("far") links p#mentions and div#far-part more than a screen apart at 1440x900',
 	);
 	// Two mentions in prose and two tokens in a far code block: the mentions do not vouch for each other, nor do the tokens.
 	expect(result.stdout).toContain(
-		'data-ref "code" links parts more than a screen apart at 1440x900; out of sight of every partner: code "hash", code "salt", span "hash" and 1 more.',
+		'1 data-ref ("code") links p#call and pre "hash(password, salt)" more than a screen apart at 1440x900',
 	);
-	expect(result.stdout).not.toContain('data-ref "near"');
-	expect(result.stdout).not.toContain('data-ref "pinned"');
+	const findings = result.stdout
+		.split("\n")
+		.filter((line) => line.includes("more than a screen apart"));
+	expect(findings.filter((line) => line.includes("figure#system"))).toEqual([
+		expect.stringContaining(
+			'4 data-refs ("input", "power", "output" and 1 more) link ul#cards and figure#system',
+		),
+		expect.stringContaining('2 data-refs ("load", "bias") link div#notes and figure#system'),
+	]);
+	expect(result.stdout).not.toContain('"near"');
+	expect(result.stdout).not.toContain('"pinned"');
 	expect(result.stdout).toContain(
 		'figure#tall.fig: its captions and the parts they light are more than a screen apart at 1440x900 (p "Step one, at the top")',
 	);
