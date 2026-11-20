@@ -1,15 +1,17 @@
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions).
-   Per topic, set only the accent, dark enough for white text in light mode and light in dark mode:
+   Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
+   (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
    <html data-scheme="dark">; charts and diagrams follow it too.
    The accent has one meaning, the finding: the headline phrase (h1 em), and on a chart the series or bar the page is about
    (color: "var(--accent)"). Series default to --c1..--c6, muted inks told apart by lightness, a line also by its dash, and best by
-   the names on them; keep each compared thing in the same one on every chart and view. A mark takes one of the accent's three
-   states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as a background),
-   for done, planned and estimated, say.
+   the names on them; keep each compared thing in the same one on every chart and view. Categories that are colours by nature
+   (energy sources, parties) take real hues: --c1..--c6 on :root, as light-dark() pairs like the accent. A mark takes one of the
+   accent's three states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as
+   a background), for done, planned and estimated, say.
    Classes: page masthead lede next meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
