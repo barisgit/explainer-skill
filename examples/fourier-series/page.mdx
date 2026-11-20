@@ -7,7 +7,7 @@ import { termsFrame } from "./terms.ts";
 import { LIMIT, JUMP, stems, fixed, overshoot, pct, peak, peakAt, sumLine, THOUSAND } from "./fourier.ts";
 import "./colours.css";
 
-# Add a thousand sines and the corner still overshoots by {pct(overshoot(peak(THOUSAND)), 0)}.
+# Add a thousand sines and the corner still overshoots by *{pct(overshoot(peak(THOUSAND)), 0)}*.
 
 The jump from −1 to +1 is {JUMP}; the sum peaks at {fixed(peak(THOUSAND))}, {fixed(peak(THOUSAND) - 1)} above the plateau, which is {pct(overshoot(peak(THOUSAND)), 2)} of the jump.
 

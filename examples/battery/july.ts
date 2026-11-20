@@ -107,9 +107,8 @@ export function july(size: number) {
 								? `battery until ${clock(empty)}, then bought ${r1(bought)} kWh`
 								: `battery all night, ${r1(spare)} kWh never used`,
 				},
-				...(size > 0
-					? [{ at: [full, roof(full, JUL)], label: `battery full ${clock(full)}` }]
-					: []),
+				// Keep this point's slot at zero so the other marks can still tween by position.
+				{ at: [full, roof(full, JUL)], label: size > 0 ? `battery full ${clock(full)}` : "" },
 			],
 		},
 	};
