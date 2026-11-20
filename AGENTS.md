@@ -148,6 +148,12 @@ Open work lives in [GitHub Issues](https://github.com/barisgit/explainer-skill/i
 
 Conventional Commits (`feat(kit):`, `fix(check):`, `chore:`, `test:`, `docs:`), one change per commit, explicit paths when staging. Gates pass on every commit. The public remote is `github.com/barisgit/explainer-skill` (MIT); releases are tags such as `v0.1.0`, which Caplet installs pin.
 
+## Pull requests
+
+Lead with **What changed and why**. Under **Evidence**, link the covering test files at the PR's head SHA and the CI run for that exact head. For visible changes, show before and after in light and dark, on desktop and phone where layout matters. For an interaction, include an animated WebP. Say what was not verified.
+
+Keep PR media off `main`: put it on the orphan `pr-media` branch under `<pr-branch>/` and embed it as `https://github.com/barisgit/explainer-skill/blob/pr-media/<pr-branch>/<file>?raw=true`. GitHub renders PNGs and animated WebPs inline; a repo-relative `<video>` does not play. Keep clips small: capture a few frames with `check --do shot:<css>` and encode them with ffmpeg's `libwebp_anim`, as the [encoder](build/media/encode.ts) used by `build/media.ts` does. If a push to `pr-media` is rejected because it advanced, fetch, rebase your media commit onto it and push again; never force-push it.
+
 ## Working in parallel
 
 Each change lives on its own branch in its own worktree (a Superset workspace, or `.worktrees/<name>`, which is ignored) and lands on `main` as a fast-forward once GitHub CI on its pull request passed on the exact head. A pull request that conflicts with `main` gets no CI run and no failure signal (`gh pr view <n> --json mergeable` shows it), so bring the branch up to date first. Every test page launches Chrome, so locally run the test files you touched, lint and the typecheck, and let the pull request's CI run the full gate: two full suites at once slow each other and the machine. Run one Chrome-driving command at a time, and leave no Chrome, profile or scratch directory behind.
