@@ -3,6 +3,7 @@ import { readFileSync, statSync } from "node:fs";
 import { runKitPart } from "../skills/explainer/src/kit.ts";
 import { pageDrawer } from "../skills/explainer/src/mdx/draw.ts";
 import { runStep } from "../skills/explainer/src/steps.ts";
+import { init as initSsr } from "../skills/explainer/vendor/echarts-ssr.js";
 import {
 	act,
 	DESKTOP,
@@ -482,16 +483,8 @@ test("a step keeps the chart's series views, so ECharts tweens from the shown st
 /** A page with a Chart, so it carries the charts runtime. */
 const WITH_CHART = `import { Chart } from "kit";\n\n# Charts\n\n<Chart label="Bars" option={{ xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "bar", data: [1] }] }} />\n`;
 
-/**
- * Page functions: `made`, a Charts.make handle on a new element once its chart has mounted, and `quiet`, which runs `fn` without
- * the one error ECharts logs for any baseOption (it sets baseOption.timeline, a component the kit does not bundle).
- */
-const MADE = `const quiet = async (fn) => {
-	const error = console.error;
-	console.error = (...args) => String(args[0]).includes("Component timeline is used but not imported") || error(...args);
-	try { return await fn(); } finally { console.error = error; }
-};
-const made = (option) => new Promise((done) => {
+/** Page function: a Charts.make handle on a new element once its chart has mounted. */
+const MADE = `const made = (option) => new Promise((done) => {
 	const el = document.createElement("div");
 	el.className = "chart";
 	document.querySelector("main").append(el);
@@ -528,14 +521,12 @@ test("a replaced series list draws what a fresh mount of the saved option draws"
 			// A step of a baseOption chart keeps its series views as a root option's does.
 			const base = (data) => ({ baseOption: { ...axes, series: [{ type: "line", data }, { type: "bar", data }] } });
 			const views = (handle) => handle.chart.getModel().getSeries().map((s) => handle.chart.getViewOfSeriesModel(s).group.id);
-			await quiet(async () => {
-				const stepped = await made(base([1, 2]));
-				const before = views(stepped);
-				stepped.set(base([3]), ["series"]);
-				if (views(stepped).join() !== before.join()) {
-					failures.push("baseOption views " + before + " became " + views(stepped));
-				}
-			});
+			const stepped = await made(base([1, 2]));
+			const before = views(stepped);
+			stepped.set(base([3]), ["series"]);
+			if (views(stepped).join() !== before.join()) {
+				failures.push("baseOption views " + before + " became " + views(stepped));
+			}
 			return failures;
 		})()`,
 			true,
@@ -678,15 +669,13 @@ test("a chart arrives drawn: no entrance animation, even where motion is allowed
 				{ baseOption: { ...axes, series, animation: false } },
 			];
 			const found = [];
-			await quiet(async () => {
-				for (const option of options) {
-					const el = document.createElement("div");
-					el.className = "chart";
-					document.querySelector("main").append(el);
-					found.push(await new Promise((done) => Charts.make(el, option, (chart) =>
-						done({ arriving: !chart.getZr().animation.isFinished(), animation: chart.getOption().animation }))));
-				}
-			});
+			for (const option of options) {
+				const el = document.createElement("div");
+				el.className = "chart";
+				document.querySelector("main").append(el);
+				found.push(await new Promise((done) => Charts.make(el, option, (chart) =>
+					done({ arriving: !chart.getZr().animation.isFinished(), animation: chart.getOption().animation }))));
+			}
 			return found;
 		})()`,
 			true,
@@ -931,7 +920,7 @@ test("treemap accent labels follow responsive, base and later data, without chan
 				probe.remove();
 			};
 			for (const [i, option] of cases.entries()) {
-				const handle = await quiet(() => made(option)); check(handle, "override " + i); handle.dispose();
+				const handle = await made(option); check(handle, "override " + i); handle.dispose();
 			}
 			const sparse = await made({ series: [{ id: "other", type: "pie", data: [1] }, { ...base.series[0], id: "tree" }], media: [{ query: { minWidth: 0 }, option: { series: [{ id: "tree", data }] } }] });
 			const sparseColor = sparse.chart.getOption().series[1].data[0].label?.color;
@@ -950,6 +939,32 @@ test("treemap accent labels follow responsive, base and later data, without chan
 	);
 	expect(result).toEqual([]);
 }, 30_000);
+
+test("SSR draws the selected media option without logging a missing timeline (#211)", () => {
+	const chart = initSsr(null, undefined, { renderer: "svg", ssr: true, width: 400, height: 300 });
+	const error = console.error;
+	const errors: unknown[] = [];
+	console.error = (...args) => errors.push(...args);
+	try {
+		chart.setOption({
+			baseOption: {
+				xAxis: { type: "category", data: ["a"] },
+				yAxis: {},
+				series: [{ type: "bar", data: [1] }],
+			},
+			media: [{ query: { minWidth: 350 }, option: { series: [{ data: [2] }] } }],
+		});
+		expect(chart.getOption()).toMatchObject({ series: [{ data: [2] }] });
+		expect(errors).toEqual([]);
+		chart.setOption({ timeline: {} });
+		expect(errors).toEqual([
+			expect.stringContaining("Component timeline is used but not imported"),
+		]);
+	} finally {
+		console.error = error;
+		chart.dispose();
+	}
+});
 
 test("pack draws accent label ink in media treemap data and defaults cover timeline options", () => {
 	const drawer = pageDrawer("en", []);
