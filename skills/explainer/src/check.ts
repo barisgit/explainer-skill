@@ -3,6 +3,7 @@ import { basename, join, resolve } from "node:path";
 import { ChromeError } from "./cdp.ts";
 import { CheckedPage, type Screen } from "./checked-page.ts";
 import { withPage } from "./chrome.ts";
+import { CONTRAST_JS } from "./contrast.ts";
 import { sweepControls } from "./control-sweep.ts";
 import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
@@ -34,7 +35,8 @@ export interface ElementShot {
  * `elements` are the `--do shot:` PNGs, in step order (overview only; views run no steps).
  * `problems` fail the check; `warnings` are worth a look but do not (console warnings, sideways-scrolling containers, tiny diagram text,
  * a missing viewport meta, content cut off in a clipping box, a diagram or chart taller than 1.5 viewports, a stepper whose steps
- * change only its captions, linked parts more than a screen apart (desktop width), an incomplete scroll sweep, visible fixed elements omitted from a full-page PNG).
+ * change only its captions, linked parts more than a screen apart (desktop width), a colour token under the contrast its use needs
+ * (CONTRAST_JS, desktop width), an incomplete scroll sweep, visible fixed elements omitted from a full-page PNG).
  */
 export interface Shot {
 	theme: string;
@@ -276,6 +278,11 @@ async function shootOverview(run: Run, screen: Screen) {
 		problems.push(...controls.problems);
 		warnings.push(...controls.warnings);
 	}
+	// Last on this load, since its probe touches the page. Each theme resolves light-dark() its own way; the desktop overview
+	// stands for the widths, as page rules rarely set tokens per width.
+	if (name === "desktop") {
+		warnings.push(...(await run.page.cdp.evaluate<string[]>(CONTRAST_JS)));
+	}
 	run.shots.push({
 		theme,
 		viewport: `${name} ${vp.width}x${vp.height}`,
@@ -396,7 +403,7 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
  * Reports as problems console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
  * missing viewport meta, tall diagrams and charts, steppers that change only their captions, linked parts more than a screen apart
- * (LINKED_JS, light desktop only) and incomplete scroll sweeps. Reduced motion is emulated so animations are
+ * (LINKED_JS, light desktop only), colour tokens under the contrast their use needs (CONTRAST_JS, desktop) and incomplete scroll sweeps. Reduced motion is emulated so animations are
  * finished in the shots.
  * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed
  * `opts.timeoutSeconds`. The PNGs of a run that succeeds replace those of the same name in `outDir`.

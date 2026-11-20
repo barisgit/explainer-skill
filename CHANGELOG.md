@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `check` warns when a colour token is too faint for its use, in either scheme: `--accent` as text on the page's tones (4.5:1), `--accent-ink` on the accent (4.5:1), and `--c1`..`--c6` as marks on `--bg` (3:1), also where an element sets its own accent. The warning names the token, scheme, element, the ratio and the colour it was measured on.
+
 ## v0.14.0
 
 - Replies can come back by themselves: `serve artifact.html` serves the packed page at one URL, prints each reply as it arrives (`--wait`: the next one, then exits) and keeps it as `.md` and `.json` beside the page in `replies/`. A changed file is served as the next version, and readers' unsent answers carry over. The reply dialog then has the reader's name and Send beside Copy; Send says "Sent." only for the server's receipt (else that it failed, or that delivery could not be confirmed) and clears nothing; sending the same reply again stores it once. `serve` needs a page with a reply question or `reply: true`, packed with this version. `serve --host 0.0.0.0` lets a team on the same network open the page; the API is anonymous, so only on a trusted network. A copy opened from a file or an email sends to the frontmatter `replyTo`, the URL `serve` prints. Without either, the page copies only, as before.
