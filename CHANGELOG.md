@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A `Chart`'s legend keeps its room under your own `grid: { bottom }` or `top`: the larger of your bottom and the legend's room is used, so the legend no longer covers the x-axis labels. A grid `height`, a legend position or grid bounds in a `media` option you set still win.
+
 ## v0.16.0
 
 - A ```` ```diff-python ```` fence (`diff-ts`, `diff-<any language pack colours>`) colours each line's code in that language, the old and new side each read as one listing, and every diff fence tints its inserted and deleted lines. `pack` fails on a `diff-<language>` it does not colour; it used to stay plain without a word. A wrapped diff line continues under its code, not under its `+` or `-`.
