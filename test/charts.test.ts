@@ -42,6 +42,17 @@ test("colour tokens resolve in any element of a series' data, not only when it s
 	expect(await packAndRun(dir, "mixed", PAGE)).toEqual([]);
 }, 30_000);
 
+test("colour tokens resolve where the chart is, so a block that sets its own accent keeps it after the live chart mounts", async () => {
+	const page = PAGE.replace(
+		'<div class="chart" id="c"></div>',
+		'<div style="--accent: #123456"><div class="chart" id="c"></div></div>',
+	)
+		.replace('itemStyle: { color: "var(--c3)" }', 'itemStyle: { color: "var(--accent)" }')
+		.replace("/^rgba?\\(/.test(color) ? []", 'color.replace(/\\s/g, "") === "rgb(18,52,86)" ? []');
+	expect(page).toContain("rgb(18,52,86)");
+	expect(await packAndRun(dir, "scoped", page)).toEqual([]);
+}, 30_000);
+
 test("a wrapped horizontal legend leaves the grid clear on phones", async () => {
 	const page = PAGE.replace(
 		/var contract =[\s\S]*<\/script>/,

@@ -7,9 +7,8 @@
 	}
 	const probe = document.createElement("i");
 	probe.hidden = true;
-	document.documentElement.append(probe);
 
-	// The chart whose text is being sized: its element inherits the label and text sizes, which a band or page may set.
+	// The chart whose text and colours are being resolved: its element inherits the label and text sizes, which a band or page may set.
 	let sizing: HTMLElement = document.documentElement;
 	/** px: a size token (--size-label, --size-text) as `el` inherits it, read from a probe placed in it for the moment. */
 	function tokenSize(token: string, el: HTMLElement = sizing) {
@@ -23,8 +22,20 @@
 	}
 	const labelSize = (el?: HTMLElement) => tokenSize("--size-label", el);
 
+	/**
+	 * Puts the colour probe in the chart being drawn (`sizing`), so a token a block sets for itself, such as its own --accent,
+	 * resolves as it does there, as pack's drawing does.
+	 */
+	function placeProbe() {
+		const host = sizing.isConnected ? sizing : document.documentElement;
+		if (probe.parentElement !== host) {
+			host.append(probe);
+		}
+	}
+
 	/** Resolves `var(--name)` to the colour for the current scheme (light-dark() included). */
 	function color(name: string) {
+		placeProbe();
 		probe.style.color = `var(--${name})`;
 		return getComputedStyle(probe).color;
 	}
@@ -34,6 +45,7 @@
 
 	/** Concrete rgb(a) for a CSS colour expression in the current scheme. */
 	function resolve(expr: string) {
+		placeProbe();
 		probe.style.color = expr;
 		const computed = getComputedStyle(probe).color;
 		if (computed.startsWith("rgb") || !pixel) {
