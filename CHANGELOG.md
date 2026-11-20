@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `Plot` marks take an arrow, `{ from: [x, y], to: [x, y], label }`, anchored to data: for a change the reader should follow, such as a peak moving. Labels keep off it and its label is placed as a note; it moves with the plot. In an `Explore`, `pack` warns about a short arrow, a crowded note or name, or unnamed lines in each frame it checks, naming the frame.
 - Line names are never moved into a legend any more. A `Plot`'s named lines keep their names on the plot at every width: stacked at the ends with leaders, else beside their own line. A `Chart`'s crowded end names move apart about their ends. `pack` warns, naming the line and width, where a name finds no clear place: shorten it, add height, or end the lines further apart. A legend you set, the picked key and the legend of stems and bars stay.
 - A `Chart`'s named lines keep their names at their ends beside your own grid bounds (`grid: { bottom: 24 }`) and an axis `min` or `max` that holds every point; these used to leave the lines with no names at all. Where the kit still cannot name them (zoom, a dataset, an explicit grid `width`, a reversed or second axis, a `textStyle`), `pack` says so: leave that out, or set a legend.
 

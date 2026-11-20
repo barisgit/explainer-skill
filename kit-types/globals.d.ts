@@ -83,12 +83,14 @@ interface PlotMarkNone {
 	at?: never;
 	between?: never;
 	fill?: never;
+	from?: never;
+	to?: never;
 }
 /**
- * A marker or a note, anchored to data, in one of five shapes: x alone a dashed line down the plot, y alone one across it, each
+ * A marker or a note, anchored to data, in one of six shapes: x alone a dashed line down the plot, y alone one across it, each
  * with its label on top; x [from, to] a span, a bracket on top with its label; x [from, to] with between, the region between two
  * series (by name) or a series and a value, filled when fill is set, its label inside it or beside it; at, a label beside that
- * point.
+ * point; from and to, an arrow from one point to the other, its label beside it.
  */
 type PlotMark =
 	| (Omit<PlotMarkNone, "x"> & { x: number | readonly [number, number]; label?: string })
@@ -99,7 +101,8 @@ type PlotMark =
 			fill?: PlotFill | true;
 			label?: string;
 	  })
-	| (Omit<PlotMarkNone, "at"> & { at: PlotPoint; label: string });
+	| (Omit<PlotMarkNone, "at"> & { at: PlotPoint; label: string })
+	| (Omit<PlotMarkNone, "from" | "to"> & { from: PlotPoint; to: PlotPoint; label?: string });
 
 interface PlotOption {
 	series?: PlotSeries[];
@@ -375,6 +378,12 @@ declare var ChartsEnds: (env: {
 	isObject: (value: unknown) => value is Record<string, unknown>;
 	size: () => number;
 }) => Pick<ReturnType<typeof ChartsOption>, "endNames" | "unnamed" | "spreadEnds">;
+/** What a plot drawn last found no clear place for (notes' labels and line names) and its arrows too short to read. */
+interface PlotCrowded {
+	notes: string[];
+	names: string[];
+	arrows: string[];
+}
 /** See ChartsOption's defaults (kit/parts/charts/defaults.ts). */
 declare var ChartsDefaults: {
 	/** ECharts component matching, shared by responsive defaults and saved-option updates. */
@@ -427,7 +436,7 @@ declare var PlotDraw: (env: {
 	 * What the last render found no clear place for, each drawn on its least bad one: notes by their label, line names by their
 	 * series' name.
 	 */
-	crowded(): { notes: string[]; names: string[] };
+	crowded(): PlotCrowded;
 };
 
 /** A mark's value text from its value, its index in the series and, for a stem, its x. */

@@ -580,6 +580,14 @@ h3,
 	stroke: var(--c);
 	stroke-width: 1.5;
 }
+/* An arrow from one data point to another, in ink over the lines: the change the page points at. */
+.plot svg .arrow {
+	stroke: var(--ink);
+	stroke-width: 1.5;
+}
+.plot svg .arrow-head {
+	fill: var(--ink);
+}
 .plot svg :is(.line, .stem) {
 	fill: none;
 	stroke: var(--c);
@@ -3274,7 +3282,7 @@ pre [data-ref].is-lit {
 <script type="application/json" id="explainer-islands">[{"m":0,"e":"Plot","p":{"label":"ECharts in a chart page: 931 KB plain, 418 KB compressed","height":"clamp(10rem, 16vw, 14rem)","option":{"horizontal":true,"categories":[{"name":"Plain","note":"kit/echarts.js"},{"name":"Compressed","note":"deflate-raw in base64"}],"series":[{"type":"bar","data":[931,418],"fill":["","accent"],"label":{"unit":"KB"}}],"x":{"min":0}}}}]</script>
 <script>/* plot areas: the areas a plot fills and the notes it writes on itself, not referenced from pages: pack joins it in front of
    plot.js with draw.ts, which uses it. PlotAreas({ svgText, svgLine, wrap, area, place }) gives draw(option, frame, taken):
-   the filled lines' areas and the regions between lines (`fills`), and the labels of points and regions (`notes`), placed by
+   the filled lines' areas and the regions between lines (`fills`), and the labels of points, arrows and regions (`notes`), placed by
    place.ts (PlotPlace) clear of the plot's lines, of the labels placed before them and of each other. */
 window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
   const { CLEAR, cheapest, cost, leaderSpots, longest, nearest, pointSpots, spot, widest } = place;
@@ -3478,6 +3486,7 @@ window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
       return { ...region, edges: sides, polygon: [...sides[0], ...[...sides[1]].reverse()] };
     });
   }
+  const middle = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   function draw(option, f, taken, goal) {
     const all = regions(option, f);
     const drawn = all.map((r) => r.fill ? area(r.fill, r.colour, r.polygon) : undefined);
@@ -3485,7 +3494,8 @@ window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
       const k = all.findIndex((r) => r.mark === mark);
       const region = all[k];
       const solid = drawn[k] && !drawn[k].open ? "var(--accent)" : undefined;
-      const at = mark.at && [f.X(mark.at[0]), f.Y(mark.at[1])];
+      const px = (p) => [f.X(p[0]), f.Y(p[1])];
+      const at = mark.at ? px(mark.at) : mark.from && mark.to && middle(px(mark.from), px(mark.to));
       return mark.label && (region || at) ? [{ label: mark.label, at, region: region && { ...region, colour: solid } }] : [];
     });
     const fills = drawn.map((d) => d?.markup ?? "").join("");
@@ -3691,7 +3701,7 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
 
 /* plot draw: what kit:plot.js draws, not referenced from pages: pack joins it in front of plot.js, and runs it itself to draw each
    plot into the page (src/mdx/draw.ts). PlotDraw({ lang, size }) gives render(option, W, H, textWidth, shown), the SVG content,
-   legendMarkup(option, textWidth, H), the legend's buttons (none when names sit at the line ends of an H px high area), and
+   legendMarkup(option), the legend's buttons (none when the lines carry their names), and
    switchedOn(series, off), which series the legend leaves on; numbers are written in lang(), text is set at size() px (the
    theme's --size-label), and textWidth measures a label at that size. Bars' and areas' states and markers are marks.ts's
    (PlotMarks), regions and notes areas.ts's (PlotAreas), bars and their value labels bars.ts's (PlotBars), the lines' ends
@@ -3699,6 +3709,7 @@ window.PlotBars = ({ svgLine, svgText, size, marks, esc, fill, colour, labeller,
    and notes are placed together by place.ts (PlotPlace), after the markers' labels. bands(option, W, H, textWidth) is where a
    bar plot's categories lie along their axis, for code that maps a click to one. */
 window.PlotDraw = ({ lang, size }) => {
+  const SHORT = 6;
   let FONT = size();
   const PAD = 16;
   const GAP = 5;
@@ -3722,7 +3733,7 @@ window.PlotDraw = ({ lang, size }) => {
     area: marks.area,
     place: placer
   });
-  let crowded = [];
+  let crowded = { notes: [], names: [], arrows: [] };
   const format = window.PlotFormat({ lang });
   const { formatter, labeller } = format;
   const pick = window.PlotPick({ esc, formatter, labeller });
@@ -3759,9 +3770,6 @@ window.PlotDraw = ({ lang, size }) => {
     pick
   });
   const bottomAt = (H, xName, notes = false, labelled = true) => Math.floor(H - (labelled ? GAP + FONT + 8 : 4) - (xName ? 22 : 0) - (notes ? lineHeight() : 0));
-  const pointBottom = (option, H) => bottomAt(H, option.x?.name, false, option.x?.labels !== false);
-  const namesAtEnds = (option, textWidth, H) => ends.fit(option, textWidth, pointBottom(option, H));
-  const endNamed = (option, textWidth, H) => ends.named(option, textWidth, pointBottom(option, H));
   const digits = (v) => String(v).replace(/\D/g, "").replace(/^0+/, "");
   function valueAxisOut(option) {
     const key = option.horizontal ? "x" : "y";
@@ -3836,9 +3844,9 @@ window.PlotDraw = ({ lang, size }) => {
       ...unplaced
     };
   }
-  const markedAt = (option, key) => (option.marks ?? []).flatMap((m) => [
+  const markedAt = (option, key, arrows) => (option.marks ?? []).flatMap((m) => [
     ...[m[key] ?? []].flat(),
-    ...m.at ? [m.at[key === "x" ? 0 : 1]] : []
+    ...[m.at, ...arrows ? [m.from, m.to] : []].flatMap((p) => p ? [p[key === "x" ? 0 : 1]] : [])
   ]);
   function place(axis, a, b) {
     if (axis.names) {
@@ -3925,7 +3933,7 @@ window.PlotDraw = ({ lang, size }) => {
     }));
     const sum = (c, sign) => c.filter((v) => v * sign > 0).reduce((a, b) => a + b, 0);
     const ends = cols.flatMap((c) => option.stack ? [sum(c, -1), sum(c, 1)] : c);
-    const marked = markedAt(option, option.horizontal ? "x" : "y");
+    const marked = markedAt(option, option.horizontal ? "x" : "y", false);
     const span = [
       Math.min(0, ...ends, ...marked),
       Math.max(0, ...ends, ...marked)
@@ -3944,8 +3952,8 @@ window.PlotDraw = ({ lang, size }) => {
   }
   function plotAxes(option, W, H) {
     const series = option.series ?? [];
-    const [yMin, yMax] = extent(series, 1, [...markedAt(option, "y"), ...levelsOf(option)]);
-    const [xMin, xMax] = extent(series, 0, markedAt(option, "x"));
+    const [yMin, yMax] = extent(series, 1, [...markedAt(option, "y", true), ...levelsOf(option)]);
+    const [xMin, xMax] = extent(series, 0, markedAt(option, "x", true));
     const room = series.some((s) => s.type === "stem") ? 0.06 : 0;
     const dx = (xMax - xMin) * room;
     const dy = (yMax - yMin) * room;
@@ -3984,7 +3992,7 @@ window.PlotDraw = ({ lang, size }) => {
     FONT = size();
     const axes = option.categories ? barAxes(option, option.categories, W, H) : plotAxes(option, W, H);
     const { xa, ya } = axes;
-    const named = endNamed(option, textWidth, H).map(({ s, name }) => ({
+    const named = ends.named(option, textWidth).map(({ s, name }) => ({
       name,
       x: s.data.filter(finite).at(-1)?.[0] ?? 0
     }));
@@ -3994,7 +4002,7 @@ window.PlotDraw = ({ lang, size }) => {
   }
   function render(option, W, H, textWidth, shown, texts = option) {
     const series = option.series ?? [];
-    crowded = [];
+    crowded = { notes: [], names: [], arrows: [] };
     const laid = laidOut(option, W, H, textWidth, shown, texts);
     if (!laid) {
       return "";
@@ -4010,8 +4018,8 @@ window.PlotDraw = ({ lang, size }) => {
     const going = texts === option ? undefined : laidOut(texts, W, H, textWidth, shown, texts);
     const goal = going && !("cat" in going.axes) ? labelled(texts, { ...going, ...going.axes }) : undefined;
     const { points, marked, named, noted } = labelled(option, { ...laid, ...axes }, goal?.noted.placed);
-    crowded = noted.crowded;
-    return drawAxes(points) + noted.fills + pointMarks(series, points) + marked.lines + named + marked.labels + noted.notes;
+    crowded = { notes: noted.crowded, names: named.crowded, arrows: short(option, points) };
+    return drawAxes(points) + noted.fills + pointMarks(series, points) + marked.lines + named.markup + marked.labels + noted.notes;
   }
   function laidOut(option, W, H, textWidth, shown, texts) {
     const { axes, box, rows } = layoutOf(option, W, H, textWidth);
@@ -4025,6 +4033,7 @@ window.PlotDraw = ({ lang, size }) => {
     const ctx = { xa, ya, L, R, T, B, W, H, textWidth, shown, texts };
     return { axes, box, ctx };
   }
+  const short = (option, { X, Y }) => (option.marks ?? []).flatMap(({ from, to, label }) => from && to && Math.hypot(X(to[0]) - X(from[0]), Y(to[1]) - Y(from[1])) < SHORT ? [label ?? `${JSON.stringify(from)} to ${JSON.stringify(to)}`] : []);
   function labelled(option, { xa, ya, box, ctx }, goal) {
     const points = { ...ctx, xa, ya, X: xa.at, Y: ya.at };
     const frame = { ...points, T: box.T - 10, line: lineHeight(), colour: seriesColor };
@@ -4032,14 +4041,10 @@ window.PlotDraw = ({ lang, size }) => {
     const choose = (spots, placed) => placer.cheapest(spots, labelFrame, placed);
     const marked = marks.markers(option.marks ?? [], { ...markFrame(points), choose }, box.T - 6);
     const placed = [...marked.boxes];
-    const bottom = pointBottom(option, points.H);
-    const named = ends.marks(option, points, bottom, { ...labelFrame, R: points.W - 2 }, placed);
+    const named = ends.marks(option, points, { ...labelFrame, R: points.W - 2 }, placed);
     return { points, marked, named, noted: areas.draw(option, frame, placed, goal) };
   }
-  function legendMarkup(option, textWidth, H) {
-    FONT = size();
-    return legend.markup(option, namesAtEnds(option, textWidth, H));
-  }
+  const legendMarkup = (option) => legend.markup(option, ends.fit(option));
   return {
     render,
     legendMarkup,
@@ -4051,13 +4056,15 @@ window.PlotDraw = ({ lang, size }) => {
   };
 };
 
-/* plot ends: what a plot's lines say at their ends, their names in place of a legend and a labelled line's last value, not
-   referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({ svgLine, svgText, size,
-   place, format, colour, dash, wrap }) gives fit(...), whether the names go at the ends; named(...), the lines with text there;
-   room(...), the room a name takes right of the plot; and marks(...), the texts drawn, placed with the plot's other labels. */
+/* plot ends: what a plot's lines say on themselves, their names (a plot never falls back to a legend for them) and a labelled
+   line's last value, not referenced from pages: pack joins it in front of plot.js with draw.ts, which uses it. PlotEnds({
+   svgLine, svgText, size, place, format, colour, dash, wrap }) gives fit(option), whether the lines carry their names;
+   named(...), the lines with text at their ends; room(...), the room a name takes right of the plot; and marks(...), the texts
+   drawn, placed with the plot's other labels, and the series whose name found no clear place. */
 window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }) => {
   const END_GAP = 6;
   const LEADER = 10;
+  const ALONG = 8;
   const NARROWEST = 288;
   const NAMES_SHARE = 0.45;
   const step = () => size() + 3;
@@ -4076,15 +4083,17 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
     return label && last && finite(last) ? label(last[1], k, last[0]) : "";
   }
   const nameAndValue = (option, s) => [s.name, lastValue(option, s)].filter(Boolean).join(": ");
-  function fits(option, textWidth, bottom) {
+  function fits(option) {
     const named = (option.series ?? []).filter((s) => s.name);
-    return option.legend === undefined && !option.categories && named.length > 0 && (named.length - 1) * step() <= bottom - size() / 2 && named.every((s) => (s.type ?? "line") === "line" && across(textWidth(nameAndValue(option, s))) <= NARROWEST * NAMES_SHARE);
+    return option.legend === undefined && !option.categories && named.length > 0 && named.every((s) => (s.type ?? "line") === "line");
   }
-  function named(option, textWidth, bottom) {
-    const names = fits(option, textWidth, bottom);
+  function named(option, textWidth) {
+    const names = fits(option);
+    const fitted = (text) => text && wrapped(text, textWidth).length ? text : "";
     return (option.series ?? []).flatMap((s, i) => {
-      const name = names && s.name ? nameAndValue(option, s) : lastValue(option, s);
-      return name && wrapped(name, textWidth).length ? [{ s, i, name }] : [];
+      const own = names && s.name;
+      const kept = own ? fitted(nameAndValue(option, s)) || own : fitted(lastValue(option, s));
+      return kept ? [{ s, i, name: kept }] : [];
     });
   }
   function classic({ name, at, colour, dash }, y, f) {
@@ -4107,7 +4116,7 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
       [name],
       ...cut > 0 ? [[name.slice(0, cut + 1), name.slice(cut + 2)]] : [],
       wrapped(name, f.textWidth)
-    ];
+    ].filter((lines) => lines.length);
     return layouts.flatMap((lines) => {
       const w = Math.max(...lines.map(f.textWidth));
       const h = lines.length * f.line;
@@ -4126,11 +4135,47 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
       ];
     });
   }
+  function distance([x, y], line) {
+    let least = Number.POSITIVE_INFINITY;
+    for (const [i, [x1, y1]] of line.entries()) {
+      const [x2, y2] = line[i + 1] ?? [x1, y1];
+      const [dx, dy] = [x2 - x1, y2 - y1];
+      const along = dx || dy ? ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy) : 0;
+      const t = Math.min(Math.max(along, 0), 1);
+      least = Math.min(least, Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)));
+    }
+    return least;
+  }
+  function owns({ box }, line, others) {
+    const middle = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2];
+    const own = distance(middle, line);
+    return others.every((other) => distance(middle, other) > own);
+  }
+  function along(line, t) {
+    const lengths = line.slice(1).map((q, i) => {
+      const p = line[i];
+      return Math.hypot(q[0] - p[0], q[1] - p[1]);
+    });
+    let left = t * lengths.reduce((sum, l) => sum + l, 0);
+    for (const [i, l] of lengths.entries()) {
+      const [p, q] = [line[i], line[i + 1]];
+      if (left <= l) {
+        const u = l ? left / l : 0;
+        return [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
+      }
+      left -= l;
+    }
+    return line.at(-1);
+  }
+  function alongSpots({ name, line }, f) {
+    const points = Array.from({ length: ALONG }, (_, k) => along(line, (ALONG - k) / (ALONG + 1)));
+    return points.flatMap((p) => p ? place.pointSpots(name, p, f).filter((s) => !s.leader) : []);
+  }
   function spotText({ box, lines, anchor }, line) {
     const x = anchor === "start" ? box.x0 : anchor === "end" ? box.x1 : (box.x0 + box.x1) / 2;
     return lines.map((t, k) => svgText("end", x, box.y0 + line / 2 + k * line, anchor, t)).join("");
   }
-  function spread(list, f, placed) {
+  function spread(list, f, placed, lines) {
     const ends = list.map((end) => {
       const x0 = end.at.x + END_GAP;
       return { end, y: end.at.y, x0, x1: x0 + LEADER + f.textWidth(end.name) };
@@ -4145,22 +4190,60 @@ window.PlotEnds = ({ svgLine, svgText, size, place, format, colour, dash, wrap }
       const below = ends.slice(k + 1).filter(sharing(end));
       end.y = Math.min(end.y, f.B, ...below.map((other) => other.y - step()));
     }
-    return ends.map(({ end, y }) => {
+    const crowded = [];
+    const markup = ends.map(({ end, y }) => {
       const first = classic(end, y, f);
-      const beside = besideSpots(end, f);
-      const spots = first.box.x1 <= f.R ? [first, ...beside] : beside;
-      const chosen = place.cheapest(spots, f, placed) ?? first;
+      const others = lines.filter((line) => line !== end.line);
+      const { chosen, clear } = choose(end, first, others, f, placed);
+      if (!clear) {
+        crowded.push(end.series);
+      }
       placed.push(chosen.box);
       return chosen === first ? first.markup : spotText(chosen, f.line);
     }).join("");
+    return { markup, crowded };
   }
-  function marks(option, { X, Y, shown, textWidth, texts = option }, bottom, f, placed) {
-    const list = named(texts, textWidth, bottom).flatMap(({ s: said, i, name }) => {
+  function choose(end, first, others, f, placed) {
+    const mine = (spots) => spots.filter((spot) => owns(spot, end.line, others));
+    const inside = first.box.x1 <= f.R && first.box.y0 >= 0;
+    const stages = [
+      () => inside ? [first] : [],
+      () => mine(besideSpots(end, f)),
+      () => mine(alongSpots(end, f))
+    ];
+    const tried = [];
+    let best;
+    for (const stage of stages) {
+      tried.push(...stage());
+      best = place.cheapest(tried, f, placed);
+      if (best && place.cost(best, f, placed) < place.CLEAR) {
+        return { chosen: best, clear: true };
+      }
+    }
+    return {
+      chosen: best ?? place.cheapest(besideSpots(end, f), f, placed) ?? first,
+      clear: false
+    };
+  }
+  function marks(option, { X, Y, shown, textWidth, texts = option }, f, placed) {
+    const lines = (option.series ?? []).map((s, i) => shown[i] && (s.type ?? "line") === "line" ? s.data.filter(finite).map(([x, y]) => [X(x), Y(y)]) : []);
+    const visible = lines.filter((line) => line.length);
+    const list = named(texts, textWidth).flatMap(({ s: said, i, name }) => {
       const s = option.series?.[i] ?? said;
-      const last = s.data.filter(finite).at(-1);
-      return last && shown[i] ? [{ name, at: { x: X(last[0]), y: Y(last[1]) }, colour: colour(s, i), dash: dash(s, i) }] : [];
+      const line = lines[i] ?? s.data.filter(finite).map(([x, y]) => [X(x), Y(y)]);
+      const last = line.at(-1);
+      return last && shown[i] ? [
+        {
+          name,
+          series: s.name ?? name,
+          line,
+          at: { x: last[0], y: last[1] },
+          colour: colour(s, i),
+          dash: dash(s, i)
+        }
+      ] : [];
     });
-    return spread(list, f, placed);
+    return spread(list, f, placed, visible);
   }
   return { fit: fits, named, room, marks };
 };
@@ -4251,12 +4334,14 @@ window.PlotLegend = ({ swatch, esc, colour, dash, fill, pick }) => {
 
 /* plot marks: what kit:plot.js draws in a bar, over the plot and in a legend entry, not referenced from pages: pack joins it in
    front of plot.js with draw.ts, which uses it. PlotMarks({ svgLine, svgText }) gives bar(...) and area(...), a bar or an area in
-   one of the accent's three states; markers(...) and rows(...), the labelled reference markers and spans and the lines their
-   labels take on top; wrap(...), a label's lines; and swatch(...), a series' legend swatch. */
+   one of the accent's three states; markers(...) and rows(...), the labelled reference markers and spans, the lines their labels
+   take on top, and the arrows; wrap(...), a label's lines; and swatch(...), a series' legend swatch. */
 window.PlotMarks = ({ svgLine, svgText }) => {
   const HATCH = 6;
   const GAP = 6;
   const EDGE = 4;
+  const ARROW_OFF = 3;
+  const HEAD = 7;
   const px = (v) => +v.toFixed(1);
   function cuts(polygon, c) {
     const xs = [];
@@ -4438,6 +4523,23 @@ window.PlotMarks = ({ svgLine, svgText }) => {
     }
     return { lines, labels };
   }
+  function arrow(from, to, X, Y) {
+    const [ax, ay, bx, by] = [X(from[0]), Y(from[1]), X(to[0]), Y(to[1])];
+    const length = Math.hypot(bx - ax, by - ay);
+    if (length < 1) {
+      return "";
+    }
+    const scale = Math.min(1, length / (2 * ARROW_OFF + HEAD + 1));
+    const [off, size] = [ARROW_OFF * scale, HEAD * scale];
+    const [ux, uy] = [(bx - ax) / length, (by - ay) / length];
+    const [tx, ty] = [bx - ux * off, by - uy * off];
+    const [cx, cy] = [tx - ux * size, ty - uy * size];
+    const [nx, ny] = [-uy * (size / 2), ux * (size / 2)];
+    const head = `M${px(tx)} ${px(ty)}L${px(cx + nx)} ${px(cy + ny)}L${px(cx - nx)} ${px(cy - ny)}Z`;
+    const shaft = svgLine("arrow", ax + ux * off, cx + ux * scale, ay + uy * off, cy + uy * scale);
+    return `${shaft}<path class="arrow-head" d="${head}"/>`;
+  }
+  const arrows = (marks, { X, Y }) => marks.map((m) => m.from && m.to && X && Y ? arrow(m.from, m.to, X, Y) : "").join("");
   function markers(marks, f, top) {
     let lines = "";
     let labels = "";
@@ -4457,7 +4559,7 @@ window.PlotMarks = ({ svgLine, svgText }) => {
     }
     const flat = acrossAll(marks, f, boxes);
     return {
-      lines: lines + flat.lines,
+      lines: lines + flat.lines + arrows(marks, f),
       labels: labels + flat.labels,
       boxes: boxes.filter((b) => b.x1 > b.x0)
     };
@@ -4555,7 +4657,7 @@ window.PlotPick = ({ esc, formatter, labeller }) => {
 
 /* plot place: where a label on the plot goes, not referenced from pages: pack joins it in front of plot.js with draw.ts, which
    uses it. PlotPlace({ wrap }) gives what the end names (ends.ts) and notes (areas.ts) are placed by, together and in that order
-   after the markers' labels: the lines they keep clear of (obstacles), what a spot costs where it lies (cost; under CLEAR is
+   after the markers' labels: the lines and arrows they keep clear of (obstacles), what a spot costs where it lies (cost; under CLEAR is
    clear), the cheapest of some spots (cheapest), a wrapped label's spot (spot), the spots beside a point and away from it tied
    by a leader (pointSpots, leaderSpots) and polygon tests (within). */
 window.PlotPlace = ({ wrap }) => {
@@ -4675,7 +4777,8 @@ window.PlotPlace = ({ wrap }) => {
     const series = (option.series ?? []).flatMap((s, i) => shown[i] && (s.type ?? "line") === "line" ? [s.data.filter(finite).map(([x, y]) => [X(x), Y(y)])] : []);
     const markers = (option.marks ?? []).flatMap((m) => [
       ...typeof m.x === "number" ? [[[X(m.x), T], [X(m.x), B]]] : [],
-      ...typeof m.y === "number" ? [[[L, Y(m.y)], [R, Y(m.y)]]] : []
+      ...typeof m.y === "number" ? [[[L, Y(m.y)], [R, Y(m.y)]]] : [],
+      ...m.from && m.to ? [[[X(m.from[0]), Y(m.from[1])], [X(m.to[0]), Y(m.to[1])]]] : []
     ]);
     return [...series, ...markers];
   }
@@ -4697,7 +4800,7 @@ window.PlotPlace = ({ wrap }) => {
 
 /* plot tween: the steps plot.js draws between two options when a set() changes what a plot shows, so bars grow or shrink and
    lines morph from the state they are in. between(from, to, k) is `to` with its numbers k of the way from `from`'s: a bar's value,
-   a point (a line of another length is read off the old one at the new x values), an axis's min and max, a marker's place, a span's and a note's point. What
+   a point (a line of another length is read off the old one at the new x values), an axis's min and max, a marker's place, a span's, a note's point and an arrow's ends (moving as the line they sit on moves, if any). What
    has no counterpart in `from` (a series of a new name, an unnamed one where `from` has none unnamed at its place, another type, a
    different number of bars) is `to`'s at once; series are matched by name, unnamed ones by place. Not referenced from
    pages: pack joins it in front of plot.js. same(a, b) says whether two options draw alike, so setting one changes nothing. */
@@ -4705,6 +4808,7 @@ window.PlotTween = () => {
   const lerp = (a, b, k) => a + (b - a) * k;
   const num = (v) => typeof v === "number" && Number.isFinite(v);
   const isPoint = (p) => Array.isArray(p) && num(p[0]) && num(p[1]);
+  const ON = 0.05;
   function yAt(points, x) {
     const after = points.findIndex((p) => p[0] >= x);
     const right = points[after];
@@ -4760,29 +4864,99 @@ window.PlotTween = () => {
     const pair = (v) => Array.isArray(v) && v.length === 2 && v.every(num);
     return pair(from) && pair(to) ? [lerp(from[0], to[0], k), lerp(from[1], to[1], k)] : to;
   }
-  function marks(a, b, k) {
+  function readable(s) {
+    const line = (s?.type ?? "line") === "line" ? (s?.data ?? []).filter(isPoint) : [];
+    const ascending = line.every((p, i) => i === 0 || line[i - 1][0] <= p[0]);
+    return ascending ? line : [];
+  }
+  function over([x, y], line) {
+    const [first, last] = [line[0], line.at(-1)];
+    return first && last && x >= first[0] && x <= last[0] ? y - yAt(line, x) : undefined;
+  }
+  function off(point, line) {
+    const d = over(point, line);
+    const heights = line.map((pt) => pt[1]);
+    const span = Math.max(...heights) - Math.min(...heights);
+    const share = d === undefined ? undefined : Math.abs(d) <= 0.000000001 ? 0 : Math.abs(d) / span;
+    return share !== undefined && share <= ON ? share : undefined;
+  }
+  function motion(a, b) {
+    if (!a || (a.type ?? "line") !== "line" || (b.type ?? "line") !== "line" || !readable(a).length) {
+      return "jump";
+    }
+    const paired = a.data.length === b.data.length && b.data.every((pt, i) => isPoint(pt) && isPoint(a.data[i]));
+    return paired ? "pair" : "resample";
+  }
+  function rider(p, q, from, to) {
+    let best;
+    let jumps = false;
+    for (const [j, s] of (to.series ?? []).entries()) {
+      const old = counterpart(from, s, j);
+      const how = motion(old, s);
+      const atQ = off(q, readable(s));
+      if (atQ === undefined) {
+        continue;
+      }
+      if (how === "jump") {
+        jumps = true;
+        continue;
+      }
+      const atP = off(p, readable(old));
+      if (atP !== undefined && (!best || atP + atQ < best.share)) {
+        best = { j, share: atP + atQ, how };
+      }
+    }
+    return { best, jumps };
+  }
+  function riding(p, q, k, from, to, now) {
+    const { best, jumps } = rider(p, q, from, to);
+    const s = best && to.series?.[best.j];
+    if (best && s) {
+      const [a, b, line] = [
+        readable(counterpart(from, s, best.j)),
+        readable(s),
+        readable(now[best.j])
+      ];
+      const x = best.how === "pair" ? lerp(p[0], q[0], k) : q[0];
+      const [d0 = 0, d1 = 0] = [over(p, a), over(q, b)];
+      return [x, yAt(line, x) + lerp(d0, d1, k)];
+    }
+    return jumps ? q : [lerp(p[0], q[0], k), lerp(p[1], q[1], k)];
+  }
+  function marks(from, to, k, now) {
+    const [a, b] = [from.marks, to.marks ?? []];
     if (a?.length !== b.length) {
       return [...b];
     }
     return b.map((m, i) => {
       const o = a[i];
       const at = (key) => m[key] === undefined ? {} : { [key]: step(o?.[key], m[key], k) };
-      return { ...m, ...at("x"), ...at("y"), ...at("at") };
+      const point = (key) => {
+        const [p, q] = [o?.[key], m[key]];
+        return q === undefined ? {} : { [key]: isPoint(p) && isPoint(q) ? riding(p, q, k, from, to, now) : q };
+      };
+      return {
+        ...m,
+        ...at("x"),
+        ...at("y"),
+        ...point("at"),
+        ...point("from"),
+        ...point("to")
+      };
     });
   }
   const counterpart = (from, b, j) => b.name === undefined ? from.series?.[j]?.name === undefined ? from.series?.[j] : undefined : from.series?.find((a) => a.name === b.name);
   function between(from, to, k) {
+    const series = (to.series ?? []).map((s, j) => {
+      const a = counterpart(from, s, j);
+      return a ? { ...s, data: data(a, s, k) } : s;
+    });
     return {
       ...to,
-      ...to.series && {
-        series: to.series.map((s, j) => {
-          const a = counterpart(from, s, j);
-          return a ? { ...s, data: data(a, s, k) } : s;
-        })
-      },
+      ...to.series && { series },
       ...to.x && { x: axis(from.x, to.x, k) },
       ...to.y && { y: axis(from.y, to.y, k) },
-      ...to.marks && { marks: marks(from.marks, to.marks, k) }
+      ...to.marks && { marks: marks(from, to, k, series) }
     };
   }
   function same(a, b) {
@@ -5031,7 +5205,7 @@ window.PlotTween = () => {
       }
     };
   }
-  function keyRoomOf(legend, textWidth) {
+  function keyRoomOf(legend) {
     let seen;
     function tallest(option, width) {
       if (option.pick === undefined || !option.categories) {
@@ -5046,7 +5220,7 @@ window.PlotTween = () => {
       });
       legend.after(ruler);
       const heights = option.categories.map((_, pick) => {
-        ruler.innerHTML = legendMarkup({ ...option, pick }, textWidth, 0);
+        ruler.innerHTML = legendMarkup({ ...option, pick });
         return ruler.getBoundingClientRect().height;
       });
       ruler.remove();
@@ -5090,11 +5264,10 @@ window.PlotTween = () => {
     const switches = legendOf(legend, () => option, () => draw());
     const font = () => `500 ${parseFloat(getComputedStyle(legend).fontSize)}px ${getComputedStyle(el).fontFamily}`;
     const textWidth = (s) => measure(font(), s);
-    const room = keyRoomOf(legend, textWidth);
-    const bareHeight = () => area.clientHeight + legend.offsetHeight - parseFloat(getComputedStyle(legend).paddingTop);
+    const room = keyRoomOf(legend);
     function draw() {
       size = parseFloat(getComputedStyle(legend).fontSize);
-      switches.write(legendMarkup(preview.look(option), textWidth, bareHeight()));
+      switches.write(legendMarkup(preview.look(option)));
       legend.style.minBlockSize = room(option);
       const W = area.clientWidth;
       if (!W || !area.clientHeight) {
@@ -5159,7 +5332,7 @@ window.PlotTween = () => {
   window.Plot = { make };
 })();
 </script>
-<script>(()=>{var oe=Object.defineProperty;var ie=(e)=>e;function le(e,n){this[e]=ie.bind(null,n)}var se=(e,n)=>{for(var t in n)oe(e,t,{get:n[t],enumerable:!0,configurable:!0,set:le.bind(n,t)})};var mn={};se(mn,{Plot:()=>Fe});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var F,p,bn,ue,N,yn,wn,xn,Y,V,O,Cn,tn,Z,nn,Pn,B={},z=[],_e=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,U=Array.isArray;function P(e,n){for(var t in n)e[t]=n[t];return e}function rn(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function w(e,n,t){var r,i,o,l={};for(o in n)o=="key"?r=n[o]:o=="ref"?i=n[o]:l[o]=n[o];if(arguments.length>2&&(l.children=arguments.length>3?F.call(arguments,2):t),typeof e=="function"&&e.defaultProps!=null)for(o in e.defaultProps)l[o]===void 0&&(l[o]=e.defaultProps[o]);return A(e,l,r,i,null)}function A(e,n,t,r,i){var o={type:e,props:n,key:t,ref:r,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:i==null?++bn:i,__i:-1,__u:0};return i==null&&p.vnode!=null&&p.vnode(o),o}function S(e){return e.children}function E(e,n){this.props=e,this.context=n}function D(e,n){if(n==null)return e.__?D(e.__,e.__i+1):null;for(var t;n<e.__k.length;n++)if((t=e.__k[n])!=null&&t.__e!=null)return t.__e;return typeof e.type=="function"?D(e):null}function ce(e){if(e.__P&&e.__d){var n=e.__v,t=n.__e,r=[],i=[],o=P({},n);o.__v=n.__v+1,p.vnode&&p.vnode(o),ln(e.__P,o,n,e.__n,e.__P.namespaceURI,32&n.__u?[t]:null,r,t==null?D(n):t,!!(32&n.__u),i),o.__v=n.__v,o.__.__k[o.__i]=o,Rn(r,o,i),n.__e=n.__=null,o.__e!=t&&Sn(o)}}function Sn(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(n){if(n!=null&&n.__e!=null)return e.__e=e.__c.base=n.__e}),Sn(e)}function en(e){(!e.__d&&(e.__d=!0)&&N.push(e)&&!q.__r++||yn!=p.debounceRendering)&&((yn=p.debounceRendering)||wn)(q)}function q(){try{for(var e,n=1;N.length;)N.length>n&&N.sort(xn),e=N.shift(),n=N.length,ce(e)}finally{N.length=q.__r=0}}function Nn(e,n,t,r,i,o,l,_,c,u,f){var d,s,a,m,k,g,v=r&&r.__k||z,h=n.length;for(c=ae(t,n,v,c,h),d=0;d<h;d++)(a=t.__k[d])!=null&&(s=a.__i!=-1&&v[a.__i]||B,a.__i=d,g=ln(e,a,s,i,o,l,_,c,u,f),m=a.__e,a.ref&&s.ref!=a.ref&&(s.ref&&sn(s.ref,null,a),f.push(a.ref,a.__c||m,a)),k==null&&m!=null&&(k=m),4&a.__u?(c=Mn(a,c,e),s.__e&&(s.__e=null)):typeof a.type=="function"&&g!==void 0?c=g:m&&(c=m.nextSibling),a.__u&=-7);return t.__e=k,c}function ae(e,n,t,r,i){var o,l,_,c,u,f=t.length,d=f,s=0;for(e.__k=Array(i),o=0;o<i;o++)(l=n[o])!=null&&typeof l!="boolean"&&typeof l!="function"?(typeof l=="string"||typeof l=="number"||typeof l=="bigint"||l.constructor==String?l=e.__k[o]=A(null,l,null,null,null):U(l)?l=e.__k[o]=A(S,{children:l},null,null,null):l.constructor===void 0&&l.__b>0?l=e.__k[o]=A(l.type,l.props,l.key,l.ref?l.ref:null,l.__v):e.__k[o]=l,c=o+s,l.__=e,l.__b=e.__b+1,_=null,(u=l.__i=fe(l,t,c,d))!=-1&&(d--,(_=t[u])&&(_.__u|=2)),_==null||_.__v==null?(u==-1&&(i>f?s--:i<f&&s++),typeof l.type!="function"&&(l.__u|=4)):u!=c&&(u==c-1?s--:u==c+1?s++:(u>c?s--:s++,l.__u|=4))):e.__k[o]=null;if(d)for(o=0;o<f;o++)(_=t[o])!=null&&(2&_.__u)==0&&(_.__e==r&&(r=D(_)),Hn(_,_));return r}function Mn(e,n,t){var r,i;if(typeof e.type=="function"){for(r=e.__k,i=0;r&&i<r.length;i++)r[i]&&(r[i].__=e,n=Mn(r[i],n,t));return n}e.__e!=n&&(n&&e.type&&!n.parentNode&&(n=D(e)),n=t.insertBefore(e.__e,n||null));do n=n&&n.nextSibling;while(n!=null&&n.nodeType==8);return n}function on(e,n){return n=n||[],e==null||typeof e=="boolean"||(U(e)?e.some(function(t){on(t,n)}):n.push(e)),n}function fe(e,n,t,r){var i,o,l,{key:_,type:c}=e,u=n[t],f=u!=null&&(2&u.__u)==0;if(u===null&&_==null||f&&_==u.key&&c==u.type)return t;if(r>(f?1:0)){for(i=t-1,o=t+1;i>=0||o<n.length;)if((u=n[l=i>=0?i--:o++])!=null&&(2&u.__u)==0&&_==u.key&&c==u.type)return l}return-1}function gn(e,n,t){n[0]=="-"?e.setProperty(n,t==null?"":t):e[n]=t==null?"":typeof t!="number"||_e.test(n)?t:t+"px"}function I(e,n,t,r,i){var o,l;n:if(n=="style")if(typeof t=="string")e.style.cssText=t;else{if(typeof r=="string"&&(e.style.cssText=r=""),r)for(n in r)t&&n in t||gn(e.style,n,"");if(t)for(n in t)r&&t[n]==r[n]||gn(e.style,n,t[n])}else if(n[0]=="o"&&n[1]=="n")o=n!=(n=n.replace(Cn,"$1")),l=n.toLowerCase(),n=l in e||n=="onFocusOut"||n=="onFocusIn"?l.slice(2):n.slice(2),e.l||(e.l={}),e.l[n+o]=t,t?r?t[O]=r[O]:(t[O]=tn,e.addEventListener(n,o?nn:Z,o)):e.removeEventListener(n,o?nn:Z,o);else{if(i=="http://www.w3.org/2000/svg")n=n.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(n!="width"&&n!="height"&&n!="href"&&n!="list"&&n!="form"&&n!="tabIndex"&&n!="download"&&n!="rowSpan"&&n!="colSpan"&&n!="role"&&n!="popover"&&n in e)try{e[n]=t==null?"":t;break n}catch(_){}typeof t=="function"||(t==null||t===!1&&n[4]!="-"?e.removeAttribute(n):e.setAttribute(n,n=="popover"&&t==1?"":t))}}function kn(e){return function(n){if(this.l){var t=this.l[n.type+e];if(n[V]==null)n[V]=tn++;else if(n[V]<t[O])return;return t(p.event?p.event(n):n)}}}function ln(e,n,t,r,i,o,l,_,c,u){var f,d,s,a,m,k,g,v,h,x,H,M,T,vn,j,X,C=n.type;if(n.constructor!==void 0)return null;128&t.__u&&(c=!!(32&t.__u),o=[_=n.__e=t.__e]),(f=p.__b)&&f(n);n:if(typeof C=="function"){d=l.length;try{if(h=n.props,x=C.prototype&&C.prototype.render,H=(f=C.contextType)&&r[f.__c],M=f?H?H.props.value:f.__:r,t.__c?v=(s=n.__c=t.__c).__=s.__E:(x?n.__c=s=new C(h,M):(n.__c=s=new E(h,M),s.constructor=C,s.render=de),H&&H.sub(s),s.state||(s.state={}),s.__n=r,a=s.__d=!0,s.__h=[],s._sb=[]),x&&s.__s==null&&(s.__s=s.state),x&&C.getDerivedStateFromProps!=null&&(s.__s==s.state&&(s.__s=P({},s.__s)),P(s.__s,C.getDerivedStateFromProps(h,s.__s))),m=s.props,k=s.state,s.__v=n,a)x&&C.getDerivedStateFromProps==null&&s.componentWillMount!=null&&s.componentWillMount(),x&&s.componentDidMount!=null&&s.__h.push(s.componentDidMount);else{if(x&&C.getDerivedStateFromProps==null&&h!==m&&s.componentWillReceiveProps!=null&&s.componentWillReceiveProps(h,M),n.__v==t.__v||!s.__e&&s.shouldComponentUpdate!=null&&s.shouldComponentUpdate(h,s.__s,M)===!1){n.__v!=t.__v&&(s.props=h,s.state=s.__s,s.__d=!1),n.__e=t.__e,n.__k=t.__k,n.__k.some(function(R){R&&(R.__=n)}),z.push.apply(s.__h,s._sb),s._sb=[],s.__h.length&&l.push(s),_=D(t);break n}s.componentWillUpdate!=null&&s.componentWillUpdate(h,s.__s,M),x&&s.componentDidUpdate!=null&&s.__h.push(function(){s.componentDidUpdate(m,k,g)})}if(s.context=M,s.props=h,s.__P=e,s.__e=!1,T=p.__r,vn=0,x)s.state=s.__s,s.__d=!1,T&&T(n),f=s.render(s.props,s.state,s.context),z.push.apply(s.__h,s._sb),s._sb=[];else do s.__d=!1,T&&T(n),f=s.render(s.props,s.state,s.context),s.state=s.__s;while(s.__d&&++vn<25);s.state=s.__s,s.getChildContext!=null&&(r=P(P({},r),s.getChildContext())),x&&!a&&s.getSnapshotBeforeUpdate!=null&&(g=s.getSnapshotBeforeUpdate(m,k)),j=f!=null&&f.type===S&&f.key==null?En(f.props.children):f,_=Nn(e,U(j)?j:[j],n,t,r,i,o,l,_,c,u),s.base=n.__e,n.__u&=-161,s.__h.length&&l.push(s),v&&(s.__E=s.__=null)}catch(R){if(l.length=d,n.__v=null,c||o!=null){if(R.then){for(n.__u|=c?160:128;_&&_.nodeType==8&&_.nextSibling;)_=_.nextSibling;o!=null&&(o[o.indexOf(_)]=null),n.__e=_}else if(o!=null)for(X=o.length;X--;)rn(o[X])}else n.__e=t.__e;n.__k==null&&(n.__k=t.__k||[]),R.then||Dn(n),p.__e(R,n,t)}}else o==null&&n.__v==t.__v?(n.__k=t.__k,n.__e=t.__e):_=n.__e=pe(t.__e,n,t,r,i,o,l,c,u);return(f=p.diffed)&&f(n),128&n.__u?void 0:_}function Dn(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(Dn))}function Rn(e,n,t){for(var r=0;r<t.length;r++)sn(t[r],t[++r],t[++r]);p.__c&&p.__c(n,e),e.some(function(i){try{e=i.__h,i.__h=[],e.some(function(o){o.call(i)})}catch(o){p.__e(o,i.__v)}})}function En(e){return typeof e!="object"||e==null||e.__b>0?e:U(e)?e.map(En):e.constructor!==void 0?null:P({},e)}function pe(e,n,t,r,i,o,l,_,c){var u,f,d,s,a,m,k,g=t.props||B,{props:v,type:h}=n;if(h=="svg"?i="http://www.w3.org/2000/svg":h=="math"?i="http://www.w3.org/1998/Math/MathML":i||(i="http://www.w3.org/1999/xhtml"),o!=null){for(u=0;u<o.length;u++)if((a=o[u])&&"setAttribute"in a==!!h&&(h?a.localName==h:a.nodeType==3)){e=a,o[u]=null;break}}if(e==null){if(h==null)return document.createTextNode(v);e=document.createElementNS(i,h,v.is&&v),_&&(p.__m&&p.__m(n,o),_=!1),o=null}if(h==null)g===v||_&&e.data==v||(e.data=v);else{if(o=h=="textarea"&&v.defaultValue!=null?null:o&&F.call(e.childNodes),!_&&o!=null)for(g={},u=0;u<e.attributes.length;u++)g[(a=e.attributes[u]).name]=a.value;for(u in g)a=g[u],u=="dangerouslySetInnerHTML"?d=a:u=="children"||(u in v)||u=="value"&&("defaultValue"in v)||u=="checked"&&("defaultChecked"in v)||I(e,u,null,a,i);for(u in v)a=v[u],u=="children"?s=a:u=="dangerouslySetInnerHTML"?f=a:u=="value"?m=a:u=="checked"?k=a:_&&typeof a!="function"||g[u]===a||I(e,u,a,g[u],i);if(f)_||d&&(f.__html==d.__html||f.__html==e.innerHTML)||(e.innerHTML=f.__html),n.__k=[];else if(d&&(e.innerHTML=""),Nn(n.type=="template"?e.content:e,U(s)?s:[s],n,t,r,h=="foreignObject"?"http://www.w3.org/1999/xhtml":i,o,l,o?o[0]:t.__k&&D(t,0),_,c),o!=null)for(u=o.length;u--;)rn(o[u]);_&&h!="textarea"||(u="value",h=="progress"&&m==null?e.removeAttribute("value"):m!=null&&(m!==e[u]||h=="progress"&&!m||h=="option"&&m!=g[u])&&I(e,u,m,g[u],i),u="checked",k!=null&&k!=e[u]&&I(e,u,k,g[u],i))}return e}function sn(e,n,t){try{if(typeof e=="function"){var r=typeof e.__u=="function";r&&e.__u(),r&&n==null||(e.__u=e(n))}else e.current=n}catch(i){p.__e(i,t)}}function Hn(e,n,t){var r,i;if(p.unmount&&p.unmount(e),(r=e.ref)&&(r.current&&r.current!=e.__e||sn(r,null,n)),(r=e.__c)!=null){if(r.componentWillUnmount)try{r.componentWillUnmount()}catch(o){p.__e(o,n)}r.base=r.__P=r.__n=null}if(r=e.__k)for(i=0;i<r.length;i++)r[i]&&Hn(r[i],n,t||typeof e.type!="function");t||rn(e.__e),e.__c=e.__=e.__e=void 0}function de(e,n,t){return this.constructor(e,t)}function un(e,n,t){var r,i,o,l;n==document&&(n=document.documentElement),p.__&&p.__(e,n),i=(r=typeof t=="function")?null:t&&t.__k||n.__k,o=[],l=[],ln(n,e=(!r&&t||n).__k=w(S,null,[e]),i||B,B,n.namespaceURI,!r&&t?[t]:i?null:n.firstChild?F.call(n.childNodes):null,o,!r&&t?t:i?i.__e:n.firstChild,r,l),Rn(o,e,l),e.props.children=null}function _n(e,n){un(e,n,_n)}function Tn(e,n,t){var r,i,o,l,_=P({},e.props);for(o in e.type&&e.type.defaultProps&&(l=e.type.defaultProps),n)o=="key"?r=n[o]:o=="ref"?i=n[o]:_[o]=n[o]===void 0&&l!=null?l[o]:n[o];return arguments.length>2&&(_.children=arguments.length>3?F.call(arguments,2):t),A(e.type,_,r||e.key,i||e.ref,null)}function On(e){function n(t){var r,i;return this.getChildContext||(r=new Set,(i={})[n.__c]=this,this.getChildContext=function(){return i},this.componentWillUnmount=function(){r=null},this.shouldComponentUpdate=function(o){this.props.value!=o.value&&r.forEach(function(l){l.__e=!0,en(l)})},this.sub=function(o){r.add(o);var l=o.componentWillUnmount;o.componentWillUnmount=function(){r&&r.delete(o),l&&l.call(o)}}),t.children}return n.__c="__cC"+Pn++,n.__=e,n.Provider=n.__l=(n.Consumer=function(t,r){return t.children(r)}).contextType=n,n}F=z.slice,p={__e:function(e,n,t,r){for(var i,o,l;n=n.__;)if((i=n.__c)&&!i.__)try{if((o=i.constructor)&&o.getDerivedStateFromError!=null&&(i.setState(o.getDerivedStateFromError(e)),l=i.__d),i.componentDidCatch!=null&&(i.componentDidCatch(e,r||{}),l=i.__d),l)return i.__E=i}catch(_){e=_}throw e}},bn=0,ue=function(e){return e!=null&&e.constructor===void 0},E.prototype.setState=function(e,n){var t;t=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=P({},this.state),typeof e=="function"&&(e=e(P({},t),this.props)),e&&P(t,e),e!=null&&this.__v&&(n&&this._sb.push(n),en(this))},E.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),en(this))},E.prototype.render=S,N=[],wn=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,xn=function(e,n){return e.__v.__b-n.__v.__b},q.__r=0,Y=Math.random().toString(8),V="__d"+Y,O="__a"+Y,Cn=/(PointerCapture)$|Capture$/i,tn=0,Z=kn(!1),nn=kn(!0),Pn=0;/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var L,y,cn,An,G=0,Bn=[],b=p,{__b:Fn,__r:Un,diffed:Ln,__c:Wn,unmount:jn,__:In}=b;function fn(e,n){b.__h&&b.__h(y,e,G||n),G=0;var t=y.__H||(y.__H={__:[],__h:[]});return e>=t.__.length&&t.__.push({}),t.__[e]}function $n(e){return G=1,he(qn,e)}function he(e,n,t){var r=fn(L++,2);if(r.t=e,!r.__c&&(r.__=[t?t(n):qn(void 0,n),function(_){var c=r.__N?r.__N[0]:r.__[0],u=r.t(c,_);c!==u&&(r.__N=[u,r.__[1]],r.__c.setState({}))}],r.__c=y,!y.__f)){var i=function(_,c,u){if(!r.__c.__H)return!0;var f=!1,d=r.__c.props!==_;if(r.__c.__H.__.some(function(a){if(a.__N){f=!0;var m=a.__[0];a.__=a.__N,a.__N=void 0,m!==a.__[0]&&(d=!0)}}),o){var s=o.call(this,_,c,u);return f?s||d:s}return!f||d};y.__f=!0;var o=y.shouldComponentUpdate,l=y.componentWillUpdate;y.componentWillUpdate=function(_,c,u){if(this.__e){var f=o;o=void 0,i(_,c,u),o=f}l&&l.call(this,_,c,u)},y.shouldComponentUpdate=i}return r.__N||r.__}function pn(e,n){var t=fn(L++,3);!b.__s&&zn(t.__H,n)&&(t.__=e,t.u=n,y.__H.__h.push(t))}function W(e){return G=5,dn(function(){return{current:e}},[])}function dn(e,n){var t=fn(L++,7);return zn(t.__H,n)&&(t.__=e(),t.__H=n,t.__h=e),t.__}function me(){for(var e;e=Bn.shift();){var n=e.__H;if(e.__P&&n)try{n.__h.some(J),n.__h.some(an),n.__h=[]}catch(t){n.__h=[],b.__e(t,e.__v)}}}b.__b=function(e){y=null,Fn&&Fn(e)},b.__=function(e,n){e&&n.__k&&n.__k.__m&&(e.__m=n.__k.__m),In&&In(e,n)},b.__r=function(e){Un&&Un(e),L=0;var n=(y=e.__c).__H;n&&(cn===y?(n.__h=[],y.__h=[],n.__.some(function(t){t.__N&&(t.__=t.__N),t.u=t.__N=void 0})):(n.__h.some(J),n.__h.some(an),n.__h=[],L=0)),cn=y},b.diffed=function(e){Ln&&Ln(e);var n=e.__c;n&&n.__H&&(n.__H.__h.length&&(Bn.push(n)!==1&&An===b.requestAnimationFrame||((An=b.requestAnimationFrame)||ve)(me)),n.__H.__.some(function(t){t.u&&(t.__H=t.u,t.u=void 0)})),cn=y=null},b.__c=function(e,n){n.some(function(t){try{t.__h.some(J),t.__h=t.__h.filter(function(r){return!r.__||an(r)})}catch(r){n.some(function(i){i.__h&&(i.__h=[])}),n=[],b.__e(r,t.__v)}}),Wn&&Wn(e,n)},b.unmount=function(e){jn&&jn(e);var n,t=e.__c;t&&t.__H&&(t.__H.__.some(function(r){try{J(r)}catch(i){n=i}}),t.__H=void 0,n&&b.__e(n,t.__v))};var Vn=typeof requestAnimationFrame=="function";function ve(e){var n,t=function(){clearTimeout(r),Vn&&cancelAnimationFrame(n),setTimeout(e)},r=setTimeout(t,35);Vn&&(n=requestAnimationFrame(t))}function J(e){var n=y,t=e.__c;typeof t=="function"&&(e.__c=void 0,t()),y=n}function an(e){var n=y;e.__c=e.__(),y=n}function zn(e,n){return!e||e.length!==n.length||n.some(function(t,r){return t!==e[r]})}function qn(e,n){return typeof n=="function"?n(e):n}var K=On(void 0),Gn=()=>({name:"",sets:new Map}),Jn=new Map;function Kn(e){let n=Jn.get(e)??{name:e,sets:new Map};return Jn.set(e,n),n}var hn=(e,n)=>typeof e==="object"&&e!==null&&("type"in e)&&e.type===n;function ye(e,n){let t=on(e),r=n?[w("a",{class:"back",href:"#"},n)]:[],i=0,o=t[0];if(hn(o,"h1")){r.push(o),i=1;for(let l=t[i];hn(l,"p");l=t[++i])r.push(l.props.class?l:Tn(l,{class:i===1?"lede":"meta"}))}return w(S,null,r.length>0&&w("div",{class:"view-head"},r),t.slice(i))}function Qn({render:e,record:n,back:t}){let[r]=$n(Gn),i=n===void 0?null:e({record:n});return w(K.Provider,{value:r},ye(hn(i,S)?i.props.children:i,t))}var ge=p.vnode;p.vnode=(e)=>{if(typeof e.type==="string"){let n=e.props;for(let t of Object.keys(n))if(t.startsWith("data-")&&n[t]===!0)n[t]=""}ge?.(e)};function ke(e,n,t){for(let[r,i,o]of n??[]){let l=r.at(-1),_=r.slice(0,-1).reduce((c,u)=>c[u],e);if(l!==void 0)_[l]=t[i]?.[o]}return e}function be(e,n){let t=n.parentNode;if(!t)throw Error("island marker without a parent");let r=()=>{let o=[];for(let l=e.nextSibling;l&&l!==n;l=l.nextSibling)o.push(l);return o},i=(o)=>o;return{nodeType:1,parentNode:t,get firstChild(){return r()[0]??null},get childNodes(){return r()},contains:(o)=>r().some((l)=>o!==null&&l.contains(i(o))),insertBefore:(o,l)=>t.insertBefore(i(o),l?i(l):n),appendChild:(o)=>t.insertBefore(i(o),n),removeChild:(o)=>t.removeChild(i(o))}}function we(){let e=new Map,n=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),t=[];for(let r=n.nextNode();r;r=n.nextNode()){if(!(r instanceof Comment))continue;let i=/^(island|slot):(\d+)$/.exec(r.data);if(i)t.push({kind:i[1]==="slot"?"slot":"island",n:Number(i[2]),start:r});else if(r.data==="/island"||r.data==="/slot"){let o=t.pop();if(o)e.set(o.n,{...e.get(o.n),[o.kind]:[o.start,r]})}}return e}class Xn extends E{shouldComponentUpdate(){return!1}componentDidMount(){this.base.after(...this.props.nodes)}componentWillUnmount(){for(let e of this.props.nodes)e.remove()}render(){return""}}function xe([e,n]){let t=[];for(let r=e.nextSibling;r&&r!==n;r=r.nextSibling)t.push(r);e.replaceWith(document.createTextNode(""));for(let r of[...t,n])r.remove();return w(Xn,{nodes:t})}function Ce(e,n,t){let r=()=>Views.on(e,(i,o)=>un(w(Qn,{key:o,render:n,record:t.records[o],back:t.back}),i));if(document.readyState==="loading")addEventListener("DOMContentLoaded",r,{once:!0});else r()}function Yn(e){let n=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),t=we();for(let[r,{m:i,e:o,p:l,r:_,s:c,v:u}]of n.entries()){let f=ke(l,_,e),d=e[i]?.[o],{island:s,slot:a}=t.get(r)??{};if(typeof d==="function"&&u!==void 0){Ce(u,d,f);continue}if(typeof d!=="function"||!s)throw Error(`island ${r} (${o}) is missing from the page`);let m=a?{...f,children:xe(a)}:f,k=w(d,m);_n(c===void 0?k:w(K.Provider,{value:Kn(c)},k),be(...s))}}var Q;function Zn(e){return{dangerouslySetInnerHTML:{__html:Q?e(Q):""}}}var ne=(e,n,t,r=!1)=>({classes:e.split(/\s+/).filter(Boolean),id:n,height:t,grows:r}),ee=(e,n)=>Q?Q.plotMarkLines(e,n):1;/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var Pe=0;function te(e,n,t,r,i,o){n||(n={});var l,_,c=n;if("ref"in c)for(_ in c={},n)_=="ref"?l=n[_]:c[_]=n[_];var u={type:e,props:c,key:t,ref:l,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--Pe,__i:-1,__u:0,__source:i,__self:o};if(typeof e=="function"&&(l=e.defaultProps))for(_ in l)c[_]===void 0&&(c[_]=l[_]);return p.vnode&&p.vnode(u),u}var Se=3.5,Ne=34,Me=2.75,De=1.375,Re=1.125,Ee=1.3125,re=(e)=>String(e).replace(/\D/g,"").replace(/^0+/,"");function He({stack:e,series:n=[],marks:t=[],x:r}){if(r?.labels!==void 0)return!r.labels;let i=(l)=>l.type==="bar"&&(l.label===!0||typeof l.label==="object"&&!Array.isArray(l.label)),o=(l)=>[l.x??[]].flat().every((_)=>re(l.label??"").includes(re(_)));return!e&&n.every(i)&&t.every(o)}function Te(e){let{horizontal:n,categories:t,series:r=[],x:i,y:o,legend:l}=e,_=l!==!1&&r.filter((u)=>u.name).length>1;if(!(n&&t?.length)||_)return;let c=Me+(i?.name?De:0)+(o?.name?Re:0)-(He(e)?Ee:0);return`${Math.min(t.length*Se+c,Ne)}rem`}var Oe=(e,n)=>`calc(${e} + var(--plot-mark-lines, ${n}) * (var(--size-label) + 4px))`,Ae=(e,n)=>({...e,...n,x:{...e.x,...n.x},y:{...e.y,...n.y}});function Fe({option:e,label:n,class:t,id:r,height:i,pick:o}){let l=W(null),_=W(o);_.current=o;let c=W(null),u=W(null),f=dn(()=>(u.current=u.current?Ae(u.current,e):e,u.current),[e]);pn(()=>{if(c.current)c.current.set(e);else if(l.current){let v=_.current&&{choose:(h)=>_.current?.choose(h),strip:_.current.strip?.current??null};c.current=window.Plot.make(l.current,e,v||void 0)}},[e]),pn(()=>()=>{c.current?.dispose(),c.current=null},[]);let d=t?`chart plot ${t}`:"chart plot",s=i||d.split(/\s+/).includes("tall")?void 0:Te(f),a=i??s,m=ne(d,r,a,Boolean(s)),k=s&&f.marks?.some((v)=>v.x!==void 0&&!v.between&&v.label),g=a&&{blockSize:k?Oe(a,ee(e,m)):a};return te("div",{ref:l,class:d,id:r,style:g||void 0,role:"img","aria-label":n,...Zn((v)=>v.plot(e,m))})}Yn([mn]);})();
+<script>(()=>{var ie=Object.defineProperty;var le=(e)=>e;function se(e,n){this[e]=le.bind(null,n)}var ue=(e,n)=>{for(var t in n)ie(e,t,{get:n[t],enumerable:!0,configurable:!0,set:se.bind(n,t)})};var mn={};ue(mn,{Plot:()=>Ue,plotPlace:()=>re});/*! preact 10.29.8, MIT licence: kit/licenses/preact.txt */var A,p,bn,_e,N,yn,wn,Pn,Y,V,T,xn,tn,Z,nn,Cn,B={},z=[],ce=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,U=Array.isArray;function C(e,n){for(var t in n)e[t]=n[t];return e}function on(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function w(e,n,t){var o,i,r,l={};for(r in n)r=="key"?o=n[r]:r=="ref"?i=n[r]:l[r]=n[r];if(arguments.length>2&&(l.children=arguments.length>3?A.call(arguments,2):t),typeof e=="function"&&e.defaultProps!=null)for(r in e.defaultProps)l[r]===void 0&&(l[r]=e.defaultProps[r]);return F(e,l,o,i,null)}function F(e,n,t,o,i){var r={type:e,props:n,key:t,ref:o,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:i==null?++bn:i,__i:-1,__u:0};return i==null&&p.vnode!=null&&p.vnode(r),r}function S(e){return e.children}function R(e,n){this.props=e,this.context=n}function O(e,n){if(n==null)return e.__?O(e.__,e.__i+1):null;for(var t;n<e.__k.length;n++)if((t=e.__k[n])!=null&&t.__e!=null)return t.__e;return typeof e.type=="function"?O(e):null}function ae(e){if(e.__P&&e.__d){var n=e.__v,t=n.__e,o=[],i=[],r=C({},n);r.__v=n.__v+1,p.vnode&&p.vnode(r),ln(e.__P,r,n,e.__n,e.__P.namespaceURI,32&n.__u?[t]:null,o,t==null?O(n):t,!!(32&n.__u),i),r.__v=n.__v,r.__.__k[r.__i]=r,Dn(o,r,i),n.__e=n.__=null,r.__e!=t&&Sn(r)}}function Sn(e){if((e=e.__)!=null&&e.__c!=null)return e.__e=e.__c.base=null,e.__k.some(function(n){if(n!=null&&n.__e!=null)return e.__e=e.__c.base=n.__e}),Sn(e)}function en(e){(!e.__d&&(e.__d=!0)&&N.push(e)&&!q.__r++||yn!=p.debounceRendering)&&((yn=p.debounceRendering)||wn)(q)}function q(){try{for(var e,n=1;N.length;)N.length>n&&N.sort(Pn),e=N.shift(),n=N.length,ae(e)}finally{N.length=q.__r=0}}function Nn(e,n,t,o,i,r,l,_,c,u,f){var h,s,a,v,k,g,m=o&&o.__k||z,d=n.length;for(c=fe(t,n,m,c,d),h=0;h<d;h++)(a=t.__k[h])!=null&&(s=a.__i!=-1&&m[a.__i]||B,a.__i=h,g=ln(e,a,s,i,r,l,_,c,u,f),v=a.__e,a.ref&&s.ref!=a.ref&&(s.ref&&sn(s.ref,null,a),f.push(a.ref,a.__c||v,a)),k==null&&v!=null&&(k=v),4&a.__u?(c=Mn(a,c,e),s.__e&&(s.__e=null)):typeof a.type=="function"&&g!==void 0?c=g:v&&(c=v.nextSibling),a.__u&=-7);return t.__e=k,c}function fe(e,n,t,o,i){var r,l,_,c,u,f=t.length,h=f,s=0;for(e.__k=Array(i),r=0;r<i;r++)(l=n[r])!=null&&typeof l!="boolean"&&typeof l!="function"?(typeof l=="string"||typeof l=="number"||typeof l=="bigint"||l.constructor==String?l=e.__k[r]=F(null,l,null,null,null):U(l)?l=e.__k[r]=F(S,{children:l},null,null,null):l.constructor===void 0&&l.__b>0?l=e.__k[r]=F(l.type,l.props,l.key,l.ref?l.ref:null,l.__v):e.__k[r]=l,c=r+s,l.__=e,l.__b=e.__b+1,_=null,(u=l.__i=pe(l,t,c,h))!=-1&&(h--,(_=t[u])&&(_.__u|=2)),_==null||_.__v==null?(u==-1&&(i>f?s--:i<f&&s++),typeof l.type!="function"&&(l.__u|=4)):u!=c&&(u==c-1?s--:u==c+1?s++:(u>c?s--:s++,l.__u|=4))):e.__k[r]=null;if(h)for(r=0;r<f;r++)(_=t[r])!=null&&(2&_.__u)==0&&(_.__e==o&&(o=O(_)),En(_,_));return o}function Mn(e,n,t){var o,i;if(typeof e.type=="function"){for(o=e.__k,i=0;o&&i<o.length;i++)o[i]&&(o[i].__=e,n=Mn(o[i],n,t));return n}e.__e!=n&&(n&&e.type&&!n.parentNode&&(n=O(e)),n=t.insertBefore(e.__e,n||null));do n=n&&n.nextSibling;while(n!=null&&n.nodeType==8);return n}function rn(e,n){return n=n||[],e==null||typeof e=="boolean"||(U(e)?e.some(function(t){rn(t,n)}):n.push(e)),n}function pe(e,n,t,o){var i,r,l,{key:_,type:c}=e,u=n[t],f=u!=null&&(2&u.__u)==0;if(u===null&&_==null||f&&_==u.key&&c==u.type)return t;if(o>(f?1:0)){for(i=t-1,r=t+1;i>=0||r<n.length;)if((u=n[l=i>=0?i--:r++])!=null&&(2&u.__u)==0&&_==u.key&&c==u.type)return l}return-1}function gn(e,n,t){n[0]=="-"?e.setProperty(n,t==null?"":t):e[n]=t==null?"":typeof t!="number"||ce.test(n)?t:t+"px"}function I(e,n,t,o,i){var r,l;n:if(n=="style")if(typeof t=="string")e.style.cssText=t;else{if(typeof o=="string"&&(e.style.cssText=o=""),o)for(n in o)t&&n in t||gn(e.style,n,"");if(t)for(n in t)o&&t[n]==o[n]||gn(e.style,n,t[n])}else if(n[0]=="o"&&n[1]=="n")r=n!=(n=n.replace(xn,"$1")),l=n.toLowerCase(),n=l in e||n=="onFocusOut"||n=="onFocusIn"?l.slice(2):n.slice(2),e.l||(e.l={}),e.l[n+r]=t,t?o?t[T]=o[T]:(t[T]=tn,e.addEventListener(n,r?nn:Z,r)):e.removeEventListener(n,r?nn:Z,r);else{if(i=="http://www.w3.org/2000/svg")n=n.replace(/xlink(H|:h)/,"h").replace(/sName$/,"s");else if(n!="width"&&n!="height"&&n!="href"&&n!="list"&&n!="form"&&n!="tabIndex"&&n!="download"&&n!="rowSpan"&&n!="colSpan"&&n!="role"&&n!="popover"&&n in e)try{e[n]=t==null?"":t;break n}catch(_){}typeof t=="function"||(t==null||t===!1&&n[4]!="-"?e.removeAttribute(n):e.setAttribute(n,n=="popover"&&t==1?"":t))}}function kn(e){return function(n){if(this.l){var t=this.l[n.type+e];if(n[V]==null)n[V]=tn++;else if(n[V]<t[T])return;return t(p.event?p.event(n):n)}}}function ln(e,n,t,o,i,r,l,_,c,u){var f,h,s,a,v,k,g,m,d,P,E,M,H,vn,j,X,x=n.type;if(n.constructor!==void 0)return null;128&t.__u&&(c=!!(32&t.__u),r=[_=n.__e=t.__e]),(f=p.__b)&&f(n);n:if(typeof x=="function"){h=l.length;try{if(d=n.props,P=x.prototype&&x.prototype.render,E=(f=x.contextType)&&o[f.__c],M=f?E?E.props.value:f.__:o,t.__c?m=(s=n.__c=t.__c).__=s.__E:(P?n.__c=s=new x(d,M):(n.__c=s=new R(d,M),s.constructor=x,s.render=he),E&&E.sub(s),s.state||(s.state={}),s.__n=o,a=s.__d=!0,s.__h=[],s._sb=[]),P&&s.__s==null&&(s.__s=s.state),P&&x.getDerivedStateFromProps!=null&&(s.__s==s.state&&(s.__s=C({},s.__s)),C(s.__s,x.getDerivedStateFromProps(d,s.__s))),v=s.props,k=s.state,s.__v=n,a)P&&x.getDerivedStateFromProps==null&&s.componentWillMount!=null&&s.componentWillMount(),P&&s.componentDidMount!=null&&s.__h.push(s.componentDidMount);else{if(P&&x.getDerivedStateFromProps==null&&d!==v&&s.componentWillReceiveProps!=null&&s.componentWillReceiveProps(d,M),n.__v==t.__v||!s.__e&&s.shouldComponentUpdate!=null&&s.shouldComponentUpdate(d,s.__s,M)===!1){n.__v!=t.__v&&(s.props=d,s.state=s.__s,s.__d=!1),n.__e=t.__e,n.__k=t.__k,n.__k.some(function(D){D&&(D.__=n)}),z.push.apply(s.__h,s._sb),s._sb=[],s.__h.length&&l.push(s),_=O(t);break n}s.componentWillUpdate!=null&&s.componentWillUpdate(d,s.__s,M),P&&s.componentDidUpdate!=null&&s.__h.push(function(){s.componentDidUpdate(v,k,g)})}if(s.context=M,s.props=d,s.__P=e,s.__e=!1,H=p.__r,vn=0,P)s.state=s.__s,s.__d=!1,H&&H(n),f=s.render(s.props,s.state,s.context),z.push.apply(s.__h,s._sb),s._sb=[];else do s.__d=!1,H&&H(n),f=s.render(s.props,s.state,s.context),s.state=s.__s;while(s.__d&&++vn<25);s.state=s.__s,s.getChildContext!=null&&(o=C(C({},o),s.getChildContext())),P&&!a&&s.getSnapshotBeforeUpdate!=null&&(g=s.getSnapshotBeforeUpdate(v,k)),j=f!=null&&f.type===S&&f.key==null?Rn(f.props.children):f,_=Nn(e,U(j)?j:[j],n,t,o,i,r,l,_,c,u),s.base=n.__e,n.__u&=-161,s.__h.length&&l.push(s),m&&(s.__E=s.__=null)}catch(D){if(l.length=h,n.__v=null,c||r!=null){if(D.then){for(n.__u|=c?160:128;_&&_.nodeType==8&&_.nextSibling;)_=_.nextSibling;r!=null&&(r[r.indexOf(_)]=null),n.__e=_}else if(r!=null)for(X=r.length;X--;)on(r[X])}else n.__e=t.__e;n.__k==null&&(n.__k=t.__k||[]),D.then||On(n),p.__e(D,n,t)}}else r==null&&n.__v==t.__v?(n.__k=t.__k,n.__e=t.__e):_=n.__e=de(t.__e,n,t,o,i,r,l,c,u);return(f=p.diffed)&&f(n),128&n.__u?void 0:_}function On(e){e&&(e.__c&&(e.__c.__e=!0),e.__k&&e.__k.some(On))}function Dn(e,n,t){for(var o=0;o<t.length;o++)sn(t[o],t[++o],t[++o]);p.__c&&p.__c(n,e),e.some(function(i){try{e=i.__h,i.__h=[],e.some(function(r){r.call(i)})}catch(r){p.__e(r,i.__v)}})}function Rn(e){return typeof e!="object"||e==null||e.__b>0?e:U(e)?e.map(Rn):e.constructor!==void 0?null:C({},e)}function de(e,n,t,o,i,r,l,_,c){var u,f,h,s,a,v,k,g=t.props||B,{props:m,type:d}=n;if(d=="svg"?i="http://www.w3.org/2000/svg":d=="math"?i="http://www.w3.org/1998/Math/MathML":i||(i="http://www.w3.org/1999/xhtml"),r!=null){for(u=0;u<r.length;u++)if((a=r[u])&&"setAttribute"in a==!!d&&(d?a.localName==d:a.nodeType==3)){e=a,r[u]=null;break}}if(e==null){if(d==null)return document.createTextNode(m);e=document.createElementNS(i,d,m.is&&m),_&&(p.__m&&p.__m(n,r),_=!1),r=null}if(d==null)g===m||_&&e.data==m||(e.data=m);else{if(r=d=="textarea"&&m.defaultValue!=null?null:r&&A.call(e.childNodes),!_&&r!=null)for(g={},u=0;u<e.attributes.length;u++)g[(a=e.attributes[u]).name]=a.value;for(u in g)a=g[u],u=="dangerouslySetInnerHTML"?h=a:u=="children"||(u in m)||u=="value"&&("defaultValue"in m)||u=="checked"&&("defaultChecked"in m)||I(e,u,null,a,i);for(u in m)a=m[u],u=="children"?s=a:u=="dangerouslySetInnerHTML"?f=a:u=="value"?v=a:u=="checked"?k=a:_&&typeof a!="function"||g[u]===a||I(e,u,a,g[u],i);if(f)_||h&&(f.__html==h.__html||f.__html==e.innerHTML)||(e.innerHTML=f.__html),n.__k=[];else if(h&&(e.innerHTML=""),Nn(n.type=="template"?e.content:e,U(s)?s:[s],n,t,o,d=="foreignObject"?"http://www.w3.org/1999/xhtml":i,r,l,r?r[0]:t.__k&&O(t,0),_,c),r!=null)for(u=r.length;u--;)on(r[u]);_&&d!="textarea"||(u="value",d=="progress"&&v==null?e.removeAttribute("value"):v!=null&&(v!==e[u]||d=="progress"&&!v||d=="option"&&v!=g[u])&&I(e,u,v,g[u],i),u="checked",k!=null&&k!=e[u]&&I(e,u,k,g[u],i))}return e}function sn(e,n,t){try{if(typeof e=="function"){var o=typeof e.__u=="function";o&&e.__u(),o&&n==null||(e.__u=e(n))}else e.current=n}catch(i){p.__e(i,t)}}function En(e,n,t){var o,i;if(p.unmount&&p.unmount(e),(o=e.ref)&&(o.current&&o.current!=e.__e||sn(o,null,n)),(o=e.__c)!=null){if(o.componentWillUnmount)try{o.componentWillUnmount()}catch(r){p.__e(r,n)}o.base=o.__P=o.__n=null}if(o=e.__k)for(i=0;i<o.length;i++)o[i]&&En(o[i],n,t||typeof e.type!="function");t||on(e.__e),e.__c=e.__=e.__e=void 0}function he(e,n,t){return this.constructor(e,t)}function un(e,n,t){var o,i,r,l;n==document&&(n=document.documentElement),p.__&&p.__(e,n),i=(o=typeof t=="function")?null:t&&t.__k||n.__k,r=[],l=[],ln(n,e=(!o&&t||n).__k=w(S,null,[e]),i||B,B,n.namespaceURI,!o&&t?[t]:i?null:n.firstChild?A.call(n.childNodes):null,r,!o&&t?t:i?i.__e:n.firstChild,o,l),Dn(r,e,l),e.props.children=null}function _n(e,n){un(e,n,_n)}function Hn(e,n,t){var o,i,r,l,_=C({},e.props);for(r in e.type&&e.type.defaultProps&&(l=e.type.defaultProps),n)r=="key"?o=n[r]:r=="ref"?i=n[r]:_[r]=n[r]===void 0&&l!=null?l[r]:n[r];return arguments.length>2&&(_.children=arguments.length>3?A.call(arguments,2):t),F(e.type,_,o||e.key,i||e.ref,null)}function Tn(e){function n(t){var o,i;return this.getChildContext||(o=new Set,(i={})[n.__c]=this,this.getChildContext=function(){return i},this.componentWillUnmount=function(){o=null},this.shouldComponentUpdate=function(r){this.props.value!=r.value&&o.forEach(function(l){l.__e=!0,en(l)})},this.sub=function(r){o.add(r);var l=r.componentWillUnmount;r.componentWillUnmount=function(){o&&o.delete(r),l&&l.call(r)}}),t.children}return n.__c="__cC"+Cn++,n.__=e,n.Provider=n.__l=(n.Consumer=function(t,o){return t.children(o)}).contextType=n,n}A=z.slice,p={__e:function(e,n,t,o){for(var i,r,l;n=n.__;)if((i=n.__c)&&!i.__)try{if((r=i.constructor)&&r.getDerivedStateFromError!=null&&(i.setState(r.getDerivedStateFromError(e)),l=i.__d),i.componentDidCatch!=null&&(i.componentDidCatch(e,o||{}),l=i.__d),l)return i.__E=i}catch(_){e=_}throw e}},bn=0,_e=function(e){return e!=null&&e.constructor===void 0},R.prototype.setState=function(e,n){var t;t=this.__s!=null&&this.__s!=this.state?this.__s:this.__s=C({},this.state),typeof e=="function"&&(e=e(C({},t),this.props)),e&&C(t,e),e!=null&&this.__v&&(n&&this._sb.push(n),en(this))},R.prototype.forceUpdate=function(e){this.__v&&(this.__e=!0,e&&this.__h.push(e),en(this))},R.prototype.render=S,N=[],wn=typeof Promise=="function"?Promise.prototype.then.bind(Promise.resolve()):setTimeout,Pn=function(e,n){return e.__v.__b-n.__v.__b},q.__r=0,Y=Math.random().toString(8),V="__d"+Y,T="__a"+Y,xn=/(PointerCapture)$|Capture$/i,tn=0,Z=kn(!1),nn=kn(!0),Cn=0;/*! preact/hooks 10.29.8, MIT licence: kit/licenses/preact.txt */var L,y,cn,Fn,G=0,Bn=[],b=p,{__b:An,__r:Un,diffed:Ln,__c:Wn,unmount:jn,__:In}=b;function fn(e,n){b.__h&&b.__h(y,e,G||n),G=0;var t=y.__H||(y.__H={__:[],__h:[]});return e>=t.__.length&&t.__.push({}),t.__[e]}function $n(e){return G=1,me(qn,e)}function me(e,n,t){var o=fn(L++,2);if(o.t=e,!o.__c&&(o.__=[t?t(n):qn(void 0,n),function(_){var c=o.__N?o.__N[0]:o.__[0],u=o.t(c,_);c!==u&&(o.__N=[u,o.__[1]],o.__c.setState({}))}],o.__c=y,!y.__f)){var i=function(_,c,u){if(!o.__c.__H)return!0;var f=!1,h=o.__c.props!==_;if(o.__c.__H.__.some(function(a){if(a.__N){f=!0;var v=a.__[0];a.__=a.__N,a.__N=void 0,v!==a.__[0]&&(h=!0)}}),r){var s=r.call(this,_,c,u);return f?s||h:s}return!f||h};y.__f=!0;var r=y.shouldComponentUpdate,l=y.componentWillUpdate;y.componentWillUpdate=function(_,c,u){if(this.__e){var f=r;r=void 0,i(_,c,u),r=f}l&&l.call(this,_,c,u)},y.shouldComponentUpdate=i}return o.__N||o.__}function pn(e,n){var t=fn(L++,3);!b.__s&&zn(t.__H,n)&&(t.__=e,t.u=n,y.__H.__h.push(t))}function W(e){return G=5,dn(function(){return{current:e}},[])}function dn(e,n){var t=fn(L++,7);return zn(t.__H,n)&&(t.__=e(),t.__H=n,t.__h=e),t.__}function ve(){for(var e;e=Bn.shift();){var n=e.__H;if(e.__P&&n)try{n.__h.some(J),n.__h.some(an),n.__h=[]}catch(t){n.__h=[],b.__e(t,e.__v)}}}b.__b=function(e){y=null,An&&An(e)},b.__=function(e,n){e&&n.__k&&n.__k.__m&&(e.__m=n.__k.__m),In&&In(e,n)},b.__r=function(e){Un&&Un(e),L=0;var n=(y=e.__c).__H;n&&(cn===y?(n.__h=[],y.__h=[],n.__.some(function(t){t.__N&&(t.__=t.__N),t.u=t.__N=void 0})):(n.__h.some(J),n.__h.some(an),n.__h=[],L=0)),cn=y},b.diffed=function(e){Ln&&Ln(e);var n=e.__c;n&&n.__H&&(n.__H.__h.length&&(Bn.push(n)!==1&&Fn===b.requestAnimationFrame||((Fn=b.requestAnimationFrame)||ye)(ve)),n.__H.__.some(function(t){t.u&&(t.__H=t.u,t.u=void 0)})),cn=y=null},b.__c=function(e,n){n.some(function(t){try{t.__h.some(J),t.__h=t.__h.filter(function(o){return!o.__||an(o)})}catch(o){n.some(function(i){i.__h&&(i.__h=[])}),n=[],b.__e(o,t.__v)}}),Wn&&Wn(e,n)},b.unmount=function(e){jn&&jn(e);var n,t=e.__c;t&&t.__H&&(t.__H.__.some(function(o){try{J(o)}catch(i){n=i}}),t.__H=void 0,n&&b.__e(n,t.__v))};var Vn=typeof requestAnimationFrame=="function";function ye(e){var n,t=function(){clearTimeout(o),Vn&&cancelAnimationFrame(n),setTimeout(e)},o=setTimeout(t,35);Vn&&(n=requestAnimationFrame(t))}function J(e){var n=y,t=e.__c;typeof t=="function"&&(e.__c=void 0,t()),y=n}function an(e){var n=y;e.__c=e.__(),y=n}function zn(e,n){return!e||e.length!==n.length||n.some(function(t,o){return t!==e[o]})}function qn(e,n){return typeof n=="function"?n(e):n}var K=Tn(void 0),Gn=()=>({name:"",sets:new Map}),Jn=new Map;function Kn(e){let n=Jn.get(e)??{name:e,sets:new Map};return Jn.set(e,n),n}var hn=(e,n)=>typeof e==="object"&&e!==null&&("type"in e)&&e.type===n;function ge(e,n){let t=rn(e),o=n?[w("a",{class:"back",href:"#"},n)]:[],i=0,r=t[0];if(hn(r,"h1")){o.push(r),i=1;for(let l=t[i];hn(l,"p");l=t[++i])o.push(l.props.class?l:Hn(l,{class:i===1?"lede":"meta"}))}return w(S,null,o.length>0&&w("div",{class:"view-head"},o),t.slice(i))}function Qn({render:e,record:n,back:t}){let[o]=$n(Gn),i=n===void 0?null:e({record:n});return w(K.Provider,{value:o},ge(hn(i,S)?i.props.children:i,t))}var ke=p.vnode;p.vnode=(e)=>{if(typeof e.type==="string"){let n=e.props;for(let t of Object.keys(n))if(t.startsWith("data-")&&n[t]===!0)n[t]=""}ke?.(e)};function be(e,n,t){for(let[o,i,r]of n??[]){let l=o.at(-1),_=o.slice(0,-1).reduce((c,u)=>c[u],e);if(l!==void 0)_[l]=t[i]?.[r]}return e}function we(e,n){let t=n.parentNode;if(!t)throw Error("island marker without a parent");let o=()=>{let r=[];for(let l=e.nextSibling;l&&l!==n;l=l.nextSibling)r.push(l);return r},i=(r)=>r;return{nodeType:1,parentNode:t,get firstChild(){return o()[0]??null},get childNodes(){return o()},contains:(r)=>o().some((l)=>r!==null&&l.contains(i(r))),insertBefore:(r,l)=>t.insertBefore(i(r),l?i(l):n),appendChild:(r)=>t.insertBefore(i(r),n),removeChild:(r)=>t.removeChild(i(r))}}function Pe(){let e=new Map,n=document.createTreeWalker(document.body,NodeFilter.SHOW_COMMENT),t=[];for(let o=n.nextNode();o;o=n.nextNode()){if(!(o instanceof Comment))continue;let i=/^(island|slot):(\d+)$/.exec(o.data);if(i)t.push({kind:i[1]==="slot"?"slot":"island",n:Number(i[2]),start:o});else if(o.data==="/island"||o.data==="/slot"){let r=t.pop();if(r)e.set(r.n,{...e.get(r.n),[r.kind]:[r.start,o]})}}return e}class Xn extends R{shouldComponentUpdate(){return!1}componentDidMount(){this.base.after(...this.props.nodes)}componentWillUnmount(){for(let e of this.props.nodes)e.remove()}render(){return""}}function xe([e,n]){let t=[];for(let o=e.nextSibling;o&&o!==n;o=o.nextSibling)t.push(o);e.replaceWith(document.createTextNode(""));for(let o of[...t,n])o.remove();return w(Xn,{nodes:t})}function Ce(e,n,t){let o=()=>Views.on(e,(i,r)=>un(w(Qn,{key:r,render:n,record:t.records[r],back:t.back}),i));if(document.readyState==="loading")addEventListener("DOMContentLoaded",o,{once:!0});else o()}function Yn(e){let n=JSON.parse(document.getElementById("explainer-islands")?.textContent??"[]"),t=Pe();for(let[o,{m:i,e:r,p:l,r:_,s:c,v:u}]of n.entries()){let f=be(l,_,e),h=e[i]?.[r],{island:s,slot:a}=t.get(o)??{};if(typeof h==="function"&&u!==void 0){Ce(u,h,f);continue}if(typeof h!=="function"||!s)throw Error(`island ${o} (${r}) is missing from the page`);let v=a?{...f,children:xe(a)}:f,k=w(h,v);_n(c===void 0?k:w(K.Provider,{value:Kn(c)},k),we(...s))}}var Q;function Zn(e){return{dangerouslySetInnerHTML:{__html:Q?e(Q):""}}}var ne=(e,n,t,o=!1)=>({classes:e.split(/\s+/).filter(Boolean),id:n,height:t,grows:o}),ee=(e,n)=>Q?Q.plotMarkLines(e,n):1;/*! preact/jsx-runtime 10.29.8, MIT licence: kit/licenses/preact.txt */var Se=0;function te(e,n,t,o,i,r){n||(n={});var l,_,c=n;if("ref"in c)for(_ in c={},n)_=="ref"?l=n[_]:c[_]=n[_];var u={type:e,props:c,key:t,ref:l,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:--Se,__i:-1,__u:0,__source:i,__self:r};if(typeof e=="function"&&(l=e.defaultProps))for(_ in l)c[_]===void 0&&(c[_]=l[_]);return p.vnode&&p.vnode(u),u}var Ne=3.5,Me=34,Oe=2.75,De=1.375,Re=1.125,Ee=1.3125,oe=(e)=>String(e).replace(/\D/g,"").replace(/^0+/,"");function He({stack:e,series:n=[],marks:t=[],x:o}){if(o?.labels!==void 0)return!o.labels;let i=(l)=>l.type==="bar"&&(l.label===!0||typeof l.label==="object"&&!Array.isArray(l.label)),r=(l)=>[l.x??[]].flat().every((_)=>oe(l.label??"").includes(oe(_)));return!e&&n.every(i)&&t.every(r)}function Te(e){let{horizontal:n,categories:t,series:o=[],x:i,y:r,legend:l}=e,_=l!==!1&&o.filter((u)=>u.name).length>1;if(!(n&&t?.length)||_)return;let c=Oe+(i?.name?De:0)+(r?.name?Re:0)-(He(e)?Ee:0);return`${Math.min(t.length*Ne+c,Me)}rem`}var Fe=(e,n)=>`calc(${e} + var(--plot-mark-lines, ${n}) * (var(--size-label) + 4px))`;function re(e,n,t,o){let i=n?`chart plot ${n}`:"chart plot",r=o||i.split(/\s+/).includes("tall")?void 0:Te(e),l=o??r;return{classes:i,sized:l,bars:r,place:ne(i,t,l,Boolean(r))}}var Ae=(e,n)=>({...e,...n,x:{...e.x,...n.x},y:{...e.y,...n.y}});function Ue({option:e,label:n,class:t,id:o,height:i,pick:r}){let l=W(null),_=W(r);_.current=r;let c=W(null),u=W(null),f=dn(()=>(u.current=u.current?Ae(u.current,e):e,u.current),[e]);pn(()=>{if(c.current)c.current.set(e);else if(l.current){let m=_.current&&{choose:(d)=>_.current?.choose(d),strip:_.current.strip?.current??null};c.current=window.Plot.make(l.current,e,m||void 0)}},[e]),pn(()=>()=>{c.current?.dispose(),c.current=null},[]);let{classes:h,place:s,sized:a,bars:v}=re(f,t,o,i),k=v&&f.marks?.some((m)=>m.x!==void 0&&!m.between&&m.label),g=a&&{blockSize:k?Fe(a,ee(e,s)):a};return te("div",{ref:l,class:h,id:o,style:g||void 0,role:"img","aria-label":n,...Zn((m)=>m.plot(e,s))})}Yn([mn]);})();
 </script>
 <script>/* link: linked highlighting: elements sharing a data-ref light up together on hover, focus and click; Mermaid node ids are refs. pack includes it for data-ref.
    Elements that share a data-ref light up together (class is-lit) while one of them is hovered, focused or clicked:

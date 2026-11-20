@@ -579,6 +579,14 @@ h3,
 	stroke: var(--c);
 	stroke-width: 1.5;
 }
+/* An arrow from one data point to another, in ink over the lines: the change the page points at. */
+.plot svg .arrow {
+	stroke: var(--ink);
+	stroke-width: 1.5;
+}
+.plot svg .arrow-head {
+	fill: var(--ink);
+}
 .plot svg :is(.line, .stem) {
 	fill: none;
 	stroke: var(--c);
@@ -3247,6 +3255,170 @@ window.ChartsDefaults = (() => {
   return { defaults, styling, place, places };
 })();
 
+/* Chart ends: the names a Chart's lines carry at their ends (a Chart never falls back to a legend for them), not referenced from
+   pages: pack joins it in front of charts.js with option.ts, which hands it on as ChartsOption's endNames, unnamed and spreadEnds.
+   ChartsEnds({ isObject, size }) gives endNames(option, width), the option with its names at the ends; unnamed(option), why
+   pack cannot name an option's lines there; and spreadEnds(chart), names that crowd moved apart about their ends. */
+window.ChartsEnds = ({ isObject, size }) => {
+  const END_DISTANCE = 8;
+  const END_MARGIN = 8;
+  const endLine = () => size() + 2;
+  const ROOT_ONLY = ["baseOption", "options", "media", "textStyle", "dataZoom", "dataset"];
+  const SERIES_ONLY = ["labelLayout", "coordinateSystem", "xAxisIndex", "yAxisIndex", "encode"];
+  const categories = (axis) => Array.isArray(axis.data) ? axis.data.map((v) => isObject(v) ? v.value : String(v)) : undefined;
+  const empty = (v, names) => v == null || Number.isNaN(v) || (v === "-" || v === "") && !names?.includes(v);
+  function onAxis(v, names) {
+    if (typeof v === "number" && Number.isFinite(v)) {
+      return v;
+    }
+    const k = names?.lastIndexOf(v) ?? -1;
+    return k < 0 ? undefined : k;
+  }
+  function point(item, i) {
+    if (isObject(item)) {
+      return point(item.value, i);
+    }
+    return Array.isArray(item) ? [item[0], item[1]] : [i, item];
+  }
+  const bound = (at, names) => at === undefined || at === "dataMin" || at === "dataMax" ? at : onAxis(at, names) ?? Number.NaN;
+  function past(v, min, max) {
+    if (v === undefined) {
+      return "unknown";
+    }
+    return typeof min === "number" && v < min || typeof max === "number" && v > max ? "cuts" : "";
+  }
+  function clips(axis, dim, series, names) {
+    const [min, max] = [bound(axis.min, names[dim]), bound(axis.max, names[dim])];
+    if (min === undefined && max === undefined) {
+      return "";
+    }
+    const summed = dim === 1 && series.some((s) => s.stack);
+    if (Number.isNaN(min) || Number.isNaN(max) || summed && [min, max].some(Number.isFinite)) {
+      return "unknown";
+    }
+    const found = series.flatMap((s) => Array.isArray(s.data) ? s.data.map((item, i) => {
+      const xy = point(item, i);
+      return empty(xy[0], names[0]) || empty(xy[1], names[1]) ? "" : past(onAxis(xy[dim], names[dim]), min, max);
+    }) : []);
+    return found.includes("cuts") ? "cuts" : found.includes("unknown") ? "unknown" : "";
+  }
+  function axesBar({ xAxis, yAxis }, series) {
+    if (!(isObject(xAxis) && isObject(yAxis))) {
+      return "a second axis";
+    }
+    if (xAxis.inverse) {
+      return "a reversed x axis";
+    }
+    if (yAxis.type === "category" || yAxis.type === "time") {
+      return `a ${yAxis.type} y axis`;
+    }
+    if ([xAxis.min, xAxis.max, yAxis.min, yAxis.max].every((at) => at === undefined)) {
+      return "";
+    }
+    const names = [categories(xAxis), categories(yAxis)];
+    const x = clips(xAxis, 0, series, names);
+    const which = x ? "an x" : "a y";
+    switch (x || clips(yAxis, 1, series, names)) {
+      case "cuts":
+        return `${which} axis min or max that cuts a line short`;
+      case "unknown":
+        return `${which} axis min or max the kit cannot compare with the lines`;
+      default:
+        return "";
+    }
+  }
+  function namedLines(option, list) {
+    const named = list.filter((s) => typeof s.name === "string" && s.name);
+    return named.length > 1 && named.every((s) => s.type === "line") && !list.some((s) => ("endLabel" in s)) && !("legend" in option);
+  }
+  function endsBar(given) {
+    const option = isObject(given.baseOption) ? { ...given.baseOption, ...given } : given;
+    const { series, grid = {} } = option;
+    const list = Array.isArray(series) ? series.filter(isObject) : [];
+    if (!namedLines(option, list)) {
+      return;
+    }
+    return unseen(option, list) || gridBar(grid) || axesBar(option, list);
+  }
+  function unseen(option, list) {
+    const root = ROOT_ONLY.find((key) => (key in option));
+    const own = SERIES_ONLY.find((key) => list.some((s) => (key in s)));
+    return root ? `its ${root}` : own ? `a series' ${own}` : "";
+  }
+  function gridBar(grid) {
+    if (!isObject(grid)) {
+      return "a second grid";
+    }
+    if (grid.width !== undefined) {
+      return "an explicit grid width";
+    }
+    return grid.right !== undefined && typeof grid.right !== "number" ? "a grid right that is not in px" : "";
+  }
+  const unnamed = (option) => endsBar(option) || undefined;
+  function endNames(option, width) {
+    const { series, grid = {} } = option;
+    if (endsBar(option) !== "" || !(Array.isArray(series) && isObject(grid))) {
+      return;
+    }
+    const names = series.flatMap((s) => isObject(s) && s.name ? [String(s.name)] : []);
+    const room = Math.max(...names.map(width)) + END_DISTANCE + END_MARGIN;
+    const end = {
+      endLabel: { __kitEndName: true, show: true, formatter: "{a}", valueAnimation: false }
+    };
+    return {
+      ...option,
+      grid: { ...grid, right: Math.max(Number(grid.right ?? 0), Math.ceil(room)) },
+      series: series.map((s) => isObject(s) && s.name ? { ...s, ...end } : s)
+    };
+  }
+  function endsOf(model) {
+    const ends = [];
+    model.eachSeries((s) => {
+      const points = s.get(["endLabel", "__kitEndName"]) && s.get(["endLabel", "show"]) ? s.getData().getLayout("points") : undefined;
+      for (let i = (points?.length ?? 0) - 2;points && i >= 0; i -= 2) {
+        const [x, y] = [points[i], points[i + 1]];
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          ends.push({ id: s.id, name: s.name, y });
+          break;
+        }
+      }
+    });
+    return ends.sort((a, b) => a.y - b.y);
+  }
+  function spread(ys, step, [lo, hi]) {
+    const groups = [];
+    const first = ({ n, sum }) => Math.min(Math.max(sum / n - (n - 1) * step / 2, lo), hi - (n - 1) * step);
+    for (const y of ys) {
+      groups.push({ n: 1, sum: y });
+      for (let k = groups.length - 1;k > 0; k--) {
+        const [g, h] = [groups[k - 1], groups[k]];
+        if (first(g) + g.n * step <= first(h)) {
+          break;
+        }
+        groups.splice(k - 1, 2, { n: g.n + h.n, sum: g.sum + h.sum });
+      }
+    }
+    return groups.flatMap((g) => Array.from({ length: g.n }, (_, k) => first(g) + k * step));
+  }
+  function spreadEnds(chart, every = false) {
+    const model = chart.getModel();
+    const ends = endsOf(model);
+    if (!ends.length) {
+      return { patch: undefined, unclear: [] };
+    }
+    const rect = model.getComponent("grid", 0)?.coordinateSystem?.getRect();
+    const [lo, hi] = rect ? [rect.y, rect.y + Math.max(0, rect.height)] : [-1 / 0, 1 / 0];
+    const line = endLine();
+    const step = Math.min(line, (hi - lo) / Math.max(1, ends.length - 1));
+    const at = spread(ends.map((e) => e.y), step, [lo, hi]);
+    const moves = ends.map((end, k) => ({ ...end, dy: (at[k] ?? end.y) - end.y }));
+    const unclear = moves.filter(({ dy }) => ends.length > 1 && step < line || Math.abs(dy) > line / 2 + 0.5).map((m) => m.name);
+    const series = moves.filter((m) => every || m.dy !== 0).map(({ id, dy }) => ({ id, endLabel: { offset: [0, dy] } }));
+    return { patch: series.length ? { series } : undefined, unclear };
+  }
+  return { endNames, unnamed, spreadEnds };
+};
+
 /* Shared ECharts theme, layout and metrics. */
 window.ChartsOption = ({ color, lang, size, text }) => {
   const COLOR_KEY = /(olor|^fill|^stroke)$/;
@@ -3319,65 +3491,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
   }
   const settings = (option) => isObject(option.baseOption) ? option.baseOption : option;
   const still = (option) => isObject(option.baseOption) ? { ...option, baseOption: { ...option.baseOption, animation: false } } : { ...option, animation: false };
-  const END_DISTANCE = 8;
-  const END_MARGIN = 8;
-  const endLine = () => size() + 2;
-  const ROOT_ONLY = [
-    "legend",
-    "baseOption",
-    "options",
-    "media",
-    "textStyle",
-    "dataZoom",
-    "dataset"
-  ];
-  const VERTICAL_BOUNDS = ["top", "bottom", "height"];
-  const SERIES_ONLY = [
-    "endLabel",
-    "labelLayout",
-    "coordinateSystem",
-    "xAxisIndex",
-    "yAxisIndex",
-    "encode"
-  ];
-  const clips = (axis) => ("min" in axis) || ("max" in axis);
-  const leftToRight = (axis) => isObject(axis) && !axis.inverse && !clips(axis);
-  function namesFit(option, series) {
-    const { grid = {}, xAxis, yAxis } = option;
-    return isObject(grid) && series.filter((s) => isObject(s) && typeof s.name === "string" && s.name).length > 1 && series.every((s) => isObject(s) && !SERIES_ONLY.some((key) => (key in s)) && (!s.name || s.type === "line")) && (grid.right === undefined || typeof grid.right === "number") && !VERTICAL_BOUNDS.some((key) => (key in grid)) && leftToRight(xAxis) && isObject(yAxis) && !clips(yAxis) && yAxis.type !== "category" && yAxis.type !== "time";
-  }
-  function endNames(option, width) {
-    const { series, grid = {} } = option;
-    if (!(Array.isArray(series) && isObject(grid)) || ROOT_ONLY.some((key) => (key in option)) || !namesFit(option, series)) {
-      return;
-    }
-    const names = series.flatMap((s) => isObject(s) && s.name ? [String(s.name)] : []);
-    const room = Math.max(...names.map(width)) + END_DISTANCE + END_MARGIN;
-    const end = { endLabel: { show: true, formatter: "{a}", valueAnimation: false } };
-    return {
-      named: {
-        ...option,
-        grid: { ...grid, right: Math.max(Number(grid.right ?? 0), Math.ceil(room)) },
-        series: series.map((s) => isObject(s) && s.name ? { ...s, ...end } : s)
-      },
-      legend: { ...option, legend: {} }
-    };
-  }
-  function crowded(chart) {
-    const ends = [];
-    chart.getModel().eachSeries((s) => {
-      const points = s.get(["endLabel", "show"]) ? s.getData().getLayout("points") : undefined;
-      for (let i = (points?.length ?? 0) - 2;points && i >= 0; i -= 2) {
-        const [x, y] = [points[i], points[i + 1]];
-        if (Number.isFinite(x) && Number.isFinite(y)) {
-          ends.push(y);
-          break;
-        }
-      }
-    });
-    ends.sort((a, b) => a - b);
-    return ends.some((y, i) => i > 0 && y - ends[i - 1] < endLine());
-  }
+  const ends = window.ChartsEnds({ isObject, size });
   const measureText = (base) => (text, font) => text === "国" ? { width: Number(/(\d+(?:\.\d+)?)px/.exec(font ?? "")?.[1] ?? 12) } : base(text, font);
   function authoredLayout(option) {
     const component = (value, keys) => {
@@ -3598,8 +3712,9 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     measureText,
     still,
     settings,
-    endNames,
-    crowded,
+    endNames: ends.endNames,
+    unnamed: ends.unnamed,
+    spreadEnds: ends.spreadEnds,
     defaults: window.ChartsDefaults.defaults,
     styling: window.ChartsDefaults.styling,
     markSides: window.ChartsDefaults.place
@@ -3657,7 +3772,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     still,
     settings,
     endNames,
-    crowded,
+    spreadEnds,
     defaults,
     styling,
     markSides
@@ -3684,24 +3799,22 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     pixel.font = `${labelSize()}px ${getComputedStyle(document.body).fontFamily}`;
     return pixel.measureText(text).width;
   });
-  function show(chart, option, prepare, selected, how) {
+  function show(chart, option, prepare, how) {
     const draw = (sides) => {
       const kept = defaults(option, sides);
       const named = ends(kept);
-      chart.setOption(prepare(named ? named.named : kept), how);
+      chart.setOption(prepare(named ?? kept), how);
       return named;
     };
-    let both = draw();
+    let named = draw();
     const sides = markSides(chart);
     if (sides.size) {
-      both = draw(sides);
+      named = draw(sides);
     }
-    if (!(both && crowded(chart))) {
-      return false;
+    const { patch } = named ? spreadEnds(chart) : { patch: undefined };
+    if (patch) {
+      chart.setOption(patch);
     }
-    const legend = { ...both.legend, legend: selected ? { selected } : {} };
-    chart.setOption(prepare(legend), { notMerge: true });
-    return true;
   }
   const theme = (el) => tokenTheme({
     under: resolve(getComputedStyle(el).getPropertyValue("--under")),
@@ -3813,41 +3926,45 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     made.get(el)?.();
     let chart = null;
     let live = true;
-    let drawnHeight = 0;
-    let standIn = false;
-    let selected;
-    const keepStandIn = (on) => {
-      const [shown] = standIn ? on.getOption().legend ?? [] : [];
-      selected = shown?.selected;
-    };
+    let drawnSize = "";
+    const sizeOf = (on) => `${on.getWidth()}x${on.getHeight()}`;
     const mount = () => {
       if (chart) {
-        keepStandIn(chart);
         chart.dispose();
       }
       sizing = el;
       const look = theme(el);
       chart = echarts.init(el, look);
       layout(chart);
-      standIn = show(chart, option, (o) => resolveOption(still(o)), selected);
-      drawnHeight = el.clientHeight;
+      show(chart, option, (o) => resolveOption(still(o)));
+      drawnSize = sizeOf(chart);
       chart.setOption({ animation: Boolean(settings(option).animation ?? look.animation) });
       el.querySelector(":scope > .chart-drawn")?.remove();
       setup?.(chart);
     };
     const redraw = (on, patch) => {
       keepReaderState(option, on);
-      keepStandIn(on);
       patch?.();
       on.dispatchAction({ type: "hideTip" });
       sizing = el;
-      standIn = show(on, option, resolveOption, selected, { notMerge: true });
-      drawnHeight = el.clientHeight;
+      show(on, option, resolveOption, { notMerge: true });
+      drawnSize = sizeOf(on);
     };
     const fontReady = Promise.all([
       document.fonts.load(`500 ${labelSize(el)}px ${getComputedStyle(document.body).fontFamily}`).catch(() => []),
       window.echartsReady
     ]);
+    const respread = (on) => {
+      const size = sizeOf(on);
+      if (size === drawnSize) {
+        return;
+      }
+      const { patch } = spreadEnds(on, true);
+      if (patch) {
+        on.setOption(patch);
+      }
+      drawnSize = size;
+    };
     const resizer = new ResizeObserver(() => {
       if (!el.clientWidth) {
         return;
@@ -3855,9 +3972,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
       if (chart) {
         chart.resize();
         sizing = el;
-        if (el.clientHeight !== drawnHeight && ends(option)) {
-          redraw(chart);
-        }
+        respread(chart);
       } else {
         fontReady.then(() => live && !chart && el.clientWidth && mount());
       }

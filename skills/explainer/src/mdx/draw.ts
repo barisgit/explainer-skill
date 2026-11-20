@@ -25,6 +25,8 @@ import { standIns } from "./stand-ins.ts";
 
 /** A Chart or Plot option, as the page wrote it; a Plot's series is the one key the drawer reads. */
 type Option = Record<string, unknown> & { series?: unknown[] };
+/** What plot.js found no clear place for, and its arrows too short to read (PlotCrowded in kit-types/globals.d.ts). */
+type PlotCrowded = { notes: string[]; names: string[]; arrows: string[] };
 
 /** What kit/parts/charts/option.ts gives (ChartsOption in kit-types/globals.d.ts). */
 interface ChartsOption {
@@ -58,7 +60,7 @@ interface PlotDraw {
 	legendMarkup(option: Option): string;
 	switchedOn(series: unknown[], off: Set<string | undefined>): boolean[];
 	markLines(option: Option, W: number, H: number, textWidth: (s: unknown) => number): number;
-	crowded(): { notes: string[]; names: string[] };
+	crowded(): PlotCrowded;
 }
 type PlotDrawPart = (env: { lang: () => string; size: () => number }) => PlotDraw;
 
@@ -184,20 +186,31 @@ function validateChart(option: unknown): void {
 
 /** A Plot mark's shapes, by the key that names each, with the keys each takes (kit-types/globals.d.ts's PlotMark). */
 const MARK_SHAPES = [
+	{ by: "from", name: "an arrow", keys: ["from", "to", "label"] },
 	{ by: "at", name: "a note at a point", keys: ["at", "label"] },
 	{ by: "between", name: "a region", keys: ["x", "between", "fill", "label"] },
 	{ by: "y", name: "a marker across", keys: ["y", "label"] },
 	{ by: "x", name: "a marker or a span", keys: ["x", "label"] },
 ] as const;
 
+/** Whether a value is a point: two finite numbers. */
+const isPair = (v: unknown): boolean =>
+	Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === "number" && Number.isFinite(n));
+
 /** What is wrong with one Plot mark's shape, which plot.js would draw as another shape or leave out without a word. */
 function markShapeProblem(mark: Record<string, unknown>): string | undefined {
 	const written = JSON.stringify(mark);
 	const shape = MARK_SHAPES.find(({ by }) => by in mark);
 	if (!shape) {
-		return `Plot mark ${written}: a mark takes x, y, at or between.`;
+		return `Plot mark ${written}: a mark takes x, y, at, from or between${"to" in mark ? " (an arrow goes from: [x, y] to: [x, y])" : ""}.`;
 	}
 	const { x } = mark;
+	if (shape.by === "from") {
+		const bad = (["from", "to"] as const).find((end) => !isPair(mark[end]));
+		if (bad) {
+			return `Plot mark ${written}: an arrow needs ${bad}: [x, y], two numbers, the point it ${bad === "to" ? "points at" : "starts from"}.`;
+		}
+	}
 	if (shape.by === "between" && !(Array.isArray(x) && x.length === 2)) {
 		return `Plot mark ${written}: a region needs x: [from, to], the span it covers.`;
 	}
@@ -208,24 +221,30 @@ function markShapeProblem(mark: Record<string, unknown>): string | undefined {
 }
 
 /**
- * Rejects a Plot mark of no one shape and a region between a series the plot does not have, which plot.js would draw otherwise
+ * Rejects a Plot mark of no one shape, an arrow on a plot with categories and a region between a series the plot does not have, which plot.js would draw otherwise
  * or leave out without a word.
  */
 function validatePlot(option: Option): void {
-	const { marks: written } = option as { marks?: unknown };
-	const problem = (Array.isArray(written) ? written : [])
-		.map((mark) => (mark && typeof mark === "object" ? markShapeProblem(mark) : undefined))
-		.find(Boolean);
+	const { marks: written, categories } = option as { marks?: unknown; categories?: unknown };
+	const marks = (Array.isArray(written) ? written : []).filter(
+		(mark): mark is { between?: unknown } & Record<string, unknown> =>
+			Boolean(mark) && typeof mark === "object",
+	);
+	const problem = marks.map(markShapeProblem).find(Boolean);
 	if (problem) {
 		throw new PackError(problem);
+	}
+	const arrow = categories ? marks.find((m) => "from" in m) : undefined;
+	if (arrow) {
+		throw new PackError(
+			`Plot mark ${JSON.stringify(arrow)}: an arrow needs two numeric axes; a plot with categories draws none.`,
+		);
 	}
 	const lines = (option.series ?? []).flatMap((s) => {
 		const { name, type = "line" } = (s ?? {}) as { name?: unknown; type?: unknown };
 		return type === "line" && typeof name === "string" ? [name] : [];
 	});
-	const { marks: given } = option as { marks?: unknown };
-	const marks = Array.isArray(given) ? (given as { between?: unknown }[]) : [];
-	for (const bound of marks.flatMap((m) => (Array.isArray(m?.between) ? m.between : []))) {
+	for (const bound of marks.flatMap((m) => (Array.isArray(m.between) ? m.between : []))) {
 		if (typeof bound === "string" && !lines.includes(bound)) {
 			const named = lines.length ? lines.map((n) => `"${n}"`).join(", ") : "none: name one";
 			throw new PackError(
@@ -443,8 +462,12 @@ function chartCopy(copy: Copy, height: number, how: ChartHow): string | undefine
 	return stable ? kitSvg(drawing.svg, svgTag(copy, height), paintOf) : undefined;
 }
 
-/** What pack says about the notes and line names a plot drawn `width` px wide found no clear place for. */
-const crowdedWarnings = ({ notes, names }: { notes: string[]; names: string[] }, width: number) => [
+/** What pack says about the notes and line names a plot drawn `width` px wide found no clear place for, and its arrows too short to read. */
+const crowdedWarnings = ({ notes, names, arrows }: PlotCrowded, width: number) => [
+	...arrows.map(
+		(arrow) =>
+			`Plot arrow "${arrow}" is too short to read at ${width} px wide: point it between points further apart, or mark the change with a note.`,
+	),
 	...notes.map(
 		(note) =>
 			`Plot note "${note}" finds no clear place at ${width} px wide and is drawn over a line, a label or the plot's edge: shorten it, or anchor it where the plot has room.`,
@@ -476,11 +499,10 @@ function unnamedLines(part: ChartsOptionPart, option: Option): string | undefine
 		: undefined;
 }
 
-/** The drawer pack renders a page in `lang` with (kit/components/parts/drawn.ts's Drawer). */
-export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
-	const pageTouchesBox = pageBoxTouch(stylesheets);
-	/** The heights of the copies of the figure on `place`, or undefined when pack cannot tell them. */
-	function heightsOf(place: Place, titled = false): number[] | undefined {
+/** The heights of the copies of a figure on a place, or undefined when pack cannot tell them, with the page's box rules. */
+const copyHeights =
+	(pageTouchesBox: ReturnType<typeof pageBoxTouch>) =>
+	(place: Place, titled = false): number[] | undefined => {
 		if (pageTouchesBox(place, titled)) {
 			return undefined;
 		}
@@ -492,7 +514,11 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 				: lengthAt(place.height, copy.viewport),
 		);
 		return heights.every((h) => h !== undefined) ? heights : undefined;
-	}
+	};
+
+/** The drawer pack renders a page in `lang` with (kit/components/parts/drawn.ts's Drawer). */
+export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
+	const heightsOf = copyHeights(pageBoxTouch(stylesheets));
 	const chartsOption = runKitPart("charts/option.ts", "ChartsOption") as ChartsOptionPart;
 	const plots = (runKitPart("plot/draw.ts", "PlotDraw") as PlotDrawPart)({
 		lang: () => lang,
@@ -501,6 +527,9 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	const width = (s: unknown) => textWidth(String(s), LABEL, 500);
 	/** What pack says about the figures it drew: the notes and names found no clear place for, by the copy's width. */
 	const warnings = new Set<string>();
+	/** What leads each warning: an Explore frame's call while diagnose draws it, else nothing. */
+	let lead = "";
+	const warn = (warning: string) => warnings.add(lead + warning);
 	/** The lines a plot's markers' labels take on top in each copy, laid out as plot.js lays them out at the copy's width. */
 	const markRows = (option: Option, place: Place) => {
 		const heights = heightsOf(place);
@@ -511,7 +540,7 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 	const drawChart = orNothing((option: Option, place: Place) => {
 		const unnamed = unnamedLines(chartsOption, option);
 		if (unnamed) {
-			warnings.add(unnamed);
+			warn(unnamed);
 		}
 		const heights = heightsOf(place, titled(option));
 		const colours = chartColours(option, loadEcharts().ownColors);
@@ -526,7 +555,6 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const kept = charts.defaults(option, markerSides(option, theme, charts));
 		const ends = charts.endNames(kept, (text) => measureText(text, `${LABEL}px`).width);
 		const resolved = charts.resolveOption(ends ?? kept);
-		const warn = (warning: string) => warnings.add(warning);
 		const how = { option: resolved, theme, charts, paintOf, warn, spreads: Boolean(ends) };
 		const copies = COPIES.map((copy, i) => chartCopy(copy, heights[i] as number, how));
 		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
@@ -558,7 +586,7 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			const H = (heights[i] as number) - LEGEND.top - (one as number) * LEGEND.row;
 			const drawn = plots.render(option, copy.width, H, width, shown);
 			for (const w of crowdedWarnings(plots.crowded(), copy.width)) {
-				warnings.add(w);
+				warn(w);
 			}
 			return `${svgTag(copy, H)}${shorterPaths(drawn)}</svg>`;
 		});
@@ -576,9 +604,26 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			// renderItem is arbitrary drawing code: its geometry and colours cannot be proven exact by the SVG pass.
 			return seriesIn(option).includes("custom") ? "" : drawChart(option, place);
 		},
+		validatePlot,
 		plot(option: Option, place: Place) {
 			validatePlot(option);
 			return drawPlot(option, place);
+		},
+		// A plot's frame is drawn as the plot is, for what its notes, names and arrows warn of; a chart's is only read for
+		// lines left unnamed, since drawing every frame with ECharts would cost pack seconds.
+		diagnose(call: string, figure: { chart?: Option; plot?: Option }, place: Place) {
+			lead = `${call}: `;
+			try {
+				const unnamed = figure.chart && unnamedLines(chartsOption, figure.chart);
+				if (unnamed) {
+					warn(unnamed);
+				}
+				if (figure.plot) {
+					drawPlot(figure.plot, place);
+				}
+			} finally {
+				lead = "";
+			}
 		},
 	};
 }

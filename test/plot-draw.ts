@@ -13,7 +13,7 @@ export type PlotDrawing = {
 	): string;
 	legendMarkup(option: object): string;
 	markLines(option: object, W: number, H: number, width: (s: unknown) => number): number;
-	crowded(): { notes: string[]; names: string[] };
+	crowded(): { notes: string[]; names: string[]; arrows: string[] };
 };
 export const plotDrawAt = (size: number) =>
 	(

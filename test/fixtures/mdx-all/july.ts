@@ -66,6 +66,8 @@ function charge(kw: number): [number, number][] {
 const hours = (points: [number, number][]) =>
 	points.map(([x], i) => (i === points.length - 1 ? `${x.toFixed(1)} h` : ""));
 const [slow, fast] = [charge(3), charge(11)];
+/** When a curve first holds 6 kWh. */
+const sixAt = (points: [number, number][]) => points.find(([, e]) => e >= 6)?.[0] ?? 0;
 
 /** Two chargers' curves, each ending in its name and the hours it takes: "3 kW: 3.8 h". */
 export const CHARGE = {
@@ -73,7 +75,14 @@ export const CHARGE = {
 		{ name: "3 kW", data: slow, color: "var(--accent)", dash: false, label: hours(slow) },
 		{ name: "11 kW", data: fast, dash: false, label: hours(fast) },
 	],
-	marks: [{ y: 8, label: "80 %: charging slows" }],
+	marks: [
+		{ y: 8, label: "80 %: charging slows" },
+		{
+			from: [sixAt(slow), 6],
+			to: [sixAt(fast), 6],
+			label: `${(sixAt(slow) - sixAt(fast)).toFixed(1)} h sooner`,
+		},
+	],
 	x: { min: 0, format: { unit: "h" } },
 	y: { min: 0, max: 10, format: { unit: "kWh" } },
 };

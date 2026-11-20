@@ -1,6 +1,6 @@
 /* plot place: where a label on the plot goes, not referenced from pages: pack joins it in front of plot.js with draw.ts, which
    uses it. PlotPlace({ wrap }) gives what the end names (ends.ts) and notes (areas.ts) are placed by, together and in that order
-   after the markers' labels: the lines they keep clear of (obstacles), what a spot costs where it lies (cost; under CLEAR is
+   after the markers' labels: the lines and arrows they keep clear of (obstacles), what a spot costs where it lies (cost; under CLEAR is
    clear), the cheapest of some spots (cheapest), a wrapped label's spot (spot), the spots beside a point and away from it tied
    by a leader (pointSpots, leaderSpots) and polygon tests (within). */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
@@ -181,7 +181,7 @@ window.PlotPlace = ({ wrap }) => {
 	const finite = (p: number | PlotPoint): p is PlotPoint =>
 		typeof p !== "number" && Number.isFinite(p[0]) && Number.isFinite(p[1]);
 
-	/** The lines labels keep clear of: every line series switched on, and the markers' lines. */
+	/** The lines labels keep clear of: every line series switched on, the markers' lines and the arrows' shafts. */
 	function obstacles(option: PlotOption, { X, Y, L, R, T, B, shown }: PlotAreaFrame) {
 		const series = (option.series ?? []).flatMap((s, i) =>
 			shown[i] && (s.type ?? "line") === "line"
@@ -191,6 +191,9 @@ window.PlotPlace = ({ wrap }) => {
 		const markers = (option.marks ?? []).flatMap((m): PlotPx[][] => [
 			...(typeof m.x === "number" ? [[[X(m.x), T] as const, [X(m.x), B] as const]] : []),
 			...(typeof m.y === "number" ? [[[L, Y(m.y)] as const, [R, Y(m.y)] as const]] : []),
+			...(m.from && m.to
+				? [[[X(m.from[0]), Y(m.from[1])] as const, [X(m.to[0]), Y(m.to[1])] as const]]
+				: []),
 		]);
 		return [...series, ...markers];
 	}

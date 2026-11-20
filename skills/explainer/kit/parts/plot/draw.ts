@@ -10,6 +10,8 @@
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotDraw = ({ lang, size }) => {
 	// px: the label size, as theme.css sets it for .plot text (--size-label); read again at each render and legend.
+	/** px: an arrow shorter than this, its head and gaps shrunk to fit, is reported as too short to read. */
+	const SHORT = 6;
 	let FONT = size();
 	const PAD = 16;
 	const GAP = 5; // px between the plot and its tick labels
@@ -91,7 +93,7 @@ window.PlotDraw = ({ lang, size }) => {
 		place: placer,
 	});
 	/** What the last render found no clear place for: notes by label, line names by series. */
-	let crowded: { notes: string[]; names: string[] } = { notes: [], names: [] };
+	let crowded: PlotCrowded = { notes: [], names: [], arrows: [] };
 	const format = window.PlotFormat({ lang });
 	const { formatter, labeller } = format;
 	const pick = window.PlotPick({ esc, formatter, labeller });
@@ -252,11 +254,16 @@ window.PlotDraw = ({ lang, size }) => {
 			...unplaced,
 		};
 	}
-	/** The values the option's markers stand at on one axis, which its range covers. */
-	const markedAt = (option: PlotOption, key: "x" | "y") =>
+	/**
+	 * The values the option's markers, notes and, on two numeric axes (`arrows`), arrows stand at on one axis, which its range
+	 * covers. A plot with categories draws no arrow, so its arrows move no axis.
+	 */
+	const markedAt = (option: PlotOption, key: "x" | "y", arrows: boolean) =>
 		(option.marks ?? []).flatMap((m) => [
 			...[m[key] ?? []].flat(),
-			...(m.at ? [m.at[key === "x" ? 0 : 1]] : []),
+			...[m.at, ...(arrows ? [m.from, m.to] : [])].flatMap((p) =>
+				p ? [p[key === "x" ? 0 : 1]] : [],
+			),
 		]);
 
 	/** Gives the axis its pixel interval [a, b] and at(value), which maps a number, or a category index to its band centre. */
@@ -383,7 +390,7 @@ window.PlotDraw = ({ lang, size }) => {
 		const sum = (c: number[], sign: number) =>
 			c.filter((v) => v * sign > 0).reduce((a, b) => a + b, 0);
 		const ends = cols.flatMap((c) => (option.stack ? [sum(c, -1), sum(c, 1)] : c));
-		const marked = markedAt(option, option.horizontal ? "x" : "y");
+		const marked = markedAt(option, option.horizontal ? "x" : "y", false);
 		const span: [number, number] = [
 			Math.min(0, ...ends, ...marked),
 			Math.max(0, ...ends, ...marked),
@@ -421,8 +428,8 @@ window.PlotDraw = ({ lang, size }) => {
 	/** Axes of a line and stem plot, over the extent of the data. */
 	function plotAxes(option: PlotOption, W: number, H: number) {
 		const series = option.series ?? [];
-		const [yMin, yMax] = extent(series, 1, [...markedAt(option, "y"), ...levelsOf(option)]);
-		const [xMin, xMax] = extent(series, 0, markedAt(option, "x"));
+		const [yMin, yMax] = extent(series, 1, [...markedAt(option, "y", true), ...levelsOf(option)]);
+		const [xMin, xMax] = extent(series, 0, markedAt(option, "x", true));
 		// Stems reach 0, and keep a dot and label inside the axes at either end.
 		const room = series.some((s) => s.type === "stem") ? 0.06 : 0;
 		const dx = (xMax - xMin) * room;
@@ -516,7 +523,7 @@ window.PlotDraw = ({ lang, size }) => {
 		texts = option,
 	) {
 		const series = option.series ?? [];
-		crowded = { notes: [], names: [] };
+		crowded = { notes: [], names: [], arrows: [] };
 		const laid = laidOut(option, W, H, textWidth, shown, texts);
 		if (!laid) {
 			return "";
@@ -540,7 +547,7 @@ window.PlotDraw = ({ lang, size }) => {
 			{ ...laid, ...axes },
 			goal?.noted.placed,
 		);
-		crowded = { notes: noted.crowded, names: named.crowded };
+		crowded = { notes: noted.crowded, names: named.crowded, arrows: short(option, points) };
 		return (
 			drawAxes(points) +
 			noted.fills +
@@ -581,6 +588,17 @@ window.PlotDraw = ({ lang, size }) => {
 	 * names and values at the ends, then the notes (with a move's `goal`, where it placed them), each clear of those before it.
 	 * Names and notes may use the room above the plot that no label on top takes, and names the room kept for them on the right.
 	 */
+	/** The arrows drawn shorter than SHORT px, which read as a dot more than an arrow, as their label or their points. */
+	const short = (
+		option: PlotOption,
+		{ X, Y }: { X: (v: number) => number; Y: (v: number) => number },
+	) =>
+		(option.marks ?? []).flatMap(({ from, to, label }) =>
+			from && to && Math.hypot(X(to[0]) - X(from[0]), Y(to[1]) - Y(from[1])) < SHORT
+				? [label ?? `${JSON.stringify(from)} to ${JSON.stringify(to)}`]
+				: [],
+		);
+
 	function labelled(
 		option: PlotOption,
 		{ xa, ya, box, ctx }: { xa: NumericAxis; ya: NumericAxis; box: { T: number }; ctx: Ctx },

@@ -1,6 +1,6 @@
 /* plot areas: the areas a plot fills and the notes it writes on itself, not referenced from pages: pack joins it in front of
    plot.js with draw.ts, which uses it. PlotAreas({ svgText, svgLine, wrap, area, place }) gives draw(option, frame, taken):
-   the filled lines' areas and the regions between lines (`fills`), and the labels of points and regions (`notes`), placed by
+   the filled lines' areas and the regions between lines (`fills`), and the labels of points, arrows and regions (`notes`), placed by
    place.ts (PlotPlace) clear of the plot's lines, of the labels placed before them and of each other. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
@@ -322,6 +322,9 @@ window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
 		});
 	}
 
+	/** The point halfway between two points in px. */
+	const middle = (a: PlotPx, b: PlotPx): PlotPx => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
 	/**
 	 * The areas filled (`fills`, drawn under the lines) and the notes' labels (`notes`, drawn over everything), placed clear of the
 	 * lines, the markers and each other.
@@ -338,7 +341,12 @@ window.PlotAreas = ({ svgText, svgLine, wrap, area, place }) => {
 			const k = all.findIndex((r) => r.mark === mark);
 			const region = all[k];
 			const solid = drawn[k] && !drawn[k].open ? "var(--accent)" : undefined;
-			const at: PlotPx | undefined = mark.at && [f.X(mark.at[0]), f.Y(mark.at[1])];
+			// An arrow's label goes beside the middle of its shaft as drawn (its ends mapped, so a clipped end is where it is drawn),
+			// as a note beside a point; the shaft is among the lines it keeps off.
+			const px = (p: PlotPoint): PlotPx => [f.X(p[0]), f.Y(p[1])];
+			const at: PlotPx | undefined = mark.at
+				? px(mark.at)
+				: mark.from && mark.to && middle(px(mark.from), px(mark.to));
 			return mark.label && (region || at)
 				? [{ label: mark.label, at, region: region && { ...region, colour: solid } }]
 				: [];

@@ -1,12 +1,14 @@
 /* plot marks: what kit:plot.js draws in a bar, over the plot and in a legend entry, not referenced from pages: pack joins it in
    front of plot.js with draw.ts, which uses it. PlotMarks({ svgLine, svgText }) gives bar(...) and area(...), a bar or an area in
-   one of the accent's three states; markers(...) and rows(...), the labelled reference markers and spans and the lines their
-   labels take on top; wrap(...), a label's lines; and swatch(...), a series' legend swatch. */
+   one of the accent's three states; markers(...) and rows(...), the labelled reference markers and spans, the lines their labels
+   take on top, and the arrows; wrap(...), a label's lines; and swatch(...), a series' legend swatch. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.PlotMarks = ({ svgLine, svgText }) => {
 	const HATCH = 6; // px between hatch lines, measured across them
 	const GAP = 6; // px between a marker's line and its label
 	const EDGE = 4; // px a marker's label keeps from the drawing's edge
+	const ARROW_OFF = 3; // px an arrow stops short of its points
+	const HEAD = 7; // px of an arrow's head along it, half as wide
 
 	const px = (v: number) => +v.toFixed(1);
 
@@ -303,6 +305,38 @@ window.PlotMarks = ({ svgLine, svgText }) => {
 	}
 
 	/**
+	 * An arrow from one data point to another: its shaft, ARROW_OFF px short of both points so it points at them rather than
+	 * covering them, and a solid head at the second. Points closer than both gaps and a head shrink all three alike, so a short
+	 * arrow still shows on a phone; none where the points lie within a pixel.
+	 */
+	function arrow(
+		from: PlotPoint,
+		to: PlotPoint,
+		X: (v: number) => number,
+		Y: (v: number) => number,
+	) {
+		const [ax, ay, bx, by] = [X(from[0]), Y(from[1]), X(to[0]), Y(to[1])];
+		const length = Math.hypot(bx - ax, by - ay);
+		if (length < 1) {
+			return "";
+		}
+		const scale = Math.min(1, length / (2 * ARROW_OFF + HEAD + 1));
+		const [off, size] = [ARROW_OFF * scale, HEAD * scale];
+		const [ux, uy] = [(bx - ax) / length, (by - ay) / length];
+		const [tx, ty] = [bx - ux * off, by - uy * off];
+		const [cx, cy] = [tx - ux * size, ty - uy * size];
+		const [nx, ny] = [-uy * (size / 2), ux * (size / 2)];
+		const head = `M${px(tx)} ${px(ty)}L${px(cx + nx)} ${px(cy + ny)}L${px(cx - nx)} ${px(cy - ny)}Z`;
+		// The shaft runs 1 px into the head, so no seam shows between them.
+		const shaft = svgLine("arrow", ax + ux * off, cx + ux * scale, ay + uy * off, cy + uy * scale);
+		return `${shaft}<path class="arrow-head" d="${head}"/>`;
+	}
+
+	/** The arrows of a plot with numeric axes. */
+	const arrows = (marks: readonly PlotMark[], { X, Y }: PlotMarkFrame) =>
+		marks.map((m) => (m.from && m.to && X && Y ? arrow(m.from, m.to, X, Y) : "")).join("");
+
+	/**
 	 * The markers' dashed lines and the spans' brackets (`lines`, drawn under the values) and their labels (`labels`, drawn over
 	 * everything): a vertical marker from the top of its label's row to the plot's bottom, a horizontal one across the plot (see
 	 * across), a span's bracket in its label's row; and the labels' boxes, which other labels keep clear of. `top` is where the
@@ -327,7 +361,7 @@ window.PlotMarks = ({ svgLine, svgText }) => {
 		}
 		const flat = acrossAll(marks, f, boxes);
 		return {
-			lines: lines + flat.lines,
+			lines: lines + flat.lines + arrows(marks, f),
 			labels: labels + flat.labels,
 			boxes: boxes.filter((b) => b.x1 > b.x0),
 		};

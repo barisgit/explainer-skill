@@ -79,6 +79,10 @@ const rise = (r: number): [number, number][] => {
 	});
 };
 
+/** ns from 0.3 VDD to the middle of the rise, 0.5 VDD, through `r`: where the opening's arrow goes from and to. */
+const MID = 0.5;
+const toMid = (r: number): number => r * CB * (-Math.log(1 - MID) - T_LOW) * 1e9;
+
 /** A line's labels with only its last point's written, which the plot prints after the line's name. */
 const atEnd = (text: string): string[] => [...Array<string>(40).fill(""), text];
 
@@ -97,6 +101,12 @@ export const OPENING = {
 	marks: [
 		{ x: ns(FAST.tr), label: `400 kHz: ${ns(FAST.tr)} ns` },
 		{ x: ns(STANDARD.tr), label: `100 kHz: ${ns(STANDARD.tr)} ns` },
+		// The fix's rise beside the found one: as many times faster as the pull-up is smaller.
+		{
+			from: [toMid(FOUND), MID],
+			to: [toMid(FIX), MID],
+			label: `${(FOUND / FIX).toFixed(1)}× faster`,
+		},
 	],
 	x: { min: 0, max: 1000, format: { unit: "ns" } },
 	// Starting the axis a little under 0.3 VDD keeps its first label clear of the time axis's "0 ns".

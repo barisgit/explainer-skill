@@ -29,6 +29,8 @@
    carries the results as JSON (formats as JSON too), which suits a choice, toggles or a few steps; above 100 KB pack fails.
    For a client frame, pack checks all combinations up to 256; above that it checks the defaults and 255 evenly spaced
    combinations in control order, including all-minimum and all-maximum values. Untested combinations can fail for readers.
+   What pack warns of in the drawn figure (crowded notes or names, short arrows, unnamed lines) it warns of in each frame it
+   checks, naming the frame.
    The starting frame is in the page as SVG when pack can draw its Plot or Chart (see kit Chart); a Plot then moves to each new
    frame from where it is, as a Chart does.
    Controls: one set of controls for figures in different sections. Write <Controls id="usage" controls={[...]} /> once, where the
@@ -46,7 +48,7 @@ import { type ComponentChildren, Fragment, h } from "preact";
 import { renderToString } from "preact-render-to-string";
 import { isClientExport, notJson } from "../islands/props.ts";
 import { Controls as ControlsIsland } from "./parts/controls-island.tsx";
-import { validateChart } from "./parts/drawn.ts";
+import { diagnoseFrame, placeOf, validateChart, validatePlot } from "./parts/drawn.ts";
 import { Explore as ExploreChart } from "./parts/explore-chart.tsx";
 import { type ExploreControlProps, parseControls } from "./parts/explore-controls.ts";
 import { Explore as ExplorePlot } from "./parts/explore-plot.tsx";
@@ -65,6 +67,7 @@ import {
 import { diff, isPoint, type Json } from "./parts/frames.ts";
 import { type Place, usePlace } from "./parts/place.ts";
 import { sharedControls } from "./parts/shared-controls.ts";
+import { plotPlace } from "./plot.tsx";
 
 export type { ExploreControlProps, ExploreFrame, ExploreValue };
 
@@ -162,6 +165,24 @@ function* combinations(
 	}
 	for (let rank = 0n; rank < total; rank++) {
 		yield combinationAt(counts, rank);
+	}
+}
+
+/**
+ * Says what the frames pack does not draw would warn of as drawn in the Explore's figure:
+ * crowded or short marks, lines left unnamed, each warning led by its frame's call.
+ */
+function diagnoseOthers(
+	frames: [string, ExploreFrame][],
+	extra: string | undefined,
+	id: string | undefined,
+	height: string | undefined,
+) {
+	for (const [call, { chart, plot }] of frames) {
+		const place = plot
+			? plotPlace(plot, extra, id, height).place
+			: placeOf(extra ? `chart ${extra}` : "chart", id, height);
+		diagnoseFrame(call, { ...(chart && { chart }), ...(plot && { plot }) }, place);
 	}
 }
 
@@ -426,7 +447,7 @@ export function Explore({
 	const { controls: shown, start } = followed(own, place);
 	const live = isClientExport(frame) || typeof document !== "undefined";
 	const fn = frame as FrameFunction;
-	const combos = typeof document === "undefined" ? combinations(shown, start, live) : [start];
+	const combos = typeof document === "undefined" ? [...combinations(shown, start, live)] : [start];
 	const frames = Array.from(combos, (combo) =>
 		called(
 			fn,
@@ -438,12 +459,22 @@ export function Explore({
 		if (result.chart) {
 			validateChart(result.chart);
 		}
+		if (result.plot) {
+			try {
+				validatePlot(result.plot);
+			} catch (e) {
+				fail(`${call}: ${e instanceof Error ? e.message : String(e)}`);
+			}
+		}
 		if (result.states !== undefined) {
 			checkStates(call, result.states);
 		}
 		return [call, result];
 	});
 	checkAxis(shown, merged);
+	// pack draws the start frame, which says what it warns of itself.
+	const others = merged.filter((_, i) => combos[i]?.join() !== start.join());
+	diagnoseOthers(others, extra, id, height);
 	const stated = [...new Set(merged.flatMap(([, f]) => Object.keys(f.states ?? {})))];
 	const kind = figureKind(merged.map(([, f]) => f));
 	if (kind && !label) {

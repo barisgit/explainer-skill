@@ -18,8 +18,11 @@ export interface Place {
 /** Draws a figure as markup for the inside of its element, sized for `place` as the theme and the page's CSS size it. */
 export interface Drawer {
 	validateChart(option: ChartOption): void;
+	validatePlot(option: PlotOption): void;
 	chart(option: ChartOption, place: Place): string;
 	plot(option: PlotOption, place: Place): string;
+	/** Says what drawing a figure pack does not draw (an Explore's other frames) would warn of, each warning led by `call`. */
+	diagnose(call: string, figure: { chart?: ChartOption; plot?: PlotOption }, place: Place): void;
 	/** The lines a plot's markers' labels take on top as pack draws it: the same in every copy, or the widest copy's. */
 	plotMarkLines(option: PlotOption, place: Place): number;
 }
@@ -34,6 +37,20 @@ export function setDrawer(next: Drawer): void {
 /** Checks a pack-visible chart option even when it is not the initial drawing (Explore's computed frames). No-op in the browser. */
 export function validateChart(option: ChartOption): void {
 	drawer?.validateChart(option);
+}
+
+/** Checks a pack-visible plot option even when it is not the initial drawing (Explore's computed frames). No-op in the browser. */
+export function validatePlot(option: PlotOption): void {
+	drawer?.validatePlot(option);
+}
+
+/** Says what an Explore frame `call` other than the one drawn would warn of as pack drew it on `place`. No-op in the browser. */
+export function diagnoseFrame(
+	call: string,
+	figure: { chart?: ChartOption; plot?: PlotOption },
+	place: Place,
+): void {
+	drawer?.diagnose(call, figure, place);
 }
 
 /**

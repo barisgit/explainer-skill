@@ -325,7 +325,7 @@ interface PlotPlacer {
 	nearest(box: PlotBox, at: PlotPx): PlotPx;
 	/** Whether a point lies inside a polygon. */
 	within(polygon: readonly PlotPx[], at: PlotPx): boolean;
-	/** The lines labels keep clear of: the line series switched on and the markers' lines, in px. */
+	/** The lines labels keep clear of: the line series switched on, the markers' lines and the arrows, in px. */
 	obstacles(option: PlotOption, frame: PlotAreaFrame): PlotPx[][];
 }
 declare var PlotPlace: (env: {

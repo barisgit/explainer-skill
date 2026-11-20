@@ -28,6 +28,9 @@
               { x: [6, 11.5], between: ["Roof", "House"], fill: "accent", label: "charging" }: the region between two named lines
                 (or a line and a number) over x, filled as a line's fill, its label inside it or beside it
               { at: [11.5, 2.8], label: "full at 11:31" }: a note beside that point
+              { from: [10, 1.09], to: [100, 1.09], label: "more terms" }: an arrow between two data points, for a change in
+                direction and size the reader should follow (a peak that moves), its label placed as a note; on two numeric axes only,
+                and pack warns about one too short to read
               Notes keep clear of the lines and labels, wrapping or tied by a leader; pack warns about one with no clear place
        x, y   { min, max, step, name, format, labels }  screen axes (labels: false leaves the tick labels out, true keeps them, and texts are
               a number axis's own, spread evenly from min to max, else the data's ends: ["06:00", "12:00", "18:00", "00:00", "06:00"]):
@@ -127,6 +130,21 @@ function barsHeight(option: PlotOption) {
 const withMarkLines = (height: string, lines: number) =>
 	`calc(${height} + var(--plot-mark-lines, ${lines}) * (var(--size-label) + 4px))`;
 
+/** Where a Plot showing `option` draws, as its props size it: a horizontal bar plot without `height` by its bars (barsHeight). */
+export function plotPlace(
+	option: PlotOption,
+	extra: string | undefined,
+	id: string | undefined,
+	height: string | undefined,
+) {
+	// "plot" is what plot.js adds; rendering it keeps a re-render from taking it away.
+	const classes = extra ? `chart plot ${extra}` : "chart plot";
+	// A height by the bar count takes the height prop's path, so pack's box rules see it as they see an author's.
+	const bars = height || classes.split(/\s+/).includes("tall") ? undefined : barsHeight(option);
+	const sized = height ?? bars;
+	return { classes, sized, bars, place: placeOf(classes, id, sized, Boolean(bars)) };
+}
+
 /** The option a plot shows once `patch` is set on it, merged as Plot.set merges (kit/plot.ts): x and y one level deeper. */
 const merged = (option: PlotOption, patch: PlotOption): PlotOption => ({
 	...option,
@@ -171,12 +189,7 @@ export function Plot({ option, label, class: extra, id, height, pick }: PlotProp
 		},
 		[],
 	);
-	// "plot" is what plot.js adds; rendering it keeps a re-render from taking it away.
-	const classes = extra ? `chart plot ${extra}` : "chart plot";
-	// A height by the bar count takes the height prop's path, so pack's box rules see it as they see an author's.
-	const bars = height || classes.split(/\s+/).includes("tall") ? undefined : barsHeight(shown);
-	const sized = height ?? bars;
-	const place = placeOf(classes, id, sized, Boolean(bars));
+	const { classes, place, sized, bars } = plotPlace(shown, extra, id, height);
 	// Markers and spans on x take lines on top; a region's label sits in the plot.
 	const marked =
 		bars && shown.marks?.some((mark) => mark.x !== undefined && !mark.between && mark.label);

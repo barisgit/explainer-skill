@@ -157,6 +157,14 @@
 	stroke: var(--c);
 	stroke-width: 1.5;
 }
+/* An arrow from one data point to another, in ink over the lines: the change the page points at. */
+.plot svg .arrow {
+	stroke: var(--ink);
+	stroke-width: 1.5;
+}
+.plot svg .arrow-head {
+	fill: var(--ink);
+}
 .plot svg :is(.line, .stem) {
 	fill: none;
 	stroke: var(--c);
