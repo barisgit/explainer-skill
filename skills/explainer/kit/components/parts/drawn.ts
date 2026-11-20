@@ -20,7 +20,7 @@ export interface Drawer {
 	validateChart(option: ChartOption): void;
 	validatePlot(option: PlotOption): void;
 	chart(option: ChartOption, place: Place): string;
-	plot(option: PlotOption, place: Place): string;
+	plot(option: PlotOption, place: Place, label: string): string;
 	/** Says what drawing a figure pack does not draw (an Explore's other frames) would warn of, each warning led by `call`. */
 	diagnose(call: string, figure: { chart?: ChartOption; plot?: PlotOption }, place: Place): void;
 	/** The lines a plot's markers' labels take on top as pack draws it: the same in every copy, or the widest copy's. */

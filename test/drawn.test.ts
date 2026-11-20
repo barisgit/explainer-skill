@@ -535,7 +535,7 @@ function drawnFigures(path: string): Map<string, string | undefined> {
 		parts.map((part, i): [string, string | undefined] => {
 			const id = /^<div [^>]*\bid="([^"]+)"/.exec(part)?.[1] ?? `figure-${i + 1}`;
 			const drawn =
-				/^<div [^>]*>(?:<ul class="plot-legend">.*?<\/ul><div class="plot-area">)?(<div class="chart-drawn".*)/s.exec(
+				/^<div [^>]*>(?:<ul class="plot-legend">.*?<\/ul><div class="plot-area"[^>]*>)?(<div class="chart-drawn".*)/s.exec(
 					part,
 				);
 			return [id, drawn?.[1]];
@@ -678,7 +678,10 @@ test("a horizontal bar plot is as tall as its bars need, up to the tall 34rem, u
 	);
 	// A legend an author asks for wraps into rows by the width, which one height cannot follow: the plot keeps the theme's height.
 	expect(figures.get("legend")).toContain('viewBox="0 0 1054 ');
-	expect(readFileSync(path, "utf8")).toMatch(/<div class="chart plot" id="legend" role="img"/);
+	expect(readFileSync(path, "utf8")).toContain(
+		'<div class="plot-area" role="img" aria-label="Legend">',
+	);
+
 	// The height takes the height prop's path, which the box gate sees, and no custom property sizes a figure.
 	const html = readFileSync(path, "utf8");
 	expect(html).toMatch(/<div class="chart plot" id="three" style="block-size:13.25rem;?"/);
@@ -690,6 +693,7 @@ test("a horizontal bar plot is as tall as its bars need, up to the tall 34rem, u
 	);
 	// A label that wraps into more lines on a phone than on a desktop has no one height to draw at: plot.js draws it.
 	expect(figures.get("wraps")).toBeUndefined();
+	expect(html).toContain('<div class="plot-area" role="img" aria-label="Wraps"></div>');
 	await expectFitted(path, 10);
 }, 60_000);
 
