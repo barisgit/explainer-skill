@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `check` groups distant `data-ref` warnings by the pair of places they link, with a count and up to three names. It also warns when a schematic or Mermaid diagram scrolls sideways in the pinned `.beside` column: lay it out tall or give it the full width.
+
 ## v0.16.0
 
 - A ```` ```diff-python ```` fence (`diff-ts`, `diff-<any language pack colours>`) colours each line's code in that language, the old and new side each read as one listing, and every diff fence tints its inserted and deleted lines. `pack` fails on a `diff-<language>` it does not colour; it used to stay plain without a word. A wrapped diff line continues under its code, not under its `+` or `-`.

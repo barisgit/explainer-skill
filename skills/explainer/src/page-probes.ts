@@ -38,7 +38,7 @@ export interface PageReport {
  * Runs in the page for the current viewport (`narrow`: the phone width). `culprits`: elements sticking out of the viewport that no scrolling
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
  * than their box and scrolls sideways (a wide data table, in a box or as its own box, or equation may, as may an SVG its min-width holds wider than the container's
- * content box, such as a diagram at its readable minimum, so a container holding one is not listed). `warnings`: content cut off inside an overflow hidden/clip box
+ * content box, such as a diagram at its readable minimum, except in the pinned `.beside` column). `warnings`: content cut off inside an overflow hidden/clip box
  * (ellipsis truncation excepted), a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS
  * names), diagrams and charts (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players
  * with a log) are tall by design and are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to
@@ -58,7 +58,11 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	const wideByDesign = (el) => el.matches("table") || [...el.querySelectorAll("table, math")].some((t) => t.getBoundingClientRect().width > el.clientWidth + 1)
 		|| [...el.querySelectorAll("svg")].some((svg) => heldWide(svg, el));
 	const tinyFix = ${TINY_TEXT_FIX_JS};
-	const inner = all.filter((el) => scrolls(el) && region(el) && !wideByDesign(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1);
+	const pinnedDrawing = (el) => {
+		const panel = el.matches(".schematic, .mermaid") && el.closest(".beside > :nth-child(2)");
+		return panel && getComputedStyle(panel).position === "sticky";
+	};
+	const inner = all.filter((el) => scrolls(el) && region(el) && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1 && (pinnedDrawing(el) || !wideByDesign(el)));
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
 	const cut = all.filter((el) => hides(el) && region(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
 	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");
@@ -82,7 +86,7 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	const repeated = [...ids].filter(([, els]) => els.length > 1).map(([id, els]) => 'the id "' + id + '" is on ' + els.length + " elements (" + els.map(name).join(", ") + "): scripts, label for, #links and --do steps find only the first; give each its own id");
 	return {
 		overflow: document.documentElement.scrollWidth > vw + 1, culprits: bad.slice(0, 4).map(name), warnings, repeated,
-		scrolls: inner.slice(0, 6).map((el) => name(el) + " (content " + el.scrollWidth + "px in " + el.clientWidth + "px)"),
+		scrolls: inner.slice(0, 6).map((el) => name(el) + " (content " + el.scrollWidth + "px in " + el.clientWidth + "px)" + (pinnedDrawing(el) ? ": lay the drawing out tall to fit the .beside column, or give it the full width" : "")),
 	};
 })()`;
 
@@ -282,8 +286,9 @@ const LINKED_MAX = 40;
  * part of each (24 px, or half of a smaller one). Parts of one SVG are one place, as kit:link.js counts places, and never
  * partners of each other. A part under a sticky box
  * (a .beside figure) is measured by scrolling the other part to the top and the bottom of the viewport, so a pinned figure
- * counts where it is pinned; the rest by their distance in the document. One warning per ref with a part out of sight of
- * every partner (see unseen), and per stepper with a part out of its captions' sight. Restores the scroll position.
+ * counts where it is pinned; the rest by their distance in the document. Refs with a part out of sight of every partner
+ * are grouped by the pair of places they link. A stepper with a part out of its captions' sight still warns separately.
+ * Restores the scroll position.
  */
 export const LINKED_JS = `(() => {
 	const shown = ${PAINTS_JS};
@@ -316,14 +321,25 @@ export const LINKED_JS = `(() => {
 	/** A term in running text: a phrasing element (span, code, strong ...) outside every figure and code block. */
 	const phrasing = new Set(["A", "ABBR", "B", "CODE", "DFN", "EM", "I", "KBD", "MARK", "Q", "SAMP", "SMALL", "SPAN", "STRONG", "SUB", "SUP", "VAR"]);
 	const mention = (el) => phrasing.has(el.tagName) && !figure(el);
-	/**
-	 * The parts that share a screen with no partner: a part in another place and, when the ref links a figure or code, not a
-	 * mention beside a mention, so terms in neighbouring paragraphs do not vouch for each other while the figure is far.
-	 */
-	const unseen = (parts) => {
-		const prose = parts.every(mention);
-		const partners = (a, b) => place(a) !== place(b) && (prose || !(mention(a) && mention(b)));
-		return parts.filter((a) => !parts.some((b) => partners(a, b) && together(a, b)));
+	// For the warning, keep each drawing or code block distinct, but group cards and mentions on the same branch.
+	const branch = (part, other) => {
+		let el = part;
+		while (el.parentElement && !el.parentElement.contains(other)) el = el.parentElement;
+		return el;
+	};
+	const groups = new Map();
+	const group = (ref, part, other) => {
+		let a = figure(part) ?? branch(part, other);
+		let b = figure(other) ?? branch(other, part);
+		if (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING) [a, b] = [b, a];
+		if (!groups.has(a)) groups.set(a, new Map());
+		const peers = groups.get(a);
+		if (!peers.has(b)) peers.set(b, new Set());
+		peers.get(b).add(ref);
+	};
+	const label = (el) => {
+		const box = el.localName === "svg" ? el.closest(".schematic, .mermaid, figure") ?? el : el;
+		return box.id ? box.localName + "#" + box.id : name(box);
 	};
 	const namedParts = ${NAMED_PARTS_JS};
 	const warnings = [];
@@ -333,10 +349,19 @@ export const LINKED_JS = `(() => {
 			if (!shown(el)) continue;
 			for (const ref of el.dataset.ref.split(/\\s+/).filter(Boolean)) byRef.set(ref, [...(byRef.get(ref) ?? []), el]);
 		}
-		for (const [ref, parts] of byRef) {
-			if (new Set(parts.map(place)).size < 2) continue;
-			const far = unseen(parts.slice(0, ${LINKED_MAX}));
-			if (far.length) warnings.push('data-ref "' + ref + '" links parts more than a screen apart at ' + screen + "; out of sight of every partner: " + far.slice(0, 3).map(name).join(", ") + (far.length > 3 ? " and " + (far.length - 3) + " more" : "") + ". A reader pointing at one cannot see the other; set the text beside its figure in a .beside block, which keeps the figure in view, or keep the ref to the parts that share a screen");
+		for (const [ref, matched] of byRef) {
+			const parts = matched.slice(0, ${LINKED_MAX});
+			const prose = parts.every(mention);
+			for (const a of parts) {
+				// Mentions in neighbouring paragraphs do not vouch for each other while their figure is far away.
+				const partners = parts.filter((b) => place(a) !== place(b) && (prose || !(mention(a) && mention(b))));
+				if (!partners.some((b) => together(a, b))) for (const b of partners) group(ref, a, b);
+			}
+		}
+		for (const [a, peers] of groups) for (const [b, refs] of peers) {
+			const count = refs.size;
+			const sample = [...refs].slice(0, 3).map((ref) => JSON.stringify(ref)).join(", ") + (count > 3 ? " and " + (count - 3) + " more" : "");
+			warnings.push(count + (count === 1 ? " data-ref (" : " data-refs (") + sample + (count === 1 ? ") links " : ") link ") + label(a) + " and " + label(b) + " more than a screen apart at " + screen + ": put the text beside its figure in .beside, or link only parts that share a screen");
 		}
 		for (const stepper of document.querySelectorAll("[data-stepper][data-live]")) {
 			const captions = stepper.querySelector("[data-captions]");
