@@ -14,11 +14,11 @@
          name   names go on the marks, never in a legend: a line's at its end (stacked with leaders where ends crowd) else
                 beside it, a stem's beside its last dots, bars side by side stacked above one group (the last column, the first
                 row) with a leader to each bar, a stack's inside a segment or beside it. One named bar series gets none: the
-                label says it. pack warns about a name with no clear place (shorten it, or add height)
+                label says it. pack warns about a name with no clear place (shorten it, drop a series, or add height)
          label  prints exact values on the marks: true, a format as below, or one text per point or bar: ["½mA", "A", "½mA"];
                 a line prints its last point's after its name: "10 kΩ: 847 ns", wrapped, or left out past two lines. A bar plot
-                whose every bar prints its value (true or a format, side by side) leaves out its value axis, unless a marker on
-                it does not write its number
+                whose every bar prints its value (true or a format, not texts; side by side) leaves out the value axis's tick labels,
+                unless a marker on it does not write its number (labels: true keeps them)
        categories  ["A", "B"] makes a bar plot (bars cannot mix with line or stem); horizontal: true runs them down the page,
                    stack: true piles the series into one bar per category, negative values down from 0, else they sit side by side. Keep names short.
                    { name: "Heat pump", note: "4,200 EUR" } adds a muted second line under a name
@@ -36,7 +36,7 @@
               a number axis's own, spread evenly from min to max, else the data's ends: ["06:00", "12:00", "18:00", "00:00", "06:00"]):
               in a horizontal bar plot y holds the categories, x the values.
               Range and step are automatic and round; numbers follow the page's lang, and format sets how:
-              { digits: 1, unit: "kHz" } (1.5 kHz), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
+              { digits: 1, unit: "kHz" } (1.5 kHz; digits: 0 rounds), { percent: true } (25%), { currency: "EUR", compact: true } (€12K)
        legend true shows the legend in place of the names, its entries switching the series on and off (a series without a
               name toggling with the named one before it); false hides both
        pick   3 picks a bar plot's fourth category: its bars framed, and the legend becomes its key, each series' value there.
@@ -45,7 +45,8 @@
      class   more classes after "chart plot", e.g. "tall"
      height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them. Size a plot with this, not with CSS on .chart.
              Unset, a horizontal bar plot without a legend is 3.5rem a bar (25 px bars) up to the tall 34rem (thinner rows past it),
-             plus the lines its marker labels and series names take; others the theme's height
+             plus the lines its marker labels and series names take; others the theme's height. Values crowding on short side-by-side
+             bars need more height or fewer series
    The plot fills the element at its pixel size and redraws on resize, so text stays at the label size from phone to desktop; light and dark switch
    with no redraw. pack draws it into the page first, so it shows with scripts off and in print, unless a page rule sizes its element or its
    legend wraps into rows pack cannot count. A new option moves the plot there from what it shows (bars grow, lines morph, the numbers
