@@ -135,20 +135,24 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 
 	/**
 	 * Layout provenance travels through ECharts' own component merges, including media/baseOption and singleton arrays. Defaults
-	 * alone cannot distinguish authored top: 65 from ECharts' top: 65. Never mark generated grid patches as authored.
+	 * alone cannot distinguish authored top: 65 from ECharts' top: 65. Never mark generated grid patches as authored. An author's
+	 * top or bottom leaves the legend its room (the larger bottom wins, as a smaller one only puts the legend over the axis
+	 * labels: #257); a height fixes the grid's box, and the author's legend position places the legend. Grid bounds in a media
+	 * query's option stay the author's: ECharts applies them again over a generated bottom.
 	 */
-	function authoredLayout(option: ChartOption): ChartOption {
+	function authoredLayout(option: ChartOption, gridKeys = ["height"]): ChartOption {
 		const component = (value: unknown, keys: string[]): unknown => {
 			if (Array.isArray(value)) {
 				return value.map((item) => component(item, keys));
 			}
+			// A key set to null clears that bound, so the component is the kit's again once none is left.
 			return isObject(value) && keys.some((key) => key in value)
-				? { ...value, __kitLegendRoom: false }
+				? { ...value, __kitLegendRoom: !keys.some((key) => value[key] != null) }
 				: value;
 		};
 		const result = { ...option };
 		if ("grid" in result) {
-			result.grid = component(result.grid, ["top", "bottom", "height", "y", "y2"]);
+			result.grid = component(result.grid, gridKeys);
 		}
 		if ("legend" in result) {
 			result.legend = component(result.legend, [
@@ -175,7 +179,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		if (Array.isArray(result.media)) {
 			result.media = result.media.map((item: unknown) =>
 				isObject(item) && isObject(item.option)
-					? { ...item, option: authoredLayout(item.option) }
+					? { ...item, option: authoredLayout(item.option, ["top", "bottom", "height", "y", "y2"]) }
 					: item,
 			);
 		}
@@ -237,12 +241,23 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 		animation.on("frame", done);
 	}
 
-	/** Install once before the first option. Restore only our bottom before author updates, never over an authored top + height. */
+	/** A grid bound in pixels as ECharts reads it (a number, digits or a percentage of the chart's height), else undefined. */
+	function pixels(value: unknown, height: number): number | undefined {
+		const text = String(value).trim();
+		const amount = Number.parseFloat(text);
+		if (typeof value === "number" || /^-?[\d.]+(px)?$/.test(text)) {
+			return Number.isFinite(amount) ? amount : undefined;
+		}
+		return /^-?[\d.]+%$/.test(text) ? (amount * height) / 100 : undefined;
+	}
+
+	/** Install once before the first option. Restore only our bottom before author updates, never over an authored height. */
 	function layout(instance: unknown): void {
 		const chart = instance as LayoutChart;
 		const setOption = chart.setOption.bind(chart);
 		const resize = chart.resize.bind(chart);
-		let saved: number | undefined;
+		// The bottom the grid had before the kit's, as written (30% stays a percentage across resizes).
+		let saved: unknown;
 		let revision = 0;
 		const restore = (lazy = false) => {
 			if (saved !== undefined && !chart.isDisposed()) {
@@ -271,10 +286,11 @@ window.ChartsOption = ({ color, lang, size, text }) => {
 			if (!box.height) {
 				return;
 			}
-			const original = Number(grid.get("bottom"));
-			const bottom = Math.max(original, chart.getHeight() - box.y + 12);
-			if (bottom !== original) {
-				saved = original;
+			const written = grid.get("bottom");
+			const original = pixels(written, chart.getHeight());
+			const bottom = chart.getHeight() - box.y + 12;
+			if (original !== undefined && bottom > original) {
+				saved = written;
 				setOption({ grid: { bottom } }, { silent: true });
 			}
 		};

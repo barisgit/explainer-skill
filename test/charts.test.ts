@@ -153,20 +153,33 @@ test("legend room follows resize and patches without replacing an author's layou
 			const untouched = !('grid' in option);
 			h.set({ legend: { textStyle: { fontSize: 12 } } });
 			const smaller = bottom();
+			// An author's bottom smaller than the legend's room would put the legend over the axis labels (#257): the room wins.
+			h.set({ grid: { bottom: 24 } });
+			const authored = bottom();
+			// A larger bottom as a percentage stays as written.
+			h.set({ grid: { bottom: "40%" } });
+			const percent = bottom();
 			h.set({ grid: { top: 20, height: 100 } });
 			const grid = h.chart.getOption().grid[0];
 			const explicit = { top: grid.top, height: grid.height };
+			// Clearing the height gives the legend its room back.
+			h.set({ grid: { top: 65, height: null, bottom: 12 } });
+			const cleared = bottom();
+			h.set({ grid: { top: 20, height: 100 } });
 			h.set({ legend: { bottom: 25, textStyle: { fontSize: 48 } } });
 			const positionedGrid = h.chart.getOption().grid[0];
 			const positioned = { top: positionedGrid.top, height: positionedGrid.height, legendBottom: h.chart.getOption().legend[0].bottom };
 			h.set({ grid: [{ bottom: 24, top: 20 }, { bottom: 12, top: 220, height: 100 }] });
-			return { initial: initial > 80, smaller, explicit, positioned, untouched, bottoms: h.chart.getOption().grid.map(g => g.bottom) };
+			return { initial: initial > 80, smaller, authored, percent, explicit, cleared, positioned, untouched, bottoms: h.chart.getOption().grid.map(g => g.bottom) };
 		})()`,
 			true,
 		);
 		expect(result).toEqual({
 			initial: true,
 			smaller: 80,
+			authored: 51,
+			percent: "40%",
+			cleared: 51,
 			explicit: { top: 20, height: 100 },
 			positioned: { top: 20, height: 100, legendBottom: 25 },
 			untouched: true,
