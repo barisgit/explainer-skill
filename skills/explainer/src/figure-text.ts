@@ -51,7 +51,8 @@ export const FIGURE_TEXT_JS = (drawn: boolean) => `(() => {
 	const shown = ${PAINTS_JS};
 	const quote = (t) => "'" + (t.length > 32 ? t.slice(0, 29) + "..." : t) + "'";
 	const figureName = (chart) => {
-		const label = chart.getAttribute("aria-label") ?? "";
+		const label = chart.getAttribute("aria-label")
+			?? chart.querySelector(':scope > .plot-area[role="img"]')?.getAttribute("aria-label") ?? "";
 		return name(chart) + (label ? ' "' + (label.length > 48 ? label.slice(0, 45) + "..." : label) + '"' : "");
 	};
 	const paints = (s) => (s.fill !== "none" && Number(s.fillOpacity) > 0)
