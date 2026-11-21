@@ -53,10 +53,9 @@
    Axes carry their labels and a quiet baseline, without gridlines or ticks: turn one on in the option (splitLine: { show: true }).
    Two or more named lines with no legend carry their names at their ends (endLabel), with room on the grid's right, never a
    legend. Names that crowd move apart inside the grid; pack warns if they cannot fit or move too far from their ends (give
-   the grid height, or end the lines further apart). Your legend or endLabel names them instead. A textStyle, dataZoom,
-   dataset, baseOption or labelLayout, an explicit grid width or a grid right not in px, an axis min or max that cuts a line
-   short (or a y one over stacked lines), a reversed x axis or a polar or second axis keeps the chart as written, and pack
-   warns that its lines carry no names.
+   the grid height, or end the lines further apart). Your legend or endLabel names them instead. The kit leaves the lines
+   unnamed, and pack warns, with any of: a textStyle, dataZoom, dataset, baseOption or labelLayout; a grid width, or a grid
+   right not in px; an axis min or max that cuts a line short (a y one over stacked lines); a reversed x, polar or second axis.
    From the page a Chart takes JSON, and functions (setup, a formatter) a "use client" module exports. A chart a slider, choice
    or toggle switches is an Explore; for anything more (a click that changes the page), render it in your own client component. */
 "use client";

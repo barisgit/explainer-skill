@@ -1,9 +1,9 @@
-import { Explore, Plot, Question, Stepper, Table, View } from "kit";
+import { Explore, Plot, Question, Stepper, View } from "kit";
 import { baseline, curve, fixes, fmt, loadFrame } from "./cafe.ts";
 
 {/* First screen: the answer, what it rests on, and the figure that shows it. */}
 
-# A second barista cuts an *18-minute* wait to 30 seconds.
+# A second barista cuts an 18-minute wait to *30 seconds*.
 
 A queueing model for a café at 90% busy, with random arrivals and orders averaging 2 minutes, some much longer.
 
@@ -64,15 +64,11 @@ Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ ord
 
 <Plot label="Average wait at 90% busy for each fix" option={{ categories: fixes.map((f) => f.name), horizontal: true, series: [{ name: "Average wait", type: "bar", data: fixes.map((f) => f.wait), fill: fixes.map((f) => (f.id === "second" ? "accent" : "")), label: { digits: 1, unit: "min" } }], x: { format: { unit: "min" } } }} />
 
-{/* One record per row, computed from the model; each name opens that fix's view. */}
-
-<Table rows={fixes} state={(f) => (f.id === "second" ? "fit" : f.id === "none" ? "out" : "maybe")} cols={[{ head: "Fix", value: "name", link: (f) => `#fix/${f.id}` }, { head: "Barista busy", value: "busy", format: { percent: true } }, { head: "Average wait", value: "wait", format: { digits: 1, unit: "min" } }, { head: "Saved", value: "saved", format: { percent: true } }]} />
-
 <p class="caveat"><b>Inferred</b>Fixes are modelled, not observed: each view says what the model leaves out.</p>
 
-{/* The decision the page ends in, asked on the page: the reply sends the answer and any notes back as Markdown. */}
+{/* The decision the page ends in, asked on its evidence: the comparison's rows are the choices, computed from the model, each name opening that fix's view. The waits are on the bars above, so the rows carry what they do not. The reply sends the answer and any notes back as Markdown. */}
 
-<Question name="first-fix" legend="Which fix would you try first?" options={{ second: "Second barista", steady: "Steadier orders", faster: "Quicker orders", fewer: "Fewer customers" }} />
+<Question name="first-fix" legend="Which fix would you try first?" recommended="Second barista" note rows={fixes.filter((f) => f.id !== "none")} cols={[{ head: "Fix", value: "name", link: (f) => `#fix/${f.id}` }, { head: "Barista busy", value: "busy", format: { percent: true } }, { head: "Wait saved", value: "saved", format: { percent: true } }]} />
 
 </section>
 
@@ -96,7 +92,7 @@ Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ ord
 		<p>{f.note}</p>
 		<section>
 			<h2>Under 10 minutes up to {f.upTo}% busy</h2>
-			<Plot label={`Average wait with ${f.name}, against changing nothing`} option={{ series: [{ name: "Change nothing", data: baseline, color: "var(--bad)" }, ...(f.id === "none" ? [] : [{ name: f.name, data: curve(f), color: "var(--ok)" }])], x: { format: { unit: "%" } }, y: { min: 0, max: 40, format: { unit: "min" } } }} />
+			<Plot label={`Average wait with ${f.name}, against changing nothing`} option={{ series: [{ name: "Change nothing", data: baseline }, ...(f.id === "none" ? [] : [{ name: f.name, data: curve(f), ...(f.id === "second" ? { color: "var(--accent)" } : {}) }])], x: { format: { unit: "%" } }, y: { min: 0, max: 40, format: { unit: "min" } } }} />
 		</section>
 	</View>
 ))}

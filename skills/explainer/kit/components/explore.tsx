@@ -11,7 +11,7 @@
        toggle: true              a switch, off then on; value: true starts it on
      In check --do: set:#m=0.8 moves a slider; a choice is radios with ids m-0, m-1, ... (click:#m-1 picks the second); click:#m flips a toggle.
      frame     (...values) => what the figure shows, given the controls' values in order (a number, a text, true or false):
-       plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart)
+       plot     a Plot option (kit Plot), or chart, a Chart option (kit Chart): (m) => ({ chart: { xAxis: {...}, series: [...] } })
        readout  text or JSX (blocks too) in a live line over the figure; stats { "Carrier": "67%" }, text or JSX, are figures in a row.
                 Numbers on the figure's own marks (a bar's label, a marker, an axis choice's key) read faster than a row beside it
        caption  text or JSX under the figure

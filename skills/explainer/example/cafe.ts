@@ -90,24 +90,19 @@ export const fixes = FIXES.map((f) => ({
 export const curve = (f: Fix): [number, number][] => LOADS.map((l) => [l, wait(f, l / 100)]);
 export const baseline = curve(NONE);
 
-/** Explore's frame for the load slider: the three curves, the reader's load marked on the first, and the waits it gives. */
-export function loadFrame(load: number): { plot: PlotOption; stats: Record<string, string> } {
+/** Explore's frame for the load slider: the three curves, the second barista's in the accent, and the wait at the reader's load marked on the first. */
+export function loadFrame(load: number): { plot: PlotOption } {
 	const one = wait(NONE, load / 100);
 	return {
 		plot: {
 			series: [
 				{ name: "One barista", data: curve(NONE) },
-				{ type: "stem", data: [[load, one]], label: [fmt(one)], color: "var(--accent)" },
+				{ type: "stem", data: [[load, one]], label: [fmt(one)] },
 				{ name: "Orders all 2 min", data: curve(STEADY) },
-				{ name: "Two baristas", data: curve(SECOND) },
+				{ name: "Two baristas", data: curve(SECOND), color: "var(--accent)" },
 			],
 			x: { min: 50, max: 95, format: { unit: "%" } },
 			y: { min: 0, max: 40, format: { unit: "min" } },
-		},
-		stats: {
-			"One barista": fmt(one),
-			"Versus 50% busy": `${(one / wait(NONE, 0.5)).toFixed(0)}×`,
-			"Two baristas": fmt(wait(SECOND, load / 100)),
 		},
 	};
 }

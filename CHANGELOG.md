@@ -7,6 +7,9 @@
 - `check` warns when text inside a `Chart` or `Plot` crosses the figure's edge (a label cut off on a phone) or overlaps other text (a legend over the axis labels, tick labels run together), at desktop and phone width, naming the figure and quoting the texts. A `Chart` is measured as `pack` drew it, a `Plot` as drawn and live.
 - A `Chart`'s legend keeps its room under your own `grid: { bottom }` or `top`: the larger of your bottom and the legend's room is used, so the legend no longer covers the x-axis labels. A grid `height`, a legend position or grid bounds in a `media` option you set still win.
 - Named stacked columns keep the category labels that would fit without series names. They can wrap a name beside a stack without taking room the category labels need.
+- The guide asks for the decision after its evidence and on it (a `Question` with `rows`, `recommended` on yours), separates a reader's project context from their expertise (every name, part, revision and person identified where it first appears; a section after those it depends on), says which number a two-number finding's headline carries, keeps the accent's meaning the same in every figure, and keeps the contents rail for pages too long to scan. Schedules and owners stay in the tracker.
+- `kit Chart` explains when an unpositioned legend reserves room, which settings keep your layout, and how to write responsive grid padding; `kit Explore` shows a frame returning a Chart; `kit Table` says `digits: 0` rounds; `kit Plot` says `digits: 0` rounds, that text labels keep the value axis's tick labels, and that crowded side-by-side values need height or fewer series.
+- The skill's example asks which fix to try on the comparison's rows, with its recommendation marked, and keeps the wait on the curve rather than in a row of numbers beside it, with the accent on the second barista in every figure.
 
 ## v0.16.0
 
