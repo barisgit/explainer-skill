@@ -353,8 +353,8 @@ test("check groups distant refs by the places they link, keeps stepper warnings,
 <p id="mentions">The <span data-ref="far">first</span> and <span data-ref="far">second</span> mention, and a <span data-ref="near">near</span> one.</p>
 <p>Its <span data-ref="near">partner</span> is right under it.</p>
 <p id="call">Call <code data-ref="code">hash</code> with its <code data-ref="code">salt</code>.</p>
-<ul id="cards">${cards.map((ref) => `<li data-ref="${ref}">${ref}</li>`).join("")}</ul>
-<div id="notes">${notes.map((ref) => `<p data-ref="${ref}">${ref}</p>`).join("")}</div>
+<section id="linked-lists"><ul id="cards">${cards.map((ref) => `<li data-ref="${ref}">${ref}</li>`).join("")}</ul>
+<ol id="notes">${notes.map((ref) => `<li data-ref="${ref}">${ref}</li>`).join("")}</ol></section>
 <figure class="fig" id="reach" data-stepper><p>A short picture</p><ol data-captions><li data-refs="distant">One</li><li>Two</li></ol></figure>
 ${prose(60)}
 <div id="far-part" data-ref="far">The far part</div>
@@ -389,7 +389,7 @@ ${prose(60)}
 		expect.stringContaining(
 			'4 data-refs ("input", "power", "output" and 1 more) link ul#cards and figure#system',
 		),
-		expect.stringContaining('2 data-refs ("load", "bias") link div#notes and figure#system'),
+		expect.stringContaining('2 data-refs ("load", "bias") link ol#notes and figure#system'),
 	]);
 	expect(result.stdout).not.toContain('"near"');
 	expect(result.stdout).not.toContain('"pinned"');
