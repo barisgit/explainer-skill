@@ -225,6 +225,7 @@ declare var PlotBarNames: (
 		frame: PlotNoteFrame & { texts: PlotOption },
 		top: number,
 	): { top: number; right: number };
+	sideRoom(limit: number, crowdedAt: (right: number) => string[] | undefined): number;
 };
 /** A step of a plot's tween: the option `k` of the way (0 to 1) from `from` to `to`, numbers moved where the shapes match. */
 declare var PlotTween: () => {
@@ -426,6 +427,17 @@ interface PlotCategoryAxis extends PlotAxisBase {
 	picked: number | undefined;
 }
 type PlotAxis = PlotNumericAxis | PlotCategoryAxis;
+interface PlotAxisFrame {
+	xa: PlotAxis;
+	ya: PlotAxis;
+	L: number;
+	R: number;
+	T: number;
+	B: number;
+	H: number;
+	picked: number | undefined;
+	textWidth: (s: unknown) => number;
+}
 declare var PlotAxes: (env: { formatter: ReturnType<typeof PlotFormat>["formatter"] }) => {
 	numericAxis(
 		spec: AxisSpec,
@@ -441,4 +453,8 @@ declare var PlotAxes: (env: { formatter: ReturnType<typeof PlotFormat>["formatte
 	): PlotCategoryAxis;
 	/** Gives the axis its pixel interval [a, b] and at(value), which maps a number, or a category index to its band centre. */
 	place(axis: PlotAxis, a: number, b: number): void;
+};
+declare var PlotAxisLabels: (env: PlotSvg & { size(): number; pad: number; gap: number }) => {
+	labelSpan(axis: PlotAxis, textWidth: PlotAxisFrame["textWidth"]): number;
+	draw(frame: PlotAxisFrame): string;
 };

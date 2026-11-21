@@ -79,6 +79,14 @@ window.PlotDraw = ({ lang, size }) => {
 	const { formatter, labeller } = format;
 	const pick = window.PlotPick({ esc, formatter, labeller });
 	const { numericAxis, categoryAxis, place } = window.PlotAxes({ formatter });
+	const axisLabels = window.PlotAxisLabels({
+		svgLine,
+		svgText,
+		size: () => FONT,
+		pad: PAD,
+		gap: GAP,
+	});
+	const drawAxes = (ctx: Ctx) => axisLabels.draw({ ...ctx, picked: pick.pickedAt(ctx.texts) });
 	const seriesColor = (s: PlotSeries, i: number) => s.color ?? `var(--c${(i % 6) + 1})`;
 	/** A line's dash: the author's (dash: true or false), none for a colour of the author's, else its palette slot's. */
 	const dashOf = (s: PlotSeries, i: number) =>
@@ -215,66 +223,6 @@ window.PlotDraw = ({ lang, size }) => {
 			.join("");
 	}
 
-	/** Every nth tick label, so that neighbours do not touch. */
-	function labelEvery(axis: Axis, textWidth: TextWidth) {
-		const [first, second] = axis.ticks;
-		if (first === undefined || second === undefined) {
-			return 1;
-		}
-		const gap = Math.abs(axis.at(second) - axis.at(first));
-		const room = axis.vertical
-			? FONT + 6
-			: Math.max(...axis.labels.map(textWidth), ...(axis.notes ?? []).map(textWidth)) + 12;
-		return Math.ceil(room / gap);
-	}
-
-	/**
-	 * A tick label's class: the picked category's name in ink (the pick of `texts`, so a previewed frame elsewhere leaves it), a
-	 * name over its note in ink, else none (muted).
-	 */
-	const tickClass = (axis: Axis, i: number, texts: PlotOption) =>
-		axis.names && pick.pickedAt(texts) === i ? "picked" : axis.notes ? "cat" : "";
-
-	/**
-	 * The label of one tick, or none when thinned out. Where categories have notes, each name is in ink with its note under it,
-	 * the two centred on the band together on a vertical axis.
-	 */
-	function tickLabel(axis: Axis, t: number, i: number, every: number, { L, B, texts }: Ctx) {
-		const p = axis.at(t);
-		const text = i % every === 0 ? axis.labels[i] : undefined;
-		if (!text) {
-			return "";
-		}
-		const note = axis.notes?.[i] ?? "";
-		const cls = tickClass(axis, i, texts);
-		const line = axis.notes ? lineHeight() : 0;
-		const [x, y, anchor] = axis.vertical
-			? [L - GAP - 4, p - line / 2, "end" as const]
-			: [p, B + GAP + 3 + FONT / 2, "middle" as const];
-		return (
-			svgText(cls, x, y, anchor, text) + (note ? svgText("note", x, y + line, anchor, note) : "")
-		);
-	}
-
-	/**
-	 * Tick labels, axis names and one quiet baseline, without gridlines or tick marks, as Chart draws its axes: the baseline runs
-	 * along the category axis (across the plot for lines and stems) at value 0, or the edge nearest 0.
-	 */
-	function drawAxes(ctx: Ctx) {
-		const { xa, ya, L, R, T, B, H, textWidth } = ctx;
-		let out = "";
-		for (const axis of [xa, ya]) {
-			const every = labelEvery(axis, textWidth);
-			out += axis.ticks.map((t, i) => tickLabel(axis, t, i, every, ctx)).join("");
-		}
-		out += ya.names
-			? svgLine("axis", xa.at(0), xa.at(0), T, B)
-			: svgLine("axis", L, R, ya.at(0), ya.at(0));
-		out += xa.name ? svgText("name", R, H - FONT / 2 - 2, "end", xa.name) : "";
-		out += ya.name ? svgText("name", PAD, FONT / 2 + 3, "start", ya.name) : "";
-		return out;
-	}
-
 	/** Axes of a bar plot: the categories on one, the value range of all bars on the other. */
 	function barAxes(option: PlotOption, categories: PlotCategory[], W: number, H: number) {
 		const series = option.series ?? [];
@@ -343,14 +291,13 @@ window.PlotDraw = ({ lang, size }) => {
 
 	/**
 	 * The plot rectangle inside W x H: room left for the value labels and axis names, right and left for half a label, and on the
-	 * right for the names at the line ends (`named`, each with the x its line ends at), for a stack's names beside its last
-	 * column (`stacked`, at most NAME_SHARE of the plot's width: past that they are placed elsewhere), and `right` more.
+	 * right for names at the line ends (`named`, each with the x its line ends at), and `right` more for bar names.
 	 */
 	function plotBox(
 		[xa, ya]: [Axis, Axis],
 		[W, H]: [number, number],
 		textWidth: TextWidth,
-		[named, stacked]: [{ name: string; x: number }[], string[]],
+		named: { name: string; x: number }[],
 		right: number,
 	) {
 		const yLabelWidth = Math.max(
@@ -367,10 +314,9 @@ window.PlotDraw = ({ lang, size }) => {
 			return share > 0 ? L + (W - ends.room(name, textWidth) - L) / share : W;
 		});
 		const R = Math.min(W - Math.max(PAD, lastHalf + 4), ...reach);
-		const beside = Math.min(R, ...stacked.map((name) => W - ends.room(name, textWidth)));
 		return {
 			L,
-			R: Math.floor(Math.max(beside, R - (R - L) * NAME_SHARE) - right),
+			R: Math.floor(R - right),
 			T: ya.name ? FONT + 15 : 10,
 			B: bottomAt(H, xa.name, Boolean(xa.notes), xa.labels.some(Boolean)),
 		};
@@ -411,11 +357,8 @@ window.PlotDraw = ({ lang, size }) => {
 			name,
 			x: s.data.filter(finite).at(-1)?.[0] ?? 0,
 		}));
-		// Stacked columns' names go beside the last stack when they fit no segment: room is kept for them as for line names.
-		const beside = option.categories && option.stack && !option.horizontal && ends.onMarks(option);
-		const stacked = (beside ? (option.series ?? []) : []).flatMap((s) => (s.name ? [s.name] : []));
 		const box = {
-			...plotBox([xa, ya], [W, H], textWidth, [named, stacked], extra.right),
+			...plotBox([xa, ya], [W, H], textWidth, named, extra.right),
 			textWidth,
 		};
 		place(xa, box.L, box.R);
@@ -492,11 +435,14 @@ window.PlotDraw = ({ lang, size }) => {
 	/**
 	 * The room a bar plot drawn as `geometry` keeps for the names (those of where it is going, `texts`) of bars side by side above
 	 * it and on its right: laid out again with what was missing until the names fit, as the bars scale with it, the right never
-	 * more than NAME_SHARE of the width, and never so much that no plot is left. A stack's names need none.
+	 * more than NAME_SHARE of the width, and never so much that no plot is left. Stacked columns keep side room only when it helps.
 	 */
 	function barRoom(geometry: PlotOption, [W, H, textWidth, shown, texts]: BarArgs) {
 		let room = NO_ROOM;
-		if (!ends.onMarks(texts) || texts.stack) {
+		if (geometry.stack) {
+			return stackRoom(geometry, [W, H, textWidth, shown, texts]);
+		}
+		if (!ends.onMarks(texts)) {
 			return room;
 		}
 		let laid = laidOut(geometry, W, H, textWidth, shown, texts);
@@ -520,6 +466,29 @@ window.PlotDraw = ({ lang, size }) => {
 			: { top: room.top + Math.ceil(need.top), right };
 	}
 
+	/** Spare room to the right of stacked columns without dropping any more category labels. */
+	function stackSlack({ ctx: { xa, L, R, textWidth } }: Laid) {
+		const span = R - L;
+		return Math.max(
+			0,
+			Math.floor(Math.min(span - axisLabels.labelSpan(xa, textWidth), span * NAME_SHARE)),
+		);
+	}
+
+	/** A stack gets a side gutter only if it gives more names a clear spot without thinning the category ticks. */
+	function stackRoom(option: PlotOption, [W, H, textWidth, shown, texts]: BarArgs) {
+		const plain = laidOut(option, W, H, textWidth, shown, texts);
+		if (!plain || !ends.onMarks(texts) || option.horizontal) {
+			return NO_ROOM;
+		}
+		const right = barNames.sideRoom(stackSlack(plain), (right) => {
+			const room = { top: 0, right };
+			const laid = right ? laidOut(option, W, H, textWidth, shown, texts, room) : plain;
+			return laid && decoratedBars(option, laid, texts, room)?.named.crowded;
+		});
+		return right ? { top: 0, right } : NO_ROOM;
+	}
+
 	/**
 	 * The layout a plot is drawn in and the room kept in it for bar names: what they need where the plot is going (`texts`) and,
 	 * while it moves, where the move started (`from`), so no step of it runs short; the plain layout where that leaves no plot.
@@ -531,21 +500,27 @@ window.PlotDraw = ({ lang, size }) => {
 		if (!(plain && "cat" in plain.axes)) {
 			return plain && { laid: plain, room: NO_ROOM };
 		}
-		const room = from ? wider(barRoom(texts, args), barRoom(from, args)) : barRoom(texts, args);
+		const end = barRoom(texts, args);
+		// A move switches the group/stack layout immediately; an old stack's side space does not belong to groups or rows.
+		const sameLayout =
+			from &&
+			Boolean(from.stack) === Boolean(texts.stack) &&
+			(!from.stack || Boolean(from.horizontal) === Boolean(texts.horizontal));
+		const reserved = sameLayout ? wider(end, barRoom(from, args)) : end;
+		const room =
+			option.stack && !option.horizontal && reserved.right
+				? { ...reserved, right: Math.min(reserved.right, stackSlack(plain)) }
+				: reserved;
 		const laid =
 			room === NO_ROOM ? undefined : laidOut(option, W, H, textWidth, shown, texts, room);
 		return laid ? { laid, room } : { laid: plain, room: NO_ROOM };
 	}
 
-	/**
-	 * A bar plot in its layout (drawnLayout): its bars and values, the markers (a label across the bars keeps off them and their
-	 * values), and the series' names on their bars.
-	 */
-	function barPlot(option: PlotOption, args: BarArgs, { laid, room }: { laid: Laid; room: Room }) {
-		const texts = args[4];
+	/** Places markers and names together so the room probe and the drawing see the same obstacles. */
+	function decoratedBars(option: PlotOption, laid: Laid, texts: PlotOption, room: Room) {
 		const { drawn, frame } = barsIn(option, laid, texts);
 		if (!drawn) {
-			return "";
+			return undefined;
 		}
 		const nameFrame = { ...frame, ceiling: ceilingOf(frame.T, room) };
 		const choose = (spots: PlotSpot[], placed: readonly PlotBox[]) =>
@@ -558,6 +533,16 @@ window.PlotDraw = ({ lang, size }) => {
 		const named = ends.onMarks(texts)
 			? barNames.names(option, drawn.drawn, nameFrame, [...drawn.boxes, ...marked.boxes])
 			: { markup: "", crowded: [] };
+		return { drawn, marked, named };
+	}
+
+	/** A bar plot and its labels in the layout selected by drawnLayout. */
+	function barPlot(option: PlotOption, args: BarArgs, { laid, room }: { laid: Laid; room: Room }) {
+		const parts = decoratedBars(option, laid, args[4], room);
+		if (!parts) {
+			return "";
+		}
+		const { drawn, marked, named } = parts;
 		crowded = { notes: [], names: named.crowded, arrows: [] };
 		return (
 			drawAxes(laid.ctx) + drawn.rects + marked.lines + drawn.labels + marked.labels + named.markup
@@ -644,6 +629,9 @@ window.PlotDraw = ({ lang, size }) => {
 			texts = option,
 			from?: PlotOption,
 		) {
+			if (!option.marks?.length) {
+				return 0;
+			}
 			const shown = (option.series ?? []).map(() => true);
 			return (
 				drawnLayout(option, [W, H, textWidth, shown, texts], from)?.laid.rows ??
