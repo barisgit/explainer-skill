@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import type { Cdp } from "./cdp.ts";
+import { type Cdp, ChromeError, DISPOSE_DEADLINE_MS } from "./cdp.ts";
 import { ELEMENT_NAME_JS, REGION_VISIBLE_JS, SETTLE_JS } from "./page-js.ts";
 import { MAX_BODY, parseEnvelope } from "./reply/protocol.ts";
 import { DRAG_FORM, dragStep, parseDrag } from "./step-drag.ts";
@@ -444,6 +444,68 @@ async function shotStep(
  */
 export const settlePage = (cdp: Cdp) => cdp.evaluate<string>(SETTLE_JS, true);
 
+/** A native click can open a foreground window, starving the checked page of frames. Own only its new opener-linked pages. */
+async function pointerSettlement(cdp: Cdp): Promise<() => Promise<string>> {
+	const pages = async (ms: number) =>
+		(
+			await cdp.send<{ targetInfos: { targetId: string; openerId?: string; type: string }[] }>(
+				"Target.getTargets",
+				{},
+				ms,
+			)
+		).targetInfos;
+	const [{ targetInfo }, before] = await Promise.all([
+		cdp.send<{ targetInfo: { targetId: string } }>("Target.getTargetInfo", {}, DISPOSE_DEADLINE_MS),
+		pages(DISPOSE_DEADLINE_MS),
+	]);
+	const existing = new Set(before.map((page) => page.targetId));
+	const close = async () => {
+		const deadline = performance.now() + DISPOSE_DEADLINE_MS;
+		const ms = () => Math.max(1, deadline - performance.now());
+		const opened = (await pages(ms())).filter(
+			(page) =>
+				page.type === "page" &&
+				page.openerId === targetInfo.targetId &&
+				!existing.has(page.targetId),
+		);
+		if (!opened.length) {
+			return false;
+		}
+		// A popup can close itself between listing it and sending the command. Inspect the remaining targets either way.
+		await Promise.allSettled(
+			opened.map(({ targetId }) => cdp.send("Target.closeTarget", { targetId }, ms())),
+		);
+		const ids = new Set(opened.map(({ targetId }) => targetId));
+		const problem = "the click opened a new window; Chrome did not confirm it closed";
+		const liveTargets = () =>
+			pages(ms()).catch((error: unknown) => {
+				throw new ChromeError(problem, { cause: error });
+			});
+		// Chrome can acknowledge close before removing the target from the list.
+		while ((await liveTargets()).some(({ targetId }) => ids.has(targetId))) {
+			const remaining = deadline - performance.now();
+			if (remaining <= 0) {
+				throw new ChromeError(problem);
+			}
+			await Bun.sleep(Math.min(10, remaining));
+		}
+		// Closing the active window can foreground another tab rather than the checked page.
+		await cdp.send("Page.bringToFront", {}, ms());
+		return true;
+	};
+	let opened = false;
+	return async () => {
+		opened = (await close()) || opened;
+		const missing = await settlePage(cdp);
+		const openedWhileSettling = await close();
+		opened ||= openedWhileSettling;
+		const windowProblem = opened
+			? "opened a new window instead of staying in this page; check closed it"
+			: "";
+		return [windowProblem, openedWhileSettling ? "" : missing].filter(Boolean).join("; ");
+	};
+}
+
 /**
  * Runs one step in the page, then waits until the page has settled (settlePage); a step after which something is still missing
  * reports it as its problem. Selectors may end in `@all` (every match, re-queried before each click, the page settling after
@@ -453,6 +515,8 @@ export const settlePage = (cdp: Cdp) => cdp.evaluate<string>(SETTLE_JS, true);
 export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promise<StepResult> {
 	let result: StepResult = {};
 	let missing = "";
+	const pointClick = step.startsWith("click:") && POINT.test(step.slice("click:".length));
+	const settle = pointClick ? await pointerSettlement(cdp) : () => settlePage(cdp);
 	const finish = /^(click|drag):/.test(step) ? await beginHit(cdp) : undefined;
 	let hit = "";
 	try {
@@ -465,7 +529,7 @@ export async function runStep(cdp: Cdp, step: string, shotPath: ShotPath): Promi
 				}
 			},
 			async () => {
-				missing = await settlePage(cdp);
+				missing = await settle();
 				hit = finish ? await finish() : "";
 			},
 		);
