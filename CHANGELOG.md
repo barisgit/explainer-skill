@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The guide asks for the decision after its evidence and on it (a `Question` with `rows`, `recommended` on yours), separates a reader's project context from their expertise (every name, part, revision and person identified where it first appears; a section after those it depends on), says which number a two-number finding's headline carries, keeps the accent's meaning the same in every figure, and keeps the contents rail for pages too long to scan. Schedules and owners stay in the tracker.
+- `kit Chart` separates the automatic legend room (grid top, bottom and height unset) from a layout you set; `kit Explore` shows a frame returning a Chart; `kit Table` says `digits: 0` rounds; `kit Plot` says `digits: 0` rounds, that text labels keep the value axis's tick labels, and that crowded side-by-side values need height or fewer series.
+- The skill's example asks which fix to try on the comparison's rows, with its recommendation marked, and keeps the wait on the curve rather than in a row of numbers beside it, with the accent on the second barista in every figure.
+
 ## v0.16.0
 
 - A ```` ```diff-python ```` fence (`diff-ts`, `diff-<any language pack colours>`) colours each line's code in that language, the old and new side each read as one listing, and every diff fence tints its inserted and deleted lines. `pack` fails on a `diff-<language>` it does not colour; it used to stay plain without a word. A wrapped diff line continues under its code, not under its `+` or `-`.
