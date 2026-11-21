@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `check` groups distant `data-ref` warnings by the pair of places they link, with a count and up to three names. It also warns when a schematic or Mermaid diagram scrolls sideways in the pinned `.beside` column: lay it out tall or give it the full width.
+- A Plot legend’s buttons are separate from the drawing’s image role so assistive technology can expose them as controls.
 
 ## v0.16.0
 

@@ -41,7 +41,7 @@
               name toggling with the named one before it); false hides both
        pick   3 picks a bar plot's fourth category: its bars framed, and the legend becomes its key, each series' value there.
               An Explore choice with axis: true sets it and lets the reader pick
-     label   the accessible name (role="img")
+     label   the accessible name of the drawing (role="img"), separate from the legend controls
      class   more classes after "chart plot", e.g. "tall"
      height  the height: a length in px, rem, vw or vh, or clamp()/min()/max() of them. Size a plot with this, not with CSS on .chart.
              Unset, a horizontal bar plot without a legend is 3.5rem a bar (25 px bars) up to the tall 34rem (thinner rows past it),
@@ -161,7 +161,7 @@ const merged = (option: PlotOption, patch: PlotOption): PlotOption => ({
 });
 
 /**
- * Renders `<div class="chart plot" role="img">` holding the plot as pack drew it, and draws the plot into it in the browser at
+ * Renders `<div class="chart plot">` holding the plot as pack drew it, and draws the plot into it in the browser at
  * its size; a changed `option` is applied with set(), and unmounting stops its resize observer. plot.js replaces the element's
  * children, so in the browser the element renders none of its own.
  */
@@ -189,6 +189,12 @@ export function Plot({ option, label, class: extra, id, height, pick }: PlotProp
 			handle.current = window.Plot.make(element.current, option, picker || undefined);
 		}
 	}, [option]);
+	useEffect(() => {
+		// Plot.make installs the live drawing beside the legend; name only the drawing.
+		const area = element.current?.querySelector(":scope > .plot-area");
+		area?.setAttribute("role", "img");
+		area?.setAttribute("aria-label", label);
+	}, [label]);
 	useEffect(
 		() => () => {
 			handle.current?.dispose();
@@ -210,9 +216,7 @@ export function Plot({ option, label, class: extra, id, height, pick }: PlotProp
 			class={classes}
 			id={id}
 			style={style || undefined}
-			role="img"
-			aria-label={label}
-			{...drawnInside((drawer) => drawer.plot(option, place))}
+			{...drawnInside((drawer) => drawer.plot(option, place, label))}
 		/>
 	);
 }

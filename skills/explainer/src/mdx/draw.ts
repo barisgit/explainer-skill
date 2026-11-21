@@ -12,7 +12,7 @@
  */
 import { join } from "node:path";
 import type * as EChartsSsr from "../../vendor/echarts-ssr.js";
-import { unescapeHtml } from "../escape.ts";
+import { escapeHtml, unescapeHtml } from "../escape.ts";
 import { geistAdvance, textWidth } from "../geist.ts";
 import { runKitPart, themeSize } from "../kit.ts";
 import { PackError } from "../pack-error.ts";
@@ -101,6 +101,10 @@ const svgTag = (copy: Copy, height: number) =>
 /** The copies of one figure, in the element theme.css picks one of them in and the kit script removes. */
 const drawnCopies = (svgs: string[]) =>
 	`<div class="chart-drawn" aria-hidden="true">${svgs.join("")}</div>`;
+
+/** A Plot's named image, separate from its DOM legend, even before a live-only plot draws. */
+const plotArea = (label: string, drawing = "") =>
+	`<div class="plot-area" role="img" aria-label="${escapeHtml(label)}">${drawing}</div>`;
 /** px: the size of every text in a Chart or Plot, the theme's --size-label. */
 const LABEL = themeSize("--size-label");
 /** px: a Chart title's size, the theme's --size-text. */
@@ -559,7 +563,7 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 		const copies = COPIES.map((copy, i) => chartCopy(copy, heights[i] as number, how));
 		return copies.every((copy) => copy !== undefined) ? drawnCopies(copies) : "";
 	});
-	const drawPlot = orNothing((option: Option, place: Place) => {
+	const drawPlot = orNothing((option: Option, place: Place, label?: string) => {
 		const rows = markRows(option, place);
 		const grown = heightsOf(place)?.map((h) => h + (place.grows ? (rows[0] ?? 0) * MARK_LINE : 0));
 		// A bar plot that grows by its markers' lines has one height for every copy only when they wrap alike.
@@ -591,7 +595,7 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			return `${svgTag(copy, H)}${shorterPaths(drawn)}</svg>`;
 		});
 		return copies.every((copy) => copy !== undefined)
-			? `<ul class="plot-legend">${legend}</ul><div class="plot-area">${drawnCopies(copies)}</div>`
+			? `<ul class="plot-legend">${legend}</ul>${plotArea(label ?? "", drawnCopies(copies))}`
 			: "";
 	});
 	return {
@@ -613,9 +617,9 @@ export function pageDrawer(lang: string, stylesheets: Iterable<string>) {
 			return seriesIn(option).includes("custom") ? "" : drawChart(option, place);
 		},
 		validatePlot,
-		plot(option: Option, place: Place) {
+		plot(option: Option, place: Place, label: string) {
 			validatePlot(option);
-			return drawPlot(option, place);
+			return drawPlot(option, place, label) || plotArea(label);
 		},
 		// A plot's frame is drawn as the plot is, for what its notes, names and arrows warn of; a chart's is only read for
 		// lines left unnamed, since drawing every frame with ECharts would cost pack seconds.
