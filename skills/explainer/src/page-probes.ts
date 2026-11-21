@@ -321,16 +321,17 @@ export const LINKED_JS = `(() => {
 	/** A term in running text: a phrasing element (span, code, strong ...) outside every figure and code block. */
 	const phrasing = new Set(["A", "ABBR", "B", "CODE", "DFN", "EM", "I", "KBD", "MARK", "Q", "SAMP", "SMALL", "SPAN", "STRONG", "SUB", "SUP", "VAR"]);
 	const mention = (el) => phrasing.has(el.tagName) && !figure(el);
-	// For the warning, keep each drawing or code block distinct, but group cards and mentions on the same branch.
+	// For the warning, keep drawings, code blocks and lists distinct. Group other cards and mentions on the same branch.
 	const branch = (part, other) => {
 		let el = part;
 		while (el.parentElement && !el.parentElement.contains(other)) el = el.parentElement;
 		return el;
 	};
+	const groupPlace = (part, other) => figure(part) ?? part.closest("ul, ol, dl, menu") ?? branch(part, other);
 	const groups = new Map();
 	const group = (ref, part, other) => {
-		let a = figure(part) ?? branch(part, other);
-		let b = figure(other) ?? branch(other, part);
+		let a = groupPlace(part, other);
+		let b = groupPlace(other, part);
 		if (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING) [a, b] = [b, a];
 		if (!groups.has(a)) groups.set(a, new Map());
 		const peers = groups.get(a);
