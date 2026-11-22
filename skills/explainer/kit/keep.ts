@@ -516,7 +516,7 @@
 
 	/** Empty or malformed input does not reveal the solution. */
 	function grade(input: HTMLInputElement) {
-		const text = input.value.trim();
+		const text = input.value.trim().replace(/^−/, "-");
 		if (!text) {
 			return "";
 		}

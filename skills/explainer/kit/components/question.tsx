@@ -273,6 +273,8 @@ function Numeric(props: NumericQuestion) {
 	const id = idPart(name);
 	const unitId = unit ? `${id}.unit` : undefined;
 	const [min, max] = numericBounds(answer, tolerance);
+	// The iOS decimal keypad has no minus key.
+	const inputMode = min < 0 ? "text" : "decimal";
 	return (
 		<fieldset class="self-check numeric" data-numeric-result="">
 			<legend>
@@ -282,7 +284,7 @@ function Numeric(props: NumericQuestion) {
 				<input
 					id={id}
 					type="text"
-					inputMode="decimal"
+					inputMode={inputMode}
 					aria-describedby={unitId}
 					data-number-min={min}
 					data-number-max={max}

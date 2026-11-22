@@ -16,9 +16,9 @@ import { Question } from "kit";
 
 # Vaja
 
-<Question name="voltage" legend="Kolikšna je napetost?" answer={7.83} tolerance={0.01} unit="V">
+<Question name="voltage" legend="Kolikšna je napetost?" answer={-7.83} tolerance={0.01} unit="V">
 
-Na dve decimalni mesti je to **7,83 V**.
+Na dve decimalni mesti je to **−7,83 V**.
 
 </Question>
 `;
@@ -46,18 +46,20 @@ test("checks a comma decimal in the shown unit, then keeps the solution and verd
 		expect(await cdp.evaluate(`document.querySelector("fieldset > p").checkVisibility()`)).toBe(
 			false,
 		);
-		expect(await act(cdp, type("7,80"), seen)).toEqual(["7,80", "", false, "", "V", false]);
-		expect(await act(cdp, click, seen)).toEqual(["7,80", "Napačno", true, "Napačno", "V", false]);
-		expect(await act(cdp, `${type("7,83 V")} ${click}`, seen)).toEqual([
-			"7,83 V",
-			"Vpiši število.",
-			false,
-			"Vpiši število.",
-			"V",
-			false,
-		]);
-		expect(await act(cdp, `${type("7,84")} ${click}`, seen)).toEqual([
-			"7,84",
+		expect(await act(cdp, type("-7,80"), seen)).toEqual(["-7,80", "", false, "", "V", false]);
+		expect(await act(cdp, click, seen)).toEqual(["-7,80", "Napačno", true, "Napačno", "V", false]);
+		for (const invalid of ["−7,83 V", "−7.83"]) {
+			expect(await act(cdp, `${type(invalid)} ${click}`, seen)).toEqual([
+				invalid,
+				"Vpiši število.",
+				false,
+				"Vpiši število.",
+				"V",
+				false,
+			]);
+		}
+		expect(await act(cdp, `${type("−7,84")} ${click}`, seen)).toEqual([
+			"−7,84",
 			"Pravilno",
 			true,
 			"Pravilno",
@@ -65,7 +67,7 @@ test("checks a comma decimal in the shown unit, then keeps the solution and verd
 			false,
 		]);
 		await load(cdp);
-		expect(await cdp.evaluate(seen)).toEqual(["7,84", "Pravilno", true, "", "V", false]);
+		expect(await cdp.evaluate(seen)).toEqual(["−7,84", "Pravilno", true, "", "V", false]);
 		const clear = `document.querySelector(".keep-clear .btn").click()`;
 		await act(cdp, clear, "0");
 		expect(await act(cdp, clear, seen)).toEqual(["", "", false, "", "V", false]);
@@ -98,9 +100,16 @@ test("Enter checks signed dot decimals in English and includes the decimal toler
 
 # Thresholds
 
-<Question name="q" legend="What is the threshold?" answer={0.3} tolerance={0.6} />`,
+<Question name="q" legend="What is the threshold?" answer={0.3} tolerance={0.6} />
+
+<Question name="nonnegative" legend="What is the amplitude?" answer={0.3} tolerance={0.3} />`,
 	);
 	await inPage(output, async (cdp) => {
+		expect(
+			await cdp.evaluate(
+				`Array.from(document.querySelectorAll(".numeric input"), (input) => input.inputMode)`,
+			),
+		).toEqual(["text", "decimal"]);
 		const seen = `document.querySelector("fieldset [role=status]").textContent`;
 		for (const [value, verdict] of [
 			["0.9", "Right"],
