@@ -11,6 +11,7 @@ pack places the parts, wires the nets with a grid router and draws one SVG that 
 Line:  NAME [kind] NODES... [VALUE...] [PLACE] [h|v|r90|r180|r270|flip]
   NAME      R1, Q1, C_E: a unique name; _ and {...} set subscripts in labels (V_{CC}). Its first letter is its kind, as in SPICE (R C L D V I Q M, U or X for an IC), or write a kind after it.
   kind      resistor capacitor electrolytic inductor diode zener led switch battery vsource isource  (nodes: a b; a is the anode or +)
+            tvs (a anode, b cathode), tvs2 (bidirectional), fuse, ptc (resettable fuse), varistor  (nodes: a b)
             potentiometer (a b w)   npn pnp (c b e)   nmos pmos (d g s)   opamp (- + out)   port vdd vss (one node, labelled by its value)
             ic: U1 ic LM358 left IN=a right OUT=y top VCC=vcc bottom GND=0   (pins listed per side, top to bottom or left to right; "A B"=net quotes names; a bare name is a pin left open)
   VALUE     the rest of the words, under the name: 4.7k, 100 nF, BC547.
@@ -19,13 +20,13 @@ Line:  NAME [kind] NODES... [VALUE...] [PLACE] [h|v|r90|r180|r270|flip]
             With no pin before @, the part's origin goes there: a two-terminal's pin a, a transistor's base or gate, an IC's top-left corner.
             Pins that land on the same point are joined without a wire.
   turn      h (a left, b right; the default) or v (a on top); two-terminals and transistors also take r90 r180 r270 and flip. An IC does not turn.
-Nets: when the first net is also a kind (vdd, say), write the kind explicitly: R1 resistor vdd out 1k. Names are yours; 0, gnd or GND is ground, drawn as a ground symbol at each pin (data-ref "gnd"); nc leaves a pin open on purpose: it touches nothing. A net that joins one pin is an error.
+Nets: when the first net is also a kind (vdd, say), write the kind explicitly: R1 resistor vdd out 1k. The reserved names 0, gnd and GND share one triangular ground (data-ref "gnd"); earth (three bars) and chassis (hatched bar) are separate nets, each with its own data-ref. These nets get symbols at each pin instead of routed wires. Rename an earth or chassis net if it should still be routed. nc leaves a pin open on purpose: it touches nothing. Other nets must join at least two pins.
 Comments start with #.
 
 Place a chain of parts with each one's pin on the last one's (a@R1.b), a stage by offsets from its transistor, and let the router run the rest. Leave two units or more between parts that need a wire.
 pack fails on a part with no place, an unknown part or pin, parts on top of each other, a net it cannot route, a wire through a part, a label with no room beside its part and a net that falls in pieces, each naming its line and what to change.
 
-Linking: each part carries data-ref=NAME, each wire and junction the data-ref of its net and of the parts it joins, every ground "gnd":
+Linking: each part carries data-ref=NAME, each wire and junction the refs of its net and the parts it joins, each ground the ref of its net:
   <span data-ref="R_C">the collector resistor</span>   lights the part and the wires touching it; <span data-ref="vcc">the supply rail</span> lights the net (kit link).
 For a list and its schematic, put the list first and the drawing second in a .beside block. Give each item the space-separated data-ref names of its parts. Stack stages vertically for the narrow drawing column so it fits without sideways scrolling; keep a wide comparison full width.
 Size: the drawing fills the column up to part names at the label size (13 px), larger only where that keeps the smallest text at 10 px. Phones: it shrinks no further than 10 px text and then scrolls sideways; print fits it to the paper. To resize one, set --schematic-max (widest) or --schematic-min (narrowest before it scrolls) on its svg.`;

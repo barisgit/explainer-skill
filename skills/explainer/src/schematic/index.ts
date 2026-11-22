@@ -1,7 +1,7 @@
 /**
  * Renders a ```schematic block at pack time to one inline SVG: the block is a netlist (netlist.ts) whose parts are placed
  * relative to each other (place.ts), wired by the grid router (route.ts), labelled (labels.ts) and checked (check.ts). Every part
- * carries its name as a data-ref, every wire its net's name and the parts it joins, every ground `gnd`.
+ * carries its name as a data-ref, every wire its net's name and the parts it joins, and every ground its canonical net name.
  */
 import { overlappingParts, problemsOf } from "./check.ts";
 import { placeLabels } from "./labels.ts";

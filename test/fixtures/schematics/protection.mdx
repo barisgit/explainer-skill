@@ -1,0 +1,17 @@
+# 24 V input protection
+
+F1 and D1 protect the input against overcurrent and reversed polarity. D2 clamps transients to <span data-ref="earth">protective earth</span>; RV1 clamps across the supply and its <span data-ref="gnd">0 V return</span>. The connector’s shield goes to <span data-ref="chassis">chassis</span>, not to the return. F2 is resettable protection for the 5 V output.
+
+```schematic
+title 24 V input protection and fused 5 V output
+J1 ic Input @0,0 right +24V=raw bottom SH=chassis 0V=gnd PE=earth
+F1 fuse raw fused a@J1.+24V 2,0
+D1 diode fused vin Schottky a@F1.b 2,0
+D2 tvs2 vin earth a@D1.b 0,4 v
+RV1 varistor vin gnd a@D2.a 6,0 v
+U1 ic Buck @7,15 top IN=vin bottom GND=gnd right OUT=5v
+F2 ptc 5v load a@U1.OUT 2,0
+J2 port load 5 V out a@F2.b 3,0
+```
+
+Illustrative topology; clamp ratings and coordination are not specified.

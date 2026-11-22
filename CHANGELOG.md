@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Schematic fences draw `0`/`gnd`/`GND` as a triangle and reserve `earth` (three bars) and `chassis` (hatched bar) as separate, linkable grounds. Rename a former `earth` or `chassis` net to keep it routed. Use `tvs`, `tvs2`, `fuse`, `ptc` or `varistor` for input protection. If a first net uses one of the new keywords, write the part kind explicitly.
+
 - `pack` keeps adjacent closing punctuation with an inline formula so it cannot start the next line alone.
 - A `Question` with a numeric `answer`, optional `tolerance` and `unit` checks calculations on the page and then shows the worked solution. Readers use the page's decimal separator; the answer is kept locally and stays out of replies.
 

@@ -17,6 +17,9 @@ const blocksOf = (file: string) =>
 	[...readFileSync(file, "utf8").matchAll(/```schematic\n([\s\S]*?)\n```/g)].map((m) => m[1] ?? "");
 
 const [regulator = "", commonEmitter = "", twoStage = ""] = blocksOf(CIRCUITS);
+const [protection = ""] = blocksOf(
+	join(import.meta.dir, "fixtures", "schematics", "protection.mdx"),
+);
 
 /** What `renderSchematic` reports for `lines`, as one string per problem. */
 const problemsOf = (...lines: string[]) => renderSchematic(lines.join("\n")).problems;
@@ -95,6 +98,69 @@ test("every ground hangs down, and a ground pin that faces up is an error that s
 	expect(sideways.problems).toEqual([]);
 	expect(grounds(sideways.svg).every((m) => !(m[1] ?? "").includes("rotate"))).toBe(true);
 });
+
+test("ground aliases share the signal symbol, but earth and chassis are distinct nets", () => {
+	const lines = ["0", "gnd", "GND", "earth", "earth", "chassis", "chassis"].map(
+		(net, i) => `R${i} nc ${net} @${i * 6},0`,
+	);
+	const { svg, refs, problems, stats } = renderSchematic(lines.join("\n"));
+	expect(problems).toEqual([]);
+	expect(stats.parts).toBe(lines.length);
+	expect(refs.filter((ref) => !ref.startsWith("R"))).toEqual(["gnd", "earth", "chassis"]);
+	const grounds = [...svg.matchAll(/data-ref="([^"]+)" data-kind="ground".*?<path d="([^"]+)"/g)];
+	expect(grounds.map((m) => m[1])).toEqual([
+		"gnd",
+		"gnd",
+		"gnd",
+		"earth",
+		"earth",
+		"chassis",
+		"chassis",
+	]);
+	expect(grounds[0]?.[2]).toBe(grounds[2]?.[2]);
+	expect(grounds[3]?.[2]).toBe(grounds[4]?.[2]);
+	expect(new Set(grounds.map((m) => m[2])).size).toBe(3);
+	expect(problemsOf("R1 nc earth @0,0 v", "R2 chassis nc @0,4")).toContainEqual(
+		expect.stringMatching(/nets earth and chassis touch/),
+	);
+});
+
+test("the protection parts use the same two-terminal placement and routing as other parts", () => {
+	const kinds = ["fuse", "tvs", "tvs2", "ptc", "varistor"];
+	const lines = kinds.map(
+		(kind, i) =>
+			`X${i} ${kind} ${i === 0 ? "nc" : `n${i - 1}`} ${i === kinds.length - 1 ? "earth" : `n${i}`} ${i === 0 ? "@0,0" : `a@X${i - 1}.b 3,0`}`,
+	);
+	const { svg, problems } = renderSchematic(lines.join("\n"));
+	expect(problems).toEqual([]);
+	const symbols = [...svg.matchAll(/data-ref="X\d+" data-kind="([^"]*)".*?<path d="([^"]+)"/g)];
+	expect(symbols.map((m) => m[1])).toEqual(kinds);
+	expect(new Set(symbols.map((m) => m[2])).size).toBe(kinds.length);
+	const example = renderSchematic(protection);
+	expect(example.problems).toEqual([]);
+	expect(example.stats.crossings).toBe(0);
+});
+
+test("each ground term lights only its own symbol and stub", async () => {
+	const refs = ["gnd", "earth", "chassis"];
+	const terms = refs.map((ref) => `<span data-ref="${ref}">${ref}</span>`).join(", ");
+	const circuit = refs.map((ref, i) => `R${i + 1} nc ${ref} @0,${i * 4}`).join("\n");
+	const checks = Object.fromEntries(
+		refs.map((ref) => [
+			`${ref} lights only its own ground`,
+			`(() => {
+				document.querySelector('span[data-ref="${ref}"]').dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+				const lit = [...document.querySelectorAll(".schematic svg .is-lit")];
+				return lit.length === 2 && lit.some((el) => el.matches('g[data-kind=ground][data-ref="${ref}"]'))
+					&& lit.some((el) => el.matches('path.wire[data-ref~="${ref}"]'));
+			})()`,
+		]),
+	);
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main><p>${terms}</p>
+<pre class="schematic">${circuit}</pre></main><script src="kit:link.js"></script><script>${pageContract(checks)}</script></body></html>`;
+	expect(await packAndRun(dir, "ground-refs", page)).toEqual([]);
+}, 30_000);
 
 test("a label belongs to its part only when it is strictly nearer that part than any other", () => {
 	const { parts } = parseNetlist("R1 a b 1k @0,0 v\nR2 b 0 220 @4,0 v");

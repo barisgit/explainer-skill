@@ -53,6 +53,9 @@ const CIRCLE = (r: number) => `M0,0 a${r},${r} 0 1 1 ${2 * r},0 a${r},${r} 0 1 1
 /** The plus sign that marks pin a of a polarised part, over its lead, as a box clear of the strokes. */
 const PLUS: Box = { x0: -10, y0: -11.5, x1: -3, y1: -4.5 };
 
+const ZENER: Body = { len: 12, y0: -9, y1: 9, stroke: "M0,-7 V7 L12,0 Z M9,-9 L12,-7 V7 L15,9" };
+const FUSE: Body = { len: 24, y0: -4, y1: 4, stroke: "M0,-4 H24 V4 H0 Z M0,0 H24" };
+
 /** The two-terminal bodies, pin a on the left and pin b on the right (the first and second node of a netlist line). */
 const BODIES = {
 	resistor: {
@@ -79,7 +82,24 @@ const BODIES = {
 	},
 	// A diode conducts from its anode a to its cathode b.
 	diode: { len: 12, y0: -7, y1: 7, stroke: "M0,-7 V7 L12,0 Z M12,-7 V7" },
-	zener: { len: 12, y0: -9, y1: 9, stroke: "M0,-7 V7 L12,0 Z M9,-9 L12,-7 V7 L15,9" },
+	zener: ZENER,
+	tvs: ZENER,
+	// The opposing diodes share the bent cathode bar.
+	tvs2: {
+		len: 26,
+		y0: -9,
+		y1: 9,
+		stroke: "M0,-7 V7 L13,0 Z M26,-7 V7 L13,0 Z M16,-9 L13,-7 V7 L10,9",
+	},
+	fuse: FUSE,
+	// A PTC resettable fuse is a fuse with the thermistor slash.
+	ptc: { ...FUSE, y0: -8, y1: 8, stroke: `${FUSE.stroke} M0,8 H4 L20,-8 H24` },
+	varistor: {
+		len: 24,
+		y0: -8,
+		y1: 8,
+		stroke: "M0,-4 H24 V4 H0 Z M3,8 H7 L21,-8",
+	},
 	led: {
 		len: 12,
 		y0: -15,
@@ -192,13 +212,19 @@ function mosfet(p: boolean): SymbolDef {
 	};
 }
 
-/** The earth symbol a net 0 pin ends in; the pin is the top of its stem. */
-export const GROUND: SymbolDef = {
-	pins: { a: { x: 0, y: 0 } },
-	exits: { a: UP },
-	stroke: "M0,0 V6 M-8,6 H8 M-5,9.5 H5 M-2,13 H2",
-	body: { x0: -8, y0: 2, x1: 8, y1: 13 },
-};
+/** The downward ground symbols, keyed by canonical net name; the pin is the top of the stem. */
+export const GROUND_SYMBOLS = new Map<string, SymbolDef>([
+	["gnd", ground("M0,0 V6 M-8,6 H8 L0,13 Z", { x0: -8, y0: 2, x1: 8, y1: 13 })],
+	["earth", ground("M0,0 V6 M-8,6 H8 M-5,9.5 H5 M-2,13 H2", { x0: -8, y0: 2, x1: 8, y1: 13 })],
+	[
+		"chassis",
+		ground("M0,0 V6 M-8,6 H8 M-8,6 l-4,6 M0,6 l-4,6 M8,6 l-4,6", { x0: -12, y0: 2, x1: 8, y1: 12 }),
+	],
+]);
+
+function ground(stroke: string, body: Box): SymbolDef {
+	return { pins: { a: { x: 0, y: 0 } }, exits: { a: UP }, stroke, body };
+}
 
 /** A terminal: an open circle a wire ends in, named by its label. */
 const PORT: SymbolDef = {

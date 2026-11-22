@@ -13,7 +13,7 @@ import {
 	same,
 } from "./geometry.ts";
 import { GAPS, gapBetween, obstaclesOf, type PlacedLabel, rivalOf } from "./labels.ts";
-import { GROUND_NETS, GROUND_REF, netsOf, OPEN_NET } from "./nets.ts";
+import { groundOf, netsOf, OPEN_NET } from "./nets.ts";
 import {
 	bodyOf,
 	extentOf,
@@ -27,10 +27,10 @@ import { drawnNets } from "./topology.ts";
 
 const at = (part: Part) => `line ${part.line} (${part.id})`;
 
-/** The net a pin's name stands for: every ground is the one net, whatever it was called. */
+/** The net a pin's name stands for, normalizing only the aliases of signal ground. */
 const netOf = (part: Part, pin: string) => {
 	const net = part.nets[pin] ?? "";
-	return GROUND_NETS.has(net) ? GROUND_REF : net;
+	return groundOf(net)?.ref ?? net;
 };
 
 const where = (s: Segment) => `(${s.a.x / 10},${s.a.y / 10})-(${s.b.x / 10},${s.b.y / 10})`;
@@ -139,7 +139,7 @@ function netProblems(scene: Scene): string[] {
 			);
 		}
 		for (const name of names) {
-			if (seen.has(name) && name !== GROUND_REF) {
+			if (seen.has(name) && !groundOf(name)) {
 				const first = net.pins.find((p) => netOf(p.part, p.pin) === name);
 				out.push(
 					`${first ? at(first.part) : "net"}: net ${name} is drawn in pieces; a wire could not reach all of its pins (see the no free route problems)`,
