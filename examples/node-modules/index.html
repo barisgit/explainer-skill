@@ -4133,7 +4133,7 @@ window.ViewsFolds = (kitText) => {
                h3s indented under it as its topics, and under the section that first links to a view name, each trail step's
                siblings (only the step itself past 12). The current section and topic follow scrolling, and the rail scrolls to
                keep them in sight; 07-nav.css places the rail. */
-window.ViewsNav = ({ views, canonical, key, kitText }) => {
+window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
   const STATE_KEY = "viewTrail";
   const AT_KEY = "viewTrailAt";
   const OVERVIEW_KEY = "viewTrailOverview";
@@ -4317,7 +4317,10 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   }
   const navText = (heading) => clean(heading.dataset.nav) || clean(heading.textContent);
   function topicsOf(section, id) {
-    const headings = [...section.querySelectorAll("h3")].filter((h) => h.closest("section") === section && !h.closest("details") && !names.has(h.id));
+    const headings = [...section.querySelectorAll("h3")].filter((h) => {
+      const hidden = h.closest("[hidden]");
+      return h.closest("section") === section && !h.closest("details") && !(hidden && section.contains(hidden)) && !names.has(h.id.split(/[/?]/, 1)[0] ?? "");
+    });
     return headings.map((heading, i) => {
       const text = navText(heading);
       return { heading, link: make("a", { href: `#${anchorId(heading, text, id, i + 1)}` }, text) };
@@ -4422,13 +4425,13 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       ...entry.topics.map((t) => ({ element: t.heading, link: t.link, entry }))
     ]);
     const shown = places.filter((p) => topOf(p) >= -1 && topOf(p) < innerHeight);
-    const atEnd = scrollY > 0 && scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
-    const hash = decodeURIComponent(location.hash.slice(1));
+    const atEnd = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+    const hash = decode(location.hash.slice(1));
     const asked = hash ? shown.find((p) => p.element.id === hash) : undefined;
     if (asked && (atEnd || topOf(asked) < innerHeight / 3)) {
       return asked;
     }
-    return atEnd && shown.length ? shown.at(-1) : places.filter((p) => topOf(p) < innerHeight / 3).at(-1);
+    return atEnd && scrollY > 0 && shown.length ? shown.at(-1) : places.filter((p) => topOf(p) < innerHeight / 3).at(-1);
   }
   let spied = null;
   function spy(rail) {
@@ -4577,7 +4580,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     overview: "Overview"
   };
   const kitText = (key) => window.kitLabels?.[key] || LABELS[key];
-  const nav = window.ViewsNav({ views, canonical, key, kitText });
+  const nav = window.ViewsNav({ views, canonical, key, decode, kitText });
   const refreshFolds = window.ViewsFolds(kitText);
   function decode(text) {
     try {

@@ -65,7 +65,7 @@
 	};
 	/** The page's text for `key`, else the English one. Read when the parts draw, which starts once the page's scripts have run. */
 	const kitText = (key: keyof typeof LABELS) => window.kitLabels?.[key] || LABELS[key];
-	const nav = window.ViewsNav({ views, canonical, key, kitText });
+	const nav = window.ViewsNav({ views, canonical, key, decode, kitText });
 	const refreshFolds = window.ViewsFolds(kitText);
 
 	/** A hash is typed by hand or copied from prose, so a malformed escape such as "100%" stays as written. */

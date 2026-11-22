@@ -311,6 +311,8 @@ declare var ViewsNav: (options: {
 	canonical: (hash: string) => string;
 	/** A hash's route to compare: the part before its first ?, decoded. */
 	key: (hash: string) => string;
+	/** A fragment decoded, or as written when it is no valid escape (a literal %). */
+	decode: (text: string) => string;
 	kitText: KitText<"overview" | "contents" | "breadcrumb">;
 }) => {
 	revisited(): boolean;

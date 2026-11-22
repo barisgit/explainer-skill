@@ -19,7 +19,7 @@
                siblings (only the step itself past 12). The current section and topic follow scrolling, and the rail scrolls to
                keep them in sight; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ViewsNav = ({ views, canonical, key, kitText }) => {
+window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
 	/**
 	 * One trail step: the view's route (views.js's key: decoded, without local state), its name as the reader saw it, the sibling
 	 * routes it walks (absent: every sibling), and the hash the reader was at in it, local state included, for its crumb.
@@ -355,9 +355,15 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	 * of a section inside it, folded in a <details>, or whose id a view name takes, which a link would open instead.
 	 */
 	function topicsOf(section: HTMLElement, id: string) {
-		const headings = [...section.querySelectorAll<HTMLElement>("h3")].filter(
-			(h) => h.closest("section") === section && !h.closest("details") && !names.has(h.id),
-		);
+		const headings = [...section.querySelectorAll<HTMLElement>("h3")].filter((h) => {
+			const hidden = h.closest("[hidden]");
+			return (
+				h.closest("section") === section &&
+				!h.closest("details") &&
+				!(hidden && section.contains(hidden)) &&
+				!names.has(h.id.split(/[/?]/, 1)[0] ?? "")
+			);
+		});
 		return headings.map((heading, i) => {
 			const text = navText(heading);
 			return { heading, link: make("a", { href: `#${anchorId(heading, text, id, i + 1)}` }, text) };
@@ -502,13 +508,13 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 			...entry.topics.map((t) => ({ element: t.heading, link: t.link, entry })),
 		]);
 		const shown = places.filter((p) => topOf(p) >= -1 && topOf(p) < innerHeight);
-		const atEnd = scrollY > 0 && scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
-		const hash = decodeURIComponent(location.hash.slice(1));
+		const atEnd = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+		const hash = decode(location.hash.slice(1));
 		const asked = hash ? shown.find((p) => p.element.id === hash) : undefined;
 		if (asked && (atEnd || topOf(asked) < innerHeight / 3)) {
 			return asked;
 		}
-		return atEnd && shown.length
+		return atEnd && scrollY > 0 && shown.length
 			? shown.at(-1)
 			: places.filter((p) => topOf(p) < innerHeight / 3).at(-1);
 	}

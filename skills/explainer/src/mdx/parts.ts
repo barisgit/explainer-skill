@@ -200,7 +200,9 @@ function keptBecause(node: MdxJsxFlowElement, tree: Root): string | undefined {
 		return "has a layout (export default); wrap its content in a component it imports instead";
 	}
 	const loadsRelative = [...nodesIn(tree)].some(
-		(n) => n.type === "ImportExpression" || n.type === "MetaProperty",
+		(n) =>
+			n.type === "ImportExpression" ||
+			(n.type === "MetaProperty" && (n as { meta?: { name?: string } }).meta?.name === "import"),
 	);
 	return loadsRelative
 		? "loads files relative to itself (import() or import.meta); import them at its top instead"
@@ -223,23 +225,34 @@ function* containers(tree: Root): Generator<{ children: Nodes[] }> {
 
 /**
  * Adds the file's own Markdown reference definitions (`[doc]: url`, footnotes) to those of the page so far: the spliced page is
- * one Markdown document, where the first definition of a label wins, so the same label defined otherwise fails.
+ * one Markdown document, where the first definition of a label wins, so a label another file defined otherwise fails. Within
+ * one file the first wins, as Markdown has it.
  */
 function addDefinitions(tree: Root, file: string, splice: Splice) {
+	const own = new Map<string, { label: string; key: string; shown: string }>();
 	for (const node of nodesIn(tree.children)) {
-		if (node.type === "definition" || node.type === "footnoteDefinition") {
-			const { identifier, url } = node as { identifier?: string; url?: string };
-			const label = `${node.type}:${identifier}`;
-			const key = node.type === "definition" ? `${url}` : `${file}:${identifier}`;
-			bindNew(
-				splice.definitions,
-				label,
-				key,
-				file,
-				`[${node.type === "definition" ? "" : "^"}${identifier}]`,
-			);
+		const found = definitionOf(node, file);
+		if (found && !own.has(found.label)) {
+			own.set(found.label, found);
 		}
 	}
+	for (const { label, key, shown } of own.values()) {
+		bindNew(splice.definitions, label, key, file, shown);
+	}
+}
+
+/** A reference or footnote definition's label, what it means (a footnote's is its file's own), and the label as written. */
+function definitionOf(node: { type: string }, file: string) {
+	if (node.type !== "definition" && node.type !== "footnoteDefinition") {
+		return undefined;
+	}
+	const { identifier, url, title } = node as { identifier?: string; url?: string; title?: string };
+	const link = node.type === "definition";
+	return {
+		label: `${node.type}:${identifier}`,
+		key: link ? JSON.stringify([url, title ?? null]) : `${file}:${identifier}`,
+		shown: `[${link ? "" : "^"}${identifier}]`,
+	};
 }
 
 /** What splicing a tree's parts gathers: their statements for the tree's root, warnings, and the part names spliced. */
@@ -337,10 +350,13 @@ async function spliceInto(tree: Root, file: string, chain: string[], splice: Spl
 		}
 		container.children = children;
 	}
-	dropSpliced(
-		tree,
-		[...gathered.locals].filter((local) => !stillUsed(tree, local)),
-	);
+	const mixed = [...gathered.locals].find((local) => stillUsed(tree, local));
+	if (mixed) {
+		throw new PackError(
+			`${shownPath(file)}: <${mixed}> is laid out as part of the page in one place and used as a component in another, so its code would run twice: use it one way`,
+		);
+	}
+	dropSpliced(tree, [...gathered.locals]);
 	const bound = ownBindings(tree, file);
 	tree.children.unshift(
 		...gathered.esm.flatMap(({ node, part }) => joinEsm(node, part, file, bound)),

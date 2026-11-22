@@ -511,6 +511,31 @@ var contract = settled.then(async () => {
 	expect(await runPacked(output)).toEqual([]);
 }, 30_000);
 
+test("on a page that fits the window, a followed topic is current; hidden and view-route headings are no topics; a literal % is no error", async () => {
+	const page = `---\ncontents: true\n---\n\nimport { View } from "kit";\n\n# A course\n\nThe lede.\n\n## Chapter\n\nText.\n\n### First topic\n\nText.\n\n### Second topic\n\nText.\n\n<h3 hidden>Hidden topic</h3>\n\n<h3 id="v/item">Route topic</h3>\n\n[Open](#v)\n\n## Other\n\nText.\n\n<View name="v">\n\n## V\n\nText.\n\n</View>\n\n<script src="contract.js"></script>\n`;
+	const contract = `const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const current = () => document.querySelector('.toc [aria-current="location"]')?.textContent;
+const frames = () => new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame));
+${SETTLED}
+var contract = settled.then(async () => {
+	const failures = [];
+	const expect = (ok, name) => ok || failures.push(name);
+	const errors = [];
+	addEventListener("error", (e) => errors.push(e.message));
+	expect(texts(".toc ol.topics a") === "First topic|Second topic", "topics: " + texts(".toc ol.topics a"));
+	[...document.querySelectorAll(".toc a")].find((a) => a.textContent === "Second topic").click();
+	await frames();
+	expect(current() === "Second topic", "a followed topic on a page that fits: " + current());
+	location.hash = "100%";
+	await frames();
+	expect(errors.length === 0, "a literal %: " + errors.join("; "));
+	history.replaceState(null, "", location.pathname);
+	return failures;
+});`;
+	const output = await packedMdx(dir, "fits", page, { "contract.js": contract });
+	expect(await runPacked(output)).toEqual([]);
+}, 30_000);
+
 test.each([
 	{ target: "a link", short: false },
 	{ target: "the empty space below the links", short: false },

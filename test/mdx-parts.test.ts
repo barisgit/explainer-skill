@@ -133,6 +133,35 @@ describe("a part pack cannot join to the page", () => {
 			/parts\/p\.mdx: \[doc\] is bound in \S*labels\.mdx too, to something else/,
 		);
 	}, 30_000);
+});
+
+describe("what two of a page's files share", () => {
+	test("a label one file defines twice keeps its first, as Markdown does; a part's new.target is no relative load", async () => {
+		const page = await packedMdx(
+			dir,
+			"twice",
+			`import P from "./parts/p.mdx";\n\n# T\n\nSee [doc].\n\n[doc]: https://a.example\n[doc]: https://b.example\n\n<P />\n`,
+			{ "parts/p.mdx": "export function F() { return new.target ? 1 : 2; }\n\n## A {F()}\n" },
+		);
+		const main = mainOf(page);
+		expect(main).toContain('href="https://a.example"');
+		expect(main).toMatch(/<section>\s*<h2>A 2/);
+	}, 30_000);
+
+	test("a part laid out in one place and used as a component in another fails, since its code would run twice", async () => {
+		const { result } = await packMdx(
+			dir,
+			"mixed",
+			`import P from "./parts/p.mdx";\n\n# T\n\n<P />\n\n<P kept />\n`,
+			{
+				"parts/p.mdx": "## A\n",
+			},
+		);
+		expect(result.code).not.toBe(0);
+		expect(result.stderr).toContain(
+			"mixed.mdx: <P> is laid out as part of the page in one place and used as a component in another",
+		);
+	}, 30_000);
 
 	test("a part that cannot be read fails naming the file that imports it", async () => {
 		const { result } = await packMdx(
