@@ -80,12 +80,17 @@ interface Findings {
 }
 
 /** Clicks only initial-state kit samples in a disposable default-context page; no control state reaches screenshots. */
-export async function sweepControls(owner: CheckedPage, screen: Screen): Promise<Findings> {
+export async function sweepControls(
+	owner: CheckedPage,
+	screen: Screen,
+	budgetOverride?: number,
+): Promise<Findings> {
+	const budget = budgetOverride ?? CONTROL_BUDGET_MS;
 	const findings: Findings = { problems: [], warnings: [] };
 	const limit = new AbortController();
 	const reason = new ChromeError("the kit control sweep exhausted its work budget");
 	// Reserve target disposal inside the total ceiling; timeout never poisons the caller's screenshot session.
-	const timer = setTimeout(() => limit.abort(reason), CONTROL_BUDGET_MS - DISPOSE_DEADLINE_MS);
+	const timer = setTimeout(() => limit.abort(reason), budget - DISPOSE_DEADLINE_MS);
 	let controls: Control[] | undefined;
 	let completed = 0;
 	let active = "";
@@ -97,7 +102,9 @@ export async function sweepControls(owner: CheckedPage, screen: Screen): Promise
 			await page.screen(screen);
 			await page.open();
 			controls = await cdp.evaluate<Control[]>(CONTROLS_JS);
-			for (const control of controls.slice(0, CONTROL_LIMIT)) {
+			for (const control of budgetOverride === undefined
+				? controls.slice(0, CONTROL_LIMIT)
+				: controls) {
 				active = control.name;
 				await probeControl(page, control, screen, completed > 0, findings);
 				completed++;
@@ -112,9 +119,7 @@ export async function sweepControls(owner: CheckedPage, screen: Screen): Promise
 		clearTimeout(timer);
 	}
 	if (exhausted || (controls && completed < controls.length)) {
-		const why = exhausted
-			? `${CONTROL_BUDGET_MS / 1000}s total budget`
-			: `${CONTROL_LIMIT}-control cap`;
+		const why = exhausted ? `${budget / 1000}s total budget` : `${CONTROL_LIMIT}-control cap`;
 		findings.warnings.push(
 			`control sweep incomplete: completed ${completed} of ${controls?.length ?? "unknown"} sampled control clicks (${why}${exhausted && active ? `; stopped at ${active}` : ""})`,
 		);

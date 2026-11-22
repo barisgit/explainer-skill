@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
-import { check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
+import { type CheckOptions, check, DEFAULT_TIMEOUT_SECONDS, kitReferences } from "./check.ts";
 import { CONTROL_BUDGET_MS, CONTROL_LIMIT } from "./control-sweep.ts";
 import { authorTsconfig, kitLabels, kitPath, leadingComment, pageFile } from "./kit.ts";
 import { clientBundle, isClientModule } from "./mdx/bundle.ts";
@@ -16,6 +16,7 @@ import { moduleTree, RECORDS_ANSWER_MODULE, scriptsInCode } from "./mdx/kit-scri
 import { pageSources } from "./mdx/sources.ts";
 import { pack } from "./pack.ts";
 import { PackError } from "./pack-error.ts";
+import { SCROLL_BUDGET_MS } from "./page-probes.ts";
 import { UNSENDABLE } from "./reply/handler.ts";
 import { hasEndpointSlot, PAGE_ID } from "./reply/protocol.ts";
 import { serve } from "./reply/serve.ts";
@@ -264,6 +265,46 @@ async function types(): Promise<number> {
 	}
 }
 
+/** Chrome limits each emulated dimension to 10,000,000 px; zero disables the override. */
+function viewportSize(text: string) {
+	const match = /^([1-9]\d*)x([1-9]\d*)$/.exec(text);
+	const width = Number(match?.[1]);
+	const height = Number(match?.[2]);
+	return width <= 10_000_000 && height <= 10_000_000 ? { width, height } : undefined;
+}
+
+/** Parses the scheduling overrides before allocating Chrome or an output directory. */
+function checkSchedule(
+	flags: Map<string, string[]>,
+): Pick<CheckOptions, "viewports" | "sweepBudgetMs" | "timeoutSeconds"> | string {
+	const timeout = flags.get("--timeout")?.[0];
+	const timeoutSeconds = timeout === undefined ? DEFAULT_TIMEOUT_SECONDS : Number(timeout);
+	if (!(timeoutSeconds > 0)) {
+		return `--timeout takes a number of seconds above 0, not "${timeout}"`;
+	}
+	const textBudget = flags.get("--budget")?.[0];
+	const budget = Number(textBudget?.replace(/s$/, ""));
+	if (
+		textBudget !== undefined &&
+		(!/^\d+s?$/.test(textBudget) || budget < CONTROL_BUDGET_MS / 1000 || budget > 600)
+	) {
+		return `--budget takes 8 to 600 whole seconds, not "${textBudget}"`;
+	}
+	const viewports: CheckOptions["viewports"] = [];
+	for (const text of flags.get("--viewport") ?? []) {
+		const size = viewportSize(text);
+		if (!size) {
+			return `--viewport takes a width and height from 1 to 10000000 as WxH, e.g. 1920x1080, not "${text}"`;
+		}
+		viewports.push(size);
+	}
+	return {
+		viewports,
+		sweepBudgetMs: textBudget === undefined ? undefined : budget * 1000,
+		timeoutSeconds,
+	};
+}
+
 /** One spec per command: drives dispatch, flag validation and --help. Exit codes: 0 ok, 1 problems found, 2 usage. */
 export const COMMANDS: Record<string, Command> = {
 	kit: {
@@ -331,11 +372,13 @@ export const COMMANDS: Record<string, Command> = {
 		},
 	},
 	check: {
-		summary: `Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view and one PNG of an element per --do shot:<css>, into a fresh temp directory (printed) unless --out says where. Full-page PNGs put document-sticky boxes in flow and omit viewport-fixed overlays, listing visible author-fixed omissions as grouped warnings (text and JSON); the kit's contents rail is omitted silently. First-screen and --do shot:<css> PNGs keep them. Capture preserves scroll and interaction state, deferring timers and animation frames without discarding them. Sweeps the document and inner auto/scroll containers before each full-page shot, so errors thrown by scroll handlers and IntersectionObserver callbacks are caught (one shared 3 s budget per page load; warns if an end was not reached). A default run also samples up to ${CONTROL_LIMIT} initially visible kit controls once on the light-desktop overview, each fresh with Keep cleared (${CONTROL_BUDGET_MS / 1000} s total including cleanup; no extra scroll sweeps or PNGs). One per role/component: view links, stepper navigation, DOM legends, choices and disclosures; graphical legends and ranges need --do. Findings name the control; incomplete coverage warns. --quick or --do skips it. After each load and step it waits until the page has settled: fonts loaded, every visible chart drawn, and the timers of up to 1 s the page set have run; what is still missing after 10 s is a problem. Reports first-screen info, errors, network requests, overflow and ids on more than one element as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts, text inside a drawn Chart or Plot that crosses the figure's box or other text, sideways-scrolling containers, steppers whose steps change only their captions, and linked parts (a data-ref, a stepper's captions and parts) more than a screen apart at desktop width as warnings. When Chrome fails to start or stops answering, or the run passes --timeout, check prints one error line and exits 1 with no report.`,
+		summary: `Open a packed file in headless Chrome: light+dark x desktop(1440)+narrow(390). Saves a first-viewport and a full-page PNG per theme and size, plus one full-page PNG per drill-down view and one PNG of an element per --do shot:<css>, into a fresh temp directory (printed) unless --out says where. Full-page PNGs put document-sticky boxes in flow and omit viewport-fixed overlays, listing visible author-fixed omissions as grouped warnings (text and JSON); the kit's contents rail is omitted silently. First-screen and --do shot:<css> PNGs keep them. Capture preserves scroll and interaction state, deferring timers and animation frames without discarding them. Sweeps the document and inner auto/scroll containers before each full-page shot, so errors thrown by scroll handlers and IntersectionObserver callbacks are caught (one shared ${SCROLL_BUDGET_MS / 1000} s budget per page load; warns if an end was not reached). A default run also samples up to ${CONTROL_LIMIT} initially visible kit controls once on the light-desktop overview, each fresh with Keep cleared (${CONTROL_BUDGET_MS / 1000} s total including cleanup; no extra scroll sweeps or PNGs). One per role/component: view links, stepper navigation, DOM legends, choices and disclosures; graphical legends and ranges need --do. Findings name the control; incomplete coverage warns. --quick or --do skips it. After each load and step it waits until the page has settled: fonts loaded, every visible chart drawn, and the timers of up to 1 s the page set have run; what is still missing after 10 s is a problem. Reports first-screen info, errors, network requests, overflow and ids on more than one element as problems (exit 1), and console warnings, tiny diagram text, content cut off inside an overflow:hidden box, a missing viewport meta, over-tall diagrams and charts, text inside a drawn Chart or Plot that crosses the figure's box or other text, sideways-scrolling containers, steppers whose steps change only their captions, and linked parts (a data-ref, a stepper's captions and parts) more than a screen apart at desktop and custom sizes as warnings. When Chrome fails to start or stops answering, or the run passes --timeout, check prints one error line and exits 1 with no report.`,
 		usage:
-			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--quick] [--tag <name>] [--out dir] [--timeout <seconds>] [--json]",
+			"check <artifact.html> [--do <step>]... [--view <hash|all|none>]... [--viewport <WxH>]... [--budget <s>] [--quick] [--tag <name>] [--out dir] [--timeout <seconds>] [--json]",
 		flags: [
-			`--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a viewport point; reports what it hit\n                   ${DRAG_FORM}     real left-button drag, including canvas dataZoom sliders\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, Backspace, or one character; arrows move a focused range by its step and a select by one option\n                   type:<css>=<text>    type over the first match's text key by key (a newline presses Enter), then leave it, so input and change fire; type:#q= clears it\n                   set:<css>=<value>    set a range, select, date or other field's value at once, then fire input and change\n                   shot:<css>           PNG of the first match's box as the page is at this step (@all: each match; @<n>: that one), per theme and size, listed in the report\n                   reply                print current reply Markdown without copying or sending (JSON: replies, per step/theme/size); needs a page packed with the current kit\n                   reload               reload the page, keeping what it saved for the reader (kit keep); each load otherwise starts with empty storage\n                   Points are unsigned-integer viewport pixels after preceding scrolls. hover:<css> scrolls to its target and hovers its centre. Click/drag notes report hit targets, observed chart events and hash changes per theme/size, not mark indices or a full state diff.\n                   Attribute values may be unquoted: [value=0] works. The value of type: and set: starts after the first = outside [...].`,
+			`--do <step>      run before the full-page shots, in order, repeatable. Its state persists into every saved full-page PNG (all themes and sizes); the first-viewport PNG is taken before it and drill-down views load fresh without it.\n                   click:<css>          first match (HTML or SVG DOM click, element focused first)\n                   click:<css>@all      every match in turn, re-queried before each click (the output says how many)\n                   click:<css>@<n>      the n-th match, 0-based\n                   click:<x,y>          real mouse click at a viewport point; reports what it hit\n                   ${DRAG_FORM}     real left-button drag, including canvas dataZoom sliders\n                   hover:<css | x,y>    real mouse move; fires :hover and chart tooltips (a tooltip is not in the full-page PNGs, which are taken after a relayout)\n                   focus:<css>          focus the first match, so key: reaches it\n                   key:<Key>            to the focused element: ArrowLeft/Right/Up/Down, Enter, Space, Escape, Tab, Home, End, Backspace, or one character; arrows move a focused range by its step and a select by one option\n                   type:<css>=<text>    type over the first match's text key by key (a newline presses Enter), then leave it, so input and change fire; type:#q= clears it\n                   set:<css>=<value>    set a range, select, date or other field's value at once, then fire input and change\n                   shot:<css>           PNG of the first match's box as the page is at this step (@all: each match; @<n>: that one), per theme and size, listed in the report\n                   reply                print current reply Markdown without copying or sending (JSON: replies, per step/theme/size); needs a page packed with the current kit\n                   reload               reload the page, keeping what it saved for the reader (kit keep); each load otherwise starts with empty storage\n                   Points are unsigned-integer viewport pixels after preceding scrolls. hover:<css> scrolls to its target and hovers its centre. Click/drag notes report hit targets, observed chart events and hash changes per theme/size, not mark indices or a full state diff.\n                   Attribute values may be unquoted: [value=0] works. The value of type: and set: starts after the first = outside [...].`,
+			"--viewport <WxH>  add a desktop-mode size in CSS pixels, named by its dimensions in reports and PNGs; repeatable. Keeps the default desktop and narrow sizes",
+			"--budget <s>     raise the sweep budgets (8–600 whole seconds, e.g. 60). Applies per scroll load and once to the control sweep, including cleanup; the 12-control cap is lifted. --timeout still limits the whole run",
 			"--quick          light theme only, no first-viewport shots or control sweep, no theme in PNG names (desktop.png, narrow.png); into --out (a temp directory without it)",
 			"--view <what>    choose drill-down views to capture. The report lists every view hash found (links and static views) and which were captured. Default: the first hash of each view name, at most 6 names. --view all = every hash found (one PNG set each: slower). A hash (repo/mobile) captures exactly the hashes given; repeatable. none = overview only. Hashes only a script navigates to are never found: pass them as --view name/param.",
 			"--tag <name>     add to the PNG names (a name, no path) so states do not overwrite each other; with --quick too (kind-desktop.png)",
@@ -346,6 +389,7 @@ export const COMMANDS: Record<string, Command> = {
 		examples: [
 			"check artifact.html",
 			"check artifact.html --quick --out shots",
+			"check artifact.html --viewport 1920x1080 --viewport 1280x720 --budget 60",
 			"check artifact.html --do click:.tab@all --do click:.legend-item@1 --tag open",
 			"check artifact.html --do click:'[data-go=\"1\"]' --do click:'[data-go=\"1\"]' --tag step3",
 			"check artifact.html --do focus:[data-stepper] --do key:ArrowLeft --do key:ArrowLeft --tag back2",
@@ -373,10 +417,9 @@ export const COMMANDS: Record<string, Command> = {
 			if (bad) {
 				return usage(bad);
 			}
-			const timeout = flags.get("--timeout")?.[0];
-			const timeoutSeconds = timeout === undefined ? DEFAULT_TIMEOUT_SECONDS : Number(timeout);
-			if (!(timeoutSeconds > 0)) {
-				return usage(`--timeout takes a number of seconds above 0, not "${timeout}"`);
+			const schedule = checkSchedule(flags);
+			if (typeof schedule === "string") {
+				return usage(schedule);
 			}
 			// The tag becomes part of each PNG's file name, so a path in it would write outside --out (and outside staging).
 			const tag = flags.get("--tag")?.[0] ?? "";
@@ -393,7 +436,7 @@ export const COMMANDS: Record<string, Command> = {
 				views: flags.get("--view") ?? [],
 				tag,
 				quick: flags.has("--quick"),
-				timeoutSeconds,
+				...schedule,
 			});
 			const ok = shots.every((s) => !s.problems.length);
 			if (flags.has("--json")) {

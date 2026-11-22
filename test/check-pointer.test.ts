@@ -267,3 +267,33 @@ test.each(["drag:#zoom", "drag:1,2", "drag:1,2-3", "drag:1,2-3,4@all"])(
 		expect(stepError(step)).toContain("drag:<x,y>-<x,y>");
 	},
 );
+
+test("a selector click on a Mermaid node pins its linked highlight after focus leaves", async () => {
+	const file = await packedMdx(
+		dir,
+		"tag-click",
+		`# Linked diagram
+
+See <span id="mention" data-ref="inverter">2</span>.
+
+\`\`\`mermaid tag:inverter=2
+flowchart LR
+  panel[Panel] --> inverter[Inverter]
+\`\`\`
+
+<button id="other">Other</button>`,
+	);
+	await withPage(async (cdp) => {
+		const page = new CheckedPage(cdp, `file://${file}`);
+		await page.start();
+		await page.open();
+		const click = await runStep(cdp, "click:svg g[data-ref=inverter]", () => "unused");
+		expect(click.problem).toBeUndefined();
+		expect(click.note).toContain("hit g");
+		await runStep(cdp, "focus:#other", () => "unused");
+		expect(
+			await cdp.evaluate("document.querySelector('#mention').classList.contains('is-lit')"),
+		).toBe(true);
+		expect(page.problems).toEqual([]);
+	});
+}, 30_000);

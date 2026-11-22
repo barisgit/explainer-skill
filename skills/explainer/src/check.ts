@@ -8,14 +8,22 @@ import { sweepControls } from "./control-sweep.ts";
 import { type FigureText, figureTextWarnings } from "./figure-text.ts";
 import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
-import { DISCOVER_JS, FIRST_SCREEN_JS, LINKED_JS, STEPPERS_JS, SWEEP_JS } from "./page-probes.ts";
+import {
+	DISCOVER_JS,
+	FIRST_SCREEN_JS,
+	LINKED_JS,
+	STEPPERS_JS,
+	scrollSweepJs,
+} from "./page-probes.ts";
 import { READING_JS, type ReadingLoad, readingWarnings } from "./reading-load.ts";
 import { runStep } from "./steps.ts";
 
-const VIEWPORTS = {
-	desktop: { width: 1440, height: 900 },
-	narrow: { width: 390, height: 844 },
-} as const;
+type Viewport = Pick<Screen, "name" | "vp">;
+
+const VIEWPORTS: Viewport[] = [
+	{ name: "desktop", vp: { width: 1440, height: 900 } },
+	{ name: "narrow", vp: { width: 390, height: 844 } },
+];
 const THEMES = ["light", "dark"] as const;
 /**
  * The first viewport before any `--do` step: its PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
@@ -63,6 +71,10 @@ export interface CheckOptions {
 	tag: string;
 	quick: boolean;
 	timeoutSeconds: number;
+	/** Additional desktop-mode viewports, named by their dimensions. */
+	viewports: Screen["vp"][];
+	/** If set, replaces both sweep budgets and lifts the control count cap. */
+	sweepBudgetMs: number | undefined;
 }
 
 /** The overall limit of one check run when --timeout gives none: far above a page with every view captured and many steps. */
@@ -211,7 +223,18 @@ async function firstScreen(run: Run, screen: Screen): Promise<FirstScreen> {
 
 /** Sweeps the document and inner scrollers under one per-load budget, recording incomplete coverage as one warning. */
 async function sweep(run: Run) {
-	run.page.warnings.push(...(await run.page.cdp.evaluate<string[]>(SWEEP_JS, true)));
+	const budget = run.opts.sweepBudgetMs;
+	// The browser owns the sweep deadline; give its final scroll restoration and CDP reply time to finish.
+	const deadline = budget === undefined ? undefined : budget + 5_000;
+	run.page.warnings.push(
+		...(await run.page.cdp.evaluate<string[]>(scrollSweepJs(budget), true, deadline)),
+	);
+}
+
+/** Custom screen names already are their dimensions. Keep the default report's name and size. */
+function reportedViewport({ name, vp }: Screen): string {
+	const size = `${vp.width}x${vp.height}`;
+	return name === size ? size : `${name} ${size}`;
 }
 
 /** Finds the drill-down hashes on the freshly loaded overview and records them in the report and in `run.viewHashes`. */
@@ -273,7 +296,7 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 
 /** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, full-page shot. */
 async function shootOverview(run: Run, screen: Screen) {
-	const { theme, name, vp } = screen;
+	const { theme, name } = screen;
 	const { opts } = run;
 	run.where = `at ${theme} ${name}, overview`;
 	// Pack's drawings, views' included, on a load of their own before the page's: where text sits is the same in both themes.
@@ -289,7 +312,10 @@ async function shootOverview(run: Run, screen: Screen) {
 	await sweep(run);
 	// Stepping behaves the same in every theme and width, so one pass finds a stepper that changes nothing.
 	const stepperWarnings = firstPass ? await run.page.cdp.evaluate<string[]>(STEPPERS_JS, true) : [];
-	const linkedWarnings = firstPass ? await run.page.cdp.evaluate<string[]>(LINKED_JS) : [];
+	const linkedWarnings =
+		theme === THEMES[0] && name !== "narrow"
+			? await run.page.cdp.evaluate<string[]>(LINKED_JS)
+			: [];
 	const elements = await runSteps(run, screen);
 	const png = overviewPng(run, screen);
 	const warnings = [
@@ -301,18 +327,18 @@ async function shootOverview(run: Run, screen: Screen) {
 	const problems = [...run.page.problems];
 	if (firstPass && !opts.quick && !opts.steps.length) {
 		run.where += ", kit control sweep";
-		const controls = await sweepControls(run.page, screen);
+		const controls = await sweepControls(run.page, screen, opts.sweepBudgetMs);
 		problems.push(...controls.problems);
 		warnings.push(...controls.warnings);
 	}
 	// Last on this load, since its probe touches the page. Each theme resolves light-dark() its own way; the desktop overview
 	// stands for the widths, as page rules rarely set tokens per width.
-	if (name === "desktop") {
+	if (name !== "narrow") {
 		warnings.push(...(await run.page.cdp.evaluate<string[]>(CONTRAST_JS)));
 	}
 	run.shots.push({
 		theme,
-		viewport: `${name} ${vp.width}x${vp.height}`,
+		viewport: reportedViewport(screen),
 		view: "",
 		png,
 		first,
@@ -325,7 +351,7 @@ async function shootOverview(run: Run, screen: Screen) {
 
 /** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
 async function shootView(run: Run, screen: Screen, hash: string) {
-	const { theme, name, vp } = screen;
+	const { theme, name } = screen;
 	run.where = `at ${theme} ${name}, view ${hash}`;
 	await run.page.open(hash);
 	if (
@@ -338,7 +364,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 	await sweep(run);
 	// Where parts sit is the same in both themes; desktop width is where they can stand side by side.
 	const linkedWarnings =
-		theme === THEMES[0] && name === "desktop"
+		theme === THEMES[0] && name !== "narrow"
 			? await run.page.cdp.evaluate<string[]>(LINKED_JS)
 			: [];
 	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
@@ -346,7 +372,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 	const warnings = [...linkedWarnings, ...(await capture(run, png, screen, hash))];
 	run.shots.push({
 		theme,
-		viewport: `${name} ${vp.width}x${vp.height}`,
+		viewport: reportedViewport(screen),
 		view: hash,
 		png,
 		elements: [],
@@ -360,11 +386,13 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 
 /** Every theme x viewport: the overview, then each chosen view. */
 async function shootAll(run: Run, themes: readonly string[]) {
+	const custom = new Map(run.opts.viewports.map((vp) => [`${vp.width}x${vp.height}`, vp]));
+	const viewports = [...VIEWPORTS, ...[...custom].map(([name, vp]) => ({ name, vp }))];
 	await run.page.start();
 	for (const theme of themes) {
-		for (const [name, vp] of Object.entries(VIEWPORTS)) {
-			await run.page.screen({ theme, name, vp });
-			const screen = { theme, name, vp };
+		for (const viewport of viewports) {
+			const screen = { theme, ...viewport };
+			await run.page.screen(screen);
 			await shootOverview(run, screen);
 			for (const hash of run.viewHashes) {
 				await shootView(run, screen, hash);
@@ -425,13 +453,13 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
 
 /**
  * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
- * the first viewport before any step, the full page after a scroll sweep (see SWEEP_JS) and the `--do` steps (their state persists into those shots), and a full-page shot
+ * the first viewport before any step, the full page after a scroll sweep (see scrollSweepJs) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
  * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
  * Reports as problems console/page errors, network requests, failed loads, page-level horizontal overflow, repeated ids and what a page had
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
  * missing viewport meta, tall diagrams and charts, figure text crossing its box or other text (FIGURE_TEXT_JS, light theme), steppers that change only their captions, linked parts more than a screen apart
- * (LINKED_JS, light desktop only), colour tokens under the contrast their use needs (CONTRAST_JS, desktop) and incomplete scroll sweeps. Reduced motion is emulated so animations are
+ * (LINKED_JS, light desktop and custom viewports), colour tokens under the contrast their use needs (CONTRAST_JS, desktop and custom viewports) and incomplete scroll sweeps. Reduced motion is emulated so animations are
  * finished in the shots.
  * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed
  * `opts.timeoutSeconds`. The PNGs of a run that succeeds replace those of the same name in `outDir`.

@@ -369,6 +369,29 @@ test.each([
 	30_000,
 );
 
+test("an explicit sweep budget lets controls beyond the default cap run", async () => {
+	const file = dir.write(
+		"extra-controls.html",
+		`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">
+${Array.from({ length: 13 }, (_, i) => `<div data-stepper><button data-go="1" id="step-${i}" onclick="console.warn(this.id)">Next</button></div>`).join("")}`,
+	);
+	const result = await runCli([
+		"check",
+		file,
+		"--budget",
+		"60",
+		"--out",
+		dir.path("extra-controls-shots"),
+		"--json",
+	]);
+	expect(result.stderr).toBe("");
+	expect(result.code).toBe(0);
+	const { shots } = JSON.parse(result.stdout) as CheckResult;
+	const warnings = shots.flatMap((shot) => shot.warnings);
+	expect(warnings).toContain("control #step-12: console.warning: step-12");
+	expect(warnings.some((w) => w.startsWith("control sweep incomplete"))).toBe(false);
+}, 30_000);
+
 test("a timed-out disposable control page closes without poisoning the screenshot page", async () => {
 	await withPage(async (cdp) => {
 		await cdp.send("Page.enable");

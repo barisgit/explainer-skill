@@ -253,7 +253,11 @@ async function domClick(cdp: Cdp, step: string, target: Target): Promise<StepRes
 			cdp,
 			target.selector,
 			i,
-			"el.scrollIntoView({ block: 'center' }); el.focus?.({ preventScroll: true }); el.click()",
+			`el.scrollIntoView({ block: 'center' });
+			el.focus?.({ preventScroll: true });
+			if (el instanceof SVGElement) {
+				el.dispatchEvent(new PointerEvent('click', { bubbles: true, cancelable: true, composed: true }));
+			} else el.click()`,
 		);
 		if (target.indices.length > 1) {
 			// What a click still misses shows in the settle after the step.

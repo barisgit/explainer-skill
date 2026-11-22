@@ -411,11 +411,11 @@ export class Cdp {
 		);
 	}
 	/** Evaluates `expression` in the page and returns its JSON value; throws with the page's error when the script throws. */
-	async evaluate<T>(expression: string, awaitPromise = false): Promise<T> {
+	async evaluate<T>(expression: string, awaitPromise = false, deadline?: number): Promise<T> {
 		const { result, exceptionDetails } = await this.send<{
 			result: { value: T };
 			exceptionDetails?: ExceptionDetails;
-		}>("Runtime.evaluate", { expression, returnByValue: true, awaitPromise });
+		}>("Runtime.evaluate", { expression, returnByValue: true, awaitPromise }, deadline);
 		if (exceptionDetails) {
 			throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
 		}

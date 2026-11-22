@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import type { Shot } from "../skills/explainer/src/check.ts";
 import { withPage } from "../skills/explainer/src/chrome.ts";
-import { SWEEP_JS, SWEEP_WARNING } from "../skills/explainer/src/page-probes.ts";
+import { SWEEP_WARNING, scrollSweepJs } from "../skills/explainer/src/page-probes.ts";
 import { report } from "../skills/explainer/src/report.ts";
 import { runCli, scratch } from "./support.ts";
 
@@ -101,7 +101,7 @@ test("a nonzero scroller exposes its reset position before advancing and is rest
 			new IntersectionObserver(entries => {
 				if (entries.some(e => e.isIntersecting)) window.atStart.observer = true;
 			}, { root: panel }).observe(document.getElementById('start'));`);
-		expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+		expect(await cdp.evaluate<string[]>(scrollSweepJs(), true)).toEqual([]);
 		expect(await cdp.evaluate("window.atStart")).toEqual({ scroll: true, observer: true });
 		expect(
 			await cdp.evaluate(
@@ -132,7 +132,7 @@ test("the sweep restores non-target hidden ancestors moved by scrollIntoView", a
 			new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))`,
 			true,
 		);
-		expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+		expect(await cdp.evaluate<string[]>(scrollSweepJs(), true)).toEqual([]);
 		expect(
 			await cdp.evaluate(`['outer','hidden','panel'].map(id => {
 			const el = document.getElementById(id); return [el.scrollLeft, el.scrollTop];
@@ -179,7 +179,7 @@ test("oversized scrollers advance by the viewport-visible area, including ancest
 				true,
 			);
 			expect(await cdp.evaluate("window.seen")).toBe(false);
-			expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+			expect(await cdp.evaluate<string[]>(scrollSweepJs(), true)).toEqual([]);
 			expect(await cdp.evaluate("window.seen")).toBe(true);
 		}
 	});
@@ -200,7 +200,7 @@ test("an unreachable off-canvas scroller does not starve later visible panels", 
 			)}`,
 		);
 		const started = performance.now();
-		const warnings = await cdp.evaluate<string[]>(SWEEP_JS, true);
+		const warnings = await cdp.evaluate<string[]>(scrollSweepJs(), true);
 		expect(await cdp.evaluate("window.visited")).toBe(true);
 		expect(performance.now() - started).toBeLessThan(1000);
 		expect(warnings).toHaveLength(1);
@@ -236,6 +236,45 @@ addEventListener("scroll", () => { if (scrollY) elapsed += 4000; });`,
 	expect(result.stdout.match(/scroll sweep incomplete/g)).toHaveLength(1);
 	expect(result.stdout).toContain("Verdict: ok, 0 problems, 1 warning.");
 }, 30_000);
+
+test("an explicit sweep budget reaches content past the default deadline", async () => {
+	const file = dir.write(
+		"long-sweep.html",
+		page(
+			'<div style="height:2400px">Long</div><div id="end">End</div>',
+			`const now = performance.now.bind(performance);
+let elapsed = 0;
+performance.now = () => now() + elapsed;
+addEventListener("scroll", () => { if (scrollY) elapsed = 4000; });
+new IntersectionObserver(entries => {
+	if (entries.some(e => e.isIntersecting)) console.warn("saw the end");
+}).observe(document.getElementById('end'));`,
+		),
+	);
+	const result = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--budget",
+		"60s",
+		"--out",
+		dir.path("long-sweep-shots"),
+	]);
+	expect(result.stderr).toBe("");
+	expect(result.code).toBe(0);
+	expect(result.stdout).toContain("console.warning: saw the end");
+	expect(result.stdout).not.toContain("scroll sweep incomplete");
+}, 30_000);
+
+test.each(["7", "601s", "8.5", "Infinity"])(
+	"check rejects invalid sweep budget %s before starting Chrome",
+	async (budget) => {
+		const file = dir.write("invalid-budget.html", page("<h1>Budget</h1>"));
+		const result = await runCli(["check", file, "--budget", budget]);
+		expect(result.code).toBe(2);
+		expect(result.stderr).toContain(`--budget takes 8 to 600 whole seconds, not "${budget}"`);
+	},
+);
 
 test("incomplete sweeps group differing screen details once per overview or view", () => {
 	const shot = (viewport: string, view: string, detail: string): Shot => ({
@@ -287,7 +326,7 @@ test("the document and inner scrollers share one budget and restore their positi
 			performance.now = () => window.originalNow() + elapsed;
 			addEventListener('scroll', () => { elapsed += 4000; }, { once: true });`);
 		const started = performance.now();
-		const warnings = await cdp.evaluate<string[]>(SWEEP_JS, true);
+		const warnings = await cdp.evaluate<string[]>(scrollSweepJs(), true);
 		expect(performance.now() - started).toBeLessThan(1000);
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0]).toContain("document not reached");
@@ -302,7 +341,7 @@ test("the document and inner scrollers share one budget and restore their positi
 			for (const panel of document.querySelectorAll('div[id]')) panel.firstElementChild.style.height = '200px';
 			document.getElementById('panel0').scrollTop = 40;
 		`);
-		expect(await cdp.evaluate<string[]>(SWEEP_JS, true)).toEqual([]);
+		expect(await cdp.evaluate<string[]>(scrollSweepJs(), true)).toEqual([]);
 		expect(await cdp.evaluate("document.getElementById('panel0').scrollTop")).toBe(40);
 		expect(await cdp.evaluate("scrollY")).toBe(0);
 	});

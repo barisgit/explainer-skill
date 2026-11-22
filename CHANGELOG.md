@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `check --viewport 1920x1080` adds a size to the default desktop and narrow checks, with its dimensions in the report and PNG names. Repeat it to check several sizes.
+- `check --budget 60` gives each scroll sweep and the one kit-control sweep more time and lifts the default 12-control cap on long pages.
+- `check --do click:<css>` now clicks SVG parts, so a step can pin a linked Mermaid or schematic part before capturing it.
+
 - Put a list and its drawing in `<div class="beside" data-width="full">` to reach both sides of the prose column without crowding the contents rail. The pinned diagram fits the window height where its labels stay readable, leaving spare width for the list. Phones still stack.
 
 - Schematic fences draw `0`/`gnd`/`GND` as a triangle and reserve `earth` (three bars) and `chassis` (hatched bar) as separate, linkable grounds. Rename a former `earth` or `chassis` net to keep it routed. Use `tvs`, `tvs2`, `fuse`, `ptc` or `varistor` for input protection. If a first net uses one of the new keywords, write the part kind explicitly.

@@ -128,19 +128,19 @@ export const DISCOVER_JS = `(() => {
 	return { hashes: [...byRoute.values()], templates: [...names].filter((n) => !n.includes("/") && !reached(n)) };
 })()`;
 
-const SWEEP_BUDGET_MS = 3000;
+export const SCROLL_BUDGET_MS = 3000;
 const SWEEP_TICK_MS = 80;
 /** Stable report identity; coverage details can differ across screens of the same overview or view. */
 export const SWEEP_WARNING = "scroll sweep incomplete";
 /**
  * Runs in the page: sweeps the document, then laid-out auto/scroll containers on both axes, following growing content and waiting
- * for scroll events and observers. The 3 s budget is shared by all targets per page load, never multiplied by inner scrollers.
+ * for scroll events and observers. The budget is shared by all targets per page load, never multiplied by inner scrollers.
  * Returns at most one incomplete-sweep warning per load; report.ts groups it per overview/view, even when coverage differs across screens.
  * Restores inner and ancestor positions (including non-target overflow:hidden boxes) and returns the document to the top,
  * with one bounded event-delivery tick after restoration.
  */
-export const SWEEP_JS = `(async () => {
-	const end = performance.now() + ${SWEEP_BUDGET_MS};
+export const scrollSweepJs = (budget = SCROLL_BUDGET_MS) => `(async () => {
+	const end = performance.now() + ${budget};
 	const tick = () => new Promise((done) => {
 		const timer = setTimeout(done, ${SWEEP_TICK_MS});
 		requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(timer); done(); }));
@@ -266,7 +266,7 @@ export const SWEEP_JS = `(async () => {
 	if (missed.some((t) => t.el === root)) parts.push("document not reached");
 	const panels = missed.filter((t) => t.el !== root);
 	if (panels.length) parts.push(panels.length + " inner scroller(s) not reached (" + panels.slice(0, 3).map((t) => name(t.el)).join(", ") + (panels.length > 3 ? ", …" : "") + ")");
-	const cutoff = performance.now() >= end ? "${SWEEP_BUDGET_MS / 1000} s budget exhausted; " : "";
+	const cutoff = performance.now() >= end ? "${budget / 1000} s budget exhausted; " : "";
 	return ["${SWEEP_WARNING}: " + cutoff + parts.join("; ") + ": scroll the rest by hand"];
 })()`;
 
