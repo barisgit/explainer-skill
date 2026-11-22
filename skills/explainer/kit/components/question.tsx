@@ -1,4 +1,4 @@
-/* Question: a question answered in the reply (choices or table rows), checked on the spot (given the right answer), or written out.
+/* Question: a question answered in the reply, checked on the spot (a choice or number), or written out.
    <Question name="first-fix" legend="Which fix would you try first?" options={{ second: "Second barista", steady: "Steadier orders" }} />
    <Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>
    <Question name="why" legend="Why does the queue grow at noon?">Orders arrive faster than one barista serves them.</Question>
@@ -7,7 +7,7 @@
      legend    the question. Leave it out under the heading that asks it: the group then takes that heading (the nearest h2 to h6
                before it in its own section) as its name and as the reply's label, and its note field is named by it too. pack fails
                if there is none, and for a Question drawn in the browser (inside a filled View's record, or one a client component
-               mounts after load), which needs its legend. A written answer keeps its legend
+               mounts after load), which needs its legend. Numeric and written answers always need a legend
      options   value: label pairs, or a list of labels that are their own values; each value once
      rows, cols  in place of options, a comparison whose rows are the choices, taken as Table takes them; each row's first
                column is its value (text or a number), and a click on a row chooses it (not on a control, link or fold in it, and not
@@ -22,6 +22,10 @@
      answer    the right value: a self-check. Choosing marks the right option and a wrong choice, says Right or Wrong (also
                to a screen reader) and opens the explanation written inside the Question; it is not part of the reply and
                brings no Reply button
+   A numeric answer takes no options: <Question name="voltage" legend="How much?" answer={7.83} tolerance={0.01} unit="V">Worked solution</Question>
+   Give a finite answer and an optional absolute tolerance (inclusive, zero by default). The optional unit is shown next to
+   the box; enter just the number, using the page's decimal separator and no digit grouping. Check answer or Enter marks the
+   attempt and opens the worked solution; a reload restores the number and its verdict silently, and Clear answers resets both.
    Without options or rows the reader writes the answer in a text box (its id is the name, written as above). What is written inside the Question
    is the model answer, behind a fold the reader opens when ready (kitLabels.showAnswer), which Expand all leaves shut; such a Question
    is a self-check too: kept, but not in the reply. With nothing inside, the written answer joins the reply.
@@ -36,9 +40,15 @@ import { NoteField } from "./parts/records-answer.tsx";
 import { compareTable, read, type TableColumn } from "./table.tsx";
 
 /** What every form of Question takes. */
-interface QuestionBase {
+interface QuestionPrompt {
 	name: string;
 	legend?: ComponentChildren;
+	/** A self-check's explanation, or a written answer's model answer. */
+	children?: ComponentChildren;
+}
+
+/** What choice and written Questions take. */
+interface QuestionBase extends QuestionPrompt {
 	multiple?: boolean;
 	checked?: string | string[];
 	/** The value (or values) the page recommends, marked on its choice. */
@@ -47,8 +57,8 @@ interface QuestionBase {
 	note?: boolean;
 	/** The right value, which makes the Question a self-check; `children` are its explanation. */
 	answer?: string;
-	/** A self-check's explanation, or a written answer's model answer. */
-	children?: ComponentChildren;
+	tolerance?: never;
+	unit?: never;
 }
 
 /** The choices: options, the rows of a table (each row one option, valued by its first column), or neither (a written answer). */
@@ -56,7 +66,27 @@ type QuestionChoices<Row> =
 	| { options?: Record<string, string> | string[]; rows?: undefined; cols?: undefined }
 	| { rows: readonly Row[]; cols: readonly TableColumn<Row>[]; options?: undefined };
 
-export type QuestionProps<Row = unknown> = QuestionBase & QuestionChoices<Row>;
+/** A numeric self-check takes a finite target and optional nonnegative absolute tolerance, in the stated unit. */
+interface NumericQuestion extends QuestionPrompt {
+	legend: ComponentChildren;
+	answer: number;
+	tolerance?: number;
+	unit?: string;
+	options?: never;
+	rows?: never;
+	cols?: never;
+	multiple?: never;
+	checked?: never;
+	recommended?: never;
+	note?: never;
+}
+
+type ChoiceQuestion<Row> = QuestionBase & QuestionChoices<Row>;
+
+export type QuestionProps<Row = unknown> = ChoiceQuestion<Row> | NumericQuestion;
+
+const isNumeric = <Row,>(props: QuestionProps<Row>): props is NumericQuestion =>
+	typeof props.answer === "number";
 
 /** The English texts the component adds, by kitLabels key; `kit labels` lists them with the kit scripts' own. */
 const LABELS = {
@@ -64,6 +94,8 @@ const LABELS = {
 	recommended: "Recommended",
 	right: "Right",
 	wrong: "Wrong",
+	checkAnswer: "Check answer",
+	enterNumber: "Enter a number.",
 	note: "Note",
 	notePlaceholder: "Note for the agent",
 };
@@ -151,7 +183,12 @@ function chosenProblem(
 }
 
 /** The problem with a Question over rows, if any: rows replace options, need their columns, and are never a self-check. */
-function rowsProblem<Row>({ options, rows, cols, answer }: QuestionProps<Row>): string | undefined {
+function rowsProblem<Row>({
+	options,
+	rows,
+	cols,
+	answer,
+}: ChoiceQuestion<Row>): string | undefined {
 	if (rows === undefined) {
 		return cols === undefined ? undefined : "has cols but no rows: give the rows the columns show";
 	}
@@ -167,22 +204,28 @@ function rowsProblem<Row>({ options, rows, cols, answer }: QuestionProps<Row>): 
 }
 
 /**
- * Renders a question in one of four forms. With `options`: `<fieldset data-reply="">` with its legend and a `.seg` of radios,
+ * Renders a reply question or self-check. With `options`: `<fieldset data-reply="">` with its legend and a `.seg` of radios,
  * or checkboxes when `multiple`, a recommended option's text carrying `data-recommended` (the mark the theme shows, outside the
  * label's text the reply sends), and with `note` a `data-note` field after them; with `answer` as well, a
  * `<fieldset class="self-check">` whose right option carries `data-right`, followed by a paragraph holding both words, each `data-verdict` (the
  * theme shows the one that applies), an empty `role="status"` that kit keep.js fills for the reader's own choice, and the
  * children in a `.explain` that the theme shows once an option is chosen. With `rows` and `cols`: the same fieldset around the
- * `table.compare` a Table draws of them, each row's name cell holding that row's option. Without either: a
+ * `table.compare` a Table draws of them, each row's name cell holding that row's option. With a numeric `answer`: a self-check
+ * with a text input and kit keep.js marking a checked value. Without choices or an `answer`: a
  * `<fieldset class="written">` with a textarea; with children it is also a self-check (`class="written self-check"`, kept
  * but out of the reply) and holds them in a `details.answer`, the fold kit views.js's Expand all skips; without, it is
  * `data-reply`. A repeated value, or props that do not fit the form, throw.
  */
 export function Question<Row>(props: QuestionProps<Row>) {
+	if (isNumeric(props)) {
+		return <Numeric {...props} />;
+	}
 	const { name, options, rows, cols } = props;
 	const problem =
-		rowsProblem(props) ??
-		(options === undefined && rows === undefined ? writtenProblem(props) : undefined);
+		props.tolerance !== undefined || props.unit !== undefined
+			? "tolerance and unit need a numeric answer"
+			: (rowsProblem(props) ??
+				(options === undefined && rows === undefined ? writtenProblem(props) : undefined));
 	if (problem) {
 		throw new Error(`<Question name="${name}"> ${problem}`);
 	}
@@ -190,6 +233,87 @@ export function Question<Row>(props: QuestionProps<Row>) {
 		return <RowsChoice {...props} rows={rows} cols={cols} />;
 	}
 	return options === undefined ? <Written {...props} /> : <Choice {...props} options={options} />;
+}
+
+/** Invalid combinations can still be passed from untyped MDX. */
+function numericProblem(props: NumericQuestion): string | undefined {
+	if (props.legend === undefined) {
+		return "has no legend: a numeric answer's box is named by it, so write legend";
+	}
+	if (props.options !== undefined || props.rows !== undefined || props.cols !== undefined) {
+		return "a numeric answer has no options or rows";
+	}
+	if (
+		props.multiple ||
+		props.checked !== undefined ||
+		props.recommended !== undefined ||
+		props.note
+	) {
+		return "a numeric self-check starts unanswered and is not in the reply: leave out multiple, checked, recommended and note";
+	}
+	if (!Number.isFinite(props.answer)) {
+		return "answer must be finite";
+	}
+	if (props.tolerance !== undefined && (!Number.isFinite(props.tolerance) || props.tolerance < 0)) {
+		return "tolerance must be finite and nonnegative";
+	}
+	if (props.unit !== undefined && typeof props.unit !== "string") {
+		return "unit must be text";
+	}
+	return undefined;
+}
+
+/** Numeric text keeps its original spelling; keep.js checks it using the page language. */
+function Numeric(props: NumericQuestion) {
+	const { name, legend, answer, tolerance = 0, unit, children } = props;
+	const problem = numericProblem(props);
+	if (problem) {
+		throw new Error(`<Question name="${name}"> ${problem}`);
+	}
+	const id = idPart(name);
+	const unitId = unit ? `${id}.unit` : undefined;
+	const [min, max] = numericBounds(answer, tolerance);
+	return (
+		<fieldset class="self-check numeric" data-numeric-result="">
+			<legend>
+				<label for={id}>{legend}</label>
+			</legend>
+			<div class="numeric-entry">
+				<input
+					id={id}
+					type="text"
+					inputMode="decimal"
+					aria-describedby={unitId}
+					data-number-min={min}
+					data-number-max={max}
+				/>
+				{unitId && <span id={unitId}>{unit}</span>}
+				<button class="btn" type="button">
+					{kitText("checkAnswer")}
+				</button>
+			</div>
+			<Verdict numeric />
+			{children !== undefined && <div class="explain">{children}</div>}
+		</fieldset>
+	);
+}
+
+/** Represent the decimal spelling of a finite JS number as an integer times a power of ten. */
+function decimal(value: number) {
+	const [mantissa = "", exponent = "0"] = String(value).split("e");
+	const [whole = "", fraction = ""] = mantissa.split(".");
+	return { digits: BigInt(whole + fraction), power: Number(exponent) - fraction.length };
+}
+
+/** Round each decimal endpoint once, so e.g. 0.3 + 0.6 includes a reader's 0.9 without widening the tolerance. */
+function numericBounds(answer: number, tolerance: number): [number, number] {
+	const target = decimal(answer);
+	const delta = decimal(tolerance);
+	const power = Math.min(target.power, delta.power);
+	const atPower = (n: ReturnType<typeof decimal>) => n.digits * 10n ** BigInt(n.power - power);
+	const center = atPower(target);
+	const radius = atPower(delta);
+	return [Number(`${center - radius}e${power}`), Number(`${center + radius}e${power}`)];
 }
 
 /**
@@ -385,12 +509,13 @@ function RowsChoice<Row>(
 }
 
 /** A self-check's verdict: both words, of which the theme shows the one that applies, and the region keep.js speaks it in. */
-function Verdict() {
+function Verdict({ numeric }: { numeric?: boolean } = {}) {
 	return (
 		<>
 			<p>
 				<span data-verdict="right">{kitText("right")}</span>
 				<span data-verdict="wrong">{kitText("wrong")}</span>
+				{numeric && <span data-verdict="invalid">{kitText("enterNumber")}</span>}
 			</p>
 			<span role="status" />
 		</>

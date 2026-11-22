@@ -481,7 +481,7 @@ describe("kit scripts", () => {
 		expect(kept).toBe(true);
 	}, 30_000);
 
-	test("a self-check a client component renders later, chosen or written beside a model answer, brings keep.js and not reply.js", async () => {
+	test("a choice, numeric or written self-check a client component renders later brings keep.js and not reply.js", async () => {
 		const scripts = async (name: string, jsx: string) => {
 			dir.write(`${name}.tsx`, revealing("Question", jsx));
 			const page = `import { Reveal } from "./${name}.tsx";\n\n# Check\n\n<Reveal />\n`;
@@ -489,6 +489,9 @@ describe("kit scripts", () => {
 		};
 		const unit = `<Question name="unit" legend="Which one is energy?" options={["kW", "kWh"]} answer="kWh">A kWh is a kW for an hour.</Question>`;
 		expect(await scripts("check-later", unit)).toEqual(["keep"]);
+		expect(
+			await scripts("number-later", `<Question name="voltage" legend="How much?" answer={7.83} />`),
+		).toEqual(["keep"]);
 		const why = `<Question name="why" legend="Why?"><p>Because.</p></Question>`;
 		expect(await scripts("study-later", why)).toEqual(["keep"]);
 		// With nothing inside, a written Question joins the reply.

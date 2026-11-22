@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { packMdx, pageContract, runCli, runPacked, scratch } from "./support.ts";
+import { inPage, packMdx, pageContract, runCli, runPacked, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -30,12 +30,47 @@ $$
 `;
 
 describe("TeX math in an .mdx page", () => {
+	test("adjacent punctuation moves with inline math, without swallowing spaces or the next word", async () => {
+		const { output, result } = await packMdx(
+			dir,
+			"punctuation",
+			"# Punctuation\n\nThe ratio is ($x+y$), then $z$ ; not right next to it.\n",
+		);
+		expect(result.code).toBe(0);
+		const seen = await inPage(output, (cdp) =>
+			cdp.evaluate(`(() => {
+				const p = document.querySelector("p");
+				const math = p.querySelector("math");
+				const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+				let text;
+				while ((text = walker.nextNode()) && !text.data.startsWith("),")) {}
+				const rect = (start, end) => {
+					const range = document.createRange();
+					range.setStart(text, start); range.setEnd(text, end);
+					return range.getBoundingClientRect();
+				};
+				p.style.width = math.getBoundingClientRect().width + rect(0, 2).width / 2 + "px";
+				const formula = math.getBoundingClientRect();
+				return [
+					rect(0, 2).top < formula.bottom,
+					p.textContent,
+					p.querySelectorAll("math")[1].nextSibling.textContent,
+				];
+			})()`),
+		);
+		expect(seen).toEqual([
+			true,
+			"The ratio is (x+y), then z ; not right next to it.",
+			" ; not right next to it.",
+		]);
+	}, 30_000);
+
 	test("renders to MathML in pack: no script ships, and only a page with math carries the math stylesheet", async () => {
 		const math = await packMdx(dir, "math", PAGE);
 		expect(math.result.stderr).toBe("");
 		const html = readFileSync(math.output, "utf8");
 		expect(html).not.toContain("<script");
-		expect(html).toMatch(/, <math><mrow><msub><mi>V<\/mi>/);
+		expect(html).toContain(', <span class="math-tail"><math><mrow><msub><mi>V</mi>');
 		expect(html).toContain('<div class="math"><math display="block" class="tml-display"');
 		expect(html).toContain("<mtable");
 		expect(html).toContain("font-family: 'Temml'");

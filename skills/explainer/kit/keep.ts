@@ -7,7 +7,7 @@
    value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept. A self-check Question says Right or Wrong to a screen reader when the reader chooses (not on a restore).
+   <details> are not kept. A self-check Question speaks its verdict when the reader chooses or checks a number (not on a restore).
    Once a Question's answer is saved, a Clear answers button at the end of the page puts the answers back
    to their defaults, again with events, and drops their saved copy; a first press only asks, a second within 4 s clears. Other
    controls stay kept without a button. With reply (kit reply) the reader's notes are kept too, and on a page that asks for
@@ -162,7 +162,7 @@
 		});
 	}
 
-	/** True for a control inside a self-check Question (a choice, or a written answer with a model answer). */
+	/** True for a control inside a self-check Question (choice, number, or written answer with a model answer). */
 	const isAnswer = (c: Control) => c.closest(".self-check") !== null;
 	const moved = (u: Unit) => !same(readControl(u.el), u.initial);
 	/** Answered: moved off the default, or chosen by the reader even where that equals it. */
@@ -466,26 +466,105 @@
 	 * Says a self-check's verdict for the reader's own choice: its status region gets the word the theme now shows, emptied first
 	 * so a second wrong choice is said again. A restored or cleared choice empties it instead, so a reload stays silent.
 	 */
-	function sayVerdict(e: Event) {
-		const input = e.target;
-		// Only the Question's own choices: a control in its explanation leaves the verdict alone.
-		const own =
-			input instanceof HTMLInputElement && input.matches(".self-check > .seg > label > input");
-		const check = own ? input.closest(".self-check") : null;
-		const status = check?.querySelector(":scope > [role=status]");
-		if (!(input instanceof HTMLInputElement && status)) {
+	function sayVerdict(check: Element, verdict: string) {
+		const status = check.querySelector(":scope > [role=status]");
+		if (!status) {
 			return;
 		}
 		status.textContent = "";
-		const verdict = input.checked && input.hasAttribute("data-right") ? "right" : "wrong";
-		const word = check?.querySelector(`:scope > p > [data-verdict=${verdict}]`)?.textContent;
-		if (!applying && input.checked && word) {
+		const word =
+			!applying &&
+			verdict &&
+			check.querySelector(`:scope > p > [data-verdict=${verdict}]`)?.textContent;
+		if (word) {
 			requestAnimationFrame(() => {
-				status.textContent = word;
+				const current = check.getAttribute("data-numeric-result");
+				if (current === null || current === verdict) {
+					status.textContent = word;
+				}
 			});
 		}
 	}
-	document.addEventListener("change", sayVerdict);
+
+	function radioVerdict(e: Event) {
+		const input = e.target;
+		// Only the Question's own choices: a control in its explanation leaves the verdict alone.
+		if (
+			!(input instanceof HTMLInputElement && input.matches(".self-check > .seg > label > input"))
+		) {
+			return;
+		}
+		const check = input.closest(".self-check");
+		const verdict = input.hasAttribute("data-right") ? "right" : "wrong";
+		if (check) {
+			sayVerdict(check, input.checked ? verdict : "");
+		}
+	}
+	document.addEventListener("change", radioVerdict);
+
+	const numberField = ".numeric > .numeric-entry > input[data-number-min]";
+
+	/** The page chooses the decimal mark independently of the reader's browser settings. */
+	function decimalMark(lang: string) {
+		try {
+			const parts = new Intl.NumberFormat(lang).formatToParts(0.5);
+			return parts.find(({ type }) => type === "decimal")?.value ?? ".";
+		} catch {
+			return ".";
+		}
+	}
+
+	/** Empty or malformed input does not reveal the solution. */
+	function grade(input: HTMLInputElement) {
+		const text = input.value.trim();
+		if (!text) {
+			return "";
+		}
+		const mark = decimalMark(input.closest("[lang]")?.getAttribute("lang") || "en");
+		const plain = mark === "." || !text.includes(".") ? text.replace(mark, ".") : "";
+		const value = Number(plain);
+		if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(plain) || !Number.isFinite(value)) {
+			return "invalid";
+		}
+		return value >= Number(input.dataset.numberMin) && value <= Number(input.dataset.numberMax)
+			? "right"
+			: "wrong";
+	}
+
+	function numericVerdict(input: HTMLInputElement, verdict = grade(input)) {
+		const question = input.closest<HTMLElement>(".numeric");
+		if (question) {
+			question.dataset.numericResult = verdict;
+			sayVerdict(question, verdict);
+		}
+	}
+
+	document.addEventListener("click", (e) => {
+		const button =
+			e.target instanceof Element ? e.target.closest(".numeric > .numeric-entry > button") : null;
+		const input = button?.parentElement?.querySelector<HTMLInputElement>("input");
+		if (input) {
+			numericVerdict(input);
+		}
+	});
+	function numericInput(e: Event) {
+		const input = e.target;
+		if (!(input instanceof HTMLInputElement && input.matches(numberField))) {
+			return;
+		}
+		if (e.type === "input") {
+			numericVerdict(input, "");
+		} else if (e.type === "change" && applying) {
+			// Restoring and clearing send change; an ordinary blur is not a check.
+			numericVerdict(input);
+		} else if (e instanceof KeyboardEvent && e.key === "Enter" && !e.isComposing) {
+			e.preventDefault();
+			numericVerdict(input);
+		}
+	}
+	for (const type of ["keydown", "input", "change"]) {
+		document.addEventListener(type, numericInput);
+	}
 
 	// Saving waits a tick so a click handler that sets a control by script is done first; leaving the page saves what is left.
 	const later = () => setTimeout(() => onChange());

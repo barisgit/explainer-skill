@@ -1,6 +1,6 @@
 /* math: TeX formulas: $...$ in a sentence, $$ on lines of their own for a display equation. pack renders them to MathML: no script ships, they take the text colour in light and dark, and only a page with math carries this file.
-   An inline formula never breaks across lines: keep it short, and give a long one its own $$ block, which scrolls sideways on a
-   phone when it is wider than the column. To fit a long chain on a phone instead, break it into lines aligned at the =:
+   An inline formula stays with closing punctuation in the same text (not across a link or emphasis boundary). Keep it short;
+   a long one gets its own $$ block, which scrolls sideways on a phone. To fit a long chain instead, align its lines at the =:
      $$
      \begin{aligned} P &= (V_{in} - V_{out})\,I \\ &= 9\,\text{V} \cdot 0.15\,\text{A} = 1.35\,\text{W} \end{aligned}
      $$
@@ -13,9 +13,12 @@
    On a phone the sheet scrolls sideways when a formula is wider than the screen; inside a table write | as \vert. */
 
 /* An inline formula is one unit in the line. Temml's sheet makes math a wrapping flex box for its own line breaks, which pack turns off. */
+.math-tail,
+math:not([display="block"]) {
+	white-space: nowrap;
+}
 math:not([display="block"]) {
 	flex-wrap: nowrap;
-	white-space: nowrap;
 }
 
 /* STIX Two and Cambria have a smaller x-height than Geist; this sets formulas level with the words around them. */

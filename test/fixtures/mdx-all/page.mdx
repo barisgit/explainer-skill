@@ -131,6 +131,14 @@ Each reading ends up in the <span data-ref="logged">meter log</span>.
 
 </section>
 
+## How much energy does the charger deliver in half an hour at 2.4 kW?
+
+<Question name="energy" legend="Energy delivered" answer={1.2} tolerance={0.01} unit="kWh">
+
+Multiply 2.4 kW by 0.5 h to get **1.2 kWh**.
+
+</Question>
+
 {SIZES.map((s) => (
 	<View name="size" param={s.id} back="Battery options">
 		<h1>{s.name}: {euro(s.price)}</h1>

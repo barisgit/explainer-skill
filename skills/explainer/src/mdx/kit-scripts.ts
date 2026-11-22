@@ -213,8 +213,8 @@ function usesOf(
 }
 
 /**
- * The kit scripts the Questions in a client scan need. A self-check, called with no spread and either options and an answer
- * written as a string, or no options and children written as one string, list or element, needs keep.js alone; any other use
+ * The kit scripts the Questions in a client scan need. A self-check called with no spread and a literal answer, or
+ * no options and literal children, needs keep.js alone; any other use
  * of Question (other props, or the component passed on) needs what Question's own code does. A guess on the safe side brings
  * reply.js, whose bar and Clear wait until the page has a reply question or a note (keep.js clears answers until then).
  */
@@ -236,6 +236,8 @@ const OBJECT_ARGUMENT = /\s*,\s*\{/y;
 const ELEMENT_CALL = /\/\* @__PURE__ \*\/\s*[\w$.]+\(/y;
 /** What follows a property's value: the next property or the end of the object. */
 const VALUE_END = /\s*[,}]/y;
+/** A numeric answer as the bundler writes a number literal. */
+const NUMBER_ANSWER = /-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*[,}]/iy;
 
 /** The index of the bracket that closes the one opening at `code[start]`, strings and template literals inside skipped. */
 function closingBracket(code: string, start: number): number {
@@ -297,9 +299,14 @@ function selfCheckCall(code: string, start: number, end: number): boolean {
 		return false;
 	}
 	const answer = props.get("answer");
-	return props.has("options")
-		? answer !== undefined && /["'`]/.test(code[answer] ?? "") && literalAt(code, answer)
-		: literalAt(code, props.get("children"));
+	if (props.has("options")) {
+		return answer !== undefined && /["'`]/.test(code[answer] ?? "") && literalAt(code, answer);
+	}
+	if (answer === undefined) {
+		return literalAt(code, props.get("children"));
+	}
+	NUMBER_ANSWER.lastIndex = answer;
+	return NUMBER_ANSWER.test(code);
 }
 
 /**

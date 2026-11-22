@@ -124,6 +124,24 @@ function dollarAmounts(markdown: string, node: Element): string | undefined {
 		: undefined;
 }
 
+/** Keep closing punctuation in the same line box as the atomic formula, without changing the copied text. */
+function withPunctuation(
+	math: MdxJsxTextElementHast,
+	next: RootContent | undefined,
+): ElementContent {
+	const tail = next?.type === "text" ? /^[,.…;:!?\p{Pe}\p{Pf}]+/u.exec(next.value)?.[0] : undefined;
+	if (next?.type !== "text" || !tail) {
+		return math;
+	}
+	next.value = next.value.slice(tail.length);
+	return {
+		type: "element",
+		tagName: "span",
+		properties: { className: ["math-tail"] },
+		children: [math, { type: "text", value: tail }],
+	};
+}
+
 /** The rehype step for one page file (`at` names a node's file, line and column): every math code element becomes MathML. */
 export function mathToMathml(at: Where) {
 	const where = (node: Element) => at(node.position?.start, true);
@@ -158,7 +176,8 @@ export function mathToMathml(at: Where) {
 		parent.children.forEach((child, i) => {
 			const math = rendered(child, markdown);
 			if (math) {
-				parent.children[i] = math;
+				parent.children[i] =
+					math.type === "mdxJsxTextElement" ? withPunctuation(math, parent.children[i + 1]) : math;
 			} else {
 				visit(child, markdown);
 			}
