@@ -28,5 +28,5 @@ pack fails on a part with no place, an unknown part or pin, parts on top of each
 
 Linking: each part carries data-ref=NAME, each wire and junction the refs of its net and the parts it joins, each ground the ref of its net:
   <span data-ref="R_C">the collector resistor</span>   lights the part and the wires touching it; <span data-ref="vcc">the supply rail</span> lights the net (kit link).
-For a list and its schematic, put the list first and the drawing second in a .beside block. Give each item the space-separated data-ref names of its parts. Stack stages vertically for the narrow drawing column so it fits without sideways scrolling; keep a wide comparison full width.
+Put a list and its schematic in <div class="beside" data-width="full">, list first. Give each item the space-separated data-ref names of its parts. If the pinned diagram still scrolls sideways, try stacking stages vertically; keep a wide comparison full width above the list.
 Size: the drawing fills the column up to part names at the label size (13 px), larger only where that keeps the smallest text at 10 px. Phones: it shrinks no further than 10 px text and then scrolls sideways; print fits it to the paper. To resize one, set --schematic-max (widest) or --schematic-min (narrowest before it scrolls) on its svg.`;

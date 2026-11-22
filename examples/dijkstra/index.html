@@ -387,14 +387,39 @@ h3,
 		grid-template-columns: minmax(min(100%, 20rem), 2fr) minmax(0, 3fr);
 		margin-inline-end: calc(-1 * var(--wide-reach, (min(44rem, 50vw - var(--gutter)) - 50%)));
 	}
+	.beside[data-width="full"] {
+		margin-inline: calc(-1 * var(--full-reach, (50vw - var(--gutter) - 50%)));
+	}
+	/* Give the drawing only the width it can use at the pinned height. Keep 20rem for the list; if the drawing
+	   cannot fit either axis at its readable minimum, let it scroll instead of shrinking the labels further. */
+	.beside[data-width="full"] > :first-child:is(ul, ol) {
+		max-inline-size: none;
+	}
+	.beside[data-width="full"]:has(> :nth-child(2):is(.mermaid, .schematic)) {
+		grid-template-columns: minmax(20rem, 1fr) minmax(0, max-content);
+	}
+	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) {
+		padding-block: 0;
+	}
+	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) > svg:not([data-phone]) {
+		display: block;
+		inline-size: clamp(
+			var(--schematic-min, var(--mermaid-min)),
+			var(--pin-height) *
+			var(--diagram-ratio),
+			var(--schematic-max, var(--mermaid-max))
+		);
+		max-inline-size: 100%;
+	}
 	.beside :is(.mermaid, .schematic) {
 		text-align: start;
 	}
 	.beside > :nth-child(2) {
 		--pin-top: 1.5rem;
+		--pin-height: calc(100vh - var(--pin-top) - 1.5rem);
 		position: sticky;
 		inset-block-start: var(--pin-top);
-		max-block-size: calc(100vh - var(--pin-top) - 1.5rem);
+		max-block-size: var(--pin-height);
 		overflow: auto;
 	}
 }

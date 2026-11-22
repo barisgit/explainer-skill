@@ -388,14 +388,39 @@ h3,
 		grid-template-columns: minmax(min(100%, 20rem), 2fr) minmax(0, 3fr);
 		margin-inline-end: calc(-1 * var(--wide-reach, (min(44rem, 50vw - var(--gutter)) - 50%)));
 	}
+	.beside[data-width="full"] {
+		margin-inline: calc(-1 * var(--full-reach, (50vw - var(--gutter) - 50%)));
+	}
+	/* Give the drawing only the width it can use at the pinned height. Keep 20rem for the list; if the drawing
+	   cannot fit either axis at its readable minimum, let it scroll instead of shrinking the labels further. */
+	.beside[data-width="full"] > :first-child:is(ul, ol) {
+		max-inline-size: none;
+	}
+	.beside[data-width="full"]:has(> :nth-child(2):is(.mermaid, .schematic)) {
+		grid-template-columns: minmax(20rem, 1fr) minmax(0, max-content);
+	}
+	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) {
+		padding-block: 0;
+	}
+	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) > svg:not([data-phone]) {
+		display: block;
+		inline-size: clamp(
+			var(--schematic-min, var(--mermaid-min)),
+			var(--pin-height) *
+			var(--diagram-ratio),
+			var(--schematic-max, var(--mermaid-max))
+		);
+		max-inline-size: 100%;
+	}
 	.beside :is(.mermaid, .schematic) {
 		text-align: start;
 	}
 	.beside > :nth-child(2) {
 		--pin-top: 1.5rem;
+		--pin-height: calc(100vh - var(--pin-top) - 1.5rem);
 		position: sticky;
 		inset-block-start: var(--pin-top);
-		max-block-size: calc(100vh - var(--pin-top) - 1.5rem);
+		max-block-size: var(--pin-height);
 		overflow: auto;
 	}
 }
@@ -3191,7 +3216,7 @@ pre [data-ref].is-lit {
 </style>
 </head>
 <body>
-<main class="page"><div data-overview><header class="masthead"><h1>Shipping <span class="cased">ECharts</span> compressed takes <em>513 KB</em> off every chart page and costs 31 ms.</h1><p class="lede">Commit 7d4f018 makes pack inline <code>kit/echarts.js</code> as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.</p></header><!--island:0--><div class="chart plot" style="block-size:clamp(10rem, 16vw, 14rem);"><ul class="plot-legend"></ul><div class="plot-area" role="img" aria-label="ECharts in a chart page: 931 KB plain, 418 KB compressed"><div class="chart-drawn" aria-hidden="true"><svg viewBox="0 0 1054 216"><text class="cat" x="153" y="52" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="69" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="153" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="170" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="212"/><rect class="bar" style="--c:var(--c1)" x="162" y="38" width="815.6" height="45.1"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="139" width="366.2" height="45.1"><title>Compressed: 418</title></rect><text class="value" x="983.6" y="60.5" dy="0.35em" text-anchor="start">931 KB</text><text class="value" x="534.2" y="161.5" dy="0.35em" text-anchor="start">418 KB</text></svg><svg viewBox="0 0 527 216" data-fit="half"><text class="cat" x="153" y="52" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="69" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="153" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="170" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="212"/><rect class="bar" style="--c:var(--c1)" x="162" y="38" width="324.9" height="45.1"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="139" width="145.9" height="45.1"><title>Compressed: 418</title></rect><text class="value inside" x="480.9" y="60.5" dy="0.35em" text-anchor="end" style="--c:var(--c1)">931 KB</text><text class="value" x="313.9" y="161.5" dy="0.35em" text-anchor="start">418 KB</text></svg><svg viewBox="0 0 356 152" data-fit="phone"><text class="cat" x="153" y="36" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="53" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="105" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="122" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="148"/><rect class="bar" style="--c:var(--c1)" x="162" y="29.1" width="165.7" height="30.8"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="98.1" width="74.4" height="30.8"><title>Compressed: 418</title></rect><text class="value inside" x="321.7" y="44.5" dy="0.35em" text-anchor="end" style="--c:var(--c1)">931 KB</text><text class="value" x="242.4" y="113.5" dy="0.35em" text-anchor="start">418 KB</text></svg></div></div></div><!--/island--><section><h2>Four files change, and the charts wait for <span class="cased">ECharts</span></h2><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090.761 98.35" width="100%" style="--mermaid-max: 1090px; --mermaid-min: 840px">
+<main class="page"><div data-overview><header class="masthead"><h1>Shipping <span class="cased">ECharts</span> compressed takes <em>513 KB</em> off every chart page and costs 31 ms.</h1><p class="lede">Commit 7d4f018 makes pack inline <code>kit/echarts.js</code> as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.</p></header><!--island:0--><div class="chart plot" style="block-size:clamp(10rem, 16vw, 14rem);"><ul class="plot-legend"></ul><div class="plot-area" role="img" aria-label="ECharts in a chart page: 931 KB plain, 418 KB compressed"><div class="chart-drawn" aria-hidden="true"><svg viewBox="0 0 1054 216"><text class="cat" x="153" y="52" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="69" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="153" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="170" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="212"/><rect class="bar" style="--c:var(--c1)" x="162" y="38" width="815.6" height="45.1"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="139" width="366.2" height="45.1"><title>Compressed: 418</title></rect><text class="value" x="983.6" y="60.5" dy="0.35em" text-anchor="start">931 KB</text><text class="value" x="534.2" y="161.5" dy="0.35em" text-anchor="start">418 KB</text></svg><svg viewBox="0 0 527 216" data-fit="half"><text class="cat" x="153" y="52" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="69" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="153" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="170" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="212"/><rect class="bar" style="--c:var(--c1)" x="162" y="38" width="324.9" height="45.1"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="139" width="145.9" height="45.1"><title>Compressed: 418</title></rect><text class="value inside" x="480.9" y="60.5" dy="0.35em" text-anchor="end" style="--c:var(--c1)">931 KB</text><text class="value" x="313.9" y="161.5" dy="0.35em" text-anchor="start">418 KB</text></svg><svg viewBox="0 0 356 152" data-fit="phone"><text class="cat" x="153" y="36" dy="0.35em" text-anchor="end">Plain</text><text class="note" x="153" y="53" dy="0.35em" text-anchor="end">kit/echarts.js</text><text class="cat" x="153" y="105" dy="0.35em" text-anchor="end">Compressed</text><text class="note" x="153" y="122" dy="0.35em" text-anchor="end">deflate-raw in base64</text><line class="axis" x1="162" x2="162" y1="10" y2="148"/><rect class="bar" style="--c:var(--c1)" x="162" y="29.1" width="165.7" height="30.8"><title>Plain: 931</title></rect><rect class="bar" style="--c:var(--accent)" x="162" y="98.1" width="74.4" height="30.8"><title>Compressed: 418</title></rect><text class="value inside" x="321.7" y="44.5" dy="0.35em" text-anchor="end" style="--c:var(--c1)">931 KB</text><text class="value" x="242.4" y="113.5" dy="0.35em" text-anchor="start">418 KB</text></svg></div></div></div><!--/island--><section><h2>Four files change, and the charts wait for <span class="cased">ECharts</span></h2><div class="mermaid"><svg id="mm0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090.761 98.35" width="100%" style="--mermaid-max: 1090px; --mermaid-min: 840px; --diagram-ratio: 11.090604982206406">
 <defs>
   <marker id="mm0-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
@@ -3256,7 +3281,7 @@ pre [data-ref].is-lit {
   </g>
   <text x="1016.4264999999999" y="38.900000000000006" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">charts mount</text>
 </g>
-</svg><svg data-phone data-print id="mm0-phone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 189.8385 609.9" width="100%" style="--mermaid-max: 189px; --mermaid-min: 147px">
+</svg><svg data-phone data-print id="mm0-phone" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 189.8385 609.9" width="100%" style="--mermaid-max: 189px; --mermaid-min: 147px; --diagram-ratio: 0.31126168224299067">
 <defs>
   <marker id="mm0-phone-arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
     <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />

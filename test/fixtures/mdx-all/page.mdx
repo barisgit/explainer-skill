@@ -58,16 +58,13 @@ Illustrative numbers, not a real quote
 
 <Explore controls={[{ id: "hour", label: "Time of day", choice: { morning: "Morning", evening: "Evening", night: "Night" } }]} frame={supplier} />
 
-<div class="beside">
-<div>
+<div class="beside" data-width="full">
 
 - <span data-ref="panels">1</span> The <span data-ref="panels">panels</span> stay as they are.
 - <span data-ref="inverter">2</span> The <span data-ref="inverter">hybrid inverter</span> replaces the string inverter and decides where each kWh goes.
 - <span data-ref="battery">3</span> The <span data-ref="battery">battery</span> takes the surplus and gives it back in the evening.
 - <span data-ref="grid">4</span> The <span data-ref="grid">grid</span> covers what is left, through a new bidirectional meter.
 
-</div>
-<figure class="fig">
 
 ```mermaid tag:panels=1 tag:inverter=2 tag:battery=3 tag:grid=4
 flowchart TD
@@ -78,7 +75,6 @@ flowchart TD
 	grid["Grid"] -->|"shortfall"| house
 ```
 
-</figure>
 </div>
 
 The status lamp on the inverter is wired like this:

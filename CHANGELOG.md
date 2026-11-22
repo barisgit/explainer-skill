@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Put a list and its drawing in `<div class="beside" data-width="full">` to reach both sides of the prose column without crowding the contents rail. The pinned diagram fits the window height where its labels stay readable, leaving spare width for the list. Phones still stack.
+
 - Schematic fences draw `0`/`gnd`/`GND` as a triangle and reserve `earth` (three bars) and `chassis` (hatched bar) as separate, linkable grounds. Rename a former `earth` or `chassis` net to keep it routed. Use `tvs`, `tvs2`, `fuse`, `ptc` or `varistor` for input protection. If a first net uses one of the new keywords, write the part kind explicitly.
 
 - `pack` keeps adjacent closing punctuation with an inline formula so it cannot start the next line alone.

@@ -256,9 +256,9 @@ function readableWidth(svg: string): number {
  * keeps its smallest text readable (never more than the most), below which its block scrolls sideways. Custom properties
  * rather than an inline max-width, so one page rule on `.mermaid > svg` can still size it.
  */
-function sizeStyle(svg: string): string {
-	const most = Math.floor(drawnWidth(svg));
-	return `--mermaid-max: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px`;
+function sizeStyle(svg: string, width: number, height: number): string {
+	const most = Math.floor(width);
+	return `--mermaid-max: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px; --diagram-ratio: ${width / height}`;
 }
 
 /**
@@ -276,8 +276,9 @@ function inline(svg: string, id: string): string {
 				(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
 			),
 	}).replace(
-		/^<svg ([^>]*?)width="[\d.]+" height="[\d.]+" style="[^"]*"/,
-		(_, attrs: string) => `<svg id="${id}" ${attrs}width="100%" style="${sizeStyle(svg)}"`,
+		/^<svg ([^>]*?)width="([\d.]+)" height="([\d.]+)" style="[^"]*"/,
+		(_, attrs: string, width: string, height: string) =>
+			`<svg id="${id}" ${attrs}width="100%" style="${sizeStyle(svg, Number(width), Number(height))}"`,
 	);
 }
 

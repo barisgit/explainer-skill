@@ -159,7 +159,7 @@ export function renderSvg(
 	const byPart = new Map(labels.map((l) => [l.part, l]));
 	return [
 		`<svg viewBox="${num(box.x0)} ${num(box.y0)} ${num(w)} ${num(h)}" width="100%"`,
-		` style="--schematic-max: ${most}px; --schematic-min: ${least}px" fill="currentColor" role="img" aria-label="${escapeHtml(title)}">`,
+		` style="--schematic-max: ${most}px; --schematic-min: ${least}px; --diagram-ratio: ${w / h}" fill="currentColor" role="img" aria-label="${escapeHtml(title)}">`,
 		`<g fill="none" stroke="currentColor" stroke-width="${STROKE}" stroke-linejoin="round">${wiresSvg(scene, dots)}</g>`,
 		scene.parts.map((p) => partSvg(p, byPart.get(p.id))).join(""),
 		"</svg>",
