@@ -1,5 +1,6 @@
 import type { Program } from "estree";
 import type { Element, ElementContent, Root as HastRoot, RootContent } from "hast";
+import type { Nodes as MdastNodes, Root as MdastRoot } from "mdast";
 import type { MdxJsxAttribute, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { temml } from "../../vendor/math.js";
 import { PackError } from "../pack-error.ts";
@@ -8,7 +9,7 @@ import type { Where } from "./origins.ts";
 /**
  * TeX math in an .mdx page, rendered once in pack to MathML, which the browser lays out with no script: remark-math reads
  * `$...$` (inline) and `$$` on lines of their own (display) into `code.math-inline` and `pre > code.math-display`; this
- * rehype step replaces them. Inline math is a `<math>` in the text; display math is a `<math display="block">` inside a
+ * rehype step replaces them. A paragraph that is one `$$...$$` on a single line is made display math before (displayParagraphs). Inline math is a `<math>` in the text; display math is a `<math display="block">` inside a
  * `div.math`, the box that scrolls sideways when the equation is wider than the column. kit:math.css styles both; pack adds
  * it to a page that holds math (MATH_ELEMENT).
  */
@@ -142,6 +143,14 @@ function withPunctuation(
 	};
 }
 
+/** A display equation's box: the `div.math` that scrolls sideways when the equation is wider than the column. */
+const displayBox = (tex: string, where: string): Element => ({
+	type: "element",
+	tagName: "div",
+	properties: { className: ["math"] },
+	children: [mathElement(tex, true, where)],
+});
+
 /** The rehype step for one page file (`at` names a node's file, line and column): every math code element becomes MathML. */
 export function mathToMathml(at: Where) {
 	const where = (node: Element) => at(node.position?.start, true);
@@ -152,12 +161,7 @@ export function mathToMathml(at: Where) {
 		}
 		const [code] = node.children;
 		if (node.tagName === "pre" && isMath(code, "display")) {
-			return {
-				type: "element",
-				tagName: "div",
-				properties: { className: ["math"] },
-				children: [mathElement(source(code), true, where(node))],
-			};
+			return displayBox(source(code), where(node));
 		}
 		if (!isMath(node, "inline")) {
 			return undefined;
@@ -184,4 +188,56 @@ export function mathToMathml(at: Where) {
 		});
 	};
 	return () => (tree: HastRoot, page: { value: unknown }) => visit(tree, String(page.value));
+}
+
+/**
+ * Makes each paragraph that holds one `$$...$$` and nothing else a display equation, in the Markdown tree before the page is laid
+ * out, so it ends a masthead and fills a list item as an equation on lines of its own does. remark-math reads `$$` as display
+ * math only on lines of its own and takes one written on a single line for inline math, which set alone would be a small
+ * formula at the start of the line. `markdown` is the text the tree's offsets point into.
+ */
+export function displayParagraphs(tree: MdastRoot, markdown: string) {
+	const visit = (node: MdastNodes) => {
+		if (!("children" in node)) {
+			return;
+		}
+		node.children.forEach((child, i) => {
+			const display = child.type === "paragraph" ? loneMath(child.children, markdown) : undefined;
+			if (display) {
+				node.children[i] = display;
+			} else {
+				visit(child);
+			}
+		});
+	};
+	visit(tree);
+}
+
+/** The display math node for a paragraph's content that is one `$$...$$` (spaces around it aside), or undefined. */
+function loneMath(content: MdastNodes[], markdown: string) {
+	const shown = content.filter((child) => child.type !== "text" || child.value.trim());
+	const [only] = shown;
+	const start = only?.position?.start.offset;
+	if (
+		shown.length !== 1 ||
+		only?.type !== "inlineMath" ||
+		start === undefined ||
+		!markdown.startsWith("$$", start)
+	) {
+		return undefined;
+	}
+	// The hast remark-math's own display node carries, which mathToMathml renders.
+	const code: Element = {
+		type: "element",
+		tagName: "code",
+		properties: { className: ["language-math", "math-display"] },
+		children: [{ type: "text", value: only.value }],
+	};
+	return {
+		type: "math" as const,
+		value: only.value,
+		meta: null,
+		position: only.position,
+		data: { hName: "pre", hChildren: [code] },
+	};
 }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A paragraph of one `$$...$$` on a single line is a display equation, centred and scrolling like one written with `$$` on lines of their own; it used to be a small inline formula at the line's start.
 - The guide keeps answer headings for decision pages and reports and asks for short label headings ("Mixing") on study, how-to and reference pages, the answer in the first sentence or figure. Every page shows each section's main path and puts supporting derivations, further examples, edge cases and textbook references in `<details>` folds labelled with the question they answer. Prose is plain: one idea per paragraph, bold only where a term is defined, citations and equation numbers at a paragraph's end.
 - Write a reminder the reader may need once, as `<Recall id="spectrum">One short paragraph.</Recall>`, and mark each mention with `<Term recall="spectrum">spectrum</Term>`: tapping the term opens the reminder right under it and tapping again closes it; print shows it at the first mention. `pack` fails on a `Term` naming no `Recall` and warns about a `Recall` nobody mentions.
 - A lit term now has a thin accent outline and solid underline, so it is as easy to find as its linked diagram part, even in dark mode. Inline stepper highlights use the same treatment without shifting the text.

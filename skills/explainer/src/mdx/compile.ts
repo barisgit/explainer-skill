@@ -9,7 +9,7 @@ import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
 import { codeFences } from "./code.ts";
 import { lowercaseImports } from "./esm.ts";
-import { mathToMathml } from "./math.ts";
+import { displayParagraphs, mathToMathml } from "./math.ts";
 import { origins } from "./origins.ts";
 import { spliceParts } from "./parts.ts";
 import { structurePage } from "./structure.ts";
@@ -468,6 +468,9 @@ export async function compileMdx(
 							warnings.push(...(await spliceParts(tree, path, loadPart)));
 							// Math reads a formula's source at its offsets, which for a part's nodes are in the joined text.
 							vfile.value = sources.text();
+						}
+						displayParagraphs(tree, String(vfile.value));
+						if (page === true) {
 							h1 = structurePage(tree);
 						}
 					},

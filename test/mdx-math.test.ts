@@ -29,6 +29,10 @@ $$
 | Dissipation | $P_{diss} = (V_{in} - V_{out})\\,I_{load} + V_{in}\\,I_q = 1.35\\,\\text{W} + 0.055\\,\\text{W}$ |
 `;
 
+/** One-line `$$...$$` paragraphs after a lede, in prose, a loose and a tight list item, and one inside a sentence. */
+const LONE_DISPLAY =
+	"# Ratio\n\nThe lede.\n\n$$x=1$$\n\n## Steps\n\nFrom the difference and the sum:\n\n$$m=\\frac{a-b}{a+b}.$$\n\n1. A loose step.\n\n   $$y = 2$$\n\n- $$z = 3$$\n- A tight item.\n\nIn a sentence $$w$$ stays inline.\n";
+
 describe("TeX math in an .mdx page", () => {
 	test("adjacent punctuation moves with inline math, without swallowing spaces or the next word", async () => {
 		const { output, result } = await packMdx(
@@ -93,6 +97,21 @@ describe("TeX math in an .mdx page", () => {
 			expect(result.stderr).toContain(`${span} reads as math between two dollar signs`);
 		},
 	);
+
+	test("a paragraph of one $$...$$ on a single line is a display equation wherever it stands, while $$ inside a sentence stays inline", async () => {
+		const math = await packMdx(dir, "one-line", LONE_DISPLAY);
+		expect(math.result.stderr).toBe("");
+		const html = readFileSync(math.output, "utf8");
+		const main = html.slice(html.indexOf("<main"));
+		expect(main.match(/<div class="math"><math display="block"/g)).toHaveLength(4);
+		// After the lede it ends the masthead, as the same equation on lines of its own does.
+		expect(
+			main.slice(main.indexOf('<header class="masthead"'), main.indexOf("</header>")),
+		).not.toContain("<math");
+		expect(main).toMatch(/<li>\s*<div class="math"><math display="block"/);
+		expect(main).not.toMatch(/<p><math/);
+		expect(main).toMatch(/In a sentence <math>/);
+	});
 
 	test("a TeX error fails the pack at the formula's line", async () => {
 		const { result } = await packMdx(

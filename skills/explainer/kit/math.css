@@ -1,4 +1,4 @@
-/* math: TeX formulas: $...$ in a sentence, $$ on lines of their own for a display equation. pack renders them to MathML: no script ships, they take the text colour in light and dark, and only a page with math carries this file.
+/* math: TeX formulas: $...$ in a sentence, $$ on lines of their own (or a paragraph of one $$...$$) for a display equation. pack renders them to MathML: no script ships, they take the text colour in light and dark, and only a page with math carries this file.
    An inline formula stays with closing punctuation in the same text (not across a link or emphasis boundary). Keep it short;
    a long one gets its own $$ block, which scrolls sideways on a phone. To fit a long chain instead, align its lines at the =:
      $$
