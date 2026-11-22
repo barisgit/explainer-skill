@@ -7,16 +7,18 @@
 export const ELEMENT_NAME_JS = `(el) => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : "")`;
 
 /**
- * Page-side function: true for an element laid out for the reader. Chrome still returns layout boxes for the descendants of a closed
- * `<details>`, so a box alone does not mean visible; only the `<summary>` of a closed disclosure is.
+ * Page-side function: true for a node inside a closed `<details>` but not in its `<summary>`. Chrome still returns layout boxes for
+ * the descendants of a closed disclosure, text written straight in the `<details>` included, so a box alone does not mean visible.
  */
-const LAID_OUT_JS = `(el) => {
-	if (el.getClientRects().length === 0) return false;
-	for (let child = el, p = el.parentElement; p; child = p, p = p.parentElement) {
-		if (p.tagName === "DETAILS" && !p.open && child.tagName !== "SUMMARY") return false;
+export const IN_CLOSED_FOLD_JS = `(node) => {
+	for (let child = node, p = node.parentElement; p; child = p, p = p.parentElement) {
+		if (p.tagName === "DETAILS" && !p.open && child.tagName !== "SUMMARY") return true;
 	}
-	return true;
+	return false;
 }`;
+
+/** Page-side function: true for an element laid out for the reader: it has a box and is not inside a closed fold. */
+const LAID_OUT_JS = `(el) => el.getClientRects().length > 0 && !(${IN_CLOSED_FOLD_JS})(el)`;
 
 /**
  * Page-side function: true when the element itself paints: laid out and not `visibility: hidden`. Visibility inherits, so the

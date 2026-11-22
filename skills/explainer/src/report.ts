@@ -1,6 +1,7 @@
 import type { ReplyCapture, Shot, ViewReport } from "./check.ts";
 import { OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { SWEEP_WARNING } from "./page-probes.ts";
+import { readingLines } from "./reading-load.ts";
 
 /** A list of this many in-page links in the first viewport counts as a deliberate text map. */
 const TEXT_MAP_LINKS = 3;
@@ -31,6 +32,11 @@ function firstScreens(shots: Shot[]): string[] {
 	return out.length
 		? ["First screens (taken before any --do step; open these first):", ...out, ""]
 		: [];
+}
+
+function readingLoad(shots: Shot[]): string[] {
+	const reading = shots.find((s) => s.reading)?.reading;
+	return reading ? [...readingLines(reading), ""] : [];
 }
 
 function pages(shots: Shot[], stepNotes: string[]): string[] {
@@ -119,6 +125,7 @@ export function report(
 		`Screenshots: ${outDir}`,
 		"",
 		...firstScreens(shots),
+		...readingLoad(shots),
 		...pages(shots, stepNotes),
 		...replies.flatMap((r) => [
 			"",

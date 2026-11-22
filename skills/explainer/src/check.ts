@@ -9,6 +9,7 @@ import { type FigureText, figureTextWarnings } from "./figure-text.ts";
 import { fullPageScreenshot, OMITTED_FIXED_WARNING } from "./full-page.ts";
 import { cleanUpOnSignal } from "./on-signal.ts";
 import { DISCOVER_JS, FIRST_SCREEN_JS, LINKED_JS, STEPPERS_JS, SWEEP_JS } from "./page-probes.ts";
+import { READING_JS, type ReadingLoad, readingWarnings } from "./reading-load.ts";
 import { runStep } from "./steps.ts";
 
 const VIEWPORTS = {
@@ -46,6 +47,8 @@ export interface Shot {
 	view: string;
 	png: string;
 	first?: FirstScreen | undefined;
+	/** The overview's reading load, on the light desktop screen only. */
+	reading?: ReadingLoad | undefined;
 	elements: ElementShot[];
 	problems: string[];
 	warnings: string[];
@@ -278,6 +281,8 @@ async function shootOverview(run: Run, screen: Screen) {
 	await run.page.open();
 	const first = opts.quick ? undefined : await firstScreen(run, screen);
 	const firstPass = theme === THEMES[0] && name === "desktop";
+	// The arrival state, before the sweep scrolls or the steppers change anything.
+	const reading = firstPass ? await run.page.cdp.evaluate<ReadingLoad>(READING_JS) : undefined;
 	if (firstPass) {
 		await discoverViews(run);
 	}
@@ -290,6 +295,7 @@ async function shootOverview(run: Run, screen: Screen) {
 	const warnings = [
 		...stepperWarnings,
 		...linkedWarnings,
+		...(reading ? readingWarnings(reading) : []),
 		...(await capture(run, png, screen, "", drawn)),
 	];
 	const problems = [...run.page.problems];
@@ -310,6 +316,7 @@ async function shootOverview(run: Run, screen: Screen) {
 		view: "",
 		png,
 		first,
+		reading,
 		elements,
 		problems: [...new Set(problems)],
 		warnings,
