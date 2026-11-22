@@ -195,7 +195,7 @@ import { Table } from "kit";
 		) ?? [""];
 		expect(table).toBe(markdown);
 		expect(`<main>${linked}</main>`).toBe(
-			mainOf(`<main><table class="compare table" id="linked"><thead><tr><th>Fix</th><th class="num">Wait</th></tr></thead><tbody>
+			mainOf(`<main><table class="compare table" id="linked" data-stack=""><thead><tr><th>Fix</th><th class="num">Wait</th></tr></thead><tbody>
 <tr data-state="fit"><th scope="row"><a href="#fix/second">Second barista</a><span class="why">Halves the load</span></th><td class="num" data-label="Wait">0,5\u00a0min</td></tr>
 <tr data-state="out"><th scope="row"><a href="#fix/none">Change nothing</a></th><td class="num" data-label="Wait">18\u00a0min</td></tr>
 </tbody></table></main>`),
@@ -318,7 +318,7 @@ test("kit labels prints every kit text, and the block, translated, is the page's
 	expect(await runPacked(output, { slowdown: 4 })).toEqual([]);
 }, 60_000);
 
-test("hand-written records in MDX keep category markers, a plain toolbar's Expand all, and numeric table alignment at 390px", async () => {
+test("hand-written records in MDX keep category markers, a plain toolbar's Expand all, and numeric alignment, a two-column table stacking at 390px", async () => {
 	const source = `# Records
 
 ## Tasks
@@ -341,7 +341,8 @@ test("hand-written records in MDX keep category markers, a plain toolbar's Expan
 		"labels and cells keep their category words": `[...document.querySelectorAll(".tree .chip")].map((c) => c.textContent).join() === "Firmware,FW"`,
 		"the legend and the rows use the same swatch": `new Set([...document.querySelectorAll(".chip i")].map((i) => getComputedStyle(i).backgroundColor)).size === 1`,
 		"only the right-aligned column is numeric": `document.querySelectorAll(".compare .num").length === 2 && document.querySelector(".compare th.num") && document.querySelector(".compare td.num[data-label=Hours]")`,
-		"a numeric cell ends on every screen": `getComputedStyle(document.querySelector(".compare td.num")).textAlign === "end"`,
+		// A two-column table stacks on a phone, each value under its name at the start.
+		"a numeric cell ends wherever it stands in a column": `(({ textAlign, display }) => textAlign === (display === "block" ? "start" : "end"))(getComputedStyle(document.querySelector(".compare td.num")))`,
 		"nothing scrolls sideways": `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
 	});
 	const { result, output } = await pack("records", source, { "records.js": script });

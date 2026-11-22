@@ -10,8 +10,8 @@
    <h2 data-nav="Price">The price is 40 €</h2>. A ### in a section is a topic indented under it in the rail (data-nav works there
    too), so a long page groups its rail by ## chapters. A <section> you write
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
-   right-aligned column (---:) is numeric (class="num"), and on a phone that it does not fit it scrolls sideways, its first column
-   staying in view.
+   right-aligned column (---:) is numeric (class="num"); on a phone a table of two columns stacks each name over its value
+   (data-stack), and a wider one that does not fit scrolls sideways, its first column staying in view.
    Computed destinations use <a href={...}>; braces in Markdown destinations fail pack. Destinations with spaces use angle brackets, [design](<docs/My Design Doc.md>), or %20. pack and check warn
    when link syntax stays literal outside code; use backticks or <code> for intentional examples. check treats missing #targets
    as problems and missing relative files as warnings: distribute those files beside the exported HTML. External links are not fetched.

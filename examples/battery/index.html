@@ -69,8 +69,8 @@
 	--inset: clamp(1rem, 2.5vw, 1.25rem);
 	/* Above the masthead, and above the contents rail beside it. */
 	--page-top: clamp(2rem, 6vw, 4rem);
-	/* Between sections: enough that a section stands as a screen of its own. */
-	--section-gap: clamp(4.5rem, 14vh, 8rem);
+	/* Between sections: the space above the hairline that opens each one, the same on every window height. */
+	--section-gap: clamp(2.25rem, 4.5vw, 3rem);
 	--radius: 0.125rem;
 	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */
 	--under: var(--bg);
@@ -181,8 +181,8 @@ strong {
 }
 
 /* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures, split columns. */
-/* Page shell: the masthead, then sections set apart by space alone. <p class="label"> is a plain caption over a group inside a
-   section. Type keeps to the three roles of 01-base.css: display, text, label. */
+/* Page shell: the masthead over a hairline, then sections, each opened by a hairline with space on both sides. <p class="label"> is
+   a plain caption over a group inside a section. Type keeps to the three roles of 01-base.css: display, text, label. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
@@ -191,8 +191,14 @@ strong {
 .page :where(p, ul, ol) {
 	max-inline-size: 66ch;
 }
+/* Prose lines a little apart, so lines that hold an inline formula do not crowd the next. */
+.page :where(p, li) {
+	line-height: 1.65;
+}
 .masthead {
-	margin-block-end: clamp(2rem, 5vw, 2.5rem);
+	margin-block-end: clamp(1.5rem, 4vw, 2rem);
+	padding-block-end: clamp(0.75rem, 2vw, 1.25rem);
+	border-block-end: 1px solid var(--rule);
 }
 h1 {
 	margin: 0 0 1rem;
@@ -227,7 +233,8 @@ h2 em {
 	font-style: normal;
 	color: var(--accent);
 }
-/* A heading at the text's size, in its weight: an h3, a minor section's heading (it labels reference, not a finding). */
+/* A heading at the text's size, in its weight: a minor section's heading (it labels reference, not a finding). An h3, a topic
+   inside a section, is a step larger, so it reads as a heading rather than a bold lead-in, with room above it. */
 h3,
 .minor > h2 {
 	margin: 0;
@@ -236,6 +243,11 @@ h3,
 	line-height: 1.35;
 	letter-spacing: 0;
 	text-wrap: balance;
+}
+h3 {
+	margin-block: 2rem 0.5rem;
+	font-size: 1.1875rem;
+	letter-spacing: -0.01em;
 }
 /* The masthead (and a view's head) is the headline and the lede under it, in text. The next action (a paragraph that opens with a
    bold label) reads on from the lede in the same text, and the meta lines are labels, so neither adds a level. */
@@ -261,9 +273,31 @@ h3,
 	font-weight: 500;
 	color: var(--muted);
 }
-/* Sections are set apart by space, not rules. Sections inside a figure belong to its content, not the page's rhythm. */
+/* A hairline opens each section, with space above and below it, so a long page reads as chapters without a screen of empty paper
+   between them, a view's chapters as the overview's. A band carries its own tone instead, and a section right after one, or
+   right under the masthead's line, needs none. A section inside another chapter, or inside a figure, belongs to its content,
+   not the page's rhythm. */
 .page section:not(.view, .fig *) {
 	margin-block: var(--section-gap) 0;
+}
+.page
+	section:not(
+		.view,
+		.band,
+		.band + section,
+		.masthead + section,
+		section:not(.view) section,
+		.fig *
+	) {
+	padding-block-start: clamp(1.5rem, 3vw, 2rem);
+	border-block-start: 1px solid var(--rule);
+}
+/* A fold that ends a section leaves its closing line to the hairline of the section after it; before a band, at a view's or
+   the page's end, or in a nested section, it keeps its own. */
+.page
+	section:not(.view, .band, section:not(.view) section, .fig *):has(+ section:not(.view, .band))
+	> details:last-child {
+	border-block-end: 0;
 }
 .cols {
 	display: grid;
@@ -295,7 +329,7 @@ h3,
 /* Minor section (method, sources, assumptions): closer to what it backs and, on wide screens, its heading in a column of its own,
    so it reads as reference rather than as another finding. */
 .page section.minor {
-	margin-block-start: clamp(3rem, 8vh, 5rem);
+	margin-block-start: clamp(1.5rem, 3vw, 2rem);
 }
 .minor > h2 {
 	margin-block-end: 0.75rem;
@@ -357,11 +391,20 @@ h3,
 .fig-visual.stage {
 	padding: 1rem 0;
 }
-.fig > figcaption {
+.fig > figcaption,
+figure:not([class]) > figcaption {
 	padding-block: 0.75rem 0;
 	color: var(--muted);
 	font-size: var(--size-label);
 	line-height: 1.5;
+}
+/* A plain <figure> (an image and its caption) sits as a .fig does: on the column's start, its caption a label. */
+figure:not([class]) {
+	margin: 2rem 0;
+}
+figure:not([class]) > img {
+	display: block;
+	block-size: auto;
 }
 /* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
    Two children: the text, then the figure. From 56rem they stand side by side, the text two fifths from the column's start like
@@ -1674,6 +1717,7 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	border-block-end: 0;
 }
 .rank > li > details {
+	max-inline-size: none;
 	margin: 0;
 	border: 0;
 }
@@ -1695,6 +1739,10 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	/* A shared value width keeps the bars on the same scale when digit counts differ. */
 	grid-template-columns: auto minmax(0, 2fr) minmax(2rem, 1fr) minmax(3.5rem, 6rem);
 	margin: 0;
+	text-indent: 0;
+}
+.rank > li > details > summary::before {
+	margin-inline-end: 0.25rem;
 }
 .rank .name {
 	font-weight: 600;
@@ -1734,9 +1782,22 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .scroll {
 	overflow-x: auto;
 }
+/* A table in the text keeps the space of the other blocks there (a fold, Records), so two in a row do not run together. */
+:where(.page :is(section, [data-overview]) > .scroll) {
+	margin-block: 1.25rem;
+}
+/* Separate borders with no spacing draw as collapsed ones, but each cell keeps its own: a row name that stays in view on a phone
+   (below) keeps its row's hairline. */
 .compare {
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 0;
 	inline-size: 100%;
+}
+/* A table in the text's column takes the width its columns need, so a few short columns do not spread across the page. */
+@media (min-width: 48.0625rem) {
+	.page :is(section, [data-overview]) > .scroll > .compare {
+		inline-size: auto;
+	}
 }
 .compare th,
 .compare td {
@@ -1761,8 +1822,9 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .compare tbody tr:last-child > * {
 	border-block-end: 0;
 }
+/* A row's name is set in the text's weight, a little firmer: a column of bold names would be the loudest thing on the screen. */
 .compare tbody th {
-	font-weight: 600;
+	font-weight: 500;
 	min-inline-size: 7rem;
 }
 :where(.compare) tr[data-state="fit"] > :first-child {
@@ -1774,9 +1836,6 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 /* biome-ignore lint/style/noDescendingSpecificity: the rules above with higher specificity set border-block-end on these cells, never color */
 .compare tr[data-state="out"] > * {
 	color: var(--muted);
-}
-.compare tr[data-state="out"] > th {
-	font-weight: 500;
 }
 .compare .val {
 	display: block;
@@ -1884,6 +1943,41 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
 		background: var(--accent-soft);
 	}
+	/* A table of two columns, each row a name and its value (a formula sheet), stacks instead: the name over the value, which
+	   takes the column's full width, since scrolling would cut the one long column at the screen's edge. The column heads stack
+	   the same way above the first row, so a unit in a heading still reads. pack marks a two-column Markdown table data-stack,
+	   and Table a two-column one; a table written by hand stacks only with the attribute. Child combinators keep a table nested
+	   in a cell as it is. */
+	.compare[data-stack],
+	.compare[data-stack] > :is(thead, tbody),
+	.compare[data-stack] > :is(thead, tbody) > tr {
+		display: block;
+		inline-size: auto;
+		min-inline-size: 0;
+	}
+	.compare[data-stack] > :is(thead, tbody) > tr {
+		padding-block: 0.625rem;
+		border-block-end: 1px solid var(--rule);
+	}
+	.compare[data-stack] > tbody > tr:last-child {
+		border-block-end: 0;
+	}
+	.compare[data-stack] > thead > tr {
+		padding-block-start: 0;
+		border-block-end-color: var(--rule-strong);
+	}
+	.compare[data-stack] > :is(thead, tbody) > tr > :is(th, td) {
+		display: block;
+		position: static;
+		max-inline-size: none;
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: start;
+	}
+	.compare[data-stack] > :is(thead, tbody) > tr > :first-child {
+		margin-block-end: 0.25rem;
+	}
 }
 /* Paper cannot scroll, so a printed table fits the page's width: label-size text in tighter cells, words breaking where the
    columns cannot all fit whole, rather than the last columns falling off the paper. */
@@ -1895,25 +1989,77 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 	}
 }
 
-/* theme part: caveats, details, recalls, drill-down views, reduced motion, print. */
-/* Caveat: one line beside the claim it changes; the rest goes in <details>. <b> names the kind (Inferred, Unknown). */
+/* theme part: callouts, caveats, procedures, details, recalls, drill-down views, reduced motion, print. */
+/* Callout: a block the reader should not miss in the text (a task to solve, a rule to keep), framed by a hairline. Caveat: what
+   changes how a claim reads (Inferred, Unknown, a common mistake), in the warning's tint. Both keep the measure of the text, and
+   a <b> first in either names its kind. */
+.callout,
 .caveat {
 	max-inline-size: 66ch;
 	margin: 1.25rem 0;
 	padding: 0.625rem 0.875rem;
-	background: var(--warn-soft);
 	border-radius: var(--radius);
 }
-.caveat b {
+.callout {
+	border: 1px solid var(--rule);
+	background: var(--surface);
+}
+.caveat {
+	background: var(--warn-soft);
+}
+:is(.callout, .caveat) b:first-child {
 	font-weight: 600;
-	color: var(--warn);
 	margin-inline-end: 0.5rem;
 }
-.caveat > :first-child {
+.caveat b:first-child {
+	color: var(--warn);
+}
+:is(.callout, .caveat) > :first-child {
 	margin-top: 0;
 }
-.caveat > :last-child {
+:is(.callout, .caveat) > :last-child {
 	margin-bottom: 0;
+}
+/* Procedure: a numbered list of steps done in order, each number in a ring on a hairline that runs to the next step.
+   <div class="procedure"> around a Markdown list. The ring shows the item's own number, so a list that starts at 3 says 3. */
+.procedure > ol {
+	padding-inline-start: 2.5rem;
+	list-style: none;
+}
+.procedure > ol > li {
+	position: relative;
+	padding-block-end: 1.25rem;
+}
+.procedure > ol > li:last-child {
+	padding-block-end: 0;
+}
+.procedure > ol > li::before {
+	content: counter(list-item);
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-start: -2.5rem;
+	display: grid;
+	place-items: center;
+	inline-size: 1.75rem;
+	block-size: 1.75rem;
+	border: 1px solid var(--rule-strong);
+	border-radius: 50%;
+	background: var(--under);
+	font: 500 var(--size-label) / 1 var(--font);
+	font-variant-numeric: tabular-nums;
+}
+.procedure > ol > li:not(:last-child)::after {
+	content: "";
+	position: absolute;
+	inset-block: 2rem 0.25rem;
+	inset-inline-start: calc(-2.5rem + 0.875rem - 0.5px);
+	border-inline-start: 1px solid var(--rule);
+}
+.procedure > ol > li > :first-child {
+	margin-block-start: 0;
+}
+.procedure > ol > li > :last-child {
+	margin-block-end: 0;
 }
 .detail {
 	margin: 0.75rem 0;
@@ -1956,15 +2102,21 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .term[aria-expanded="false"] + .recall {
 	display: none;
 }
+/* A fold in the text keeps the text's measure, so its rules do not read as the end of a section. Folds that are rows (a tree, a
+   ranking, a record) and a figure's fold take their own width. */
 details {
+	max-inline-size: 66ch;
 	margin: 1.25rem 0;
 	border-block: 1px solid var(--rule);
 }
+/* The question is one line of text that wraps under itself, the chevron hanging before it, so a formula or a link in it stays
+   in the sentence. The padding keeps a row at least 2.75rem tall. */
 summary {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
+	display: block;
 	min-block-size: 2.75rem;
+	padding-block: calc((2.75rem - 1lh) / 2);
+	padding-inline-start: 1.25rem;
+	text-indent: -1.25rem;
 	list-style: none;
 	cursor: pointer;
 	font-weight: 500;
@@ -1974,10 +2126,11 @@ summary::-webkit-details-marker {
 }
 summary::before {
 	content: "";
-	flex: none;
+	display: inline-block;
 	inline-size: 0.4375rem;
 	block-size: 0.4375rem;
-	margin-inline: 0.125rem 0.25rem;
+	margin-inline: 0.125rem 0.6875rem;
+	vertical-align: 0.15em;
 	border: solid var(--muted);
 	border-width: 0 1.5px 1.5px 0;
 	transform: rotate(-45deg);
@@ -1996,6 +2149,7 @@ details > :last-child:not(summary) {
 	margin-block-end: 1rem;
 }
 .fig > details {
+	max-inline-size: none;
 	margin: 0;
 	border-block-end: 0;
 }
@@ -2383,8 +2537,10 @@ details > :last-child:not(summary) {
 	gap: 0 0.5rem;
 	min-block-size: 2.5rem;
 	padding-block: 0.5625rem;
+	padding-inline: 0;
 	border-block-start: 1px solid var(--rule);
 	line-height: 1.35;
+	text-indent: 0;
 }
 .tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3)) {
 	--tree-n: 2;
@@ -2441,13 +2597,15 @@ details > :last-child:not(summary) {
 	font-weight: 500;
 }
 .tree details {
+	max-inline-size: none;
 	margin: 0;
 	border: 0;
 }
-/* The chevron is an empty box with no baseline of its own: it is centred on the first line instead. */
+/* The chevron is an empty box with no baseline of its own: it is centred on the first line instead, in its own column. */
 .tree summary::before {
 	align-self: start;
 	margin-block-start: 0.375rem;
+	margin-inline-end: 0.25rem;
 }
 /* Levels by weight: the top level and its totals strongest, a leaf (a fold with no fold inside) plain. */
 .tree > details > summary {
@@ -2707,11 +2865,13 @@ details > :last-child:not(summary) {
 /* A record's detail in a table row or on a card: the label is its summary, in line with the other cells, with no rules or
    space of its own, and the text it opens to reads as prose under it. */
 .records :is(.compare th, .lane li) > details {
+	max-inline-size: none;
 	margin: 0;
 	border: 0;
 }
 .records :is(.compare th, .lane li) > details > summary {
 	min-block-size: 1.5rem;
+	padding-block: 0;
 	margin: 0;
 	font-size: inherit;
 	font-weight: inherit;
@@ -2791,7 +2951,8 @@ details > :last-child:not(summary) {
 
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
-   Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions).
+   Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions);
+   an h3 (a topic in a section) is a step above the text, in its weight.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
    (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
@@ -2804,7 +2965,7 @@ details > :last-child:not(summary) {
    accent's three states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as
    a background), for done, planned and estimated, say.
    Classes: page masthead lede next meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
-   controls seg toggle field player btn reset | stats chip legend caveat detail details tabs | rank compare num mark expand |
+   controls seg toggle field player btn reset | stats chip legend callout caveat procedure detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input
    type="search">, selects or .field filters, each named by a caption or aria-label; one compact row, two even columns on phones;
@@ -2817,15 +2978,27 @@ details > :last-child:not(summary) {
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
    padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
-   Rhythm: sections are set apart by space alone; .band (once, where the reader acts) spans the window in the sunken tone; .minor
-   sections (method, sources) sit closer, with the heading in its own column.
+   Rhythm: a hairline under the masthead, and one opening each later section with space on both sides; .band (once, where the reader
+   acts) spans the window in the sunken tone instead; .minor sections (method, sources) sit closer, with the heading in its own
+   column. A <details> fold keeps the text's measure; its summary is the question it answers.
+   Callouts, at the text's measure, a <b> first naming the kind: <aside class="callout"> for what the reader must not miss (a
+   task to solve, a rule), class="caveat" in the warning's tint for what changes how a claim reads (Inferred, a common mistake):
+     <aside class="callout">
+
+     <b>Task 3</b> Size the pull-up for 400 kHz.
+
+     </aside>
+   Procedure: <div class="procedure"> around a Markdown numbered list rings each step's number on a hairline to the next.
    Text linked to a figure, diagram or code (data-ref) sits beside it, so both ends of a link share the screen:
      <div class="beside"><div>the text</div><figure class="fig">...</figure></div>   (or a ``` code fence as the second child)
    From 56rem the two stand side by side, the text on the column's start and the figure out to .wide's end, and the figure stays in
    view while the text scrolls; stacked on phones.
-   Tables: .compare is a table on every screen; on a phone one too wide scrolls sideways, its <th scope="row"> names staying in
-   view. Markdown tables and Table come in a <div class="scroll">, where it scrolls at readable column widths; wrap a table you
-   write in one too. class="num" on a numeric column's th and tds aligns it to the end, digits lined up. tr data-state="fit", "maybe" or "out"
+   Tables: .compare takes the width its columns need, up to the column's. On a phone it stays a table, and one too wide scrolls
+   sideways, its <th scope="row"> names staying in view; a table of two columns (a name and its value, as a formula sheet)
+   stacks each row there, its name over its value, under its column heads: pack and Table mark it data-stack, which a
+   table you write opts in with (<table class="compare" data-stack>). Markdown tables and Table come in a <div class="scroll">, where it scrolls at readable column widths; wrap a table you
+   write in one too. class="num" on a numeric column's th and tds aligns it to the end, digits lined up (a stacked table's
+   values start under their names). tr data-state="fit", "maybe" or "out"
    gives a row an ok or info edge, or mutes it:
      <div class="scroll"><table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
        <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table></div>
@@ -3345,7 +3518,7 @@ dialog.reply-dialog[open] {
   <rect x="205.0775" y="351.6" width="66.195" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
   <text x="238.17499999999998" y="370.05" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">grid</text>
 </g>
-</svg></div><div class="scroll"><table class="compare"><thead><tr><th>Part</th><th class="num">Price</th></tr></thead><tbody><tr><th scope="row"><span data-ref="bat" data-tag="">1</span> 5 kWh battery<span class="why">LFP cells rated for 6,000 cycles</span></th><td class="num" data-label="Price">€2,600</td></tr><tr><th scope="row"><span data-ref="inv" data-tag="">2</span> Hybrid inverter<span class="why">replaces the roof's own inverter</span></th><td class="num" data-label="Price">€750</td></tr><tr><th scope="row"><span data-ref="meter" data-tag="">3</span> Two-way meter<span class="why">swapped by the grid operator</span></th><td class="num" data-label="Price">€310</td></tr><tr><th scope="row">Electrician, 6 h<span class="why">mounting, wiring, commissioning</span></th><td class="num" data-label="Price">€540</td></tr></tbody></table></div></section><section><h2>Which size?</h2><fieldset data-reply aria-label="Which size?"><div class="scroll"><table class="compare"><thead><tr><th>Size</th><th class="num">Price</th><th class="num">Pays back in</th><th class="num">Saves a year</th><th class="num">Use not from the grid</th></tr></thead><tbody><tr><th scope="row"><label><input type="radio" name="size" value="5 kWh" id="size-5_20_kWh"/><span data-recommended="Best fit">5 kWh</span></label></th><td class="num" data-label="Price">€4,200</td><td class="num" data-label="Pays back in">10 years</td><td class="num" data-label="Saves a year">€415</td><td class="num" data-label="Use not from the grid">70%</td></tr><tr><th scope="row"><label><input type="radio" name="size" value="10 kWh" id="size-10_20_kWh"/><span>10 kWh</span></label></th><td class="num" data-label="Price">€7,900</td><td class="num" data-label="Pays back in">17 years</td><td class="num" data-label="Saves a year">€474</td><td class="num" data-label="Use not from the grid">73%</td></tr><tr><th scope="row"><label><input type="radio" name="size" value="15 kWh" id="size-15_20_kWh"/><span>15 kWh</span></label></th><td class="num" data-label="Price">€11,200</td><td class="num" data-label="Pays back in">23 years</td><td class="num" data-label="Saves a year">€483</td><td class="num" data-label="Use not from the grid">73%</td></tr><tr><th scope="row"><label><input type="radio" name="size" value="None yet" id="size-None_20_yet"/><span>None yet</span></label></th><td class="num" data-label="Price"></td><td class="num" data-label="Pays back in"></td><td class="num" data-label="Saves a year"></td><td class="num" data-label="Use not from the grid"></td></tr></tbody></table></div><textarea rows="1" data-grow class="note" id="size.note" data-note aria-label="Note: Which size?" placeholder="Note for the agent"></textarea></fieldset><p>Illustrative numbers, not a real quote or a measured roof. One year of invented monthly production and use, daily sun varied then normalized to keep each monthly total fixed, run quarter hour by quarter hour: surplus fills the battery and loses a tenth on the way, a shortfall empties it before the grid is asked. Electricity bought at €0.40 a kWh and sold at €0.03; cells last 16 years at one cycle a night. Left out: price changes, wear, subsidies.</p></section></div></main>
+</svg></div><div class="scroll"><table class="compare" data-stack><thead><tr><th>Part</th><th class="num">Price</th></tr></thead><tbody><tr><th scope="row"><span data-ref="bat" data-tag="">1</span> 5 kWh battery<span class="why">LFP cells rated for 6,000 cycles</span></th><td class="num" data-label="Price">€2,600</td></tr><tr><th scope="row"><span data-ref="inv" data-tag="">2</span> Hybrid inverter<span class="why">replaces the roof's own inverter</span></th><td class="num" data-label="Price">€750</td></tr><tr><th scope="row"><span data-ref="meter" data-tag="">3</span> Two-way meter<span class="why">swapped by the grid operator</span></th><td class="num" data-label="Price">€310</td></tr><tr><th scope="row">Electrician, 6 h<span class="why">mounting, wiring, commissioning</span></th><td class="num" data-label="Price">€540</td></tr></tbody></table></div></section><section><h2>Which size?</h2><fieldset data-reply aria-label="Which size?"><div class="scroll"><table class="compare"><thead><tr><th>Size</th><th class="num">Price</th><th class="num">Pays back in</th><th class="num">Saves a year</th><th class="num">Use not from the grid</th></tr></thead><tbody><tr><th scope="row"><label><input type="radio" name="size" value="5 kWh" id="size-5_20_kWh"/><span data-recommended="Best fit">5 kWh</span></label></th><td class="num" data-label="Price">€4,200</td><td class="num" data-label="Pays back in">10 years</td><td class="num" data-label="Saves a year">€415</td><td class="num" data-label="Use not from the grid">70%</td></tr><tr><th scope="row"><label><input type="radio" name="size" value="10 kWh" id="size-10_20_kWh"/><span>10 kWh</span></label></th><td class="num" data-label="Price">€7,900</td><td class="num" data-label="Pays back in">17 years</td><td class="num" data-label="Saves a year">€474</td><td class="num" data-label="Use not from the grid">73%</td></tr><tr><th scope="row"><label><input type="radio" name="size" value="15 kWh" id="size-15_20_kWh"/><span>15 kWh</span></label></th><td class="num" data-label="Price">€11,200</td><td class="num" data-label="Pays back in">23 years</td><td class="num" data-label="Saves a year">€483</td><td class="num" data-label="Use not from the grid">73%</td></tr><tr><th scope="row"><label><input type="radio" name="size" value="None yet" id="size-None_20_yet"/><span>None yet</span></label></th><td class="num" data-label="Price"></td><td class="num" data-label="Pays back in"></td><td class="num" data-label="Saves a year"></td><td class="num" data-label="Use not from the grid"></td></tr></tbody></table></div><textarea rows="1" data-grow class="note" id="size.note" data-note aria-label="Note: Which size?" placeholder="Note for the agent"></textarea></fieldset><p>Illustrative numbers, not a real quote or a measured roof. One year of invented monthly production and use, daily sun varied then normalized to keep each monthly total fixed, run quarter hour by quarter hour: surplus fills the battery and loses a tenth on the way, a shortfall empties it before the grid is asked. Electricity bought at €0.40 a kWh and sold at €0.03; cells last 16 years at one cycle a night. Left out: price changes, wear, subsidies.</p></section></div></main>
 <script type="application/json" id="explainer-islands">[{"m":0,"e":"Plot","p":{"height":"clamp(15rem, 24vw, 21rem)","label":"Years until each 5 kWh block of a home battery has paid for itself: first 5 kWh 10, second 5 kWh 62, third 5 kWh 367, against cells rated for 16 years","option":{"horizontal":true,"categories":[{"name":"first 5 kWh","note":"€4,200 ÷ €415 a year"},{"name":"second 5 kWh","note":"€3,700 ÷ €60 a year"},{"name":"third 5 kWh","note":"€3,300 ÷ €9 a year"}],"series":[{"type":"bar","data":[10,62,367],"fill":["accent","hollow","hatch"],"label":{"unit":"years"}}],"marks":[{"x":16,"label":"16 years: cells rated for 6,000 cycles"}],"x":{"min":0,"max":80}}}},{"m":1,"e":"Explore","p":{"controls":[{"id":"battery","label":"Battery","range":{"min":0,"step":1,"digits":0,"texts":["0 kWh","1 kWh","2 kWh","3 kWh","4 kWh","5 kWh","6 kWh","7 kWh","8 kWh","9 kWh","10 kWh","11 kWh","12 kWh","13 kWh","14 kWh","15 kWh"]}}],"start":[5],"label":"A typical July day: what the roof makes, what the house uses, and what the battery moves to the evening","height":"clamp(20rem, 30vw, 26rem)","first":{"plot":{"legend":false,"x":{"min":6,"max":30,"labels":["06:00","12:00","18:00","00:00","06:00"]},"y":{"labels":false},"series":[{"name":"Roof","data":[[6,0.29],[6.25,0.433],[6.5,0.576],[6.75,0.717],[7,0.856],[7.25,0.993],[7.5,1.127],[7.75,1.258],[8,1.385],[8.25,1.509],[8.5,1.628],[8.75,1.743],[9,1.853],[9.25,1.959],[9.5,2.059],[9.75,2.153],[10,2.241],[10.25,2.323],[10.5,2.399],[10.75,2.468],[11,2.531],[11.25,2.586],[11.5,2.634],[11.75,2.676],[12,2.709],[12.25,2.736],[12.5,2.755],[12.75,2.766],[13,2.77],[13.25,2.766],[13.5,2.755],[13.75,2.736],[14,2.709],[14.25,2.676],[14.5,2.634],[14.75,2.586],[15,2.531],[15.25,2.468],[15.5,2.399],[15.75,2.323],[16,2.241],[16.25,2.153],[16.5,2.059],[16.75,1.959],[17,1.853],[17.25,1.743],[17.5,1.628],[17.75,1.509],[18,1.385],[18.25,1.258],[18.5,1.127],[18.75,0.993],[19,0.856],[19.25,0.717],[19.5,0.576],[19.75,0.433],[20,0.29],[20.25,0.145],[20.5,0],[20.75,0],[21,0],[21.25,0],[21.5,0],[21.75,0],[22,0],[22.25,0],[22.5,0],[22.75,0],[23,0],[23.25,0],[23.5,0],[23.75,0],[24,0],[24.25,0],[24.5,0],[24.75,0],[25,0],[25.25,0],[25.5,0],[25.75,0],[26,0],[26.25,0],[26.5,0],[26.75,0],[27,0],[27.25,0],[27.5,0],[27.75,0],[28,0],[28.25,0],[28.5,0],[28.75,0],[29,0],[29.25,0],[29.5,0],[29.75,0.145],[30,0.29]],"color":"var(--muted)","dash":false},{"name":"House","data":[[6,0.3],[6.25,0.3],[6.5,0.3],[6.75,0.3],[7,0.8],[7.25,0.8],[7.5,0.8],[7.75,0.8],[8,0.941],[8.25,0.941],[8.5,0.941],[8.75,0.941],[9,0.441],[9.25,0.441],[9.5,0.441],[9.75,0.441],[10,0.441],[10.25,0.441],[10.5,0.441],[10.75,0.441],[11,0.441],[11.25,0.441],[11.5,0.441],[11.75,0.441],[12,0.441],[12.25,0.441],[12.5,0.441],[12.75,0.441],[13,0.441],[13.25,0.441],[13.5,0.441],[13.75,0.441],[14,0.441],[14.25,0.441],[14.5,0.441],[14.75,0.441],[15,0.441],[15.25,0.441],[15.5,0.441],[15.75,0.441],[16,0.441],[16.25,0.441],[16.5,0.441],[16.75,0.441],[17,0.441],[17.25,0.441],[17.5,0.441],[17.75,0.441],[18,1.15],[18.25,1.15],[18.5,1.15],[18.75,1.15],[19,1.15],[19.25,1.15],[19.5,1.15],[19.75,1.15],[20,1.15],[20.25,1.15],[20.5,1.15],[20.75,1.15],[21,1.15],[21.25,1.15],[21.5,1.15],[21.75,1.15],[22,0.3],[22.25,0.3],[22.5,0.3],[22.75,0.3],[23,0.1],[23.25,0.1],[23.5,0.1],[23.75,0.1],[24,0.1],[24.25,0.1],[24.5,0.1],[24.75,0.1],[25,0.1],[25.25,0.1],[25.5,0.1],[25.75,0.1],[26,0.1],[26.25,0.1],[26.5,0.1],[26.75,0.1],[27,0.1],[27.25,0.1],[27.5,0.1],[27.75,0.1],[28,0.1],[28.25,0.1],[28.5,0.1],[28.75,0.1],[29,0.1],[29.25,0.1],[29.5,0.1],[29.75,0.1],[30,0.3]],"color":"var(--ink)","dash":false}],"marks":[{"x":[5.683333333333327,5.683333333333327],"between":["Roof","House"],"fill":"accent"},{"x":[5.683333333333327,5.683333333333327],"between":["Roof","House"],"fill":"hollow"},{"x":[18.466666666666626,18.466666666666626],"between":["House","Roof"],"fill":"accent"},{"x":[18.466666666666626,18.466666666666626],"between":["House","Roof"],"fill":"hollow"},{"x":[18.466666666666626,29.683333333333326],"between":["House","Roof"],"fill":true},{"at":[15.5,2.3988959333420303],"label":"roof makes 26.5 kWh"},{"at":[20,1.15],"label":"house uses 11.6 kWh"},{"x":[10,18.466666666666626],"between":["Roof","House"],"label":"sold 18.7 kWh"},{"x":[18.466666666666626,29.683333333333326],"label":"bought 3.8 kWh"},{"at":[5.683333333333327,0.10633447784273078],"label":""}]}},"patches":[{},{"plot":{"marks":{"0":{"x":{"1":8.76666666666666}},"1":{"x":[8.76666666666666,8.76666666666666]},"2":{"x":{"1":20.36666666666666}},"3":{"x":[20.36666666666666,20.36666666666666]},"4":{"x":{"0":20.36666666666666}},"7":{"label":"sold 17.6 kWh"},"8":{"label":"battery until 20:22, then bought 2.8 kWh"},"9":{"at":[8.76666666666666,1.7507252296412954],"label":"battery full 08:46"}}}},{"plot":{"marks":{"0":{"x":{"1":9.599999999999994}},"1":{"x":[9.599999999999994,9.599999999999994]},"2":{"x":{"1":21.233333333333327}},"3":{"x":[21.233333333333327,21.233333333333327]},"4":{"x":{"0":21.233333333333327}},"7":{"label":"sold 16.5 kWh"},"8":{"label":"battery until 21:14, then bought 1.8 kWh"},"9":{"at":[9.599999999999994,2.0968811684131925],"label":"battery full 09:36"}}}},{"plot":{"marks":{"0":{"x":{"1":10.233333333333327}},"1":{"x":[10.233333333333327,10.233333333333327]},"2":{"x":{"1":22.39999999999999}},"3":{"x":[22.39999999999999,22.39999999999999]},"4":{"x":{"0":22.39999999999999}},"7":{"x":{"0":10.233333333333327},"label":"sold 15.3 kWh"},"8":{"label":"battery until 22:24, then bought 0.8 kWh"},"9":{"at":[10.233333333333327,2.3178425251161276],"label":"battery full 10:14"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 0.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 1.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 2.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 3.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 4.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 5.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 6.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 7.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 8.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 9.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 10.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}},{"plot":{"marks":{"0":{"x":{"1":10.716666666666661}},"1":{"x":[10.716666666666661,10.716666666666661]},"2":{"x":{"1":29.683333333333326}},"3":{"x":[29.683333333333326,29.683333333333326]},"4":{"x":{"0":29.683333333333326}},"7":{"x":{"0":10.716666666666661},"label":"sold 14.4 kWh"},"8":{"label":"battery all night, 11.2 kWh never used"},"9":{"at":[10.716666666666661,2.4592543217038476],"label":"battery full 10:43"}}}}],"at":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}},{"m":1,"e":"Explore","p":{"controls":[{"id":"month","label":"Month","choice":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"values":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"axis":true}],"start":[9],"label":"kWh the second and third 5 kWh blocks add to what the house gets from the battery, month by month","first":{"plot":{"categories":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],"stack":true,"series":[{"name":"second 5 kWh","type":"bar","data":[0,2,40,16,4,0,0,3,42,49,5,0],"fill":"hollow"},{"name":"third 5 kWh","type":"bar","data":[0,0,4,1,0,0,0,0,11,8,1,0],"fill":"hatch"}],"y":{"step":10,"format":{"unit":"kWh"}}}},"patches":[{}],"at":[0,0,0,0,0,0,0,0,0,0,0,0]}}]</script>
 <script>var kitLabels = {"recommended":"Best fit"};</script>
 <script>/* plot areas: the areas a plot fills and the notes it writes on itself, not referenced from pages: pack joins it in front of

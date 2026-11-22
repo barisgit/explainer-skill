@@ -10,7 +10,8 @@
        note    the key, or (record) => text, of a muted line under the value
      state   (record) => "fit", "maybe" or "out": fit and maybe rows get a coloured edge, out rows are muted
      class   more classes after "compare"
-   On a phone a table too wide for it scrolls sideways, its first column staying in view.
+   On a phone a table of two columns (a list of names and values) stacks each name over its value under the stacked column heads;
+   a wider one scrolls sideways, its first column staying in view.
    To ask which row the reader picks, give the same rows and cols to a Question (kit Question).
    Rendered when the page packs, so it shows before scripts run and prints. */
 import type { ComponentChildren } from "preact";
@@ -69,17 +70,23 @@ export type RowHead = (value: ComponentChildren, index: number) => ComponentChil
 /**
  * Renders `table.compare` in a `div.scroll` as a Markdown table does (src/mdx/compile.ts): each row's first cell is `<th scope="row">`, every
  * other cell carries its column's head as `data-label`, and a numeric column is `class="num"` on its header and cells.
- * `head` writes each row's first value (the row's name), before that cell's note.
+ * `head` writes each row's first value (the row's name), before that cell's note; `stack` marks the table `data-stack`, which
+ * stacks each row on a phone.
  */
 export function compareTable<Row>(
 	{ rows, cols, state, class: classes, id }: TableProps<Row>,
 	head: RowHead = (value) => value,
+	stack = false,
 ) {
 	const columns = cols.map((col) => ({ head: col.head, ...columnCells(rows, col) }));
 	const num = (column: { num: boolean }) => (column.num ? "num" : undefined);
 	return (
 		<div class="scroll">
-			<table class={classes ? `compare ${classes}` : "compare"} id={id}>
+			<table
+				class={classes ? `compare ${classes}` : "compare"}
+				id={id}
+				data-stack={stack ? "" : undefined}
+			>
 				<thead>
 					<tr>
 						{columns.map((column) => (
@@ -112,7 +119,7 @@ export function compareTable<Row>(
 	);
 }
 
-/** A comparison table of `rows`: compareTable with each row named by its first value. */
+/** A comparison table of `rows`: compareTable with each row named by its first value; two columns carry `data-stack`, as in Markdown. */
 export function Table<Row>(props: TableProps<Row>) {
-	return compareTable(props);
+	return compareTable(props, undefined, props.cols.length === 2);
 }

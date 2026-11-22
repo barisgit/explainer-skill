@@ -317,7 +317,8 @@ function numericCell(cell: Element) {
 
 /**
  * Markdown tables become the kit's `table.compare` in a `div.scroll`, as a v0.8 page writes one: each body row's first cell is its header
- * (`<th scope="row">`), every other cell carries its column's header as `data-label`, and a right-aligned column is `class="num"` (numericCell).
+ * (`<th scope="row">`), every other cell carries its column's header as `data-label`, a right-aligned column is `class="num"` (numericCell),
+ * and a table of two columns carries `data-stack`.
  */
 function compareTables(tree: HastRoot) {
 	inScrollBoxes(tree);
@@ -325,14 +326,19 @@ function compareTables(tree: HastRoot) {
 		if (table.tagName !== "table") {
 			continue;
 		}
-		table.properties = { ...table.properties, className: ["compare"] };
+		const [head] = rowsOf(table, "thead");
+		const labels = head ? childElements(head, "th").map(hastText) : [];
+		// A Markdown table spans no cells, so two heads are two columns: a list of names and values, which stacks on a phone.
+		table.properties = {
+			...table.properties,
+			className: ["compare"],
+			...(labels.length === 2 ? { dataStack: "" } : {}),
+		};
 		for (const cell of elementsOf(table)) {
 			if (cell.tagName === "th" || cell.tagName === "td") {
 				numericCell(cell);
 			}
 		}
-		const [head] = rowsOf(table, "thead");
-		const labels = head ? childElements(head, "th").map(hastText) : [];
 		for (const row of rowsOf(table, "tbody")) {
 			labelRow(row, labels);
 		}

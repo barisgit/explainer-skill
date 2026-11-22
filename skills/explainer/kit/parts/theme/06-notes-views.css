@@ -1,22 +1,74 @@
-/* theme part: caveats, details, recalls, drill-down views, reduced motion, print. */
-/* Caveat: one line beside the claim it changes; the rest goes in <details>. <b> names the kind (Inferred, Unknown). */
+/* theme part: callouts, caveats, procedures, details, recalls, drill-down views, reduced motion, print. */
+/* Callout: a block the reader should not miss in the text (a task to solve, a rule to keep), framed by a hairline. Caveat: what
+   changes how a claim reads (Inferred, Unknown, a common mistake), in the warning's tint. Both keep the measure of the text, and
+   a <b> first in either names its kind. */
+.callout,
 .caveat {
 	max-inline-size: 66ch;
 	margin: 1.25rem 0;
 	padding: 0.625rem 0.875rem;
-	background: var(--warn-soft);
 	border-radius: var(--radius);
 }
-.caveat b {
+.callout {
+	border: 1px solid var(--rule);
+	background: var(--surface);
+}
+.caveat {
+	background: var(--warn-soft);
+}
+:is(.callout, .caveat) b:first-child {
 	font-weight: 600;
-	color: var(--warn);
 	margin-inline-end: 0.5rem;
 }
-.caveat > :first-child {
+.caveat b:first-child {
+	color: var(--warn);
+}
+:is(.callout, .caveat) > :first-child {
 	margin-top: 0;
 }
-.caveat > :last-child {
+:is(.callout, .caveat) > :last-child {
 	margin-bottom: 0;
+}
+/* Procedure: a numbered list of steps done in order, each number in a ring on a hairline that runs to the next step.
+   <div class="procedure"> around a Markdown list. The ring shows the item's own number, so a list that starts at 3 says 3. */
+.procedure > ol {
+	padding-inline-start: 2.5rem;
+	list-style: none;
+}
+.procedure > ol > li {
+	position: relative;
+	padding-block-end: 1.25rem;
+}
+.procedure > ol > li:last-child {
+	padding-block-end: 0;
+}
+.procedure > ol > li::before {
+	content: counter(list-item);
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-start: -2.5rem;
+	display: grid;
+	place-items: center;
+	inline-size: 1.75rem;
+	block-size: 1.75rem;
+	border: 1px solid var(--rule-strong);
+	border-radius: 50%;
+	background: var(--under);
+	font: 500 var(--size-label) / 1 var(--font);
+	font-variant-numeric: tabular-nums;
+}
+.procedure > ol > li:not(:last-child)::after {
+	content: "";
+	position: absolute;
+	inset-block: 2rem 0.25rem;
+	inset-inline-start: calc(-2.5rem + 0.875rem - 0.5px);
+	border-inline-start: 1px solid var(--rule);
+}
+.procedure > ol > li > :first-child {
+	margin-block-start: 0;
+}
+.procedure > ol > li > :last-child {
+	margin-block-end: 0;
 }
 .detail {
 	margin: 0.75rem 0;
@@ -59,15 +111,21 @@
 .term[aria-expanded="false"] + .recall {
 	display: none;
 }
+/* A fold in the text keeps the text's measure, so its rules do not read as the end of a section. Folds that are rows (a tree, a
+   ranking, a record) and a figure's fold take their own width. */
 details {
+	max-inline-size: 66ch;
 	margin: 1.25rem 0;
 	border-block: 1px solid var(--rule);
 }
+/* The question is one line of text that wraps under itself, the chevron hanging before it, so a formula or a link in it stays
+   in the sentence. The padding keeps a row at least 2.75rem tall. */
 summary {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
+	display: block;
 	min-block-size: 2.75rem;
+	padding-block: calc((2.75rem - 1lh) / 2);
+	padding-inline-start: 1.25rem;
+	text-indent: -1.25rem;
 	list-style: none;
 	cursor: pointer;
 	font-weight: 500;
@@ -77,10 +135,11 @@ summary::-webkit-details-marker {
 }
 summary::before {
 	content: "";
-	flex: none;
+	display: inline-block;
 	inline-size: 0.4375rem;
 	block-size: 0.4375rem;
-	margin-inline: 0.125rem 0.25rem;
+	margin-inline: 0.125rem 0.6875rem;
+	vertical-align: 0.15em;
 	border: solid var(--muted);
 	border-width: 0 1.5px 1.5px 0;
 	transform: rotate(-45deg);
@@ -99,6 +158,7 @@ details > :last-child:not(summary) {
 	margin-block-end: 1rem;
 }
 .fig > details {
+	max-inline-size: none;
 	margin: 0;
 	border-block-end: 0;
 }

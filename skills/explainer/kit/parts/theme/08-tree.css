@@ -21,8 +21,10 @@
 	gap: 0 0.5rem;
 	min-block-size: 2.5rem;
 	padding-block: 0.5625rem;
+	padding-inline: 0;
 	border-block-start: 1px solid var(--rule);
 	line-height: 1.35;
+	text-indent: 0;
 }
 .tree :where(summary, .tree > a, details > a, .tree > .tree-head, .tree-row):has(> :nth-child(3)) {
 	--tree-n: 2;
@@ -79,13 +81,15 @@
 	font-weight: 500;
 }
 .tree details {
+	max-inline-size: none;
 	margin: 0;
 	border: 0;
 }
-/* The chevron is an empty box with no baseline of its own: it is centred on the first line instead. */
+/* The chevron is an empty box with no baseline of its own: it is centred on the first line instead, in its own column. */
 .tree summary::before {
 	align-self: start;
 	margin-block-start: 0.375rem;
+	margin-inline-end: 0.25rem;
 }
 /* Levels by weight: the top level and its totals strongest, a leaf (a fold with no fold inside) plain. */
 .tree > details > summary {

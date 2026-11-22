@@ -56,6 +56,7 @@ ${pageContract({
 	"on a phone the wide table scrolls sideways inside its box": `!phone || document.getElementById("wide").scrollWidth > document.getElementById("wide").clientWidth + 100`,
 	"scrolled, its row names stay at its start": `!phone || (document.getElementById("wide").scrollLeft = 200, Math.abs(box("#wide tbody th").left - box("#wide").left) < 1 && Math.abs(box("#wide thead th").left - box("#wide").left) < 1)`,
 	"a row name covers the cells that pass under it": `!phone || getComputedStyle(document.querySelector("#wide tbody th")).backgroundColor === getComputedStyle(document.body).backgroundColor`,
+	"a row name keeps its row's hairline over the cells under it": `!phone || Math.abs(box("#wide tbody tr:first-child th").bottom - box("#wide tbody tr:first-child td").bottom) < 1 && getComputedStyle(document.querySelector("#wide tbody tr:first-child th")).borderBottomWidth === "1px"`,
 })}</script></body></html>`;
 
 	expect(await packAndRun(dir, "phone-table", page)).toEqual([]);
@@ -188,7 +189,7 @@ const panel = document.getElementById("panel");
 const style = (id) => getComputedStyle(document.getElementById(id));
 const local = (id) => ["marginTop", "marginBottom", "paddingTop", "borderTopWidth"].every((key) => style(id)[key] === "0px");
 ${pageContract({
-	"page sections are set apart by space alone": `parseFloat(style("outer").marginTop) >= 56 && style("outer").borderTopWidth === "0px"`,
+	"a page section opens with a hairline below its gap": `parseFloat(style("outer").marginTop) >= 36 && style("outer").borderTopWidth === "1px"`,
 	"direct panel sections have no page rhythm": `local("direct")`,
 	"nested panel sections have no page rhythm": `local("nested")`,
 	// Clipped 0.375rem out (overflow-clip-margin), so the focus ring of a control at the figure's edge shows.

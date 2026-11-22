@@ -209,11 +209,13 @@
 /* A record's detail in a table row or on a card: the label is its summary, in line with the other cells, with no rules or
    space of its own, and the text it opens to reads as prose under it. */
 .records :is(.compare th, .lane li) > details {
+	max-inline-size: none;
 	margin: 0;
 	border: 0;
 }
 .records :is(.compare th, .lane li) > details > summary {
 	min-block-size: 1.5rem;
+	padding-block: 0;
 	margin: 0;
 	font-size: inherit;
 	font-weight: inherit;

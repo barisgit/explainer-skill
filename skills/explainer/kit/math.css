@@ -10,7 +10,8 @@
      | Quantity | Formula | Symbols |
      |---|---|---|
      | Output voltage | $V_{out} = V_{ref}\,\frac{R_1 + R_2}{R_2}$ | $V_{ref}$ = 7.15 V; $R_1$ output to inverting input |
-   On a phone the sheet scrolls sideways when a formula is wider than the screen; inside a table write | as \vert. */
+   On a phone the sheet scrolls sideways when a formula is wider than the screen, while a sheet of two columns (the name, then the
+   formula with its symbols) stacks each row; inside a table write | as \vert. */
 
 /* An inline formula is one unit in the line. Temml's sheet makes math a wrapping flex box for its own line breaks, which pack turns off. */
 .math-tail,

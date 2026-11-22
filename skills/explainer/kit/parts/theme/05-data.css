@@ -112,6 +112,7 @@
 	border-block-end: 0;
 }
 .rank > li > details {
+	max-inline-size: none;
 	margin: 0;
 	border: 0;
 }
@@ -133,6 +134,10 @@
 	/* A shared value width keeps the bars on the same scale when digit counts differ. */
 	grid-template-columns: auto minmax(0, 2fr) minmax(2rem, 1fr) minmax(3.5rem, 6rem);
 	margin: 0;
+	text-indent: 0;
+}
+.rank > li > details > summary::before {
+	margin-inline-end: 0.25rem;
 }
 .rank .name {
 	font-weight: 600;
@@ -172,9 +177,22 @@
 .scroll {
 	overflow-x: auto;
 }
+/* A table in the text keeps the space of the other blocks there (a fold, Records), so two in a row do not run together. */
+:where(.page :is(section, [data-overview]) > .scroll) {
+	margin-block: 1.25rem;
+}
+/* Separate borders with no spacing draw as collapsed ones, but each cell keeps its own: a row name that stays in view on a phone
+   (below) keeps its row's hairline. */
 .compare {
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 0;
 	inline-size: 100%;
+}
+/* A table in the text's column takes the width its columns need, so a few short columns do not spread across the page. */
+@media (min-width: 48.0625rem) {
+	.page :is(section, [data-overview]) > .scroll > .compare {
+		inline-size: auto;
+	}
 }
 .compare th,
 .compare td {
@@ -199,8 +217,9 @@
 .compare tbody tr:last-child > * {
 	border-block-end: 0;
 }
+/* A row's name is set in the text's weight, a little firmer: a column of bold names would be the loudest thing on the screen. */
 .compare tbody th {
-	font-weight: 600;
+	font-weight: 500;
 	min-inline-size: 7rem;
 }
 :where(.compare) tr[data-state="fit"] > :first-child {
@@ -212,9 +231,6 @@
 /* biome-ignore lint/style/noDescendingSpecificity: the rules above with higher specificity set border-block-end on these cells, never color */
 .compare tr[data-state="out"] > * {
 	color: var(--muted);
-}
-.compare tr[data-state="out"] > th {
-	font-weight: 500;
 }
 .compare .val {
 	display: block;
@@ -321,6 +337,41 @@
 	}
 	:where(.compare) :is(.is-lit, [data-kit-state][data-state~="now"]) > th[scope="row"] {
 		background: var(--accent-soft);
+	}
+	/* A table of two columns, each row a name and its value (a formula sheet), stacks instead: the name over the value, which
+	   takes the column's full width, since scrolling would cut the one long column at the screen's edge. The column heads stack
+	   the same way above the first row, so a unit in a heading still reads. pack marks a two-column Markdown table data-stack,
+	   and Table a two-column one; a table written by hand stacks only with the attribute. Child combinators keep a table nested
+	   in a cell as it is. */
+	.compare[data-stack],
+	.compare[data-stack] > :is(thead, tbody),
+	.compare[data-stack] > :is(thead, tbody) > tr {
+		display: block;
+		inline-size: auto;
+		min-inline-size: 0;
+	}
+	.compare[data-stack] > :is(thead, tbody) > tr {
+		padding-block: 0.625rem;
+		border-block-end: 1px solid var(--rule);
+	}
+	.compare[data-stack] > tbody > tr:last-child {
+		border-block-end: 0;
+	}
+	.compare[data-stack] > thead > tr {
+		padding-block-start: 0;
+		border-block-end-color: var(--rule-strong);
+	}
+	.compare[data-stack] > :is(thead, tbody) > tr > :is(th, td) {
+		display: block;
+		position: static;
+		max-inline-size: none;
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: start;
+	}
+	.compare[data-stack] > :is(thead, tbody) > tr > :first-child {
+		margin-block-end: 0.25rem;
 	}
 }
 /* Paper cannot scroll, so a printed table fits the page's width: label-size text in tighter cells, words breaking where the
