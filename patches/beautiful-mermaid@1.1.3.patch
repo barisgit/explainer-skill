@@ -312,7 +312,7 @@ index b4a6454e1015b38924cacc674f488d3460861af2..a78ca6a0384237e6edf77eaa7264dd33
        return renderSvg(positioned, colors, font, transparent)
      }
 diff --git a/src/layout-engine.ts b/src/layout-engine.ts
-index 8557308223e16670db3d126d9c55673b6e946598..4e6b2c1275f55bb5b2855b7a7fe8d5177db249e0 100644
+index 8557308223e16670db3d126d9c55673b6e946598..fccbb44c84d7f6e9066b65836dc15874e42eaf18 100644
 --- a/src/layout-engine.ts
 +++ b/src/layout-engine.ts
 @@ -29,8 +29,8 @@ import type {
@@ -490,7 +490,7 @@ index 8557308223e16670db3d126d9c55673b6e946598..4e6b2c1275f55bb5b2855b7a7fe8d517
        source: originalEdge.source,
        target: originalEdge.target,
        label: originalEdge.label,
-@@ -1212,6 +1249,23 @@ function adjustJunctionForGroups(
+@@ -1212,6 +1249,40 @@ function adjustJunctionForGroups(
    return crossingGroup.y - GAP // TD
  }
  
@@ -511,10 +511,27 @@ index 8557308223e16670db3d126d9c55673b6e946598..4e6b2c1275f55bb5b2855b7a7fe8d517
 +    ((e.source === node.id && onSide(e.points[0])) || (e.target === node.id && onSide(e.points.at(-1)))))
 +}
 +
++/** An orthogonal bundle segment enters the box if its bounds overlap the open interior on both axes. */
++function entersNode(a: Point, b: Point, node: PositionedNode): boolean {
++  return Math.min(a.x, b.x) < node.x + node.width && Math.max(a.x, b.x) > node.x &&
++    Math.min(a.y, b.y) < node.y + node.height && Math.max(a.y, b.y) > node.y
++}
++
++type BundleRoute = { edge: PositionedEdge; points: Point[] }
++
++/** Keep the routed paths and their separate ports if any branch would enter a node, even at either end of the bundle. */
++function applyBundle(routes: BundleRoute[], nodes: PositionedNode[]): boolean {
++  const entersBox = ({ points }: BundleRoute) => points.some((b, i) =>
++    i > 0 && nodes.some(node => entersNode(points[i - 1]!, b, node)))
++  if (routes.some(entersBox)) return false
++  for (const { edge, points } of routes) edge.points = points
++  return true
++}
++
  /**
   * Bundle fan-out and fan-in edge paths so they share a common trunk segment.
   *
-@@ -1267,6 +1321,9 @@ function bundleEdgePaths(
+@@ -1267,10 +1338,14 @@ function bundleEdgePaths(
      })
      if (forward.length < 2) continue
  
@@ -524,7 +541,47 @@ index 8557308223e16670db3d126d9c55673b6e946598..4e6b2c1275f55bb5b2855b7a7fe8d517
      const targets = forward.map(e => ({ edge: e, node: nodeMap.get(e.target)! }))
      const srcCX = source.x + source.width / 2
      const srcCY = source.y + source.height / 2
-@@ -1343,6 +1400,9 @@ function bundleEdgePaths(
+ 
++    const routes: BundleRoute[] = []
+     if (isHorizontal) {
+       const exitX = isLR ? source.x + source.width : source.x
+       const exitY = srcCY
+@@ -1284,13 +1359,12 @@ function bundleEdgePaths(
+       for (const { edge, node: target } of targets) {
+         const entryX = isLR ? target.x : target.x + target.width
+         const entryY = target.y + target.height / 2
+-        edge.points = [
++        routes.push({ edge, points: [
+           { x: exitX, y: exitY },
+           { x: junctionX, y: exitY },
+           { x: junctionX, y: entryY },
+           { x: entryX, y: entryY },
+-        ]
+-        processed.add(edge)
++        ] })
+       }
+     } else {
+       const exitX = srcCX
+@@ -1305,15 +1379,15 @@ function bundleEdgePaths(
+       for (const { edge, node: target } of targets) {
+         const entryX = target.x + target.width / 2
+         const entryY = isBT ? target.y + target.height : target.y
+-        edge.points = [
++        routes.push({ edge, points: [
+           { x: exitX, y: exitY },
+           { x: exitX, y: junctionY },
+           { x: entryX, y: junctionY },
+           { x: entryX, y: entryY },
+-        ]
+-        processed.add(edge)
++        ] })
+       }
+     }
++    if (applyBundle(routes, nodes)) for (const edge of forward) processed.add(edge)
+   }
+ 
+   // --- Fan-in: group edges by shared target (skip already-bundled edges) ---
+@@ -1343,10 +1417,14 @@ function bundleEdgePaths(
      })
      if (forward.length < 2) continue
  
@@ -534,7 +591,45 @@ index 8557308223e16670db3d126d9c55673b6e946598..4e6b2c1275f55bb5b2855b7a7fe8d517
      const sources = forward.map(e => ({ edge: e, node: nodeMap.get(e.source)! }))
      const tgtCX = target.x + target.width / 2
      const tgtCY = target.y + target.height / 2
-@@ -1404,9 +1464,25 @@ export function layoutGraphSync(
+ 
++    const routes: BundleRoute[] = []
+     if (isHorizontal) {
+       const entryX = isLR ? target.x : target.x + target.width
+       const entryY = tgtCY
+@@ -1360,12 +1438,12 @@ function bundleEdgePaths(
+       for (const { edge, node: src } of sources) {
+         const exitX = isLR ? src.x + src.width : src.x
+         const exitY = src.y + src.height / 2
+-        edge.points = [
++        routes.push({ edge, points: [
+           { x: exitX, y: exitY },
+           { x: junctionX, y: exitY },
+           { x: junctionX, y: entryY },
+           { x: entryX, y: entryY },
+-        ]
++        ] })
+       }
+     } else {
+       const entryX = tgtCX
+@@ -1380,14 +1458,15 @@ function bundleEdgePaths(
+       for (const { edge, node: src } of sources) {
+         const exitX = src.x + src.width / 2
+         const exitY = isBT ? src.y : src.y + src.height
+-        edge.points = [
++        routes.push({ edge, points: [
+           { x: exitX, y: exitY },
+           { x: exitX, y: junctionY },
+           { x: entryX, y: junctionY },
+           { x: entryX, y: entryY },
+-        ]
++        ] })
+       }
+     }
++    applyBundle(routes, nodes)
+   }
+ }
+ 
+@@ -1404,9 +1483,25 @@ export function layoutGraphSync(
    options: RenderOptions = {}
  ): PositionedGraph {
    const opts = { ...DEFAULTS, ...options }

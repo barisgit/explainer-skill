@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Packed Mermaid flowcharts keep routed bends when a shared edge trunk would cut through a node, including the phone layout.
 - Each section's answer is a figure, table or diagram by default, with prose interpreting it; qualitative subjects have forms too (a divergence as a flowchart, what each side has as a matrix with a status column, a history as a timeline). Link a packed page rather than embed it in a host's inline frame.
 - `check` reports the page's reading load on arrival (words on the first screen and on load, number of sections, bare words per section) and warns about a section with more than about 150 words and no figure, table, diagram or code: make its answer a figure and keep the prose to interpreting it.
 - `check` groups distant `data-ref` warnings by the pair of places they link, with a count and up to three names. It also warns when a schematic or Mermaid diagram scrolls sideways in the pinned `.beside` column: lay it out tall or give it the full width.
