@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { packAndRun, packHtml, SETTLED, scratch } from "./support.ts";
+import { inPage, packAndRun, packHtml, SETTLED, scratch } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -56,10 +56,11 @@ test("only a ref with a partner outside its own diagram lights, dims or takes fo
 	expect(inert(node("api")), "an unlinked node is neither focusable nor shows a pointer");
 	expect(events.every((refs) => refs === ""), "no ref event names an unlinked ref");
 	hover($("#term"));
-	expect(lit() === "term,cache" && dimmed() && getComputedStyle(node("api")).opacity === "0.3", "the prose term lights its node and dims the rest");
+	expect(lit() === "term,cache" && dimmed() && getComputedStyle(node("api")).opacity === "0.75", "the prose term lights its node and fades the rest a little");
+	expect(getComputedStyle(node("cache")).color === getComputedStyle($("main")).color, "the lit node's text keeps its ink");
 	expect(events.at(-1) === "cache", "the ref event names the linked ref");
 	hover(node("cache"));
-	expect(lit() === "term,cache", "the linked node lights its term");
+	expect(lit() === "term,cache" && dimmed() && getComputedStyle(node("api")).opacity === "0.75", "the linked node lights its term and fades the rest as the term does");
 	expect($("#term").tabIndex === 0 && getComputedStyle($("#term")).cursor === "pointer", "a linked term is focusable and shows a pointer");
 	hover($("main"));
 	expect(lit() === "" && !dimmed(), "leaving the parts clears the highlight");`;
@@ -106,7 +107,7 @@ test("HTML in one SVG is one place, and a nested SVG dims as part of the outermo
 	expect(lit() === "" && !$("#fa").classList.contains("is-linked"), "two labels in one SVG's foreignObject do not link");
 	hover($("main span"));
 	expect($("#outer").classList.contains("has-lit") && !$("#inner").classList.contains("has-lit"), "the outermost SVG holds the dimming");
-	expect(getComputedStyle($("#fa")).opacity === "0.3", "the rest of the outermost SVG dims");`;
+	expect(getComputedStyle($("#fa")).opacity === "0.75", "the rest of the outermost SVG dims");`;
 	expect(await packAndRun(dir, "foreign", PAGE(script, body))).toEqual([]);
 }, 30_000);
 
@@ -250,3 +251,44 @@ test("the file's starting states are what kit:link.js writes: a named ref with n
 	expect(html).toContain('<span id="pkg" data-ref="pkg">');
 	expect(html).toContain('<span id="own" data-ref="own" data-state="fit">');
 });
+
+test("a mouse click that unpins a term leaves nothing lit once the pointer moves away, while keyboard focus still lights it", async () => {
+	const output = dir.path("mouse-focus.out.html");
+	const page = PAGE("", `${DIAGRAM}<p id="away">Elsewhere.</p>`);
+	expect((await packHtml(dir.write("mouse-focus.html", page), output)).error).toBe("");
+	const states = await inPage(output, async (cdp) => {
+		const centre = (id: string) =>
+			cdp.evaluate<{ x: number; y: number }>(
+				`(() => { const r = document.getElementById("${id}").getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`,
+			);
+		const press = async (at: { x: number; y: number }) => {
+			for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+				await cdp.send("Input.dispatchMouseEvent", { type, ...at, button: "left", clickCount: 1 });
+			}
+		};
+		const lit = () =>
+			cdp.evaluate<string>(
+				`[...document.querySelectorAll(".is-lit")].map((el) => el.id || el.dataset.ref).join()`,
+			);
+		for (const type of ["keyDown", "keyUp"]) {
+			await cdp.send("Input.dispatchKeyEvent", {
+				type,
+				key: "Tab",
+				code: "Tab",
+				windowsVirtualKeyCode: 9,
+			});
+		}
+		const keyboard = {
+			focused: await cdp.evaluate<string>("document.activeElement.id"),
+			lit: await lit(),
+		};
+		const away = await centre("away");
+		await press(away);
+		const term = await centre("term");
+		await press(term);
+		await press(term);
+		await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...away });
+		return { keyboard, afterMouse: await lit() };
+	});
+	expect(states).toEqual({ keyboard: { focused: "term", lit: "term,cache" }, afterMouse: "" });
+}, 30_000);

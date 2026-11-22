@@ -232,12 +232,19 @@ test("a part's name and a net's name in the prose light the part and the wires t
 			return lit.some((el) => el.matches("g[data-ref=R_C]"))
 				&& lit.some((el) => el.matches("path.wire"))
 				&& document.querySelector("svg").classList.contains("has-lit")
-				&& getComputedStyle(document.querySelector("svg g[data-ref=Q1]")).opacity === "0.3";
+				&& getComputedStyle(document.querySelector("svg g[data-ref=Q1]")).opacity === "0.75";
+		})()`,
+		"a lit part's wires keep their ink, and its name its colour": `(() => {
+			const svg = document.querySelector("svg");
+			const wire = svg.querySelector("path.wire.is-lit");
+			const name = svg.querySelector("g[data-ref=R_C].is-lit text:not(.value)");
+			return getComputedStyle(wire).stroke === getComputedStyle(svg).color && getComputedStyle(name).fill === getComputedStyle(svg).color;
 		})()`,
 		"a lit part draws its symbol in the accent, not a frame round its hit area": `(() => {
 			const part = document.querySelector("svg g[data-ref=R_C]");
+			const accent = () => { const probe = document.body.appendChild(document.createElement("i")); probe.style.color = "var(--accent)"; const c = getComputedStyle(probe).color; probe.remove(); return c; };
 			return part.classList.contains("is-lit")
-				&& getComputedStyle(part.querySelector(":scope > g > path")).stroke === getComputedStyle(part).color
+				&& getComputedStyle(part.querySelector(":scope > g > path")).stroke === accent()
 				&& getComputedStyle(part.querySelector(":scope > rect.hit")).stroke === "none";
 		})()`,
 		"a lit part's filled marks stay unstroked": `(() => {
@@ -250,7 +257,8 @@ test("a part's name and a net's name in the prose light the part and the wires t
 			const lit = [...document.querySelectorAll("svg .is-lit")];
 			return lit.length > 2
 				&& lit.every((el) => el.getAttribute("data-ref").split(" ").includes("vcc"))
-				&& !document.querySelector("svg path[data-ref^='b ']").classList.contains("is-lit");
+				&& !document.querySelector("svg path[data-ref^='b ']").classList.contains("is-lit")
+				&& getComputedStyle(document.querySelector("svg path.wire.is-lit")).stroke !== getComputedStyle(document.querySelector("svg")).color;
 		})()`,
 	});
 	expect(await packAndRun(dir, "linked", page)).toEqual([]);

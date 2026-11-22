@@ -11,7 +11,9 @@
    its own. A prose term and a diagram part link, as do two diagrams sharing a node id.
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
-   One element may carry several refs, space separated: data-ref="cache db"; its linked ones light. In an SVG that has a lit part, unlit parts dim.
+   One element may carry several refs, space separated: data-ref="cache db"; its linked ones light.
+   A lit term takes the accent's tint; a lit SVG part is outlined in the accent, its text and wires keep their ink, and the rest of
+   that SVG fades a little, whichever side is hovered. Keyboard focus lights a part too.
    A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
    Refs a client component renders or removes after load link and unlink at once.
@@ -32,7 +34,8 @@
 	let linked = new Set<string>();
 	let linkedParts: Part[] = [];
 
-	// The active part is the hovered one, else the focused one, else the pinned one.
+	// The active part is the hovered one, else the one focused from the keyboard, else the pinned one. A click focuses a term too,
+	// but that focus is not a request to light it: the click pins or unpins, and the light leaves with the pointer.
 	let hovered: Part | null = null;
 	let focused: Part | null = null;
 	let pinned: Part | null = null;
@@ -274,7 +277,7 @@
 		paint();
 	});
 	document.addEventListener("focusin", (e) => {
-		focused = partOf(e);
+		focused = e.target instanceof Element && e.target.matches(":focus-visible") ? partOf(e) : null;
 		paint();
 	});
 	document.addEventListener("focusout", () => {
