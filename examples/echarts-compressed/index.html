@@ -2838,8 +2838,8 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 }
 
 /* Linked highlighting: parts that share a data-ref are lit together, the same way whichever one is hovered: a term takes the
-   accent's tint, an SVG part's shapes are outlined in the accent while its text keeps its ink, and the rest of that SVG fades a
-   little (--_dim), so the figure stays readable while the pointer crosses it. A stepper's current part is drawn in the accent.
+   accent's tint and outline, an SVG part's shapes are outlined in the accent while its text keeps its ink, and the rest of that
+   SVG fades a little (--_dim), so the figure stays readable while the pointer crosses it.
    Only a term that links (is-linked, set by kit:link.js) looks like one. */
 :is(span, b, strong, em, code, mark).is-linked {
 	text-decoration: underline dotted var(--muted) 1px;
@@ -2849,6 +2849,18 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 }
 :is(.is-lit, [data-step].is-now, [data-kit-state][data-state~="now"]):not(svg *) {
 	background: var(--accent-soft);
+}
+/* Keep each line of a wrapped term outlined without moving the text. Code fences and number tags have their own outlines. */
+:is(span, b, strong, em, code, mark):is(
+	.is-lit,
+	[data-step].is-now,
+	[data-kit-state][data-state~="now"]
+):not(svg *, pre *, [data-tag]) {
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	box-shadow: 0 0 0 1px var(--accent);
+	text-decoration: underline solid var(--accent) 1px;
+	text-underline-offset: 0.22em;
 }
 svg :is(.is-now, [data-kit-state][data-state~="now"]) {
 	color: var(--accent);
@@ -5901,8 +5913,8 @@ window.PlotTween = () => {
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light.
-   A lit term takes the accent's tint; a lit SVG part is outlined in the accent, its text and wires keep their ink, and the rest of
-   that SVG fades a little, whichever side is hovered. Keyboard focus lights a part too.
+   A lit term gets an accent tint, outline and solid underline. A lit SVG part gets an accent outline, keeps its text and wire
+   ink, and the rest of that SVG fades a little, whichever side is hovered. Keyboard focus lights a part too.
    A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
    Refs a client component renders or removes after load link and unlink at once.

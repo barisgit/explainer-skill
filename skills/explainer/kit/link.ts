@@ -12,8 +12,8 @@
    A part whose refs do not link does nothing: no highlight, no dimming, no focus or pointer, and it does not pass hover or click
    to a linked part around it. Linked elements carry class is-linked; kit reply keeps its note targets focusable on its own.
    One element may carry several refs, space separated: data-ref="cache db"; its linked ones light.
-   A lit term takes the accent's tint; a lit SVG part is outlined in the accent, its text and wires keep their ink, and the rest of
-   that SVG fades a little, whichever side is hovered. Keyboard focus lights a part too.
+   A lit term gets an accent tint, outline and solid underline. A lit SVG part gets an accent outline, keeps its text and wire
+   ink, and the rest of that SVG fades a little, whichever side is hovered. Keyboard focus lights a part too.
    A click pins the highlight until the next click elsewhere, Escape, or its part stops linking. Charts: document.addEventListener("ref", (e) => e.detail.refs)
    fires when the lit refs change, with the refs now lit ([] when none), for dispatching a highlight to ECharts.
    Refs a client component renders or removes after load link and unlink at once.

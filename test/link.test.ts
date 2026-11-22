@@ -55,15 +55,24 @@ test("only a ref with a partner outside its own diagram lights, dims or takes fo
 	expect(lit() === "", "a click on an unlinked node pins nothing");
 	expect(inert(node("api")), "an unlinked node is neither focusable nor shows a pointer");
 	expect(events.every((refs) => refs === ""), "no ref event names an unlinked ref");
+	const box = () => JSON.stringify($("#term").getBoundingClientRect());
+	const unlitBox = box();
 	hover($("#term"));
 	expect(lit() === "term,cache" && dimmed() && getComputedStyle(node("api")).opacity === "0.75", "the prose term lights its node and fades the rest a little");
 	expect(getComputedStyle(node("cache")).color === getComputedStyle($("main")).color, "the lit node's text keeps its ink");
 	expect(events.at(-1) === "cache", "the ref event names the linked ref");
 	hover(node("cache"));
 	expect(lit() === "term,cache" && dimmed() && getComputedStyle(node("api")).opacity === "0.75", "the linked node lights its term and fades the rest as the term does");
+	const term = getComputedStyle($("#term"));
+	for (const scheme of ["light", "dark"]) {
+		document.documentElement.dataset.scheme = scheme;
+		const stroke = getComputedStyle($('svg [data-ref="cache"] rect')).stroke;
+		expect(term.boxShadow.startsWith(stroke) && term.textDecorationColor === stroke && term.textDecorationStyle === "solid", "the term's ring and solid underline match its node's accent outline in " + scheme);
+	}
+	expect(box() === unlitBox, "highlighting does not move or resize the term");
 	expect($("#term").tabIndex === 0 && getComputedStyle($("#term")).cursor === "pointer", "a linked term is focusable and shows a pointer");
 	hover($("main"));
-	expect(lit() === "" && !dimmed(), "leaving the parts clears the highlight");`;
+	expect(lit() === "" && !dimmed() && term.boxShadow === "none" && term.textDecorationStyle === "dotted", "leaving the parts clears the highlight and restores the quiet link cue");`;
 	expect(await packAndRun(dir, "partners", PAGE(script))).toEqual([]);
 }, 30_000);
 
@@ -315,10 +324,13 @@ test("focus lights a term only while the reader is on the keyboard, so a click t
 }, 30_000);
 
 test("hovering another ref leaves a stepper's not-yet parts faded as the stepper set them", async () => {
-	const body = `${DIAGRAM}<div data-ref-states='{"api":"not-yet"}'></div>`;
+	const body = `${DIAGRAM}<div data-ref-states='{"api":"not-yet","current":"now"}'></div>
+<p><span id="current" data-ref="current">Current step</span></p>`;
 	const script = `
 	await Promise.resolve();
 	const before = getComputedStyle(node("api")).opacity;
+	const current = getComputedStyle($("#current"));
+	expect(current.boxShadow !== "none" && current.textDecorationStyle === "solid", "the current step's term uses the linked term treatment even without a partner");
 	hover($("#term"));
 	expect(dimmed() && before === "0.15" && getComputedStyle(node("api")).opacity === "0.15", "a not-yet part keeps its stepper opacity while another part is lit");`;
 	expect(await packAndRun(dir, "not-yet", PAGE(script, body))).toEqual([]);

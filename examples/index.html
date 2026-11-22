@@ -2837,8 +2837,8 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 }
 
 /* Linked highlighting: parts that share a data-ref are lit together, the same way whichever one is hovered: a term takes the
-   accent's tint, an SVG part's shapes are outlined in the accent while its text keeps its ink, and the rest of that SVG fades a
-   little (--_dim), so the figure stays readable while the pointer crosses it. A stepper's current part is drawn in the accent.
+   accent's tint and outline, an SVG part's shapes are outlined in the accent while its text keeps its ink, and the rest of that
+   SVG fades a little (--_dim), so the figure stays readable while the pointer crosses it.
    Only a term that links (is-linked, set by kit:link.js) looks like one. */
 :is(span, b, strong, em, code, mark).is-linked {
 	text-decoration: underline dotted var(--muted) 1px;
@@ -2848,6 +2848,18 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 }
 :is(.is-lit, [data-step].is-now, [data-kit-state][data-state~="now"]):not(svg *) {
 	background: var(--accent-soft);
+}
+/* Keep each line of a wrapped term outlined without moving the text. Code fences and number tags have their own outlines. */
+:is(span, b, strong, em, code, mark):is(
+	.is-lit,
+	[data-step].is-now,
+	[data-kit-state][data-state~="now"]
+):not(svg *, pre *, [data-tag]) {
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	box-shadow: 0 0 0 1px var(--accent);
+	text-decoration: underline solid var(--accent) 1px;
+	text-underline-offset: 0.22em;
 }
 svg :is(.is-now, [data-kit-state][data-state~="now"]) {
 	color: var(--accent);
