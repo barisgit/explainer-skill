@@ -14,9 +14,10 @@
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
      .toc      on a page with two or more view names, or whose <main> asks for it (data-contents, from contents: true), a contents
-               rail: the overview, its sections by their data-nav or else their h2 (ids added when missing), and under the section
-               that first links to a view name, each trail step's siblings (only the step itself past 12). The current section
-               follows scrolling; 07-nav.css places the rail. */
+               rail: the overview, its sections by their data-nav or else their h2 (ids added when missing), each section's own
+               h3s indented under it as its topics, and under the section that first links to a view name, each trail step's
+               siblings (only the step itself past 12). The current section and topic follow scrolling, and the rail scrolls to
+               keep them in sight; 07-nav.css places the rail. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
 window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	/**
@@ -307,11 +308,17 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 
 	/* ---- Contents rail ---- */
 
-	/** One overview section in the rail; `owns` lists the view names whose trail steps it shows. */
+	/** A heading the rail links to and marks while it is the last one scrolled past. */
+	interface Target {
+		heading: HTMLElement;
+		link: HTMLAnchorElement;
+	}
+	/** One overview section in the rail, with its topics (its own h3s); `owns` lists the view names whose trail steps it shows. */
 	interface Entry {
 		section: HTMLElement;
 		li: HTMLLIElement;
 		link: HTMLAnchorElement;
+		topics: Target[];
 		owns: string[];
 	}
 	interface Rail {
@@ -323,20 +330,33 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	/** An id no element has and no view name takes, so the rail's #id link scrolls to its section rather than opening a view. */
 	const freeId = (id: string) => id !== "" && !names.has(id) && !document.getElementById(id);
 
-	/** The section's id, given one from its rail label when it has none, else section-n, section-n+1, ... until one is free. */
-	function sectionId(section: HTMLElement, text: string, n: number) {
-		if (!section.id) {
+	/** The element's id, given one from its rail label when it has none, else <fallback>-n, <fallback>-n+1, ... until one is free. */
+	function anchorId(el: HTMLElement, text: string, fallback: string, n: number) {
+		if (!el.id) {
 			let id = text
 				.toLowerCase()
 				.replace(/[^\p{L}\p{N}]+/gu, "-")
 				.replace(/^-|-$/g, "")
 				.slice(0, 48);
 			for (let k = n; !freeId(id); k++) {
-				id = `section-${k}`;
+				id = `${fallback}-${k}`;
 			}
-			section.id = id;
+			el.id = id;
 		}
-		return section.id;
+		return el.id;
+	}
+
+	/** A heading's rail label: its data-nav, else its text. */
+	const navText = (heading: HTMLElement) =>
+		clean(heading.dataset.nav) || clean(heading.textContent);
+
+	/** The section's topics: the h3s it holds itself (what a ### writes there), each with a link to it. */
+	function topicsOf(section: HTMLElement, id: string) {
+		const headings = [...section.querySelectorAll<HTMLElement>(":scope > h3")];
+		return headings.map((heading, i) => {
+			const text = navText(heading);
+			return { heading, link: make("a", { href: `#${anchorId(heading, text, id, i + 1)}` }, text) };
+		});
 	}
 
 	/**
@@ -344,14 +364,21 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	 * view names the section is the first to link to.
 	 */
 	function entry(section: HTMLElement, heading: HTMLElement, n: number, claimed: Set<string>) {
-		const text =
-			clean(section.dataset.nav) || clean(heading.dataset.nav) || clean(heading.textContent);
-		const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
+		const text = clean(section.dataset.nav) || navText(heading);
+		const id = anchorId(section, text, "section", n);
+		const link = make("a", { href: `#${id}` }, text);
 		const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
 		for (const name of owns) {
 			claimed.add(name);
 		}
-		return { section, li: item(link), link, owns };
+		const li = item(link);
+		const topics = topicsOf(section, id);
+		if (topics.length) {
+			const list = make("ol", { class: "topics" });
+			list.append(...topics.map((t) => item(t.link)));
+			li.append(list);
+		}
+		return { section, li, link, topics, owns };
 	}
 
 	/** The overview's sections with an h2, which the rail lists. */
@@ -425,7 +452,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	function updateRail(rail: Rail, hash: string) {
 		rail.home.setAttribute("href", hash ? `#${overviewHash}` : "#");
 		for (const { li, owns } of rail.entries) {
-			for (const old of li.querySelectorAll("ol")) {
+			for (const old of li.querySelectorAll(":scope > ol:not(.topics)")) {
 				old.remove();
 			}
 			li.append(
@@ -447,18 +474,48 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 		}
 	}
 
-	/** In the overview: the last section whose top has passed a third of the window, or the overview link above them all. */
+	/** The last of `items` whose element's top has passed a third of the window. */
+	const lastPassed = <T>(items: T[], element: (item: T) => HTMLElement) =>
+		items.filter((item) => element(item).getBoundingClientRect().top < innerHeight / 3).at(-1);
+
+	/** The link marked current when the spy last ran, so the rail scrolls only when that changes, never against the reader. */
+	let spied: HTMLAnchorElement | null = null;
+
+	/**
+	 * In the overview: the last section whose top has passed a third of the window, or the overview link above them all, and within
+	 * that section the last topic passed. The topic is the current location and its section is marked as holding it.
+	 */
 	function spy(rail: Rail) {
 		spyQueued = false;
 		const inView = document.documentElement.classList.contains("in-view");
-		const passed = rail.entries
-			.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3)
-			.at(-1);
-		const here = inView ? null : (passed?.link ?? rail.home);
-		for (const a of [rail.home, ...rail.entries.map((e) => e.link)]) {
+		const passed = lastPassed(rail.entries, (e) => e.section);
+		const topic = passed && lastPassed(passed.topics, (t) => t.heading);
+		const here = inView ? null : (topic?.link ?? passed?.link ?? rail.home);
+		for (const a of rail.nav.querySelectorAll(
+			"#toc-list a[aria-current='location'], .holds-current",
+		)) {
 			a.removeAttribute("aria-current");
+			a.classList.remove("holds-current");
 		}
 		here?.setAttribute("aria-current", "location");
+		if (topic && !inView) {
+			passed.link.classList.add("holds-current");
+		}
+		if (here && here !== spied) {
+			keepInSight(rail.nav, here);
+		}
+		spied = here;
+	}
+
+	/** Scrolls the rail, when it scrolls (the fixed rail beside the page), so that `link` is in it, a third of the way down. */
+	function keepInSight(nav: HTMLElement, link: HTMLElement) {
+		const top = link.offsetTop;
+		if (nav.scrollHeight <= nav.clientHeight) {
+			return;
+		}
+		if (top < nav.scrollTop || top + link.offsetHeight > nav.scrollTop + nav.clientHeight) {
+			nav.scrollTop = top - nav.clientHeight / 3;
+		}
 	}
 
 	const page = overview?.parentElement;

@@ -2129,16 +2129,17 @@ details > :last-child:not(summary) {
 	outline-offset: -2px;
 }
 .toc a:hover,
-.toc a:is([aria-current], .is-trail) {
+.toc a:is([aria-current], .is-trail, .holds-current) {
 	color: var(--ink);
 }
-.toc a:is([aria-current], .is-trail) {
+.toc a:is([aria-current], .is-trail, .holds-current) {
 	font-weight: 600;
 }
 .toc a[aria-current] {
 	border-inline-start-color: var(--ink);
 }
-/* A trail step's siblings, on a hairline under their section; the current one carries its bar onto the line. */
+/* A section's topics (its ###s) and a trail step's siblings, on a hairline under their section; the current one carries its
+   bar onto the line. */
 .toc ol ol {
 	margin: 0.125rem 0 0.5rem 0.75rem;
 	border-inline-start: 1px solid var(--rule);
@@ -6657,9 +6658,10 @@ window.ViewsFolds = (kitText) => {
      .trail    in a view, breadcrumbs that start with its own .back link (whose text names the overview, and which keeps any
                listener or selector the page gave it), with previous and next on the right.
      .toc      on a page with two or more view names, or whose <main> asks for it (data-contents, from contents: true), a contents
-               rail: the overview, its sections by their data-nav or else their h2 (ids added when missing), and under the section
-               that first links to a view name, each trail step's siblings (only the step itself past 12). The current section
-               follows scrolling; 07-nav.css places the rail. */
+               rail: the overview, its sections by their data-nav or else their h2 (ids added when missing), each section's own
+               h3s indented under it as its topics, and under the section that first links to a view name, each trail step's
+               siblings (only the step itself past 12). The current section and topic follow scrolling, and the rail scrolls to
+               keep them in sight; 07-nav.css places the rail. */
 window.ViewsNav = ({ views, canonical, key, kitText }) => {
   const STATE_KEY = "viewTrail";
   const AT_KEY = "viewTrailAt";
@@ -6832,24 +6834,40 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
     return bar;
   }
   const freeId = (id) => id !== "" && !names.has(id) && !document.getElementById(id);
-  function sectionId(section, text, n) {
-    if (!section.id) {
+  function anchorId(el, text, fallback, n) {
+    if (!el.id) {
       let id = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 48);
       for (let k = n;!freeId(id); k++) {
-        id = `section-${k}`;
+        id = `${fallback}-${k}`;
       }
-      section.id = id;
+      el.id = id;
     }
-    return section.id;
+    return el.id;
+  }
+  const navText = (heading) => clean(heading.dataset.nav) || clean(heading.textContent);
+  function topicsOf(section, id) {
+    const headings = [...section.querySelectorAll(":scope > h3")];
+    return headings.map((heading, i) => {
+      const text = navText(heading);
+      return { heading, link: make("a", { href: `#${anchorId(heading, text, id, i + 1)}` }, text) };
+    });
   }
   function entry(section, heading, n, claimed) {
-    const text = clean(section.dataset.nav) || clean(heading.dataset.nav) || clean(heading.textContent);
-    const link = make("a", { href: `#${sectionId(section, text, n)}` }, text);
+    const text = clean(section.dataset.nav) || navText(heading);
+    const id = anchorId(section, text, "section", n);
+    const link = make("a", { href: `#${id}` }, text);
     const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
     for (const name of owns) {
       claimed.add(name);
     }
-    return { section, li: item(link), link, owns };
+    const li = item(link);
+    const topics = topicsOf(section, id);
+    if (topics.length) {
+      const list = make("ol", { class: "topics" });
+      list.append(...topics.map((t) => item(t.link)));
+      li.append(list);
+    }
+    return { section, li, link, topics, owns };
   }
   function headedSections(overview) {
     const sections = [...overview.querySelectorAll(":scope > section")];
@@ -6904,7 +6922,7 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   function updateRail(rail, hash) {
     rail.home.setAttribute("href", hash ? `#${overviewHash}` : "#");
     for (const { li, owns } of rail.entries) {
-      for (const old of li.querySelectorAll("ol")) {
+      for (const old of li.querySelectorAll(":scope > ol:not(.topics)")) {
         old.remove();
       }
       li.append(...steps.filter((s) => owns.includes(nameOf(s.hash))).map((s) => stepList(s, hash)));
@@ -6922,15 +6940,35 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       requestAnimationFrame(() => spy(rail));
     }
   }
+  const lastPassed = (items, element) => items.filter((item) => element(item).getBoundingClientRect().top < innerHeight / 3).at(-1);
+  let spied = null;
   function spy(rail) {
     spyQueued = false;
     const inView = document.documentElement.classList.contains("in-view");
-    const passed = rail.entries.filter((e) => e.section.getBoundingClientRect().top < innerHeight / 3).at(-1);
-    const here = inView ? null : passed?.link ?? rail.home;
-    for (const a of [rail.home, ...rail.entries.map((e) => e.link)]) {
+    const passed = lastPassed(rail.entries, (e) => e.section);
+    const topic = passed && lastPassed(passed.topics, (t) => t.heading);
+    const here = inView ? null : topic?.link ?? passed?.link ?? rail.home;
+    for (const a of rail.nav.querySelectorAll("#toc-list a[aria-current='location'], .holds-current")) {
       a.removeAttribute("aria-current");
+      a.classList.remove("holds-current");
     }
     here?.setAttribute("aria-current", "location");
+    if (topic && !inView) {
+      passed.link.classList.add("holds-current");
+    }
+    if (here && here !== spied) {
+      keepInSight(rail.nav, here);
+    }
+    spied = here;
+  }
+  function keepInSight(nav, link) {
+    const top = link.offsetTop;
+    if (nav.scrollHeight <= nav.clientHeight) {
+      return;
+    }
+    if (top < nav.scrollTop || top + link.offsetHeight > nav.scrollTop + nav.clientHeight) {
+      nav.scrollTop = top - nav.clientHeight / 3;
+    }
   }
   const page = overview?.parentElement;
   const railHost = page && overview && wantsRail(page) ? { page, overview } : null;

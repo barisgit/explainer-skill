@@ -7,7 +7,8 @@
    display: condensed (poster capitals for the # and ##: kit display).
    The # and the paragraph right under it are the masthead: the headline states the finding, the lede what it rests on. Each ##
    starts a section; to give one a short name in the contents rail, write its heading as
-   <h2 data-nav="Price">The price is 40 €</h2>. A <section> you write
+   <h2 data-nav="Price">The price is 40 €</h2>. A ### in a section is a topic indented under it in the rail (data-nav works there
+   too), so a long page groups its rail by ## chapters. A <section> you write
    yourself (class="band", say) is kept as written. A Markdown table is a table.compare: its first column names the rows, a
    right-aligned column (---:) is numeric (class="num"), and on a phone that it does not fit it scrolls sideways, its first column
    staying in view.

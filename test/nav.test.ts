@@ -420,6 +420,72 @@ var contract = settled.then(async () => {
 	expect(await runPacked(output)).toEqual([]);
 }, 30_000);
 
+/** A page of two chapters (##), each with three topics (###), and a closing section with none; every block a screen or more. */
+const CHAPTERS = (front: string, end = "") => `${front}# A course
+
+The lede.
+
+${["One", "Two"]
+	.map(
+		(chapter) => `## Chapter ${chapter.toLowerCase()}
+
+${"Words. ".repeat(200)}
+
+${["a", "b", "c"]
+	.map(
+		(t, i) =>
+			`${i === 1 ? `<h3 data-nav="${chapter} ${t}">The long ${chapter} ${t} heading</h3>` : `### ${chapter} ${t}`}\n\n${"Words. ".repeat(250)}\n`,
+	)
+	.join("\n")}`,
+	)
+	.join("\n")}
+
+## Formula sheet
+
+${"Words. ".repeat(250)}
+
+${end}`;
+
+test("a chapter's ### topics are indented under it in the rail, and the current topic and its chapter follow the scroll, the rail keeping them in sight", async () => {
+	const contract = `const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const current = () => document.querySelector('.toc [aria-current="location"]')?.textContent;
+const holding = () => texts(".toc .holds-current");
+const frames = () => new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame));
+${SETTLED}
+var contract = settled.then(async () => {
+	const failures = [];
+	const expect = (ok, name) => ok || failures.push(name);
+	expect(texts("#toc-list > li > a") === "Overview|Chapter one|Chapter two|Formula sheet", "groups: " + texts("#toc-list > li > a"));
+	expect(texts("#toc-list > li:nth-child(3) > ol.topics a") === "Two a|Two b|Two c", "topics: " + texts("#toc-list > li:nth-child(3) > ol.topics a"));
+	const topic = document.querySelectorAll("[data-overview] h3")[1];
+	expect(topic.id && document.querySelector('.toc a[href="#' + topic.id + '"]'), "a topic gets an id its entry links to");
+	const nav = document.querySelector(".toc");
+	const inSight = (a) => { const r = a.getBoundingClientRect(), n = nav.getBoundingClientRect(); return r.top >= n.top && r.bottom <= n.bottom; };
+	const at = (el) => { scrollTo(0, scrollY + el.getBoundingClientRect().top - 10); return frames(); };
+	const sections = document.querySelectorAll("[data-overview] > section");
+	await at(sections[1]);
+	expect(current() === "Chapter two" && holding() === "", "at a chapter's start it is current: " + current() + " / " + holding());
+	await at(sections[1].querySelectorAll("h3")[1]);
+	expect(current() === "Two b" && holding() === "Chapter two", "at a topic, it is current and its chapter holds it: " + current() + " / " + holding());
+	expect(document.querySelectorAll('.toc [aria-current="location"]').length === 1, "one current location");
+	if (nav.scrollHeight > nav.clientHeight) {
+		expect(inSight(document.querySelector('.toc [aria-current="location"]')), "the rail scrolled the current topic into sight");
+	}
+	await at(sections[2]);
+	expect(current() === "Formula sheet" && holding() === "", "a section without topics: " + current() + " / " + holding());
+	scrollTo(0, 0);
+	await frames();
+	return failures;
+});`;
+	const output = await packedMdx(
+		dir,
+		"chapters",
+		CHAPTERS("---\ncontents: true\n---\n\n", '<script src="contract.js"></script>'),
+		{ "contract.js": contract },
+	);
+	expect(await runPacked(output, { widths: [DESKTOP, { ...DESKTOP, height: 260 }] })).toEqual([]);
+}, 30_000);
+
 test.each([
 	{ target: "a link", short: false },
 	{ target: "the empty space below the links", short: false },

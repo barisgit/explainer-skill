@@ -127,16 +127,17 @@
 	outline-offset: -2px;
 }
 .toc a:hover,
-.toc a:is([aria-current], .is-trail) {
+.toc a:is([aria-current], .is-trail, .holds-current) {
 	color: var(--ink);
 }
-.toc a:is([aria-current], .is-trail) {
+.toc a:is([aria-current], .is-trail, .holds-current) {
 	font-weight: 600;
 }
 .toc a[aria-current] {
 	border-inline-start-color: var(--ink);
 }
-/* A trail step's siblings, on a hairline under their section; the current one carries its bar onto the line. */
+/* A section's topics (its ###s) and a trail step's siblings, on a hairline under their section; the current one carries its
+   bar onto the line. */
 .toc ol ol {
 	margin: 0.125rem 0 0.5rem 0.75rem;
 	border-inline-start: 1px solid var(--rule);
