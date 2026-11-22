@@ -6,6 +6,7 @@ import {
 	packAndCheck,
 	packAndRun,
 	packedMdx,
+	packHtml,
 	SETTLED,
 	scratch,
 } from "./support.ts";
@@ -279,4 +280,45 @@ test("a static view whose record id holds ? or % opens at its escaped link, by c
 		},
 		clicked: why,
 	});
+}, 30_000);
+
+const RETURN_PAGE = `<!doctype html><html><head><link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><div data-overview><h1>Plan</h1><div style="block-size: 1500px"></div><p>Read <a id="to-a" href="#a">A</a> now.</p><div style="block-size: 3000px"></div></div>
+<section class="view" data-view="a"><a class="back" href="#">Plan</a><h1>A</h1><div style="block-size: 1500px"></div><p><a id="to-b" href="#b">B</a></p><div style="block-size: 3000px"></div></section>
+<section class="view" data-view="b"><a class="back" href="#">Plan</a><h1>B</h1></section></main><script src="kit:views.js"></script></body></html>`;
+
+test("Back returns to the link the reader left from, at its place in the window and focused: on the overview and in a view", async () => {
+	const input = dir.write("return.html", RETURN_PAGE);
+	const output = dir.path("return-out.html");
+	await packHtml(input, output);
+	interface Seen {
+		hash: string;
+		top: number;
+		focused: string;
+	}
+	const state = (id: string) =>
+		`({ hash: location.hash, top: Math.round(document.getElementById("${id}").getBoundingClientRect().top), focused: document.activeElement?.id ?? "" })`;
+	const seen = await inPage(output, async (cdp) => {
+		// click() focuses no link, as a pointer in Safari does not: the router keeps the link followed itself.
+		await cdp.evaluate(`document.getElementById("to-a").scrollIntoView({ block: "center" })`);
+		const overview = await act<Seen>(cdp, "", state("to-a"));
+		await act(cdp, `document.getElementById("to-a").click()`, "0");
+		await cdp.evaluate(`document.getElementById("to-b").scrollIntoView({ block: "center" })`);
+		const inA = await act<Seen>(cdp, "", state("to-b"));
+		await act(cdp, `document.getElementById("to-b").click()`, "0");
+		const backToA = await act(cdp, "history.back()", state("to-b"));
+		const backToOverview = await act(cdp, "history.back()", state("to-a"));
+		// Forward opens A as the reader left it, its link to B focused; opened fresh from the overview, A starts at its top.
+		const forward = await act(cdp, "history.forward()", state("to-b"));
+		await act(cdp, "history.back()", "0");
+		const fresh = await act(
+			cdp,
+			`document.getElementById("to-a").click()`,
+			`({ y: scrollY, focused: document.activeElement?.textContent })`,
+		);
+		return { overview, inA, backToA, backToOverview, forward, fresh };
+	});
+	expect(seen.backToA).toEqual({ ...seen.inA, focused: "to-b" });
+	expect(seen.backToOverview).toEqual({ ...seen.overview, focused: "to-a" });
+	expect(seen.forward).toEqual({ ...seen.inA, focused: "to-b" });
+	expect(seen.fresh).toEqual({ y: 0, focused: "A" });
 }, 30_000);

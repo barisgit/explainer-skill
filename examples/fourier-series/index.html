@@ -2065,6 +2065,18 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .term[aria-expanded="true"] {
 	text-decoration-style: solid;
 }
+/* A Term that leads to a View (kit Recall) keeps the sentence's ink, as a reminder's term does, with a link's grey solid
+   underline: it goes somewhere, where the dotted accent one opens here. */
+a.term {
+	color: inherit;
+	text-decoration: underline solid var(--rule-strong);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+}
+a.term:hover {
+	text-decoration-color: currentcolor;
+	text-decoration-thickness: 2px;
+}
 .recall {
 	display: block;
 	max-inline-size: 66ch;
@@ -6817,7 +6829,7 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
   };
 };
 
-/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
+/* views: hash router for drill-down views inside one file (#name/param, Back works, returning to the link the reader left from), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
    no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
    on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to.
@@ -6872,7 +6884,6 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
   const views = [...document.querySelectorAll("[data-view]")];
   const handlers = {};
   let started = false;
-  let overviewY = 0;
   const LABELS = {
     contents: "Contents",
     breadcrumb: "Breadcrumb",
@@ -6895,6 +6906,9 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
   }
   const OVERVIEW = { name: "", view: undefined, param: "", hash: "" };
   let shown = OVERVIEW;
+  const places = new Map;
+  let followed = null;
+  let leaving = null;
   function split(hash) {
     const query = hash.indexOf("?");
     return query < 0 ? { path: hash, local: "" } : { path: hash.slice(0, query), local: hash.slice(query + 1) };
@@ -6949,9 +6963,11 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
     const { view } = at;
     const again = started && at === shown && Boolean(view);
     const wasInView = root.classList.contains("in-view");
-    if (view && !wasInView) {
-      overviewY = scrollY;
+    if (started && at !== shown) {
+      places.set(shown.hash, leaving ?? placeIn(shown, location.hash));
     }
+    followed = null;
+    leaving = null;
     for (const v of views) {
       v.classList.toggle("active", v === view);
     }
@@ -6962,6 +6978,22 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
     draw(at, again);
     land(at, { wasInView, again, revisited });
   }
+  const inPart = (at, el) => at.view ? at.view.contains(el) : !el.closest("[data-view]");
+  function placeIn(at, hash) {
+    const link = followed?.getAttribute("href");
+    const to = link !== undefined && link !== null && key(link.slice(1)) === key(hash.slice(1));
+    const from = to ? followed : document.activeElement;
+    const own = from instanceof HTMLElement && from !== document.body && inPart(at, from) ? from : null;
+    return { y: scrollY, from: own, top: own?.getBoundingClientRect().top ?? 0 };
+  }
+  function restore(place) {
+    const from = place?.from;
+    const box = from?.isConnected && from.getClientRects().length ? from.getBoundingClientRect() : null;
+    scrollTo(0, box && place ? scrollY + box.top - place.top : place?.y ?? 0);
+    if (box) {
+      from?.focus({ preventScroll: true });
+    }
+  }
   function land(at, { wasInView, again, revisited }) {
     const target = shownTarget(at);
     if (target) {
@@ -6969,16 +7001,21 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
     }
     if (target && (at.view || !revisited)) {
       target.scrollIntoView();
-    } else if (!at.view) {
-      if (wasInView) {
-        scrollTo(0, overviewY);
-      }
-    } else if (!again) {
-      scrollTo(0, 0);
-      const heading = at.view.querySelector("h1, h2");
-      heading?.setAttribute("tabindex", "-1");
-      heading?.focus({ preventScroll: true });
+    } else if (at.view && !again) {
+      openView(at.view, revisited ? places.get(at.hash) : undefined);
+    } else if (!at.view && wasInView) {
+      restore(places.get(at.hash));
     }
+  }
+  function openView(view, place) {
+    if (place) {
+      restore(place);
+      return;
+    }
+    scrollTo(0, 0);
+    const heading = view.querySelector("h1, h2");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus({ preventScroll: true });
   }
   function routeOf(el) {
     const view = el.closest("[data-view]");
@@ -7026,9 +7063,15 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
     }
   };
   root.classList.add("js-views");
+  if ("navigation" in window) {
+    navigation.addEventListener("navigate", (e) => {
+      leaving = started ? placeIn(shown, new URL(e.destination.url).hash) : null;
+    });
+  }
   addEventListener("hashchange", show);
   document.addEventListener("click", (e) => {
     const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+    followed = link;
     const hash = canonical((link?.getAttribute("href") ?? "").slice(1));
     const target = hash === canonical(location.hash.slice(1)) && shownTarget(shown);
     if (target) {

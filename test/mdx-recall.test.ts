@@ -268,3 +268,138 @@ describe("recalls in the browser", () => {
 		expect(closedAgain).toEqual([true, false, true]);
 	}, 30_000);
 });
+
+/** A page whose Term leads to a View far down its overview, and a Term to a static view whose param holds a ?. */
+const VIEW_PAGE = `import { Term, View } from "kit";
+
+# Mixing moves a band
+
+<div style={{ blockSize: "1500px" }} />
+
+A mixer multiplies by a cosine, which shifts the <Term view="spectrum">spectrum</Term> by $\\pm f_0$, as <Term view="person/a?b">Ana</Term> showed.
+
+<div style={{ blockSize: "3000px" }} />
+
+<View name="spectrum" back="Mixing">
+
+# The spectrum
+
+The **spectrum** $X(f)$ of a signal says how strong each frequency in it is.
+
+</View>
+
+<View name="person" param="a?b" back="Mixing">
+
+# Ana
+
+</View>
+`;
+
+/** Clicks the element `selector` names at its centre, as a pointer does (Chrome focuses no link on a mouse click). */
+async function pointerClick(cdp: Cdp, selector: string) {
+	const [x, y] = await cdp.evaluate<[number, number]>(
+		`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`,
+	);
+	for (const type of ["mousePressed", "mouseReleased"]) {
+		await cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+	}
+	await cdp.evaluate(FRAMES, true);
+}
+
+describe("Terms that lead to a View", () => {
+	test("pack writes a Term with view as a link to its View's route, which brings views.js and no recall.js", async () => {
+		const output = await packedMdx(dir, "term-view", VIEW_PAGE);
+		const html = readFileSync(output, "utf8");
+		expect(html).toContain(
+			'<a class="term" href="#spectrum" data-term-view="spectrum">spectrum</a>',
+		);
+		expect(html).toContain(
+			'<a class="term" href="#person/a%3Fb" data-term-view="person/a?b">Ana</a>',
+		);
+		expect(kitScriptsIn(output)).toEqual(["views"]);
+	}, 30_000);
+
+	test("pack fails on a Term leading to no View, in a heading, or naming both a Recall and a View", async () => {
+		const page = (body: string) => `import { Recall, Term, View } from "kit";
+
+# Broken
+
+${body}
+
+<View name="person" param="ana" back="Broken">
+
+# Ana
+
+</View>
+
+<View name="item" back="Broken">
+
+# Item
+
+</View>
+
+<Recall id="a">A.</Recall>
+`;
+		const { result } = await packMdx(
+			dir,
+			"term-view-broken",
+			page(`## The <Term view="item">item</Term> heading
+
+See <Term view="nope">nope</Term>, <Term view="person/bo">Bo</Term>, <Term view="item/7">item 7</Term> and <Term recall="a">a</Term>.`),
+		);
+		expect(result.code).toBe(1);
+		for (const problem of [
+			'<Term view="item"> is in the heading "The item heading"',
+			'<Term view="nope"> under "The item heading" leads to no View (the page\'s views are person, item)',
+			'<Term view="person/bo"> under "The item heading" leads to no View',
+		]) {
+			expect(result.stderr).toContain(problem);
+		}
+		// A view without a param draws every param of its name, as views.js routes it.
+		expect(result.stderr).not.toContain('<Term view="item/7">');
+		const both = await packMdx(
+			dir,
+			"term-both",
+			page('See <Term recall="a" view="item">a</Term>.'),
+		);
+		expect(both.result.code).toBe(1);
+		expect(both.result.stderr).toContain('<Term> takes recall="..."');
+	}, 30_000);
+
+	test("Back and the view's Back link return the reader to the Term they left from, at its place in the window and focused", async () => {
+		const output = await packedMdx(dir, "term-view-back", VIEW_PAGE);
+		const term = `document.querySelector('a.term[href="#spectrum"]')`;
+		const state = `({ top: Math.round(${term}.getBoundingClientRect().top), focused: document.activeElement === ${term}, hash: location.hash })`;
+		for (const viewport of WIDTHS) {
+			const seen = await inPage(
+				output,
+				async (cdp) => {
+					await cdp.evaluate(`${term}.scrollIntoView({ block: "center" })`);
+					const before = await act<{ top: number; focused: boolean; hash: string }>(cdp, "", state);
+					await pointerClick(cdp, 'a.term[href="#spectrum"]');
+					const opened = await act(
+						cdp,
+						"",
+						`({ hash: location.hash, heading: document.activeElement?.textContent })`,
+					);
+					const back = await act(cdp, "history.back()", state);
+					await pointerClick(cdp, 'a.term[href="#spectrum"]');
+					const link = await act(
+						cdp,
+						`document.querySelector(".view.active .back").click()`,
+						state,
+					);
+					return { before, opened, back, link };
+				},
+				viewport,
+			);
+			const at = { top: seen.before.top, focused: true, hash: "" };
+			expect(seen).toEqual({
+				before: { ...at, focused: false },
+				opened: { hash: "#spectrum", heading: "The spectrum" },
+				back: at,
+				link: at,
+			});
+		}
+	}, 60_000);
+});

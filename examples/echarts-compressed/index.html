@@ -2066,6 +2066,18 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 .term[aria-expanded="true"] {
 	text-decoration-style: solid;
 }
+/* A Term that leads to a View (kit Recall) keeps the sentence's ink, as a reminder's term does, with a link's grey solid
+   underline: it goes somewhere, where the dotted accent one opens here. */
+a.term {
+	color: inherit;
+	text-decoration: underline solid var(--rule-strong);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+}
+a.term:hover {
+	text-decoration-color: currentcolor;
+	text-decoration-thickness: 2px;
+}
 .recall {
 	display: block;
 	max-inline-size: 66ch;

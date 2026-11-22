@@ -1,4 +1,4 @@
-/* views: hash router for drill-down views inside one file (#name/param, Back works, scroll restored), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
+/* views: hash router for drill-down views inside one file (#name/param, Back works, returning to the link the reader left from), with breadcrumbs, previous/next, a contents rail, Expand all, and .tree lists of hierarchical records.
    `#name/param` shows <section class="view" data-view="name"> and hides [data-overview];
    no hash shows the overview. A plain #anchor (a hash no view claims) whose element is in the open view keeps that view, also
    on Back and reload; any other shows the overview. Either way the folds around the element open and it is scrolled to.
@@ -54,7 +54,6 @@
 	const views = [...document.querySelectorAll<HTMLElement>("[data-view]")];
 	const handlers: Record<string, ViewHandler> = {};
 	let started = false;
-	let overviewY = 0;
 	/** The English texts of the navigation parts, by kitLabels key. */
 	const LABELS = {
 		contents: "Contents",
@@ -96,6 +95,22 @@
 	const OVERVIEW: Route = { name: "", view: undefined, param: "", hash: "" };
 	/** The route last drawn, once routing has started. */
 	let shown = OVERVIEW;
+
+	/** Where the reader was in a route when they left it: the scroll, and the element they left from with its top in the window. */
+	interface Place {
+		y: number;
+		from: HTMLElement | null;
+		top: number;
+	}
+	/** The place each route was last left at, by its canonical hash ("" for the overview). */
+	const places = new Map<string, Place>();
+	/** The link the reader last followed, which the route they leave is left from. */
+	let followed: Element | null = null;
+	/**
+	 * The place taken as the next navigation starts (the Navigation API's navigate event), before Back or Forward restores the
+	 * scroll of the entry they go to; without the API, the place is taken at hashchange.
+	 */
+	let leaving: Place | null = null;
 
 	/** A canonical hash split at its first ?: the route, and the local state after it ("" when there is no ?). */
 	function split(hash: string) {
@@ -194,9 +209,11 @@
 		// route() hands back `shown` itself for an anchor inside the open view; the overview is a shared constant, so it needs a view.
 		const again = started && at === shown && Boolean(view);
 		const wasInView = root.classList.contains("in-view");
-		if (view && !wasInView) {
-			overviewY = scrollY;
+		if (started && at !== shown) {
+			places.set(shown.hash, leaving ?? placeIn(shown, location.hash));
 		}
+		followed = null;
+		leaving = null;
 		for (const v of views) {
 			v.classList.toggle("active", v === view);
 		}
@@ -208,10 +225,41 @@
 		land(at, { wasInView, again, revisited });
 	}
 
+	/** Whether an element is in the part of the page `at` shows: its view, or outside every view on the overview. */
+	const inPart = (at: Route, el: Element) =>
+		at.view ? at.view.contains(el) : !el.closest("[data-view]");
+
+	/**
+	 * Where the reader is in the route being left: the link they just followed to the new hash, else the element focused, when it
+	 * is in that route's part of the page.
+	 */
+	function placeIn(at: Route, hash: string): Place {
+		const link = followed?.getAttribute("href");
+		const to = link !== undefined && link !== null && key(link.slice(1)) === key(hash.slice(1));
+		const from = to ? followed : document.activeElement;
+		const own =
+			from instanceof HTMLElement && from !== document.body && inPart(at, from) ? from : null;
+		return { y: scrollY, from: own, top: own?.getBoundingClientRect().top ?? 0 };
+	}
+
+	/**
+	 * Returns to a place: the element left from back at its height in the window and focused (it moved if the page above it
+	 * changed), else the scroll left at; the top when the route was never left.
+	 */
+	function restore(place: Place | undefined) {
+		const from = place?.from;
+		const box =
+			from?.isConnected && from.getClientRects().length ? from.getBoundingClientRect() : null;
+		scrollTo(0, box && place ? scrollY + box.top - place.top : (place?.y ?? 0));
+		if (box) {
+			from?.focus({ preventScroll: true });
+		}
+	}
+
 	/**
 	 * Scrolls for a route just drawn. The folds around the element a plain #anchor names open. It is scrolled to in a view, and on
-	 * the overview when a link was just followed to it; else the overview returns to where the reader left it, and a newly opened
-	 * view starts at its top, its heading focused.
+	 * the overview when a link was just followed to it; else the overview returns to where the reader left it, focus on the link
+	 * they left from, as does a view on Back and Forward; a view opened by a link starts at its top, its heading focused.
 	 */
 	function land(
 		at: Route,
@@ -223,16 +271,23 @@
 		}
 		if (target && (at.view || !revisited)) {
 			target.scrollIntoView();
-		} else if (!at.view) {
-			if (wasInView) {
-				scrollTo(0, overviewY);
-			}
-		} else if (!again) {
-			scrollTo(0, 0);
-			const heading = at.view.querySelector<HTMLElement>("h1, h2");
-			heading?.setAttribute("tabindex", "-1");
-			heading?.focus({ preventScroll: true });
+		} else if (at.view && !again) {
+			openView(at.view, revisited ? places.get(at.hash) : undefined);
+		} else if (!at.view && wasInView) {
+			restore(places.get(at.hash));
 		}
+	}
+
+	/** A view just opened: back at the place the reader left it on Back and Forward, else at its top, its heading focused. */
+	function openView(view: HTMLElement, place: Place | undefined) {
+		if (place) {
+			restore(place);
+			return;
+		}
+		scrollTo(0, 0);
+		const heading = view.querySelector<HTMLElement>("h1, h2");
+		heading?.setAttribute("tabindex", "-1");
+		heading?.focus({ preventScroll: true });
 	}
 
 	/** The shown route an element's local state follows: `shown` when the element is in its view, OVERVIEW outside every view. */
@@ -285,11 +340,17 @@
 		},
 	};
 	root.classList.add("js-views");
+	if ("navigation" in window) {
+		navigation.addEventListener("navigate", (e) => {
+			leaving = started ? placeIn(shown, new URL(e.destination.url).hash) : null;
+		});
+	}
 	addEventListener("hashchange", show);
-	// A link to the current hash fires no hashchange, so the folds its element is in (closed again since) open here; the browser
-	// then scrolls to it as it does for any link to the current hash.
+	// The link followed is the place the route it leaves returns to. A link to the current hash fires no hashchange, so the folds
+	// its element is in (closed again since) open here; the browser then scrolls to it as it does for any link to the current hash.
 	document.addEventListener("click", (e) => {
 		const link = e.target instanceof Element ? e.target.closest("a[href^='#']") : null;
+		followed = link;
 		const hash = canonical((link?.getAttribute("href") ?? "").slice(1));
 		const target = hash === canonical(location.hash.slice(1)) && shownTarget(shown);
 		if (target) {

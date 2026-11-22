@@ -4,7 +4,8 @@
  * prerendered page and writes it into the box after each of its mentions (after the closing punctuation that follows the term),
  * so the page holds every reminder without scripts, marks the box of each Recall's first mention `data-first` (what a printout
  * shows), and names what the author must fix: a mention of no Recall, in a heading, inside a link or holding one, and a Recall
- * written twice, without an id, empty, or holding what cannot sit inside a sentence.
+ * written twice, without an id, empty, or holding what cannot sit inside a sentence. A Term with `view` is an
+ * `a.term[data-term-view]` to its View's route instead, held to the same places and failing when no View claims that route.
  */
 import { unescapeHtml } from "./escape.ts";
 
@@ -174,47 +175,90 @@ function readDefinitions(found: Written[]) {
 	return { texts, problems, ids: [...new Set(found.map(({ id }) => id))].filter(Boolean) };
 }
 
+/** A Term as its problems name it: what it opens (a Recall, or a View it links to) and the name it gives. */
+interface Mention {
+	kind: "recall" | "view";
+	id: string;
+}
+
+const written = ({ kind, id }: Mention) => `<Term ${kind}="${id}">`;
+
+/** The Term the element is, if it is one: a Recall's button or a View's link. */
+function mentionOf(el: HTMLRewriterTypes.Element): Mention | undefined {
+	const recall = el.tagName === "button" ? el.getAttribute("data-recall") : null;
+	const view = el.tagName === "a" ? el.getAttribute("data-term-view") : null;
+	if (recall !== null) {
+		return { kind: "recall", id: unescapeHtml(recall) };
+	}
+	return view === null ? undefined : { kind: "view", id: unescapeHtml(view) };
+}
+
+/** The page's View routes as their data-view gives them (name, or name/param with the param escaped as View writes it). */
+const viewRoutes = (html: string) =>
+	new Set([...html.matchAll(/\sdata-view="([^"]*)"/g)].map((m) => unescapeHtml(m[1] ?? "")));
+
+/** Whether a View claims the Term's route as views.js routes it: its exact route, else, for name/param, the one view of that name. */
+function claimed(routes: Set<string>, href: string) {
+	const slash = href.indexOf("/");
+	return routes.has(href) || (slash > 0 && routes.has(href.slice(0, slash)));
+}
+
+/** The problem with a Term that names what the page does not have: no such Recall, or no View at its route. */
+function missing(mention: Mention, at: string, ids: string[], routes: Set<string>, href: string) {
+	if (mention.kind === "view") {
+		const names = [...new Set([...routes].map((r) => r.split("/")[0]))];
+		const known = names.length
+			? `the page's views are ${names.join(", ")}`
+			: "the page has no View";
+		return claimed(routes, href)
+			? undefined
+			: `${written(mention)}${at} leads to no View (${known}): write the <View name="..."> it opens, or correct the name`;
+	}
+	const known = ids.length ? `the page's recalls are ${ids.join(", ")}` : "the page has no Recall";
+	return ids.includes(mention.id)
+		? undefined
+		: `${written(mention)}${at} names no Recall (${known}): write <Recall id="${mention.id}">...</Recall> once in the page, or correct the name`;
+}
+
 /**
- * Reads each Term's button as `rewriter` passes it: a mention of no Recall, in a heading, inside interactive content or holding
- * some go into `problems`; each heading mention is reported once its heading's text is whole, by `headingProblems`.
+ * Reads each Term (a Recall's button or a View's link) as `rewriter` passes it: a mention of no Recall or View, in a heading,
+ * inside interactive content or holding some go into `problems`; each heading mention is reported once its heading's text is
+ * whole, by `headingProblems`.
  */
-function readTerms(rewriter: HTMLRewriter, ids: string[], problems: string[]) {
+function readTerms(rewriter: HTMLRewriter, ids: string[], routes: Set<string>, problems: string[]) {
 	const heading = headings(rewriter);
-	const inHeadings: { id: string; text: string[] }[] = [];
-	const around = { interactive: 0, term: undefined as string | undefined };
-	const term = (el: HTMLRewriterTypes.Element, id: string) => {
+	const inHeadings: { mention: Mention; text: string[] }[] = [];
+	const around = { interactive: 0, term: undefined as Mention | undefined };
+	const term = (el: HTMLRewriterTypes.Element, mention: Mention) => {
 		const at = under(heading.last);
+		const href = unescapeHtml(el.getAttribute("href") ?? "").slice(1);
+		const problem = heading.open ? undefined : missing(mention, at, ids, routes, href);
 		if (heading.open) {
-			inHeadings.push({ id, text: heading.open });
-		} else if (!ids.includes(id)) {
-			const known = ids.length
-				? `the page's recalls are ${ids.join(", ")}`
-				: "the page has no Recall";
-			problems.push(
-				`<Term recall="${id}">${at} names no Recall (${known}): write <Recall id="${id}">...</Recall> once in the page, or correct the name`,
-			);
+			inHeadings.push({ mention, text: heading.open });
+		} else if (problem) {
+			problems.push(problem);
 		}
 		if (around.interactive || around.term !== undefined) {
 			problems.push(
-				`<Term recall="${id}">${at} is inside a link, another control or another Term: a Term is a button of its own, so write it beside the link`,
+				`${written(mention)}${at} is inside a link, another control or another Term: a Term is a control of its own, so write it beside the link`,
 			);
 		}
 		const outer = around.term;
-		around.term = id;
+		around.term = mention;
 		el.onEndTag(() => {
 			around.term = outer;
 		});
 	};
 	rewriter.on(INTERACTIVE, {
 		element(el) {
-			const id = el.tagName === "button" ? el.getAttribute("data-recall") : null;
-			if (id !== null) {
-				term(el, unescapeHtml(id));
+			const mention = mentionOf(el);
+			if (mention) {
+				term(el, mention);
 				return;
 			}
 			if (around.term !== undefined) {
 				problems.push(
-					`<Term recall="${around.term}">${under(heading.last)} holds a <${el.tagName}>: a Term is a button, so write its words as text and the link beside it`,
+					`${written(around.term)}${under(heading.last)} holds a <${el.tagName}>: a Term is a control of its own, so write its words as text and the link beside it`,
 				);
 			}
 			if (el.canHaveContent) {
@@ -227,8 +271,8 @@ function readTerms(rewriter: HTMLRewriter, ids: string[], problems: string[]) {
 	});
 	return () =>
 		inHeadings.map(
-			({ id, text }) =>
-				`<Term recall="${id}"> is in the heading "${spoken(text)}": a heading names its section in the contents rail, so mention the term in the text under it`,
+			({ mention, text }) =>
+				`${written(mention)} is in the heading "${spoken(text)}": a heading names its section in the contents rail, so mention the term in the text under it`,
 		);
 }
 
@@ -239,14 +283,18 @@ function readTerms(rewriter: HTMLRewriter, ids: string[], problems: string[]) {
 export async function placeRecalls(
 	html: string,
 ): Promise<{ html: string; problems: string[]; warnings: string[] }> {
-	if (!html.includes("<explainer-recall") && !html.includes("data-recall-text")) {
+	if (
+		!html.includes("<explainer-recall") &&
+		!html.includes("data-recall-text") &&
+		!html.includes("data-term-view")
+	) {
 		return { html, problems: [], warnings: [] };
 	}
 	const { out, found } = takeDefinitions(html);
 	const { texts, problems, ids } = readDefinitions(found);
 	const mentioned = new Set<string>();
 	const rewriter = new HTMLRewriter();
-	const headingProblems = readTerms(rewriter, ids, problems);
+	const headingProblems = readTerms(rewriter, ids, viewRoutes(out), problems);
 	const filled = await rewriter
 		.on("span.recall[data-recall-text]", {
 			element(el) {
