@@ -457,6 +457,9 @@ const COMPONENT_USES: Record<string, { use: string; scripts: string[] }> = {
 	},
 };
 
+/** A View, Recall or Term inside a client component fails the pack (mdx-recall.test.ts for the last two): no later use. */
+const NO_LATER_USE = ["View", "Recall", "Term"];
+
 describe("kit scripts", () => {
 	test("a Question a client component reveals after a click brings reply.js, and its answer is kept", async () => {
 		dir.write(
@@ -539,8 +542,7 @@ export function Later({ id }: { id: string }) {
 		const exported = new Bun.Transpiler({ loader: "ts" }).scan(
 			readFileSync(new URL("../skills/explainer/kit/components/index.ts", import.meta.url), "utf8"),
 		).exports;
-		// A View inside a client component fails the pack, so it is the one component without a later use.
-		expect([...Object.keys(COMPONENT_USES), "View"].sort()).toEqual(exported.sort());
+		expect([...Object.keys(COMPONENT_USES), ...NO_LATER_USE].sort()).toEqual(exported.sort());
 		const found = await Promise.all(
 			Object.entries(COMPONENT_USES).map(async ([name, { use }]) => {
 				dir.write(`later-${name}.tsx`, revealing(name, use));

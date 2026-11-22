@@ -87,7 +87,17 @@ export async function packedMdx(
 }
 
 /** The kit scripts a page can include, in the order pack writes them. */
-const KIT_SCRIPTS = ["echarts", "charts", "plot", "views", "steps", "link", "keep", "reply"];
+const KIT_SCRIPTS = [
+	"echarts",
+	"charts",
+	"plot",
+	"views",
+	"steps",
+	"link",
+	"recall",
+	"keep",
+	"reply",
+];
 
 /** The kit scripts the packed file includes, found by the documentation comment pack puts in front of each. */
 export const kitScriptsIn = (file: string): string[] => {

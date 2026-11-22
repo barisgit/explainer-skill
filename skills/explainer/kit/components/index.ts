@@ -35,6 +35,7 @@ export { Chart } from "./chart.tsx";
 export { Controls, Explore } from "./explore.tsx";
 export { Plot } from "./plot.tsx";
 export { Question } from "./question.tsx";
+export { Recall, Term } from "./recall.tsx";
 export { Records, type RecordsProps } from "./records.tsx";
 export { Stepper } from "./stepper.tsx";
 export { Table } from "./table.tsx";

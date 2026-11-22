@@ -1,7 +1,7 @@
 ---
 title: Home battery size
 ---
-import { Chart, Explore, Plot, Question, Records, Stepper, View } from "kit";
+import { Chart, Explore, Plot, Question, Recall, Records, Stepper, Term, View } from "kit";
 import { euro, MONTHS, month, PRODUCTION, payback, quote, SIZE_ROWS, SIZES, supplier, USE } from "./data.ts";
 import { Day } from "./day.tsx";
 import { CHARGE, JULY } from "./july.ts";
@@ -158,7 +158,7 @@ Multiply 2.4 kW by 0.5 h to get **1.2 kWh**.
 <div class="beside">
 <div>
 
-A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model: each hour the <span data-ref="surplus">surplus</span> charges the battery up to its size, losing a tenth on the way, and a shortfall draws it down before the grid is asked.
+A year of hourly meter readings, scaled to the quote's battery sizes with a simple charge model: each hour the <span data-ref="surplus">surplus</span> charges the battery up to its size, losing a tenth on the way (its <Term recall="round-trip">round trip</Term>), and a shortfall draws it down before the grid is asked.
 
 </div>
 
@@ -185,6 +185,10 @@ for (const hour of year) {
 
 ## Not included
 
-Price changes, battery wear after year ten, and any subsidy.
+Price changes, battery wear after year ten, and any subsidy, which would shorten the <Term recall="payback">payback</Term>.
+
+<Recall id="round-trip">A battery's **round trip** is the share of the energy put in that comes back out, here 90%.</Recall>
+
+<Recall id="payback">The **payback** time is the price over the yearly saving: the years until the battery has paid for itself.</Recall>
 
 </View>

@@ -10,6 +10,7 @@ import { findLoads, type Load } from "./loads.ts";
 import { mdxPage } from "./mdx/page.ts";
 import { renderMermaid } from "./mermaid.ts";
 import { PackError } from "./pack-error.ts";
+import { placeRecalls } from "./recalls.ts";
 import { type PlacedRecord, writeRefStates } from "./ref-states.ts";
 import { renderSchematic } from "./schematic/index.ts";
 import { themeSvgImages } from "./svg-theme.ts";
@@ -330,9 +331,10 @@ export async function pack(mdxPath: string): Promise<{ html: string; warnings: s
  * process), with the records its filled Views drew, becomes one HTML file with local CSS, scripts, images and fonts inlined, relative to `baseDir`. Authors reach it only
  * through `pack`; the kit runtime tests hand it hand-written HTML. Throws PackError listing every remaining network dependency
  * (remote src/href/url(), srcset, and anything findLoads finds in the finished page) and every diagram that fails to render,
- * then, once those are fixed, every ref a Stepper or Explore names that no element carries (ref-states.ts, which also writes the
- * starting states) and every id the finished page has on more than one element.
- * `warnings` lists mentions that say another number than their part's tag (tags.ts), links that go nowhere and page classes the
+ * then, once those are fixed, what is wrong with the recalls (recalls.ts, which also places each Recall's text at its Terms),
+ * every ref a Stepper or Explore names that no element carries (ref-states.ts, which also writes the starting states) and every
+ * id the finished page has on more than one element.
+ * `warnings` lists Recalls no Term mentions, mentions that say another number than their part's tag (tags.ts), links that go nowhere and page classes the
  * kit styles too (see classCollisions).
  */
 export async function packPage(
@@ -351,8 +353,9 @@ export async function packPage(
 			diagramRefs,
 		),
 	);
+	const recalls = await placeRecalls(rendered);
 	const { html: source, warnings: tagWarnings } = await markTagMentions(
-		rendered,
+		recalls.html,
 		new Map([...diagramTags].map(([id, { tag }]) => [id, tag])),
 	);
 	const inlined = await inliningRewriter(baseDir, problems).transform(new Response(source)).text();
@@ -366,11 +369,16 @@ export async function packPage(
 			`${all.map((p) => `- ${p}`).join("\n")}${remote ? "\nFix: save remote files next to the page and import or reference them relatively." : ""}`,
 		);
 	}
-	const unaddressed = [...states.problems, ...(await repeatedIdProblems(html))];
+	const unaddressed = [
+		...recalls.problems,
+		...states.problems,
+		...(await repeatedIdProblems(html)),
+	];
 	if (unaddressed.length) {
 		throw new PackError(unaddressed.map((p) => `- ${p}`).join("\n"));
 	}
 	const warnings = [
+		...recalls.warnings,
 		...tagWarnings,
 		...(await literalLinkWarnings(html)),
 		...loneRefs(source, diagramRefs, states.named).map(

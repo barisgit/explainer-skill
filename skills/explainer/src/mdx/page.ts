@@ -5,6 +5,7 @@ import { safeScript } from "../escape.ts";
 import { idUses, recordIdProblems } from "../ids.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
+import { clientRecallProblems } from "../recalls.ts";
 import type { PlacedRecord } from "../ref-states.ts";
 import { endpointMeta } from "../reply/protocol.ts";
 import { clientBundle, clientScan, prerender } from "./bundle.ts";
@@ -294,7 +295,7 @@ export async function mdxPage(
 	if (loads.length) {
 		throw new PackError(`${loads.map((load) => `- ${load}`).join("\n")}\n${CLIENT_LOAD_FIX}`);
 	}
-	const repeated = await recordProblems(html, islands);
+	const repeated = [...clientRecallProblems(scan), ...(await recordProblems(html, islands))];
 	if (repeated.length) {
 		throw new PackError(repeated.map((problem) => `- ${problem}`).join("\n"));
 	}

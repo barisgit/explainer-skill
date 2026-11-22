@@ -170,13 +170,12 @@ const FEATURES: Feature[] = [
 	{
 		name: "reply",
 		files: ["reply.js"],
-		line: "data-reply=\"Label\" on a panel of controls with ids: their values join the reader's reply, with the reader's notes.",
+		line: 'data-reply="Label" on a panel of controls: their values join the reader\'s reply, with notes. Controls with ids keep their values (kit keep).',
 		doc: () => kitHeader("reply.js"),
 	},
 	{
 		name: "keep",
 		files: ["keep.js"],
-		line: 'controls with ids keep their values across reloads; data-keep="off" leaves one out.',
 		doc: () => kitHeader("keep.js"),
 	},
 	{
@@ -187,8 +186,8 @@ const FEATURES: Feature[] = [
 	},
 ];
 
-/** Components documented with another one: `kit Controls` prints Explore's, which Controls belongs to. */
-const DOCUMENTED_WITH: Record<string, string> = { controls: "explore" };
+/** Components documented with another one: `kit Controls` prints Explore's, which Controls belongs to, and `kit Term` Recall's. */
+const DOCUMENTED_WITH: Record<string, string> = { controls: "explore", term: "recall" };
 
 /** The documentation `kit <topic>` prints: a component's (any case) or a feature's (kit:reply.js and reply.js name reply). */
 function topicDoc(topic: string): string | undefined {

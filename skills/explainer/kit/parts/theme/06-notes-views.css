@@ -1,4 +1,4 @@
-/* theme part: caveats, details, drill-down views, reduced motion, print. */
+/* theme part: caveats, details, recalls, drill-down views, reduced motion, print. */
 /* Caveat: one line beside the claim it changes; the rest goes in <details>. <b> names the kind (Inferred, Unknown). */
 .caveat {
 	max-inline-size: 66ch;
@@ -24,6 +24,40 @@
 	background: var(--surface);
 	border: 1px solid var(--rule);
 	border-radius: var(--radius);
+}
+/* A Term (kit Recall) is a word of the sentence with a dotted accent underline; its reminder opens right after it as a block
+   inside the text. The Term's aria-expanded is the one state. */
+.term {
+	padding: 0;
+	border: 0;
+	background: none;
+	line-height: inherit;
+	text-align: inherit;
+	cursor: pointer;
+	text-decoration: underline dotted var(--accent);
+	text-decoration-thickness: 1.5px;
+	text-underline-offset: 0.25em;
+}
+.term:hover,
+.term[aria-expanded="true"] {
+	text-decoration-style: solid;
+}
+.recall {
+	display: block;
+	max-inline-size: 66ch;
+	margin-block: 0.375rem 0.625rem;
+	padding: 0.5rem 0.75rem;
+	background: var(--sunken);
+	border-inline-start: 2px solid var(--accent);
+	border-radius: var(--radius);
+	/* Plain text whatever the term's phrase is set in (a Term in bold or italics). */
+	font-style: normal;
+	font-weight: normal;
+	/* A formula wider than a phone's column scrolls inside the box, as display math does. */
+	overflow-x: auto;
+}
+.term[aria-expanded="false"] + .recall {
+	display: none;
 }
 details {
 	margin: 1.25rem 0;
@@ -147,6 +181,10 @@ details > :last-child:not(summary) {
 	}
 	summary::before {
 		transform: rotate(45deg) translate(-0.125rem, -0.0625rem);
+	}
+	/* Paper cannot be tapped: each reminder prints at its first mention, and wherever it is open. */
+	.term + .recall[data-first] {
+		display: block;
 	}
 	.fig {
 		break-inside: avoid;

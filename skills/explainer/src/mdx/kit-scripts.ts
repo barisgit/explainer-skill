@@ -20,6 +20,7 @@ export type KitScript =
 	| "views.js"
 	| "steps.js"
 	| "link.js"
+	| "recall.js"
 	| "keep.js"
 	| "reply.js";
 
@@ -152,6 +153,11 @@ const MARKERS: { html: string; code: (code: string) => boolean; scripts: KitScri
 		code: matches(new RegExp(`${literal("data-ref")}|\\bdataset\\.ref\\b`)),
 		scripts: ["link.js"],
 	},
+	{
+		html: "button[data-recall]",
+		code: matches(new RegExp(literal("data-recall"))),
+		scripts: ["recall.js"],
+	},
 	{ html: "input[id], select[id], textarea[id]", code: controlWithId, scripts: ["keep.js"] },
 	{
 		html: "[data-reply]",
@@ -162,7 +168,7 @@ const MARKERS: { html: string; code: (code: string) => boolean; scripts: KitScri
 
 /**
  * The order the kit scripts run in. Libraries the client components call (Charts.make, Plot.make) load before the islands
- * hydrate; scripts that read and wire the page's DOM (views, steps, link, keep, reply) load after, so they reach the markup Preact
+ * hydrate; scripts that read and wire the page's DOM (views, steps, link, recall, keep, reply) load after, so they reach the markup Preact
  * owns. reply.js drives keep.js, so keep.js comes first.
  */
 export const BEFORE_ISLANDS: KitScript[] = ["echarts.js", "charts.js", "plot.js"];
@@ -170,6 +176,7 @@ export const AFTER_ISLANDS: KitScript[] = [
 	"views.js",
 	"steps.js",
 	"link.js",
+	"recall.js",
 	"keep.js",
 	"reply.js",
 ];
