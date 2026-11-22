@@ -1,7 +1,7 @@
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
-   Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions);
-   an h3 (a topic in a section) is a step above the text, in its weight.
+   Three text roles: display, --size-text and --size-label (figures, controls, captions). Headings have their own scale:
+   h1 at --size-headline, h2 at --size-display and h3 (a topic in a section) at 19px.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
    (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
@@ -27,9 +27,9 @@
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
    padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
-   Rhythm: a hairline under the masthead, and one opening each later section with space on both sides; .band (once, where the reader
-   acts) spans the window in the sunken tone instead; .minor sections (method, sources) sit closer, with the heading in its own
-   column. A <details> fold keeps the text's measure; its summary is the question it answers.
+   Rhythm: a hairline under the masthead, then space between sections, in Views too. Markdown --- on its own line between
+   blank lines draws a quiet hairline with the section spacing. .band (once, where the reader acts) spans the window in the
+   sunken tone; .minor sections (method, sources) sit closer, with the heading in its own column. A <details> fold keeps the text's measure; its summary is the question it answers.
    Callouts, at the text's measure, a <b> first naming the kind: <aside class="callout"> for what the reader must not miss (a
    task to solve, a rule), class="caveat" in the warning's tint for what changes how a claim reads (Inferred, a common mistake):
      <aside class="callout">

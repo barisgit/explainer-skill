@@ -50,8 +50,7 @@
 	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
 	--hatch: color-mix(in oklab, var(--ink) 60%, var(--bg));
 	--hatch-fill: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 6px);
-	/* Three type roles, so a screen holds at most three levels: display (the page's headline, a section's heading), text, and
-	   label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
+	/* Three text roles: display (headings have their own scale), text, and label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
 	--size-headline: clamp(1.875rem, 3.3vw, 2.875rem);
 	--size-display: clamp(1.375rem, 2vw, 1.75rem);
 	--size-text: 1.0625rem;
@@ -61,7 +60,7 @@
 	--inset: clamp(1rem, 2.5vw, 1.25rem);
 	/* Above the masthead, and above the contents rail beside it. */
 	--page-top: clamp(2rem, 6vw, 4rem);
-	/* Between sections: the space above the hairline that opens each one, the same on every window height. */
+	/* Between sections: the same space on every window height. */
 	--section-gap: clamp(2.25rem, 4.5vw, 3rem);
 	--radius: 0.125rem;
 	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */

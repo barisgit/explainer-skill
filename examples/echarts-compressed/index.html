@@ -58,8 +58,7 @@
 	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
 	--hatch: color-mix(in oklab, var(--ink) 60%, var(--bg));
 	--hatch-fill: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 6px);
-	/* Three type roles, so a screen holds at most three levels: display (the page's headline, a section's heading), text, and
-	   label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
+	/* Three text roles: display (headings have their own scale), text, and label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
 	--size-headline: clamp(1.875rem, 3.3vw, 2.875rem);
 	--size-display: clamp(1.375rem, 2vw, 1.75rem);
 	--size-text: 1.0625rem;
@@ -69,7 +68,7 @@
 	--inset: clamp(1rem, 2.5vw, 1.25rem);
 	/* Above the masthead, and above the contents rail beside it. */
 	--page-top: clamp(2rem, 6vw, 4rem);
-	/* Between sections: the space above the hairline that opens each one, the same on every window height. */
+	/* Between sections: the same space on every window height. */
 	--section-gap: clamp(2.25rem, 4.5vw, 3rem);
 	--radius: 0.125rem;
 	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */
@@ -181,8 +180,7 @@ strong {
 }
 
 /* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures, split columns. */
-/* Page shell: the masthead over a hairline, then sections, each opened by a hairline with space on both sides. <p class="label"> is
-   a plain caption over a group inside a section. Type keeps to the three roles of 01-base.css: display, text, label. */
+/* Page shell: the masthead over a hairline, then sections. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
@@ -273,31 +271,14 @@ h3 {
 	font-weight: 500;
 	color: var(--muted);
 }
-/* A hairline opens each section, with space above and below it, so a long page reads as chapters without a screen of empty paper
-   between them, a view's chapters as the overview's. A band carries its own tone instead, and a section right after one, or
-   right under the masthead's line, needs none. A section inside another chapter, or inside a figure, belongs to its content,
-   not the page's rhythm. */
+/* Space separates chapters, in a view as in the overview. An explicit thematic break uses the same rhythm. */
 .page section:not(.view, .fig *) {
 	margin-block: var(--section-gap) 0;
 }
-.page
-	section:not(
-		.view,
-		.band,
-		.band + section,
-		.masthead + section,
-		section:not(.view) section,
-		.fig *
-	) {
-	padding-block-start: clamp(1.5rem, 3vw, 2rem);
+.page :where(hr) {
+	margin-block: var(--section-gap);
+	border: 0;
 	border-block-start: 1px solid var(--rule);
-}
-/* A fold that ends a section leaves its closing line to the hairline of the section after it; before a band, at a view's or
-   the page's end, or in a nested section, it keeps its own. */
-.page
-	section:not(.view, .band, section:not(.view) section, .fig *):has(+ section:not(.view, .band))
-	> details:last-child {
-	border-block-end: 0;
 }
 .cols {
 	display: grid;
@@ -2951,8 +2932,8 @@ details > :last-child:not(summary) {
 
 /* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
-   Type has three roles, --size-display (h1 at --size-headline, h2), --size-text and --size-label (figures, controls, captions);
-   an h3 (a topic in a section) is a step above the text, in its weight.
+   Three text roles: display, --size-text and --size-label (figures, controls, captions). Headings have their own scale:
+   h1 at --size-headline, h2 at --size-display and h3 (a topic in a section) at 19px.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
    (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
@@ -2978,9 +2959,9 @@ details > :last-child:not(summary) {
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
    padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
-   Rhythm: a hairline under the masthead, and one opening each later section with space on both sides; .band (once, where the reader
-   acts) spans the window in the sunken tone instead; .minor sections (method, sources) sit closer, with the heading in its own
-   column. A <details> fold keeps the text's measure; its summary is the question it answers.
+   Rhythm: a hairline under the masthead, then space between sections, in Views too. Markdown --- on its own line between
+   blank lines draws a quiet hairline with the section spacing. .band (once, where the reader acts) spans the window in the
+   sunken tone; .minor sections (method, sources) sit closer, with the heading in its own column. A <details> fold keeps the text's measure; its summary is the question it answers.
    Callouts, at the text's measure, a <b> first naming the kind: <aside class="callout"> for what the reader must not miss (a
    task to solve, a rule), class="caveat" in the warning's tint for what changes how a claim reads (Inferred, a common mistake):
      <aside class="callout">

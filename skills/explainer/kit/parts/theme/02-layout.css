@@ -1,6 +1,5 @@
 /* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures, split columns. */
-/* Page shell: the masthead over a hairline, then sections, each opened by a hairline with space on both sides. <p class="label"> is
-   a plain caption over a group inside a section. Type keeps to the three roles of 01-base.css: display, text, label. */
+/* Page shell: the masthead over a hairline, then sections. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
@@ -91,31 +90,14 @@ h3 {
 	font-weight: 500;
 	color: var(--muted);
 }
-/* A hairline opens each section, with space above and below it, so a long page reads as chapters without a screen of empty paper
-   between them, a view's chapters as the overview's. A band carries its own tone instead, and a section right after one, or
-   right under the masthead's line, needs none. A section inside another chapter, or inside a figure, belongs to its content,
-   not the page's rhythm. */
+/* Space separates chapters, in a view as in the overview. An explicit thematic break uses the same rhythm. */
 .page section:not(.view, .fig *) {
 	margin-block: var(--section-gap) 0;
 }
-.page
-	section:not(
-		.view,
-		.band,
-		.band + section,
-		.masthead + section,
-		section:not(.view) section,
-		.fig *
-	) {
-	padding-block-start: clamp(1.5rem, 3vw, 2rem);
+.page :where(hr) {
+	margin-block: var(--section-gap);
+	border: 0;
 	border-block-start: 1px solid var(--rule);
-}
-/* A fold that ends a section leaves its closing line to the hairline of the section after it; before a band, at a view's or
-   the page's end, or in a nested section, it keeps its own. */
-.page
-	section:not(.view, .band, section:not(.view) section, .fig *):has(+ section:not(.view, .band))
-	> details:last-child {
-	border-block-end: 0;
 }
 .cols {
 	display: grid;

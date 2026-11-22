@@ -189,7 +189,7 @@ const panel = document.getElementById("panel");
 const style = (id) => getComputedStyle(document.getElementById(id));
 const local = (id) => ["marginTop", "marginBottom", "paddingTop", "borderTopWidth"].every((key) => style(id)[key] === "0px");
 ${pageContract({
-	"a page section opens with a hairline below its gap": `parseFloat(style("outer").marginTop) >= 36 && style("outer").borderTopWidth === "1px"`,
+	"a page section opens with space, not a hairline": `parseFloat(style("outer").marginTop) >= 36 && style("outer").borderTopWidth === "0px"`,
 	"direct panel sections have no page rhythm": `local("direct")`,
 	"nested panel sections have no page rhythm": `local("nested")`,
 	// Clipped 0.375rem out (overflow-clip-margin), so the focus ring of a control at the figure's edge shows.

@@ -79,6 +79,8 @@ Because.
 <figcaption>A caption.</figcaption>
 </figure>
 
+---
+
 ## Before the band
 
 Text.
@@ -115,6 +117,8 @@ Because.
 
 Text.
 
+---
+
 ## Chapter two
 
 Text.
@@ -122,7 +126,7 @@ Text.
 </View>
 `;
 
-test("sections open with a hairline (the first under the masthead's, a view's chapters too), a fold ending a section draws no second line, folds keep the text's measure, two-column tables stack on a phone and size to their content beside the text, and a plain figure sits on the column", async () => {
+test("explicit chapter dividers, fold measure, phone tables and plain figures", async () => {
 	const output = await packedMdx(dir, "rhythm", RHYTHM, { "own.css": ".pairs { display: grid; }" });
 	const at = (viewport: typeof PHONE) =>
 		inPage(
@@ -130,18 +134,24 @@ test("sections open with a hairline (the first under the masthead's, a view's ch
 			(cdp) =>
 				cdp.evaluate<Record<string, boolean>>(`(() => {
 		const style = (el) => getComputedStyle(el);
-		const [first, sheet] = document.querySelectorAll("[data-overview] > section");
+		const sections = [...document.querySelectorAll("[data-overview] > section")];
+		const [first, sheet] = sections;
 		const [table, pairs, ab, grouped] = sheet.querySelectorAll("table");
 		const chapters = [...document.querySelectorAll("section.view > section")];
 		const figure = document.querySelector("figure");
 		const phone = innerWidth < 640;
 		const stacked = (t) => style(t.querySelector("tbody td")).display === "block";
 		return {
-			// The masthead's line opens the first section; each later one opens with its own, in a view as in the overview.
-			hairlines: style(document.querySelector(".masthead")).borderBottomWidth === "1px" && style(first).borderTopWidth === "0px" && style(sheet).borderTopWidth === "1px",
-			viewChapters: chapters.length === 2 && chapters.every((c) => style(c).borderTopWidth === "1px"),
-			// A fold leaves its closing line to the next section's hairline, and keeps it where none follows (a band, the end).
-			foldEndsSection: style(first.querySelector("details")).borderBottomWidth === "0px" && ["before-band", "last-fold"].every((id) => style(document.getElementById(id)).borderBottomWidth === "1px"),
+			mastheadRule: style(document.querySelector(".masthead")).borderBottomWidth === "1px",
+			spaceOnly: sections.concat(chapters).every((section) => style(section).borderTopWidth === "0px"),
+			authoredRules: [sheet, chapters[0]].every((section) => {
+				const hr = section.querySelector(":scope > hr:last-child");
+				const rule = style(hr);
+				return rule.borderBlockStartWidth === "1px" && rule.borderBlockEndWidth === "0px"
+					&& rule.borderBlockStartColor === style(document.querySelector(".masthead")).borderBlockEndColor
+					&& rule.marginBlockStart === style(section).marginBlockStart;
+			}),
+			foldEndsSection: [first.querySelector("details"), ...["before-band", "last-fold"].map((id) => document.getElementById(id))].every((fold) => style(fold).borderBottomWidth === "1px"),
 			foldMeasure: Math.abs(document.querySelector("details").getBoundingClientRect().width - first.querySelector("p").getBoundingClientRect().width) < 1,
 			tablesStack: [table, pairs, ab].every((t) => phone === stacked(t)),
 			// A row that spans both columns makes a grouped table, which keeps its columns.
@@ -161,8 +171,9 @@ test("sections open with a hairline (the first under the masthead's, a view's ch
 			viewport,
 		);
 	const want = {
-		hairlines: true,
-		viewChapters: true,
+		mastheadRule: true,
+		spaceOnly: true,
+		authoredRules: true,
 		foldEndsSection: true,
 		foldMeasure: true,
 		tablesStack: true,
