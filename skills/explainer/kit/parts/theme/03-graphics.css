@@ -348,7 +348,13 @@
 }
 /* An edge label's box masks the line under it, so a dimmed label dims by colour, its text mixed toward the tone as far as the
    other parts fade: a faded mask would let the line strike through the text. */
-.mermaid > svg.has-lit .edge-label[data-ref]:not(.is-lit) {
+.mermaid
+	> svg.has-lit
+	.edge-label[data-ref]:not(
+		.is-lit,
+		[data-kit-state][data-state~="not-yet"],
+		[data-live] [data-step]:not(.is-on)
+	) {
 	--_text-sec: color-mix(in srgb, var(--muted) calc(var(--_dim) * 100%), var(--bg));
 	opacity: 1;
 }
@@ -426,12 +432,12 @@
 .schematic > svg .value {
 	fill: var(--muted);
 }
-/* The wires of a lit part keep their ink, so the part stands out rather than its whole net; a net lit on its own (no part lit)
-   draws its wires and junction dots in the accent. */
-.schematic > svg:has(g[data-ref].is-lit) path.wire.is-lit {
+/* The wires of a lit part keep their ink, so the part stands out rather than its whole net; a net lit on its own (no part lit;
+   ground symbols belong to the gnd net) draws its wires and junction dots in the accent. */
+.schematic > svg:has(g[data-ref]:not([data-kind="ground"]).is-lit) path.wire.is-lit {
 	stroke: currentColor;
 }
-.schematic > svg:not(:has(g[data-ref].is-lit)) circle[data-ref].is-lit {
+.schematic > svg:not(:has(g[data-ref]:not([data-kind="ground"]).is-lit)) circle[data-ref].is-lit {
 	color: var(--accent);
 }
 @media print {

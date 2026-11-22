@@ -119,7 +119,13 @@ svg
 svg.has-lit {
 	--_dim: 0.75;
 }
-svg.has-lit [data-ref]:not(.is-lit) {
+/* A part a stepper has not reached yet keeps its stepper's fade. */
+svg.has-lit
+	[data-ref]:not(
+		.is-lit,
+		[data-kit-state][data-state~="not-yet"],
+		[data-live] [data-step]:not(.is-on)
+	) {
 	opacity: var(--_dim);
 }
 

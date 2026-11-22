@@ -252,16 +252,37 @@ test("a part's name and a net's name in the prose light the part and the wires t
 			const marks = [...document.querySelectorAll("svg g[data-ref=Q1].is-lit [stroke=none]")];
 			return marks.length > 0 && marks.every((mark) => getComputedStyle(mark).stroke === "none");
 		})()`,
-		"hovering the net lights every wire and dot on it, not the other nets": `(() => {
+		"hovering the net lights every wire and dot on it in the accent, not the other nets": `(() => {
+			const accent = () => { const probe = document.body.appendChild(document.createElement("i")); probe.style.color = "var(--accent)"; const c = getComputedStyle(probe).color; probe.remove(); return c; };
 			document.querySelector("#net").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
 			const lit = [...document.querySelectorAll("svg .is-lit")];
 			return lit.length > 2
 				&& lit.every((el) => el.getAttribute("data-ref").split(" ").includes("vcc"))
 				&& !document.querySelector("svg path[data-ref^='b ']").classList.contains("is-lit")
-				&& getComputedStyle(document.querySelector("svg path.wire.is-lit")).stroke !== getComputedStyle(document.querySelector("svg")).color;
+				&& getComputedStyle(document.querySelector("svg path.wire.is-lit")).stroke === accent()
+				&& [...document.querySelectorAll("svg circle.is-lit")].every((dot) => getComputedStyle(dot).fill === accent() && getComputedStyle(dot).stroke === "none")
+				&& document.querySelectorAll("svg circle.is-lit").length > 0;
 		})()`,
 	});
 	expect(await packAndRun(dir, "linked", page)).toEqual([]);
+}, 30_000);
+
+test("ground named on its own lights its symbols and stubs in the accent, as a net", async () => {
+	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="kit:theme.css"></head><body><main>
+<p>Every resistor returns to <span id="ground" data-ref="gnd">ground</span>.</p>
+<pre class="schematic">R1 0 b 1k @0,0\nR2 b c 2k a@R1.b\nR3 c 0 3k a@R2.b</pre></main><script src="kit:link.js"></script><script>${pageContract(
+		{
+			"the stubs and symbols of gnd take the accent": `(() => {
+				const accent = () => { const probe = document.body.appendChild(document.createElement("i")); probe.style.color = "var(--accent)"; const c = getComputedStyle(probe).color; probe.remove(); return c; };
+				document.querySelector("#ground").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
+				const wires = [...document.querySelectorAll("svg path.wire.is-lit")];
+				const symbols = [...document.querySelectorAll("svg g[data-kind=ground].is-lit > g > path")];
+				return wires.length > 0 && symbols.length > 0 && [...wires, ...symbols].every((el) => getComputedStyle(el).stroke === accent());
+			})()`,
+		},
+	)}</script></body></html>`;
+	expect(await packAndRun(dir, "ground", page)).toEqual([]);
 }, 30_000);
 
 test("on a wide screen the drawing fills the column up to part names at the label size, and no text is larger", async () => {

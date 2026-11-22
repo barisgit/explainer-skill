@@ -34,11 +34,13 @@
 	let linked = new Set<string>();
 	let linkedParts: Part[] = [];
 
-	// The active part is the hovered one, else the one focused from the keyboard, else the pinned one. A click focuses a term too,
-	// but that focus is not a request to light it: the click pins or unpins, and the light leaves with the pointer.
+	// The active part is the hovered one, else the focused one while the reader is on the keyboard, else the pinned one. A click
+	// focuses a term too, but that focus is not a request to light it: the click pins or unpins, and the light leaves with the
+	// pointer. A key press hands lighting back to focus, without moving it.
 	let hovered: Part | null = null;
 	let focused: Part | null = null;
 	let pinned: Part | null = null;
+	let onKeyboard = true;
 
 	// What paint last did: the refs it lit (space separated, as the ref event last announced them), and the elements it lit and dimmed.
 	let litRefs = "";
@@ -208,7 +210,7 @@
 	 * refresh: the elements carrying them may have changed.
 	 */
 	function paint(force = false) {
-		const active = hovered ?? focused ?? pinned;
+		const active = hovered ?? (onKeyboard ? focused : null) ?? pinned;
 		const refs = active?.isConnected ? refsOf(active).filter((ref) => linked.has(ref)) : [];
 		const joined = refs.join(" ");
 		if (joined === litRefs && !force) {
@@ -277,11 +279,15 @@
 		paint();
 	});
 	document.addEventListener("focusin", (e) => {
-		focused = e.target instanceof Element && e.target.matches(":focus-visible") ? partOf(e) : null;
+		focused = partOf(e);
 		paint();
 	});
 	document.addEventListener("focusout", () => {
 		focused = null;
+		paint();
+	});
+	document.addEventListener("pointerdown", () => {
+		onKeyboard = false;
 		paint();
 	});
 	document.addEventListener("click", (e) => {
@@ -290,9 +296,10 @@
 		paint();
 	});
 	document.addEventListener("keydown", (e) => {
-		if (e.key === "Escape" && pinned) {
+		onKeyboard = true;
+		if (e.key === "Escape") {
 			pinned = null;
-			paint();
 		}
+		paint();
 	});
 })();

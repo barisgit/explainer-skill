@@ -252,7 +252,7 @@ test("the file's starting states are what kit:link.js writes: a named ref with n
 	expect(html).toContain('<span id="own" data-ref="own" data-state="fit">');
 });
 
-test("a mouse click that unpins a term leaves nothing lit once the pointer moves away, while keyboard focus still lights it", async () => {
+test("focus lights a term only while it shows keyboard focus, so a click that unpins leaves nothing lit", async () => {
 	const output = dir.path("mouse-focus.out.html");
 	const page = PAGE("", `${DIAGRAM}<p id="away">Elsewhere.</p>`);
 	expect((await packHtml(dir.write("mouse-focus.html", page), output)).error).toBe("");
@@ -266,29 +266,52 @@ test("a mouse click that unpins a term leaves nothing lit once the pointer moves
 				await cdp.send("Input.dispatchMouseEvent", { type, ...at, button: "left", clickCount: 1 });
 			}
 		};
+		const key = async (name: string, code: number) => {
+			for (const type of ["keyDown", "keyUp"]) {
+				await cdp.send("Input.dispatchKeyEvent", {
+					type,
+					key: name,
+					code: name,
+					windowsVirtualKeyCode: code,
+				});
+			}
+		};
 		const lit = () =>
 			cdp.evaluate<string>(
 				`[...document.querySelectorAll(".is-lit")].map((el) => el.id || el.dataset.ref).join()`,
 			);
-		for (const type of ["keyDown", "keyUp"]) {
-			await cdp.send("Input.dispatchKeyEvent", {
-				type,
-				key: "Tab",
-				code: "Tab",
-				windowsVirtualKeyCode: 9,
-			});
-		}
+		const away = await centre("away");
+		const term = await centre("term");
+		await key("Tab", 9);
 		const keyboard = {
 			focused: await cdp.evaluate<string>("document.activeElement.id"),
 			lit: await lit(),
 		};
-		const away = await centre("away");
-		await press(away);
-		const term = await centre("term");
+		// Pin and unpin the term that already has keyboard focus, then leave it: focus stays, the light goes.
 		await press(term);
 		await press(term);
 		await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...away });
-		return { keyboard, afterMouse: await lit() };
+		const afterMouse = {
+			focused: await cdp.evaluate<string>("document.activeElement.id"),
+			lit: await lit(),
+		};
+		// A key pressed on the mouse-focused term shows its focus again, and lights it.
+		await key("ArrowRight", 39);
+		return { keyboard, afterMouse, afterKey: await lit() };
 	});
-	expect(states).toEqual({ keyboard: { focused: "term", lit: "term,cache" }, afterMouse: "" });
+	expect(states).toEqual({
+		keyboard: { focused: "term", lit: "term,cache" },
+		afterMouse: { focused: "term", lit: "" },
+		afterKey: "term,cache",
+	});
+}, 30_000);
+
+test("hovering another ref leaves a stepper's not-yet parts faded as the stepper set them", async () => {
+	const body = `${DIAGRAM}<div data-ref-states='{"api":"not-yet"}'></div>`;
+	const script = `
+	await Promise.resolve();
+	const before = getComputedStyle(node("api")).opacity;
+	hover($("#term"));
+	expect(dimmed() && before === "0.15" && getComputedStyle(node("api")).opacity === "0.15", "a not-yet part keeps its stepper opacity while another part is lit");`;
+	expect(await packAndRun(dir, "not-yet", PAGE(script, body))).toEqual([]);
 }, 30_000);

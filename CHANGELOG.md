@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Pointing at a linked part is quieter (#245): a lit diagram or schematic part is outlined in the accent while its text and its wires keep their ink, and the rest of the figure fades to 75 % instead of 30 %, the same whether you hover the part or the term that names it. A click on a term no longer leaves it lit through its focus after the pointer leaves; keyboard focus still lights it.
+- Pointing at a linked part is quieter (#245): a lit diagram or schematic part is outlined in the accent while its text and its wires keep their ink, and the rest of the figure fades to 75 % instead of 30 %, the same whether you hover the part or the term that names it. A click on a term no longer leaves it lit through its focus after the pointer leaves; keyboard focus still lights it, and a stepper's parts not reached yet stay faded while another part is lit.
 - Packed Mermaid flowcharts keep routed bends when a shared edge trunk would cut through a node, including the phone layout.
 - A long page can group its contents rail: each `##` is a group and its `###` topics are listed indented under it; the current topic and its group follow the scroll, and the rail scrolls to keep them in sight. A page without `###` keeps its rail as it was.
 - A page can be split into `.mdx` parts: `import Intro from "./parts/intro.mdx"` and `<Intro />` on a line of its own (at the page's root or in a `View`) is laid out as if written there, so its `#` and `##` give the masthead, sections and rail. A part's imports join the page's (paths kept relative to the part), and `pack` fails on a name two files bind to different things. A part given props, a layout or an `import()` of its own stays a component, and `pack` warns when its headings then make no sections.
