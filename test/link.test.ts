@@ -252,7 +252,7 @@ test("the file's starting states are what kit:link.js writes: a named ref with n
 	expect(html).toContain('<span id="own" data-ref="own" data-state="fit">');
 });
 
-test("focus lights a term only while it shows keyboard focus, so a click that unpins leaves nothing lit", async () => {
+test("focus lights a term only while the reader is on the keyboard, so a click that unpins or an Escape leaves nothing lit", async () => {
 	const output = dir.path("mouse-focus.out.html");
 	const page = PAGE("", `${DIAGRAM}<p id="away">Elsewhere.</p>`);
 	expect((await packHtml(dir.write("mouse-focus.html", page), output)).error).toBe("");
@@ -297,12 +297,20 @@ test("focus lights a term only while it shows keyboard focus, so a click that un
 		};
 		// A key pressed on the mouse-focused term shows its focus again, and lights it.
 		await key("ArrowRight", 39);
-		return { keyboard, afterMouse, afterKey: await lit() };
+		const afterKey = await lit();
+		// Escape drops a pin made with the mouse, and the mouse-focused term does not light again.
+		await press(term);
+		await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...away });
+		const pinned = await lit();
+		await key("Escape", 27);
+		return { keyboard, afterMouse, afterKey, pinned, afterEscape: await lit() };
 	});
 	expect(states).toEqual({
 		keyboard: { focused: "term", lit: "term,cache" },
 		afterMouse: { focused: "term", lit: "" },
 		afterKey: "term,cache",
+		pinned: "term,cache",
+		afterEscape: "",
 	});
 }, 30_000);
 

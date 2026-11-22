@@ -4991,9 +4991,10 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
     paint();
   });
   document.addEventListener("keydown", (e) => {
-    onKeyboard = true;
     if (e.key === "Escape") {
       pinned = null;
+    } else {
+      onKeyboard = true;
     }
     paint();
   });

@@ -36,7 +36,7 @@
 
 	// The active part is the hovered one, else the focused one while the reader is on the keyboard, else the pinned one. A click
 	// focuses a term too, but that focus is not a request to light it: the click pins or unpins, and the light leaves with the
-	// pointer. A key press hands lighting back to focus, without moving it.
+	// pointer. A key press other than Escape hands lighting back to focus, without moving it.
 	let hovered: Part | null = null;
 	let focused: Part | null = null;
 	let pinned: Part | null = null;
@@ -296,9 +296,11 @@
 		paint();
 	});
 	document.addEventListener("keydown", (e) => {
-		onKeyboard = true;
+		// Escape dismisses: it drops the pin and hands nothing back to a focus the mouse gave.
 		if (e.key === "Escape") {
 			pinned = null;
+		} else {
+			onKeyboard = true;
 		}
 		paint();
 	});
