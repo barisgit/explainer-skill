@@ -1151,6 +1151,16 @@ textarea {
 	border-radius: var(--radius);
 	background: var(--surface);
 }
+.numeric-entry {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+.numeric-entry > input {
+	min-inline-size: 0;
+	inline-size: 12ch;
+}
 /* A free-response field: the width of its column, taller only by the reader's hand. */
 textarea {
 	display: block;
@@ -1486,14 +1496,19 @@ textarea[data-grow] {
 [data-verdict="wrong"] {
 	color: var(--bad);
 }
-.self-check:not(:has(> .seg input:checked)) > :is(.explain, p:has(> [data-verdict])),
-.self-check:has(> .seg input[data-right]:checked) > p > [data-verdict="wrong"],
-.self-check:has(> .seg input:checked:not([data-right])) > p > [data-verdict="right"] {
-	display: none;
-}
 .self-check > p:has(> [data-verdict]) {
 	margin-block: 0.625rem 0;
 	font-weight: 600;
+}
+.numeric:not([data-numeric-result="right"], [data-numeric-result="wrong"]) > .explain,
+.numeric[data-numeric-result=""] > p:has(> [data-verdict]),
+.numeric:not([data-numeric-result="right"]) > p > [data-verdict="right"],
+.numeric:not([data-numeric-result="wrong"]) > p > [data-verdict="wrong"],
+.numeric:not([data-numeric-result="invalid"]) > p > [data-verdict="invalid"],
+.self-check:not(.numeric, :has(> .seg input:checked)) > :is(.explain, p:has(> [data-verdict])),
+.self-check:has(> .seg input[data-right]:checked) > p > [data-verdict="wrong"],
+.self-check:has(> .seg input:checked:not([data-right])) > p > [data-verdict="right"] {
+	display: none;
 }
 .self-check > [role="status"] {
 	position: absolute;
@@ -6009,7 +6024,7 @@ window.PlotTween = () => {
    value) keeps its answer. Controls are matched by id (else radio form, group and value, else position), so give inputs ids; a
    saved value is dropped when the control's own label or type differs from when it was saved (a regenerated page).
    Put data-keep="off" on a control or its container to leave it out. Without usable storage the page works as before. Open
-   <details> are not kept. A self-check Question says Right or Wrong to a screen reader when the reader chooses (not on a restore).
+   <details> are not kept. A self-check Question speaks its verdict when the reader chooses or checks a number (not on a restore).
    Once a Question's answer is saved, a Clear answers button at the end of the page puts the answers back
    to their defaults, again with events, and drops their saved copy; a first press only asks, a second within 4 s clears. Other
    controls stay kept without a button. With reply (kit reply) the reader's notes are kept too, and on a page that asks for
@@ -6320,24 +6335,87 @@ window.PlotTween = () => {
       }
     };
   }
-  function sayVerdict(e) {
-    const input = e.target;
-    const own = input instanceof HTMLInputElement && input.matches(".self-check > .seg > label > input");
-    const check = own ? input.closest(".self-check") : null;
-    const status = check?.querySelector(":scope > [role=status]");
-    if (!(input instanceof HTMLInputElement && status)) {
+  function sayVerdict(check, verdict) {
+    const status = check.querySelector(":scope > [role=status]");
+    if (!status) {
       return;
     }
     status.textContent = "";
-    const verdict = input.checked && input.hasAttribute("data-right") ? "right" : "wrong";
-    const word = check?.querySelector(`:scope > p > [data-verdict=${verdict}]`)?.textContent;
-    if (!applying && input.checked && word) {
+    const word = !applying && verdict && check.querySelector(`:scope > p > [data-verdict=${verdict}]`)?.textContent;
+    if (word) {
       requestAnimationFrame(() => {
-        status.textContent = word;
+        const current = check.getAttribute("data-numeric-result");
+        if (current === null || current === verdict) {
+          status.textContent = word;
+        }
       });
     }
   }
-  document.addEventListener("change", sayVerdict);
+  function radioVerdict(e) {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement && input.matches(".self-check > .seg > label > input"))) {
+      return;
+    }
+    const check = input.closest(".self-check");
+    const verdict = input.hasAttribute("data-right") ? "right" : "wrong";
+    if (check) {
+      sayVerdict(check, input.checked ? verdict : "");
+    }
+  }
+  document.addEventListener("change", radioVerdict);
+  const numberField = ".numeric > .numeric-entry > input[data-number-min]";
+  function decimalMark(lang) {
+    try {
+      const parts = new Intl.NumberFormat(lang).formatToParts(0.5);
+      return parts.find(({ type }) => type === "decimal")?.value ?? ".";
+    } catch {
+      return ".";
+    }
+  }
+  function grade(input) {
+    const text = input.value.trim();
+    if (!text) {
+      return "";
+    }
+    const mark = decimalMark(input.closest("[lang]")?.getAttribute("lang") || "en");
+    const plain = mark === "." || !text.includes(".") ? text.replace(mark, ".") : "";
+    const value = Number(plain);
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(plain) || !Number.isFinite(value)) {
+      return "invalid";
+    }
+    return value >= Number(input.dataset.numberMin) && value <= Number(input.dataset.numberMax) ? "right" : "wrong";
+  }
+  function numericVerdict(input, verdict = grade(input)) {
+    const question = input.closest(".numeric");
+    if (question) {
+      question.dataset.numericResult = verdict;
+      sayVerdict(question, verdict);
+    }
+  }
+  document.addEventListener("click", (e) => {
+    const button = e.target instanceof Element ? e.target.closest(".numeric > .numeric-entry > button") : null;
+    const input = button?.parentElement?.querySelector("input");
+    if (input) {
+      numericVerdict(input);
+    }
+  });
+  function numericInput(e) {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement && input.matches(numberField))) {
+      return;
+    }
+    if (e.type === "input") {
+      numericVerdict(input, "");
+    } else if (e.type === "change" && applying) {
+      numericVerdict(input);
+    } else if (e instanceof KeyboardEvent && e.key === "Enter" && !e.isComposing) {
+      e.preventDefault();
+      numericVerdict(input);
+    }
+  }
+  for (const type of ["keydown", "input", "change"]) {
+    document.addEventListener(type, numericInput);
+  }
   const later = () => setTimeout(() => onChange());
   for (const type of ["input", "change", "click"]) {
     document.addEventListener(type, later);

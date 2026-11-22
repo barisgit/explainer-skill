@@ -1150,6 +1150,16 @@ textarea {
 	border-radius: var(--radius);
 	background: var(--surface);
 }
+.numeric-entry {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+.numeric-entry > input {
+	min-inline-size: 0;
+	inline-size: 12ch;
+}
 /* A free-response field: the width of its column, taller only by the reader's hand. */
 textarea {
 	display: block;
@@ -1485,14 +1495,19 @@ textarea[data-grow] {
 [data-verdict="wrong"] {
 	color: var(--bad);
 }
-.self-check:not(:has(> .seg input:checked)) > :is(.explain, p:has(> [data-verdict])),
-.self-check:has(> .seg input[data-right]:checked) > p > [data-verdict="wrong"],
-.self-check:has(> .seg input:checked:not([data-right])) > p > [data-verdict="right"] {
-	display: none;
-}
 .self-check > p:has(> [data-verdict]) {
 	margin-block: 0.625rem 0;
 	font-weight: 600;
+}
+.numeric:not([data-numeric-result="right"], [data-numeric-result="wrong"]) > .explain,
+.numeric[data-numeric-result=""] > p:has(> [data-verdict]),
+.numeric:not([data-numeric-result="right"]) > p > [data-verdict="right"],
+.numeric:not([data-numeric-result="wrong"]) > p > [data-verdict="wrong"],
+.numeric:not([data-numeric-result="invalid"]) > p > [data-verdict="invalid"],
+.self-check:not(.numeric, :has(> .seg input:checked)) > :is(.explain, p:has(> [data-verdict])),
+.self-check:has(> .seg input[data-right]:checked) > p > [data-verdict="wrong"],
+.self-check:has(> .seg input:checked:not([data-right])) > p > [data-verdict="right"] {
+	display: none;
 }
 .self-check > [role="status"] {
 	position: absolute;
