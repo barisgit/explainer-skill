@@ -245,6 +245,10 @@
 	}
 
 	window.Views = {
+		record(el) {
+			const at = routeOf(el);
+			return at?.view?.hasAttribute("data-fill") ? at.param : null;
+		},
 		local(el) {
 			const hash = canonical(location.hash.slice(1));
 			const view = el.closest("[data-view]");

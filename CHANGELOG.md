@@ -5,6 +5,7 @@
 - The guide keeps answer headings for decision pages and reports and asks for short label headings ("Mixing") on study, how-to and reference pages, the answer in the first sentence or figure. Every page shows each section's main path and puts supporting derivations, further examples, edge cases and textbook references in `<details>` folds labelled with the question they answer. Prose is plain: one idea per paragraph, bold only where a term is defined, citations and equation numbers at a paragraph's end.
 - Write a reminder the reader may need once, as `<Recall id="spectrum">One short paragraph.</Recall>`, and mark each mention with `<Term recall="spectrum">spectrum</Term>`: tapping the term opens the reminder right under it and tapping again closes it; print shows it at the first mention. `pack` fails on a `Term` naming no `Recall` and warns about a `Recall` nobody mentions.
 - A lit term now has a thin accent outline and solid underline, so it is as easy to find as its linked diagram part, even in dark mode. Inline stepper highlights use the same treatment without shifting the text.
+- A reply note is written and edited in a small popover under the text or part it is about, which stays highlighted while you write. A saved note stays marked: click its highlight, or its margin button from the keyboard, to edit or delete it in place. Marks stay with the reader across reloads and do not print. Pages set the new popover buttons' texts with the `deleteNote` and `done` labels.
 
 ## v0.17.0
 

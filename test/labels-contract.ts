@@ -34,6 +34,8 @@ export const ENGLISH = {
 	part: "Part",
 	cancel: "Cancel",
 	saveNote: "Save note",
+	deleteNote: "Delete",
+	done: "Done",
 	noteSaved: "Note saved.",
 	toReply: "Go to Reply",
 	figure: "figure",
@@ -104,6 +106,8 @@ export const SLOVENIAN: typeof ENGLISH = {
 	part: "Del",
 	cancel: "Prekliči",
 	saveNote: "Shrani opombo",
+	deleteNote: "Izbriši",
+	done: "Končano",
 	noteSaved: "Opomba je shranjena.",
 	toReply: "Pojdi na Odgovor",
 	figure: "slika",
@@ -220,7 +224,7 @@ function clearing() {
 	expect("clear cancelled", clear.textContent === L.clear && $(".reply-bar [role=status]").textContent === L.clearCancelled);
 }
 
-function note() {
+async function note() {
 	$("[data-ref=cache]").click();
 	expect("note hint", $(".reply-hint").textContent === L.noteOn + " \u201ccache\u201d");
 	$(".reply-hint").click();
@@ -229,17 +233,27 @@ function note() {
 	expect("note editor", pop.getAttribute("aria-label") === L.addNote && text.getAttribute("aria-label") === L.note && text.placeholder === L.notePlaceholder && $(".meta", pop).textContent === L.part + ": cache");
 	expect("note editor buttons", $(".btn:not(.primary)", pop).textContent === L.cancel && $(".primary", pop).textContent === L.saveNote);
 	text.value = "x";
+	text.dispatchEvent(new Event("input"));
 	$(".primary", pop).click();
 	expect("note saved", $(".reply-pop .meta").textContent === L.noteSaved && $(".reply-pop .btn").textContent === L.toReply && $(".reply-bar [role=status]").textContent === L.noteSaved);
+	$(".reply-pop .btn").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+	await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+	$(".reply-mark").click();
+	const saved = $(".reply-note-pop");
+	expect("saved note popover", saved.getAttribute("aria-label") === L.noteOn + " \u201ccache\u201d" && $(".reply-delete", saved).textContent === L.deleteNote && $(".primary", saved).textContent === L.done);
+	$(".primary", saved).click();
 	for (const ref of ["db", "loose"]) {
 		$("[data-ref=" + ref + "]").click();
 		$(".reply-hint").click();
 		$(".reply-pop textarea").value = "x";
+		$(".reply-pop textarea").dispatchEvent(new Event("input"));
 		$(".reply-pop .primary").click();
 	}
 }
 
 async function dialog() {
+	// A note whose part is gone has no mark to be edited at, so the dialog keeps its field and Remove.
+	$("[data-ref=loose]").removeAttribute("data-ref");
 	$(".reply-bar .primary").click();
 	const box = $(".reply-dialog");
 	expect("dialog", aria(".reply-dialog") === L.yourReply && $("h2", box).textContent === L.yourReply && $("header .btn", box).textContent === L.close);
@@ -247,7 +261,7 @@ async function dialog() {
 	expect("note captions", captions.join("|") === ["cache · § Items", "db · " + L.figure + " \u201cScheme\u201d", "loose · " + L.page].join("|"));
 	const markdown = $(".reply-md", box).textContent;
 	expect("the reply Markdown locates notes in English", markdown.includes('(figure "Scheme")') && markdown.includes("(page)"));
-	expect("dialog note", aria(".reply-note textarea", box) === L.note && $(".reply-note .btn", box).textContent === L.remove && $("footer .primary", box).textContent === L.copyReply);
+	expect("dialog notes", box.querySelectorAll(".reply-note textarea").length === 1 && aria(".reply-note textarea", box) === L.note && $(".reply-note .btn", box).textContent === L.remove && $("footer .primary", box).textContent === L.copyReply);
 	const status = changed($("footer [role=status]", box));
 	$("footer .primary", box).click();
 	await status;
@@ -261,7 +275,7 @@ var contract = settled.then(async () => {
 	await views();
 	await records();
 	clearing();
-	note();
+	await note();
 	await dialog();
 	return failures;
 });

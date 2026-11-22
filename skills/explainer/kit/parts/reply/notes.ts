@@ -1,13 +1,34 @@
-/* reply notes: the note-taking half of kit:reply.js (select text or click a [data-ref] part, write a note). Not referenced from pages: pack
-   joins it in front of reply.js, which calls it once with
-     kitText(key)       reply.js's text for a key: the hint's and the editor's texts
+/* reply notes: the note-taking half of kit:reply.js (select text or click a [data-ref] part, write a note) and the one popover a
+   note is written and edited in. Not referenced from pages: pack joins it in front of reply.js, which calls it once with
+     kitText(key)       reply.js's text for a key: the hint's and the popover's texts
      h, clean, quoted   the element and text helpers of reply.js
      root               the element whose content takes notes
-     addNote(note)      receives { quote | part, place, where, text } when the reader saves a note
+     marks              kit reply marks: anchors, what a note marks, the note at a point, the open note's mark
+   and places its hint and popover with kit/parts/reply/place.ts.
+     addNote(note)      receives { quote | part, place, where, anchor?, text } when the reader saves a new note
+     removeNote(note)   drops a saved note (Delete, or a note left empty)
+     changed()          a saved note's text changed in the popover
+     label(note)        a saved note's accessible name, "Note on “…”"
      toReply()          brings the reader to the Reply button, from the saved note's "Go to Reply"
-     paused()           true while the reply dialog is open, when no hint or editor should appear */
+     paused()           true while the reply dialog is open, when no hint or popover should appear
+   It returns { edit(note), close(), row(note, head, then), follow() }: edit opens a saved note's popover (its margin button),
+   close puts the popover away, row draws the note in the reply dialog, follow moves the popover with its target after the marks
+   are drawn again (a scroll, a fold, a changed page), closing it when its target is gone. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the function only scopes the part's names away from the page; the code in it is split into small functions
-window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused }) => {
+window.ReplyNotes = ({
+	kitText,
+	h,
+	clean,
+	quoted,
+	root,
+	marks,
+	addNote,
+	removeNote,
+	changed,
+	label,
+	toReply,
+	paused,
+}) => {
 	const NATIVE = "a[href], button, input, select, textarea, summary, label, .reply-ui";
 
 	/** Where a note sits: its figure's aria-label, else the section heading, else the figure caption, else the page. */
@@ -40,10 +61,29 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	}
 
 	type Target = Omit<ReplyNote, "text">;
+	/** What a new note is on: the selected text (a copy of its range) or the part. */
+	const anchorOf = (target: Range | Part) => {
+		const at = marks.anchor(target);
+		return at ? { anchor: at } : {};
+	};
 	let hint: HTMLButtonElement | null = null;
 	let hintFromSelection = false;
 	let pop: HTMLElement | null = null;
 	let popSize: ResizeObserver | null = null;
+	/** Moves the open popup with its target (null while none is open): `true` when it must also fit, after a size change. */
+	let follow: ((fit: boolean) => void) | null = null;
+	/** The frame that fits it again after a size change. */
+	let moved = 0;
+	/**
+	 * The note the popover is on: `saved` once it is one of the reply's notes, `live` what it is about now; focus goes back to
+	 * `origin` when it closes.
+	 */
+	let editing: {
+		note: ReplyNote;
+		saved: boolean;
+		live: () => NoteTarget | null;
+		origin: Part | null;
+	} | null = null;
 	const clearHint = () => {
 		hint?.remove();
 		hint = null;
@@ -52,96 +92,73 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 	const closePop = () => {
 		const open = pop;
 		pop = null;
+		follow = null;
+		cancelAnimationFrame(moved);
+		moved = 0;
 		popSize?.disconnect();
 		popSize = null;
 		open?.remove();
 	};
 
+	const place = window.ReplyPlace(root);
 	/** Keep an anchor in document coordinates, so growing an editor after a scroll still measures the same target. */
 	const documentRect = (at: DOMRect) =>
 		new DOMRect(at.x + scrollX, at.y + scrollY, at.width, at.height);
 
-	/** Above or below the target; if neither fits, scroll only the shorter feasible distance to make one fit. */
-	function vertical(at: DOMRect, height: number) {
-		const above = at.top - height - 6;
-		const below = at.bottom + 6;
-		if (above >= 8) {
-			return above;
-		}
-		if (below + height <= innerHeight - 8) {
-			return below;
-		}
-		const bottom = document.documentElement.scrollHeight - innerHeight;
-		const fit = [
-			{ top: above, delta: above - 8 },
-			{ top: below, delta: below + height + 8 - innerHeight },
-		]
-			.filter(({ delta }) => scrollY + delta >= 0 && scrollY + delta <= bottom)
-			.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta))[0];
-		if (!fit) {
-			return below;
-		}
-		const before = scrollY;
-		scrollBy(0, fit.delta);
-		return fit.top - (scrollY - before);
-	}
-
-	/** A measured overlay inside the page column and viewport: above the target, else beside, below, then clamped. */
-	function position(popup: HTMLElement, anchor: DOMRect) {
-		const at = new DOMRect(anchor.x - scrollX, anchor.y - scrollY, anchor.width, anchor.height);
-		const column = root.getBoundingClientRect();
-		const left = Math.max(8, column.left);
-		const right = Math.min(innerWidth - 8, column.right);
-		popup.style.maxWidth = `${Math.max(0, right - left)}px`;
-		popup.style.maxHeight = `${innerHeight - 16}px`;
-		const { width, height } = popup.getBoundingClientRect();
-		const clampX = (x: number) => Math.max(left, Math.min(x, right - width));
-		const clampY = (y: number) => Math.max(8, Math.min(y, innerHeight - height - 8));
-		let x = clampX(at.right - width);
-		let y = at.top - height - 6;
-		// Above keeps following prose clear; beside is useful for a selection at the very top of the screen.
-		if (y < 8) {
-			if (at.right + 6 + width <= right) {
-				x = at.right + 6;
-				y = at.bottom - height;
-			} else {
-				y = vertical(at, height);
-			}
-		}
-		popup.style.left = `${clampX(x) + scrollX}px`;
-		popup.style.top = `${clampY(y) + scrollY}px`;
-	}
-
-	/** Clicking the small button opens the note editor at the same target. */
-	function showHint(label: string, at: DOMRect, target: Target, fromSelection: boolean) {
+	/** Clicking the small button opens the note's popover at the same target. */
+	function showHint(
+		text: string,
+		at: DOMRect,
+		target: Target,
+		live: NoteTarget,
+		origin: Part | null,
+	) {
 		clearHint();
-		hintFromSelection = fromSelection;
-		const button = h("button", { type: "button", class: "btn reply-ui reply-hint" }, label);
-		const anchor = documentRect(at);
+		hintFromSelection = live instanceof Range;
+		const button = h("button", { type: "button", class: "btn reply-ui reply-hint" }, text);
 		button.addEventListener("pointerdown", (e) => e.preventDefault()); // keeps the text selection alive until the click
 		button.addEventListener("click", () => {
 			clearHint();
-			openNote(target, anchor);
+			create(target, live, origin);
 		});
 		document.body.append(button);
-		position(button, anchor);
+		place.hint(button, documentRect(at));
 		hint = button;
 	}
 
-	/** Shows the editor or saved-note action around the original target's document-space anchor, not the hint button. */
-	function showPop(popup: HTMLElement, anchor: DOMRect) {
+	/** Shows a popup next to its target and keeps it there as it grows, the window changes or its target scrolls. */
+	function showPop(popup: HTMLElement, live: () => NoteTarget | null) {
 		document.body.append(popup);
-		position(popup, anchor);
-		popSize = new ResizeObserver(() => position(popup, anchor));
-		popSize.observe(popup);
+		const beside = place.beside(popup, live, () => (editing ? close() : closePop()));
 		pop = popup;
+		follow = beside;
+		beside(true);
+		if (pop === popup) {
+			// Still open: placing it closes it when its target is already gone.
+			popSize = new ResizeObserver(() => follow?.(true));
+			popSize.observe(popup);
+		}
 	}
+	/** The window changed size, a phone's keyboard included: the open popup fits again at the next frame. */
+	const refit = () => {
+		if (!follow) {
+			return;
+		}
+		if (!moved) {
+			moved = requestAnimationFrame(() => {
+				moved = 0;
+				follow?.(true);
+			});
+		}
+	};
+	addEventListener("resize", refit);
+	window.visualViewport?.addEventListener("resize", refit);
 
 	/**
-	 * Where the editor was: "Note saved." with the way to the Reply button, which stays under the last question however far below
+	 * Where the popover was: "Note saved." with the way to the Reply button, which stays under the last question however far below
 	 * it the note is. Focus moves to that button, so a keyboard reader is one Enter from Reply; leaving it or Escape closes it.
 	 */
-	function showSaved(at: DOMRect) {
+	function showSaved(note: ReplyNote, live: NoteTarget) {
 		const go = h(
 			"button",
 			{
@@ -156,13 +173,18 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		);
 		const popup = h(
 			"div",
-			{ class: "reply-ui reply-pop", role: "group", "aria-label": kitText("noteSaved") },
+			{
+				class: "reply-ui reply-pop reply-note-pop",
+				role: "group",
+				"aria-label": kitText("noteSaved"),
+			},
 			h("p", { class: "meta" }, kitText("noteSaved")),
 			h("div", { class: "reply-row" }, go),
 		);
 		popup.addEventListener("keydown", (e) => {
 			if (e.key === "Escape") {
 				closePop();
+				marks.button(note)?.focus();
 			}
 		});
 		popup.addEventListener("focusout", (e) => {
@@ -170,52 +192,144 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 				closePop();
 			}
 		});
-		showPop(popup, at);
+		showPop(popup, () => marks.target(note) ?? live);
 		go.focus({ preventScroll: true });
 	}
 
-	function openNote(target: Target, at: DOMRect) {
+	/**
+	 * Puts the popover away. Closing keeps what the reader wrote, a new note included (a note left empty is no note); `drop`
+	 * (Cancel, Delete) leaves no note. With `back`, focus goes where the note was opened from, else to its margin button, else,
+	 * when neither is left (a text note cancelled or deleted), the reading position is put back at its text.
+	 */
+	function close({ drop = false, back = false } = {}) {
+		const open = editing;
+		if (!open) {
+			return;
+		}
+		const at = open.live();
+		editing = null;
 		closePop();
+		marks.show(null);
+		const { note, saved } = open;
+		const empty = !note.text.trim();
+		if (saved && (drop || empty)) {
+			removeNote(note);
+		} else if (!(saved || drop || empty)) {
+			note.text = note.text.trim();
+			addNote(note);
+		}
+		if (back) {
+			giveBack(open.origin, note, at);
+		}
+	}
+
+	function giveBack(origin: Part | null, note: ReplyNote, at: NoteTarget | null) {
+		marks.flush(); // the note's button, made or removed just now
+		const button = marks.button(note);
+		const to = origin?.isConnected ? origin : button && !button.hidden ? button : null;
+		if (to) {
+			to.focus({ preventScroll: true });
+		} else if (at instanceof Range) {
+			getSelection()?.setBaseAndExtent(
+				at.startContainer,
+				at.startOffset,
+				at.startContainer,
+				at.startOffset,
+			);
+		}
+	}
+
+	/**
+	 * The one popover a note is written and edited in, under the text it is about with that text lit: the quote, the note, and
+	 * Cancel and Save note for a new note or Delete and Done for a saved one, whose text changes as it is typed.
+	 */
+	function popover(
+		note: ReplyNote,
+		saved: boolean,
+		live: () => NoteTarget | null,
+		origin: Part | null,
+	) {
+		close();
+		clearHint();
+		editing = { note, saved, live, origin };
 		const text = h("textarea", {
 			rows: "1",
 			"data-grow": "",
 			"aria-label": kitText("note"),
 			placeholder: kitText("notePlaceholder"),
 		});
-		const save = () => {
-			const value = text.value.trim();
-			closePop();
-			if (value) {
-				addNote({ ...target, text: value });
-				showSaved(at);
+		text.value = note.text;
+		text.addEventListener("input", () => {
+			note.text = text.value;
+			if (saved) {
+				changed();
+			}
+		});
+		const button = (name: string, onclick: () => void, kind = "btn") =>
+			h("button", { type: "button", class: kind, onclick }, name);
+		const finish = () => {
+			const target = !saved && note.text.trim() ? live() : null;
+			close({ back: saved || !target });
+			if (target) {
+				showSaved(note, target);
 			}
 		};
 		const popup = h(
 			"div",
-			{ class: "reply-ui reply-pop", role: "dialog", "aria-label": kitText("addNote") },
+			{
+				class: "reply-ui reply-pop reply-note-pop",
+				role: "dialog",
+				"aria-label": saved ? label(note) : kitText("addNote"),
+			},
 			h(
 				"p",
-				{ class: "meta" },
-				target.quote ? `“${target.quote}”` : `${kitText("part")}: ${target.part}`,
+				{ class: "meta reply-quote" },
+				note.quote ? `“${note.quote}”` : `${kitText("part")}: ${note.part}`,
 			),
 			text,
 			h(
 				"div",
 				{ class: "reply-row" },
-				h("button", { type: "button", class: "btn", onclick: closePop }, kitText("cancel")),
-				h("button", { type: "button", class: "btn primary", onclick: save }, kitText("saveNote")),
+				saved
+					? button(
+							kitText("deleteNote"),
+							() => close({ drop: true, back: true }),
+							"btn reply-delete",
+						)
+					: button(kitText("cancel"), () => close({ drop: true, back: true })),
+				button(kitText(saved ? "done" : "saveNote"), finish, "btn primary"),
 			),
 		);
-		text.addEventListener("keydown", (e) => {
+		popup.addEventListener("keydown", (e) => {
 			if (e.key === "Escape") {
-				closePop();
+				e.preventDefault();
+				e.stopPropagation();
+				close({ back: true });
 			}
 			if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-				save();
+				finish();
 			}
 		});
-		showPop(popup, at);
+		const target = live();
+		marks.show(note, target ?? undefined, !saved);
+		showPop(popup, live);
 		text.focus({ preventScroll: true });
+		text.setSelectionRange(text.value.length, text.value.length);
+	}
+
+	/** A new note's popover, on a copy of the selection's range (the selection itself moves to the note field) or on the part. */
+	function create(target: Target, live: NoteTarget, origin: Part | null) {
+		const on = live instanceof Range ? live.cloneRange() : live;
+		popover({ ...target, text: "" }, false, () => on, origin);
+	}
+
+	/** A saved note's popover, from its margin button or a click on what it marks; a second press on the button closes it. */
+	function edit(note: ReplyNote, origin: Part | null = null) {
+		if (editing?.note === note) {
+			close({ back: true });
+			return;
+		}
+		popover(note, true, () => marks.target(note), origin);
 	}
 
 	/** A tree branch uses its summary's label cell, not its numbers or descendants; an explicit label always wins. */
@@ -226,6 +340,7 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		return {
 			part: clean(label ?? "").slice(0, 60) || (part.dataset.ref?.split(" ")[0] ?? ""),
 			...located(part),
+			...anchorOf(part),
 		};
 	}
 
@@ -311,9 +426,22 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 				return;
 			}
 			const rect = range.getBoundingClientRect();
-			showHint(kitText("addNote"), rect, { quote, ...located(host) }, true);
+			const target = { quote, ...located(host), ...anchorOf(range) };
+			showHint(kitText("addNote"), rect, target, range.cloneRange(), null);
 		}, 200);
 	});
+
+	/** Whether a press lands on the open note: its popover, its margin button, or what it marks. */
+	function onOpen(e: PointerEvent) {
+		const at = e.target instanceof Node ? e.target : null;
+		const note = editing?.note;
+		return Boolean(
+			at &&
+				(pop?.contains(at) ||
+					(note &&
+						(marks.button(note)?.contains(at) || marks.at(e.clientX, e.clientY, at) === note))),
+		);
+	}
 
 	document.addEventListener(
 		"pointerdown",
@@ -321,30 +449,55 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 			if (hint && e.target !== hint) {
 				clearHint();
 			}
-			if (pop && !(e.target instanceof Node && pop.contains(e.target))) {
-				closePop();
+			if (pop && !onOpen(e)) {
+				// A press elsewhere puts the popover away where the reader pressed, keeping the note as written.
+				if (editing) {
+					close();
+				} else {
+					closePop();
+				}
 			}
 		},
 		true,
 	);
 
+	/**
+	 * The note a click lands on: what a note marks, outside the page's controls, except a text note over a label's text (a
+	 * Question's option), whose click is the note's rather than the option's.
+	 */
+	function notedAt(e: MouseEvent, el: Element) {
+		const control = el.closest(NATIVE);
+		const noted = control && !control.matches("label") ? null : marks.at(e.clientX, e.clientY, el);
+		return noted && (!control || marks.target(noted) instanceof Range) ? noted : null;
+	}
+
 	document.addEventListener("click", (e) => {
 		const el = e.target;
-		if (!(el instanceof Element)) {
+		if (!(el instanceof Element) || paused() || getSelection()?.isCollapsed === false) {
+			return;
+		}
+		// A click on what a note marks opens that note, as a comment's highlight does in a document editor.
+		const noted = notedAt(e, el);
+		if (noted) {
+			e.preventDefault(); // claims the click, so a Question row under the highlight keeps its answer
+			if (editing?.note !== noted) {
+				edit(noted);
+			}
 			return;
 		}
 		const part = el.closest<Part>("[data-ref]");
-		if (
-			!part ||
-			!root.contains(part) ||
-			el.closest(NATIVE) ||
-			getSelection()?.isCollapsed === false ||
-			paused()
-		) {
+		if (!part || !root.contains(part) || el.closest(NATIVE)) {
 			return;
 		}
 		const target = partTarget(part);
-		showHint(`${kitText("noteOn")} “${target.part}”`, part.getBoundingClientRect(), target, false);
+		const origin = part.tabIndex >= 0 ? part : null;
+		showHint(
+			`${kitText("noteOn")} “${target.part}”`,
+			part.getBoundingClientRect(),
+			target,
+			part,
+			origin,
+		);
 	});
 	markTargets();
 	document.addEventListener("keydown", (e) => {
@@ -358,6 +511,58 @@ window.ReplyNotes = ({ kitText, h, clean, quoted, root, addNote, toReply, paused
 		) {
 			return;
 		}
-		openNote(partTarget(part), documentRect(part.getBoundingClientRect()));
+		const noted = marks.at(Number.NaN, Number.NaN, part);
+		if (noted) {
+			edit(noted, part);
+		} else {
+			create(partTarget(part), part, part);
+		}
 	});
+
+	/**
+	 * A note's row in the reply dialog, under its caption `head`: its text, edited where its mark is; a note with no mark on the
+	 * page (an older note, a text since changed) keeps a field and Remove here. `then(removed)` follows an edit or a removal.
+	 */
+	function row(note: ReplyNote, head: string, then: (removed: boolean) => void) {
+		const caption = h("p", { class: "meta" }, head);
+		if (marks.target(note)) {
+			return h(
+				"div",
+				{ class: "reply-note" },
+				caption,
+				h("p", { class: "reply-note-text" }, note.text),
+			);
+		}
+		const text = h("textarea", { rows: "1", "data-grow": "", "aria-label": kitText("note") });
+		text.value = note.text;
+		text.addEventListener("input", () => {
+			note.text = text.value;
+			changed();
+			then(false);
+		});
+		const remove = () => {
+			removeNote(note);
+			then(true);
+		};
+		const button = h(
+			"button",
+			{ type: "button", class: "btn", onclick: remove },
+			kitText("remove"),
+		);
+		return h("div", { class: "reply-note" }, caption, text, button);
+	}
+
+	return {
+		row,
+		follow: () => follow?.(false),
+		edit,
+		close: () => {
+			clearHint();
+			if (editing) {
+				close();
+			} else {
+				closePop();
+			}
+		},
+	};
 };

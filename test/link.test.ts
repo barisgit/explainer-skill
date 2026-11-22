@@ -168,14 +168,19 @@ test("the light and dark copies of an SVG file are one place", async () => {
 	expect(await packAndRun(dir, "twin", PAGE(script, body))).toEqual([]);
 }, 30_000);
 
-/** Focuses `el` and presses Enter on it, as a keyboard reader asks for a note; true when the note editor opened. */
+/**
+ * Focuses `el` and presses Enter on it, as a keyboard reader asks for a note; true when the note editor opened and Cancel gave
+ * focus back to `el`, which then lets it go so the next check starts from no focus.
+ */
 const NOTE_BY_KEY = `const noteByKey = (el) => {
 		el.focus();
 		const focused = document.activeElement === el;
 		el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		const opened = $(".reply-pop") !== null;
 		$(".reply-pop .btn:not(.primary)")?.click();
-		return focused && opened;
+		const back = document.activeElement === el;
+		el.blur();
+		return focused && opened && back;
 	};
 	const underlined = (el) => getComputedStyle(el).textDecorationLine === "underline";`;
 

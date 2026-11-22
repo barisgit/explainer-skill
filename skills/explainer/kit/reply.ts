@@ -20,12 +20,17 @@
    (kit link refs, Mermaid node ids); Enter on a focused ref opens its note. Refs in the text are made focusable and marked
    is-annotatable (a faint underline), also those rendered later. An aria-label names a note target explicitly; otherwise a tree
    branch uses its summary's first cell, other parts their text. Put a tree ref on its details, leaving the summary free to fold it.
+   A note is written and edited in one popover under the text or part it is about, which is lit while it is open: the quote, the
+   note, and Cancel and Save note (a new one) or Delete and Done (a saved one, changed as it is typed). Escape or a press elsewhere
+   closes it keeping what was written. A saved note stays lit, and a click on its highlight or its margin button (a named button,
+   for the keyboard) opens it again; none of this prints.
    The Reply and Clear buttons, with the answered count, sit in the page's flow where the reader decides, never on the first
    screen unless a question is: at the end of the section holding the last question of what is shown (the overview or the open
    view), else, once there is something to send or clear, at the end of it. So a page with questions in several views has the
    bar under the last question of each, and a reply: true page at its end. A section a client component draws is its own, so
    the bar follows it instead. A saved note offers "Go to Reply" where it was, so a note far below the questions is one step from
-   the bar. The Reply button opens the reply: editable notes and the Markdown that goes back. "Copy reply" puts it on the
+   the bar. The Reply button opens the reply, for sending: the notes (edited where they are; one with no mark on the page is
+   edited here) and the Markdown that goes back. "Copy reply" puts it on the
    clipboard and also delivers it to a host: document.dispatchEvent(new CustomEvent("reply", { detail })) and, when the page is
    framed, parent.postMessage({ type: "explainer:reply", ...detail }, "*"). detail = { title, page, markdown, notes: [{ where,
    quote | part, text }], answers: [{ label, value, note, touched, recommended? }] }.
@@ -44,7 +49,8 @@
    answers and notes." (announced; kit keep lists the confirm's other texts), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
    copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
-   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", noteSaved "Note saved."
+   noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", deleteNote "Delete",
+   done "Done", noteSaved "Note saved."
    (announced, and over the saved note's toReply "Go to Reply"), and in the caption over a
    note in the dialog figure "figure" ("figure “name”"), page "page" (a note outside any figure or headed section) and answered
    "{answered} of {total} answered" (the bar's count, over the whole page); for Send, sendReply "Send reply", sending
@@ -79,6 +85,8 @@
 		part: "Part",
 		cancel: "Cancel",
 		saveNote: "Save note",
+		deleteNote: "Delete",
+		done: "Done",
 		noteSaved: "Note saved.",
 		toReply: "Go to Reply",
 		figure: "figure",
@@ -265,17 +273,27 @@
 	}
 
 	function restoreNotes(saved: unknown) {
-		for (const n of Array.isArray(saved) ? saved : []) {
-			if (typeof n?.text === "string" && (n.quote || n.part)) {
-				const place = isPlace(n.place) ? { place: n.place } : {};
-				notes.push({
-					where: String(n.where),
-					...place,
-					quote: n.quote,
-					part: n.part,
-					text: n.text,
-				});
+		if (!Array.isArray(saved)) {
+			return;
+		}
+		for (const n of saved) {
+			if (typeof n?.text !== "string" || !(n.quote || n.part)) {
+				continue;
 			}
+			const note: ReplyNote = {
+				where: String(n.where),
+				quote: n.quote,
+				part: n.part,
+				text: n.text,
+			};
+			const anchor = marks.read(n.anchor);
+			if (anchor) {
+				note.anchor = anchor;
+			}
+			if (isPlace(n.place)) {
+				note.place = n.place;
+			}
+			notes.push(note);
 		}
 	}
 
@@ -380,10 +398,7 @@
 	const button = h("button", {
 		type: "button",
 		class: "btn primary",
-		onclick: () => {
-			renderDialog();
-			dialog.showModal();
-		},
+		onclick: () => showDialog(),
 	});
 	// keep.js's Clear, with texts that name the notes it clears too.
 	const clear = keep.clearButton(
@@ -395,6 +410,7 @@
 	const actions = h("div", { class: "reply-actions" }, button, clear.button, clear.status);
 	const bar = h("div", { class: "reply-ui reply-bar", hidden: "" }, actions, progress);
 	function clearAll() {
+		noting.close();
 		notes.length = 0;
 		keep.clear();
 	}
@@ -472,7 +488,9 @@
 			asked || filledNotes().length > 0 || document.querySelector("[data-asks-reply]") !== null;
 		const kept = keep.update(inBar);
 		const given = answers();
-		const count = filledNotes().length + given.filter((a) => a.touched).length;
+		const filled = filledNotes();
+		marks.sync(filled);
+		const count = filled.length + given.filter((a) => a.touched).length;
 		// Answered: chosen or noted by the reader, so a default left alone is not counted until the reader picks it.
 		const questions = new Set<HTMLElement>(
 			given.map((a) => a.host).filter((host) => host instanceof HTMLFieldSetElement),
@@ -507,35 +525,15 @@
 	/** Draws the dialog for the reply as it is now. */
 	function renderDialog() {
 		const preview = h("pre", { class: "reply-md" }, markdown());
-		const rows = notes.map((n) => {
-			const text = h("textarea", { rows: "1", "data-grow": "", "aria-label": kitText("note") });
-			text.value = n.text;
-			text.addEventListener("input", () => {
-				n.text = text.value;
+		const head = (n: ReplyNote) => `${n.quote ? `“${n.quote}”` : n.part} · ${caption(n)}`;
+		const then = (removed: boolean) => {
+			if (removed) {
+				renderDialog();
+			} else {
 				preview.textContent = markdown();
-				sync();
-			});
-			const remove = h(
-				"button",
-				{
-					type: "button",
-					class: "btn",
-					onclick: () => {
-						notes.splice(notes.indexOf(n), 1);
-						sync();
-						renderDialog();
-					},
-				},
-				kitText("remove"),
-			);
-			return h(
-				"div",
-				{ class: "reply-note" },
-				h("p", { class: "meta" }, `${n.quote ? `“${n.quote}”` : n.part} · ${caption(n)}`),
-				text,
-				remove,
-			);
-		});
+			}
+		};
+		const rows = notes.map((n) => noting.row(n, head(n), then));
 		const status = h("span", { role: "status", class: "meta" });
 		const send = sender.controls(status);
 		const copyButton = h(
@@ -576,18 +574,45 @@
 		}
 	});
 
-	window.ReplyNotes({
+	// The dialog is for sending: a note is opened where it is, in the notes' popover.
+	function showDialog() {
+		noting.close();
+		renderDialog();
+		dialog.showModal();
+	}
+
+	const label = (n: ReplyNote) => {
+		const target = n.quote ?? n.part ?? "";
+		return `${kitText("noteOn")} “${target.length > 60 ? `${target.slice(0, 60).trimEnd()}…` : target}”`;
+	};
+	const marks = window.ReplyMarks({
+		root,
+		label,
+		open: (note, from) => noting.edit(note, from),
+		painted: () => noting.follow(),
+	});
+	const noting = window.ReplyNotes({
+		marks,
 		kitText,
 		h,
 		clean,
 		quoted,
 		root,
+		label,
 		paused: () => dialog.open,
 		addNote: (note) => {
 			notes.push(note);
 			sync();
 			clear.status.textContent = kitText("noteSaved");
 		},
+		removeNote: (note) => {
+			const at = notes.indexOf(note);
+			if (at >= 0) {
+				notes.splice(at, 1);
+			}
+			sync();
+		},
+		changed: sync,
 		toReply: () => {
 			bar.scrollIntoView({ block: "center" });
 			button.focus({ preventScroll: true });
@@ -623,7 +648,13 @@
 		const choice = el
 			?.closest("fieldset[data-reply] .compare tbody > tr")
 			?.querySelector<HTMLInputElement>(":scope > th > label:first-child > input");
-		if (choice && !el?.closest(OWN_CLICK) && getSelection()?.isCollapsed !== false) {
+		// A click that opened a note (on its highlight) is the note's.
+		if (
+			choice &&
+			!e.defaultPrevented &&
+			!el?.closest(OWN_CLICK) &&
+			getSelection()?.isCollapsed !== false
+		) {
 			choice.focus({ preventScroll: true }); // as a click on its label does, so the arrow keys go on from it
 			choice.click();
 		}

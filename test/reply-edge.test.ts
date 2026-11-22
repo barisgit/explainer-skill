@@ -126,10 +126,13 @@ for (const keyboard of [true, false]) {
 			return { clear: box.bottom <= target.top - 5 || box.top >= target.bottom + 5, moved: Math.abs(scrollY - ${before.scroll}), height: box.height };
 		})()`);
 			expect(seen.clear).toBe(true);
-			expect(seen.moved).toBeCloseTo(
-				Math.min(seen.height + 14 - before.top, before.bottom + seen.height + 14 - 400),
-				0,
+			// The window scrolls by whole pixels, so a fractional shortfall is met by rounding up.
+			const needed = Math.min(
+				seen.height + 16 - before.top,
+				before.bottom + seen.height + 16 - 400,
 			);
+			expect(seen.moved).toBeGreaterThanOrEqual(Math.floor(needed));
+			expect(seen.moved).toBeLessThanOrEqual(Math.ceil(needed));
 			expect(await cdp.evaluate(`(${VISIBLE})('.reply-pop')`)).toBe(true);
 		});
 	}, 30_000);

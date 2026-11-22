@@ -120,7 +120,15 @@ interface PlotOption {
 /** Where a note sits: in a figure (its aria-label or caption), in a section (its heading), or on the page. */
 type NotePlace = { kind: "figure" | "section"; name: string } | { kind: "page" };
 
+/** A local locator, not part of a sent reply. */
+type NotePoint = [path: number[], offset: number];
+type NoteAnchor = { path: number[]; record: string | null } & (
+	| { ref: string }
+	| { start: NotePoint; end: NotePoint; text: string }
+);
+
 interface ReplyNote {
+	anchor?: NoteAnchor;
 	/** The place as the agent's Markdown names it, always English: figure "name", § heading, or page. */
 	where: string;
 	/** The place the reader's caption is built from, in the page's language. Notes saved before v0.7.1 have none. */
@@ -196,8 +204,11 @@ interface ReplyNotesOptions {
 		| "part"
 		| "cancel"
 		| "saveNote"
+		| "deleteNote"
+		| "done"
 		| "noteSaved"
 		| "toReply"
+		| "remove"
 	>;
 	h: <K extends keyof HTMLElementTagNameMap>(
 		tag: K,
@@ -207,10 +218,38 @@ interface ReplyNotesOptions {
 	clean: (text: string) => string;
 	quoted: (text: string) => string;
 	root: HTMLElement;
+	marks: ReplyMarksApi;
+	/** A new note the reader saved. */
 	addNote: (note: ReplyNote) => void;
+	/** A saved note the reader deleted or left empty. */
+	removeNote: (note: ReplyNote) => void;
+	/** A saved note's text changed where it is edited. */
+	changed: () => void;
+	/** A saved note's accessible name. */
+	label: (note: ReplyNote) => string;
 	/** Scrolls to the Reply button and focuses it. */
 	toReply: () => void;
 	paused: () => boolean;
+}
+
+/** reply.js's marks (kit/parts/reply/marks.ts): what each note is about, lit on the page, with a margin button that opens it. */
+interface ReplyMarksApi {
+	/** A local locator for a selection's range or a part; undefined where none can be kept. */
+	anchor: (target: Range | Part) => NoteAnchor | undefined;
+	/** A locator read back from Keep, validated. */
+	read: (value: unknown) => NoteAnchor | undefined;
+	/** The note marking what is at a viewport point: a noted part holding `el`, else highlighted text under the point. */
+	at: (x: number, y: number, el?: Node | null) => ReplyNote | null;
+	/** What a shown note marks now: its range or part, null where it does not resolve (another view, a fold, a changed page). */
+	target: (note: ReplyNote) => Range | Element | null;
+	/** A saved note's margin button. */
+	button: (note: ReplyNote) => HTMLButtonElement | undefined;
+	/** Lights the note open in the popover (null: none); a `draft` (a new note) is lit on `live` and has no button yet. */
+	show: (note: ReplyNote | null, live?: Range | Element, draft?: boolean) => void;
+	/** Draws the marks now rather than at the next frame, so a button just made or removed can take or give up focus. */
+	flush: () => void;
+	/** The saved notes, whose marks are drawn. */
+	sync: (notes: ReplyNote[]) => void;
 }
 
 /** A note as a reply envelope carries it (skills/explainer/src/reply/protocol.ts; kit-types/reply-protocol.ts keeps them equal). */
@@ -285,6 +324,8 @@ declare var Plot: {
 };
 declare var Steps: { refresh(el: Element, step?: number): void };
 declare var Views: {
+	/** The id of the currently drawn filled record containing `el`, or null outside it. */
+	record(el: Element): string | null;
 	on(name: string, fn: ViewHandler): void;
 	/** The part of the hash that belongs to `el`: after its view's route and ?, the whole hash on the overview; null while hidden. */
 	local(el: Element): string | null;
@@ -293,12 +334,38 @@ declare var Views: {
 };
 declare var Keep: KeepApi;
 declare var ReplyNotes: {
-	(options: ReplyNotesOptions): void;
+	/** Note taking: returns the popover's `edit` (open a saved note, or close it when open), `close`, and a note's dialog `row`. */
+	(
+		options: ReplyNotesOptions,
+	): {
+		edit(note: ReplyNote, origin?: Part | null): void;
+		close(): void;
+		row(note: ReplyNote, head: string, then: (removed: boolean) => void): HTMLElement;
+		follow(): void;
+	};
 	/** Current reply Markdown, available once reply.js has initialized; no clipboard or host delivery. */
 	markdown?: () => string;
 	/** The request body (a ReplyEnvelope as JSON) Send would post now, available once reply.js has initialized; nothing is sent. */
 	body?: () => string;
 };
+/** What a note is about while its popover is open: a selection's range or a part. */
+type NoteTarget = Range | Element;
+/** reply.js's placement of the note hint and popover (kit/parts/reply/place.ts), in and over `root`'s column. */
+declare var ReplyPlace: (root: HTMLElement) => {
+	hint(popup: HTMLElement, at: DOMRect): void;
+	beside(
+		popup: HTMLElement,
+		live: () => NoteTarget | null,
+		lost: () => void,
+	): (fit: boolean) => void;
+};
+/** reply.js's marks: `open` receives a note whose margin button was pressed, with the button. */
+declare var ReplyMarks: (options: {
+	root: HTMLElement;
+	label: (note: ReplyNote) => string;
+	open: (note: ReplyNote, button: HTMLButtonElement) => void;
+	painted: () => void;
+}) => ReplyMarksApi;
 /** reply.js's sending part (kit/parts/reply/send.ts): the request body, and the dialog's Send when the page has an endpoint. */
 declare var ReplySend: (options: ReplySendOptions) => {
 	/** What Send would post now, built as Send builds it. */
