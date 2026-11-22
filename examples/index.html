@@ -6872,15 +6872,14 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   }
   const navText = (heading) => clean(heading.dataset.nav) || clean(heading.textContent);
   function topicsOf(section, id) {
-    const headings = [...section.querySelectorAll(":scope > h3")];
+    const headings = [...section.querySelectorAll("h3")].filter((h) => h.closest("section") === section && !h.closest("details") && !names.has(h.id));
     return headings.map((heading, i) => {
       const text = navText(heading);
       return { heading, link: make("a", { href: `#${anchorId(heading, text, id, i + 1)}` }, text) };
     });
   }
-  function entry(section, heading, n, claimed) {
-    const text = clean(section.dataset.nav) || navText(heading);
-    const id = anchorId(section, text, "section", n);
+  function entry(section, text, claimed) {
+    const id = section.id;
     const link = make("a", { href: `#${id}` }, text);
     const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
     for (const name of owns) {
@@ -6907,7 +6906,12 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
   }
   function buildRail(page, overview) {
     const claimed = new Set;
-    const entries = headedSections(overview).map(({ section, heading }, i) => entry(section, heading, i + 1, claimed));
+    const sections = headedSections(overview).map(({ section, heading }, i) => {
+      const text = clean(section.dataset.nav) || navText(heading);
+      anchorId(section, text, "section", i + 1);
+      return { section, text };
+    });
+    const entries = sections.map(({ section, text }) => entry(section, text, claimed));
     const home = make("a", { href: "#" }, overviewName());
     const list = make("ol", { id: "toc-list" });
     list.append(item(home), ...entries.map((e) => e.li));
@@ -6966,21 +6970,34 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
       requestAnimationFrame(() => spy(rail));
     }
   }
-  const lastPassed = (items, element) => items.filter((item) => element(item).getBoundingClientRect().top < innerHeight / 3).at(-1);
+  const topOf = (place) => place.element.getBoundingClientRect().top;
+  function placeHere(rail) {
+    const places = rail.entries.flatMap((entry) => [
+      { element: entry.section, link: entry.link, entry },
+      ...entry.topics.map((t) => ({ element: t.heading, link: t.link, entry }))
+    ]);
+    const shown = places.filter((p) => topOf(p) >= -1 && topOf(p) < innerHeight);
+    const atEnd = scrollY > 0 && scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+    const hash = decodeURIComponent(location.hash.slice(1));
+    const asked = hash ? shown.find((p) => p.element.id === hash) : undefined;
+    if (asked && (atEnd || topOf(asked) < innerHeight / 3)) {
+      return asked;
+    }
+    return atEnd && shown.length ? shown.at(-1) : places.filter((p) => topOf(p) < innerHeight / 3).at(-1);
+  }
   let spied = null;
   function spy(rail) {
     spyQueued = false;
     const inView = document.documentElement.classList.contains("in-view");
-    const passed = lastPassed(rail.entries, (e) => e.section);
-    const topic = passed && lastPassed(passed.topics, (t) => t.heading);
-    const here = inView ? null : topic?.link ?? passed?.link ?? rail.home;
+    const place = inView ? undefined : placeHere(rail);
+    const here = inView ? null : place?.link ?? rail.home;
     for (const a of rail.nav.querySelectorAll("#toc-list a[aria-current='location'], .holds-current")) {
       a.removeAttribute("aria-current");
       a.classList.remove("holds-current");
     }
     here?.setAttribute("aria-current", "location");
-    if (topic && !inView) {
-      passed.link.classList.add("holds-current");
+    if (place && place.link !== place.entry.link) {
+      place.entry.link.classList.add("holds-current");
     }
     if (here && here !== spied) {
       keepInSight(rail.nav, here);

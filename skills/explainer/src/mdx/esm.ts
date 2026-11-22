@@ -5,7 +5,7 @@ import type {
 	ImportSpecifier,
 	Program,
 } from "estree";
-import type { Root, RootContent } from "mdast";
+import type { Root } from "mdast";
 import type { MdxjsEsm } from "mdast-util-mdxjs-esm";
 import { PackError } from "../pack-error.ts";
 
@@ -57,15 +57,18 @@ export interface LooseNode {
 const isNode = (value: object): value is LooseNode =>
 	"type" in value && typeof value.type === "string";
 
-/** Every node in `value` (mdast and estree nodes alike, as LooseNode), depth first. */
-export function* nodesIn(value: unknown): Generator<LooseNode> {
+/** Every node in `value` (mdast and estree nodes alike, as LooseNode), depth first, but those `skip` takes and what they hold. */
+export function* nodesIn(
+	value: unknown,
+	skip: (node: LooseNode) => boolean = () => false,
+): Generator<LooseNode> {
 	if (Array.isArray(value)) {
 		for (const item of value) {
-			yield* nodesIn(item);
+			yield* nodesIn(item, skip);
 		}
 		return;
 	}
-	if (!isObject(value)) {
+	if (!isObject(value) || (isNode(value) && skip(value))) {
 		return;
 	}
 	if (isNode(value)) {
@@ -73,7 +76,7 @@ export function* nodesIn(value: unknown): Generator<LooseNode> {
 	}
 	for (const [key, child] of Object.entries(value)) {
 		if (key !== "position" && key !== "loc") {
-			yield* nodesIn(child);
+			yield* nodesIn(child, skip);
 		}
 	}
 }
@@ -90,18 +93,19 @@ function tagName(node: LooseNode): string | undefined {
 }
 
 /**
- * Fails on a JSX tag that starts with a small letter and names an import (`<s10_Mean />` for `import { s10_Mean }`): MDX writes
- * such a tag as an HTML element, so the component never draws and nothing else says why.
+ * Fails on a JSX tag that starts with a small letter and names an import (`<s10_Mean />` for `import { s10_Mean }`), in the
+ * Markdown, an expression or an export: MDX writes such a tag as an HTML element, so the component never draws and nothing
+ * else says why.
  */
 export function lowercaseImports(tree: Root, file: string) {
 	const imported = new Set(importsOf(tree).map((i) => i.local));
-	for (const node of nodesIn(tree.children.filter((n: RootContent) => n.type !== "mdxjsEsm"))) {
+	for (const node of nodesIn(tree.children)) {
 		const name = tagName(node);
 		if (name && /^[a-z]/.test(name) && imported.has(name)) {
 			const line = (node.position ?? node.loc)?.start?.line;
 			const capital = name[0]?.toUpperCase() + name.slice(1);
 			throw new PackError(
-				`${file}${line ? `:${line}` : ""}: <${name}> starts with a small letter, so MDX writes it as an HTML element and the imported ${name} never draws: import it under a capitalised name (import { ${name} as ${capital} }) and write <${capital} />`,
+				`${file}${line ? `:${line}` : ""}: <${name}> starts with a small letter, so MDX writes it as an HTML element and the imported ${name} never draws: import it under a name with a capital letter, such as ${capital}, and write <${capital} />`,
 			);
 		}
 	}

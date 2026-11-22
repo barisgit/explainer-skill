@@ -486,6 +486,31 @@ var contract = settled.then(async () => {
 	expect(await runPacked(output, { widths: [DESKTOP, { ...DESKTOP, height: 260 }] })).toEqual([]);
 }, 30_000);
 
+test("the rail marks the place a reader went to, keeps section ids for sections, and lists topics beside a figure", async () => {
+	const words = (n: number) => "Words. ".repeat(n);
+	const page = `---\ncontents: true\n---\n\n# A course\n\nThe lede.\n\n## Chapter\n\n${words(200)}\n\n### Examples\n\nShort.\n\n### Close one\n\nOne line.\n\n### Close two\n\n${words(300)}\n\n<div class="beside">\n\n### Beside topic\n\n${words(300)}\n\n</div>\n\n## Examples\n\n${words(300)}\n\n## End\n\n${words(300)}\n\n### Last\n\nOne line.\n\n<script src="contract.js"></script>\n`;
+	const contract = `const texts = (selector) => [...document.querySelectorAll(selector)].map((el) => el.textContent).join("|");
+const current = () => document.querySelector('.toc [aria-current="location"]')?.textContent;
+const frames = () => new Promise(requestAnimationFrame).then(() => new Promise((done) => setTimeout(done, 50))).then(() => new Promise(requestAnimationFrame));
+${SETTLED}
+var contract = settled.then(async () => {
+	const failures = [];
+	const expect = (ok, name) => ok || failures.push(name);
+	expect(document.querySelector('#toc-list > li > a[href="#examples"]')?.textContent === "Examples", "the section keeps its id: " + texts("#toc-list > li > a"));
+	expect(texts("#toc-list > li:nth-child(2) > ol.topics a") === "Examples|Close one|Close two|Beside topic", "topics: " + texts("#toc-list > li:nth-child(2) > ol.topics a"));
+	const go = (text) => { [...document.querySelectorAll(".toc a")].find((a) => a.textContent === text).click(); return frames(); };
+	await go("Close one");
+	expect(current() === "Close one", "a topic followed with the next one close below: " + current());
+	await go("Last");
+	expect(current() === "Last", "a topic at the page's end: " + current());
+	scrollTo(0, 0);
+	await frames();
+	return failures;
+});`;
+	const output = await packedMdx(dir, "landing", page, { "contract.js": contract });
+	expect(await runPacked(output)).toEqual([]);
+}, 30_000);
+
 test.each([
 	{ target: "a link", short: false },
 	{ target: "the empty space below the links", short: false },

@@ -37,18 +37,76 @@ describe("a page made of .mdx parts", () => {
 		expect(main).toBe(mainOf(whole));
 	}, 30_000);
 
-	test("a part given props stays a component, and pack warns that its headings make no sections", async () => {
-		const { result } = await packMdx(
+	test("runs a spliced part's code once: the part is no module of its own any more", async () => {
+		const page = await packedMdx(
 			dir,
-			"props",
-			`import One from "./parts/one.mdx";\n\n# T\n\n<One open />\n`,
-			PARTS,
+			"once",
+			`import P from "./parts/count.mdx";\n\n# T\n\n<P />\n`,
+			{
+				"parts/count.mdx": `export const calls = (globalThis.partCalls = (globalThis.partCalls ?? 0) + 1);\n\n## A\n\nCalled {globalThis.partCalls} time(s).\n`,
+			},
 		);
-		expect(result.code).toBe(0);
-		expect(result.stdout).toMatch(
-			/warning: \S*props\.mdx: <One> has props or children, so it stays a component and its # and ## headings make no masthead, sections or contents entries; write <One \/> alone to lay it out as part of the page/,
-		);
+		expect(readFileSync(page, "utf8")).toContain("Called 1 time(s).");
 	}, 30_000);
+
+	test("joins the same thing bound twice once: one import written two ways, a nested part spliced by two chapters", async () => {
+		const page = await packedMdx(
+			dir,
+			"same",
+			`import { default as A } from "./parts/a.mdx";\nimport B from "./parts/b.mdx";\n\n# T\n\n<A />\n\n<B />\n`,
+			{
+				"parts/a.mdx": `import V from "./v.ts";\nimport N from "./n.mdx";\n\n## A {V}\n\n<N />\n`,
+				"parts/b.mdx": `import { default as V } from "./v.ts";\nimport N from "./n.mdx";\n\n## B {V}\n\n<N />\n`,
+				"parts/n.mdx": `export const shared = 3;\n\n### Shared {shared}\n`,
+				"parts/v.ts": "export default 7;\n",
+			},
+		);
+		const main = mainOf(page);
+		expect(main?.match(/<section>\s*<h2>[AB] 7/g)).toHaveLength(2);
+		expect(main?.match(/<h3[^>]*>Shared 3/g)).toHaveLength(2);
+	}, 30_000);
+});
+
+describe("a part pack cannot join to the page", () => {
+	test.each([
+		[
+			"props",
+			`<One open />`,
+			{},
+			"has props or children; write <One /> alone to lay it out as part of the page",
+		],
+		[
+			"layout",
+			`<One />`,
+			{ "parts/one.mdx": `export { Wrap as default } from "./wrap.tsx";\n\n## A\n` },
+			"has a layout (export default); wrap its content in a component it imports instead",
+		],
+		[
+			"import()",
+			`<One />`,
+			{ "parts/one.mdx": `export const data = await import("./values.ts");\n\n## A\n` },
+			"loads files relative to itself (import() or import.meta); import them at its top instead",
+		],
+	])(
+		"a part with %s stays a component, and pack warns that its headings make no sections",
+		async (name, use, files, why) => {
+			const { result } = await packMdx(
+				dir,
+				"kept",
+				`import One from "./parts/one.mdx";\n\n# T\n\n${use}\n`,
+				{
+					...PARTS,
+					"parts/wrap.tsx": "export const Wrap = (p: { children?: unknown }) => p.children;\n",
+					...files,
+				},
+			);
+			expect(result.code, name).toBe(0);
+			expect(result.stdout).toContain(
+				`kept.mdx: <One> stays a component, so its # and ## headings make no masthead, sections or contents entries: it ${why}`,
+			);
+		},
+		30_000,
+	);
 
 	test("a name two files bind to different things fails, naming both", async () => {
 		const { result } = await packMdx(
@@ -61,6 +119,32 @@ describe("a page made of .mdx parts", () => {
 		expect(result.stderr).toMatch(
 			/parts\/one\.mdx: rows is bound in \S*clash\.mdx too, to something else; a part's names join the page's, so rename one of them/,
 		);
+	}, 30_000);
+
+	test("a reference label two files define differently fails, naming both", async () => {
+		const { result } = await packMdx(
+			dir,
+			"labels",
+			`import P from "./parts/p.mdx";\n\n# T\n\nSee [doc].\n\n[doc]: https://a.example\n\n<P />\n`,
+			{ "parts/p.mdx": "## A\n\nSee [doc].\n\n[doc]: https://b.example\n" },
+		);
+		expect(result.code).not.toBe(0);
+		expect(result.stderr).toMatch(
+			/parts\/p\.mdx: \[doc\] is bound in \S*labels\.mdx too, to something else/,
+		);
+	}, 30_000);
+
+	test("a part that cannot be read fails naming the file that imports it", async () => {
+		const { result } = await packMdx(
+			dir,
+			"missing",
+			`import P from "./parts/none.mdx";\n\n# T\n\n<P />\n`,
+		);
+		expect(result.code).not.toBe(0);
+		expect(result.stderr).toMatch(
+			/missing\.mdx: <P> imports \S*parts\/none\.mdx, which cannot be read/,
+		);
+		expect(result.stderr).not.toContain("    at ");
 	}, 30_000);
 
 	test("an error in a part names the part's file and line", async () => {
@@ -96,13 +180,19 @@ describe("a component imported under a lowercase name", () => {
 			{ "parts/p.mdx": `import { s10_Mean } from "../mean.tsx";\n\n## A\n\n<s10_Mean />\n` },
 			"parts/p.mdx:5",
 		],
+		[
+			"in an export",
+			`import { s10_Mean } from "./mean.tsx";\n\nexport const Figure = () => <s10_Mean />;\n\n# T\n\n<Figure />\n`,
+			{},
+			"lower.mdx:3",
+		],
 	])(
 		"fails %s, naming where and how to fix it",
 		async (_where, page, files, at) => {
 			const { result } = await packMdx(dir, "lower", page, { "mean.tsx": TSX, ...files });
 			expect(result.code).not.toBe(0);
 			expect(result.stderr).toContain(
-				`${at}: <s10_Mean> starts with a small letter, so MDX writes it as an HTML element and the imported s10_Mean never draws: import it under a capitalised name (import { s10_Mean as S10_Mean }) and write <S10_Mean />`,
+				`${at}: <s10_Mean> starts with a small letter, so MDX writes it as an HTML element and the imported s10_Mean never draws: import it under a name with a capital letter, such as S10_Mean, and write <S10_Mean />`,
 			);
 		},
 		30_000,

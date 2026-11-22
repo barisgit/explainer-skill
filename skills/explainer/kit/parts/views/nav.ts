@@ -350,9 +350,14 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	const navText = (heading: HTMLElement) =>
 		clean(heading.dataset.nav) || clean(heading.textContent);
 
-	/** The section's topics: the h3s it holds itself (what a ### writes there), each with a link to it. */
+	/**
+	 * The section's topics: the h3s it holds (what a ### writes there, beside a figure too), each with a link to it; not those
+	 * of a section inside it, folded in a <details>, or whose id a view name takes, which a link would open instead.
+	 */
 	function topicsOf(section: HTMLElement, id: string) {
-		const headings = [...section.querySelectorAll<HTMLElement>(":scope > h3")];
+		const headings = [...section.querySelectorAll<HTMLElement>("h3")].filter(
+			(h) => h.closest("section") === section && !h.closest("details") && !names.has(h.id),
+		);
 		return headings.map((heading, i) => {
 			const text = navText(heading);
 			return { heading, link: make("a", { href: `#${anchorId(heading, text, id, i + 1)}` }, text) };
@@ -363,9 +368,8 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	 * A section's entry, named by its data-nav, then its heading's data-nav, then the heading text; it owns the
 	 * view names the section is the first to link to.
 	 */
-	function entry(section: HTMLElement, heading: HTMLElement, n: number, claimed: Set<string>) {
-		const text = clean(section.dataset.nav) || navText(heading);
-		const id = anchorId(section, text, "section", n);
+	function entry(section: HTMLElement, text: string, claimed: Set<string>) {
+		const id = section.id;
 		const link = make("a", { href: `#${id}` }, text);
 		const owns = [...names].filter((name) => !claimed.has(name) && linksTo(name, section).length);
 		for (const name of owns) {
@@ -398,9 +402,13 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 	/** The rail, first in `page`: the overview link, then one entry per overview section with an h2. */
 	function buildRail(page: HTMLElement, overview: HTMLElement): Rail {
 		const claimed = new Set<string>();
-		const entries = headedSections(overview).map(({ section, heading }, i) =>
-			entry(section, heading, i + 1, claimed),
-		);
+		// Every section's id first, so no topic takes the id its own section's label would give a later one.
+		const sections = headedSections(overview).map(({ section, heading }, i) => {
+			const text = clean(section.dataset.nav) || navText(heading);
+			anchorId(section, text, "section", i + 1);
+			return { section, text };
+		});
+		const entries = sections.map(({ section, text }) => entry(section, text, claimed));
 		const home = make("a", { href: "#" }, overviewName());
 		const list = make("ol", { id: "toc-list" });
 		list.append(item(home), ...entries.map((e) => e.li));
@@ -474,23 +482,49 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 		}
 	}
 
-	/** The last of `items` whose element's top has passed a third of the window. */
-	const lastPassed = <T>(items: T[], element: (item: T) => HTMLElement) =>
-		items.filter((item) => element(item).getBoundingClientRect().top < innerHeight / 3).at(-1);
+	/** A place the rail links to: a section or one of its topics. */
+	interface Place {
+		element: HTMLElement;
+		link: HTMLAnchorElement;
+		entry: Entry;
+	}
+
+	const topOf = (place: Place) => place.element.getBoundingClientRect().top;
+
+	/**
+	 * Where the reader is: the place the address names while it is in sight near the top (a link just followed, which may leave
+	 * the next topic in the top third too) or at the page's end, where it cannot scroll to the top; else, at the end, the last
+	 * place in sight; else the last place whose top has passed a third of the window.
+	 */
+	function placeHere(rail: Rail) {
+		const places = rail.entries.flatMap((entry) => [
+			{ element: entry.section, link: entry.link, entry },
+			...entry.topics.map((t) => ({ element: t.heading, link: t.link, entry })),
+		]);
+		const shown = places.filter((p) => topOf(p) >= -1 && topOf(p) < innerHeight);
+		const atEnd = scrollY > 0 && scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+		const hash = decodeURIComponent(location.hash.slice(1));
+		const asked = hash ? shown.find((p) => p.element.id === hash) : undefined;
+		if (asked && (atEnd || topOf(asked) < innerHeight / 3)) {
+			return asked;
+		}
+		return atEnd && shown.length
+			? shown.at(-1)
+			: places.filter((p) => topOf(p) < innerHeight / 3).at(-1);
+	}
 
 	/** The link marked current when the spy last ran, so the rail scrolls only when that changes, never against the reader. */
 	let spied: HTMLAnchorElement | null = null;
 
 	/**
-	 * In the overview: the last section whose top has passed a third of the window, or the overview link above them all, and within
-	 * that section the last topic passed. The topic is the current location and its section is marked as holding it.
+	 * In the overview, marks where the reader is (placeHere), or the overview link above every section, as the current location;
+	 * a topic's section is marked as holding it.
 	 */
 	function spy(rail: Rail) {
 		spyQueued = false;
 		const inView = document.documentElement.classList.contains("in-view");
-		const passed = lastPassed(rail.entries, (e) => e.section);
-		const topic = passed && lastPassed(passed.topics, (t) => t.heading);
-		const here = inView ? null : (topic?.link ?? passed?.link ?? rail.home);
+		const place = inView ? undefined : placeHere(rail);
+		const here = inView ? null : (place?.link ?? rail.home);
 		for (const a of rail.nav.querySelectorAll(
 			"#toc-list a[aria-current='location'], .holds-current",
 		)) {
@@ -498,8 +532,8 @@ window.ViewsNav = ({ views, canonical, key, kitText }) => {
 			a.classList.remove("holds-current");
 		}
 		here?.setAttribute("aria-current", "location");
-		if (topic && !inView) {
-			passed.link.classList.add("holds-current");
+		if (place && place.link !== place.entry.link) {
+			place.entry.link.classList.add("holds-current");
 		}
 		if (here && here !== spied) {
 			keepInSight(rail.nav, here);
