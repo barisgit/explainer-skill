@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.17.0
 
 - `check --viewport 1920x1080` adds a size to the default desktop and narrow checks, with its dimensions in the report and PNG names. Repeat it to check several sizes.
 - `check --budget 60` gives each scroll sweep and the one kit-control sweep more time and lifts the default 12-control cap on long pages.
-- `check --do click:<css>` now clicks SVG parts, so a step can pin a linked Mermaid or schematic part before capturing it.
+- `check --do click:<css>` now clicks SVG parts, so a step can pin a linked Mermaid or schematic part before capturing it. A coordinate click that opens a new window reports and closes it instead of timing out.
 
 - Put a list and its drawing in `<div class="beside" data-width="full">` to reach both sides of the prose column without crowding the contents rail. The pinned diagram fits the window height where its labels stay readable, leaving spare width for the list. Phones still stack.
 
@@ -19,11 +19,12 @@
 - A page can be split into `.mdx` parts: `import Intro from "./parts/intro.mdx"` and `<Intro />` on a line of its own (at the page's root or in a `View`) is laid out as if written there, so its `#` and `##` give the masthead, sections and rail. A part's imports join the page's (paths kept relative to the part), and `pack` fails on a name two files bind to different things. A part given props, a layout or an `import()` of its own stays a component, and `pack` warns when its headings then make no sections.
 - `pack` fails on a JSX tag that starts with a small letter and names an import (`<s10_Mean />`), which MDX writes as an HTML element that draws nothing: import the component under a capitalised name.
 - Each section's answer is a figure, table or diagram by default, with prose interpreting it; qualitative subjects have forms too (a divergence as a flowchart, what each side has as a matrix with a status column, a history as a timeline). Link a packed page rather than embed it in a host's inline frame.
-- `check` reports the page's reading load on arrival (words on the first screen and on load, number of sections, bare words per section) and warns about a section with more than about 150 words and no figure, table, diagram or code: make its answer a figure and keep the prose to interpreting it.
+- `check` reports the page's reading load on arrival (words on the first screen and on load, number of sections, bare words per section) and warns about a section with more than 175 bare words and no figure, table, diagram or code: make its answer a figure and keep the prose to interpreting it.
 - `check` groups distant `data-ref` warnings by the pair of places they link, with a count and up to three names. It also warns when a schematic or Mermaid diagram scrolls sideways in the pinned `.beside` column: lay it out tall or give it the full width.
 - A Plot legend’s buttons are separate from the drawing’s image role so assistive technology can expose them as controls.
 - `check` warns when text inside a `Chart` or `Plot` crosses the figure's edge (a label cut off on a phone) or overlaps other text (a legend over the axis labels, tick labels run together), at desktop and phone width, naming the figure and quoting the texts. A `Chart` is measured as `pack` drew it, a `Plot` as drawn and live.
 - A `Chart`'s legend keeps its room under your own `grid: { bottom }` or `top`: the larger of your bottom and the legend's room is used, so the legend no longer covers the x-axis labels. A grid `height`, a legend position or grid bounds in a `media` option you set still win.
+- A Chart using ECharts `baseOption` without a timeline no longer reports a missing timeline.
 - Named stacked columns keep the category labels that would fit without series names. They can wrap a name beside a stack without taking room the category labels need.
 - The guide asks for the decision after its evidence and on it (a `Question` with `rows`, `recommended` on yours), separates a reader's project context from their expertise (every name, part, revision and person identified where it first appears; a section after those it depends on), says which number a two-number finding's headline carries, keeps the accent's meaning the same in every figure, and keeps the contents rail for pages too long to scan. Schedules and owners stay in the tracker.
 - `kit Chart` explains when an unpositioned legend reserves room, which settings keep your layout, and how to write responsive grid padding; `kit Explore` shows a frame returning a Chart; `kit Table` says `digits: 0` rounds; `kit Plot` says `digits: 0` rounds, that text labels keep the value axis's tick labels, and that crowded side-by-side values need height or fewer series.
