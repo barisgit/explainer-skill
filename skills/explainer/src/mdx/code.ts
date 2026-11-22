@@ -1,6 +1,7 @@
 import type { Element, ElementContent, Root as HastRoot, RootContent } from "hast";
 import { refractor } from "../../vendor/refractor.js";
 import { PackError } from "../pack-error.ts";
+import type { Where } from "./origins.ts";
 
 /**
  * Code fences, drawn once in pack: no script ships. Each line of a fence (`pre > code`) becomes a `span.code-line`, with
@@ -370,11 +371,10 @@ function colours(
 	};
 }
 
-/** The rehype step for one page file (its name as errors show it): every code fence is drawn as lines, tokens and marks. */
-export function codeFences(file: string) {
+/** The rehype step for one page file (`where` names a fence's file and line): every code fence is drawn as lines, tokens and marks. */
+export function codeFences(where: Where) {
 	const draw = (pre: Element, code: Element) => {
-		const line = pre.position?.start.line;
-		const fail = (what: string) => new PackError(`${file}${line ? `:${line}` : ""}: ${what}`);
+		const fail = (what: string) => new PackError(`${where(pre.position?.start)}: ${what}`);
 		const text = code.children.map((child) => (child.type === "text" ? child.value : "")).join("");
 		const { tokens, kinds } = colours(text, languageOf(code), fail);
 		const refs = refsAt(text, marksOf(code.data?.meta ?? "", fail), fail);

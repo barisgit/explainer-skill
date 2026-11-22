@@ -19,6 +19,9 @@
    An imported image or font is a data: URL pack embeds: import icon from "./icon.svg", then <img src={icon} />. Client code must
    import the files it shows: pack fails on a file path written in it, in its props or in a filled view's records, since the
    browser would load that file later, from beside the page. An SVG file a client component draws keeps its own colours in dark.
+   A long page can be split into parts: import Intro from "./parts/intro.mdx", then <Intro /> on a line of its own (no props) is
+   laid out as if its text were written there; its imports join the page's, so one name must mean one thing in every part.
+   Component names start with a capital letter: MDX writes <s10_Mean /> as an HTML element, so pack fails on one that names an import.
    Your own components live in .tsx files next to the page; they import kit components from "kit" and hooks from "preact/hooks".
    To typecheck the page's own .ts and .tsx files, run kit types > tsconfig.json beside the page, then bun --check (no install); the first command only prepares the config, the second reports type errors or success. MDX expressions are not typechecked.
    pack renders every component to static HTML; a module whose first line is "use client" is also hydrated in the browser, so its

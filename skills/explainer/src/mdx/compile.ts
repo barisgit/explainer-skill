@@ -8,7 +8,10 @@ import { kitLabels } from "../kit.ts";
 import { PackError } from "../pack-error.ts";
 import { shownPath } from "../paths.ts";
 import { codeFences } from "./code.ts";
+import { lowercaseImports } from "./esm.ts";
 import { mathToMathml } from "./math.ts";
+import { origins } from "./origins.ts";
+import { spliceParts } from "./parts.ts";
 import { structurePage } from "./structure.ts";
 
 /** What a page's YAML frontmatter sets; authors read it in kit/components/index.ts (kit page). */
@@ -35,6 +38,8 @@ export interface CompiledMdx {
 	front: Frontmatter;
 	/** The frontmatter title, else the text of the page's first `#`. */
 	title: string | undefined;
+	/** What pack warns about the page's parts (parts.ts): parts kept as components whose headings make no sections. */
+	warnings: string[];
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
@@ -379,11 +384,57 @@ interface MdxMessage {
 const isMdxMessage = (e: unknown): e is MdxMessage =>
 	e instanceof Error && "reason" in e && typeof e.reason === "string";
 
+/** The error a message from the MDX parser becomes: the file and, when it has one, line:column. */
+const parseError = (e: MdxMessage, file: string) =>
+	new PackError(`${file}${e.line === undefined ? "" : `:${e.line}:${e.column ?? 1}`}: ${e.reason}`);
+
+/** Stops a part's processing once its Markdown is read (MDX's own steps and the remark plugins), before it is compiled. */
+const READ = new Error("read");
+
+/**
+ * Reads an .mdx part as the page's Markdown is read: parsed with the same plugins, through MDX's own first step (JSX alone in
+ * a paragraph is a block), with the checks every file gets; it is not compiled, since parts.ts splices it into the page.
+ */
+async function readPart(path: string): Promise<{ tree: Root; text: string }> {
+	const file = shownPath(path);
+	const text = readFileSync(path, "utf8");
+	frontmatter(text, file);
+	let read: Root | undefined;
+	const remarkPlugins = [
+		remarkFrontmatter,
+		remarkGfm,
+		remarkMath,
+		() => (tree: Root) => {
+			fileChecks(tree, file);
+			read = tree;
+			throw READ;
+		},
+	];
+	try {
+		await compile({ path, value: text }, { remarkPlugins });
+	} catch (e) {
+		if (e !== READ) {
+			throw isMdxMessage(e) ? parseError(e, file) : e;
+		}
+	}
+	if (!read) {
+		throw new Error(`${file} was not read`);
+	}
+	return { tree: read, text };
+}
+
+/** What pack checks in every .mdx file's tree, page or part: link destinations and tags that name an import in lower case. */
+function fileChecks(tree: Root, file: string) {
+	linkExpressions(tree, file);
+	lowercaseImports(tree, file);
+}
+
 /**
  * Compiles an .mdx file for Preact: frontmatter, GFM (tables as table.compare, task lists, strikethrough, autolinks), TeX math
  * as MathML (math.ts), Mermaid fences, code fences as lines and tokens (code.ts) and, when `page` is true (the page's own file),
- * the page layout (structure.ts). Otherwise `page` is the frontmatter of the page that imports the file, compiled as a fragment
- * whose headings follow that page's display face. A syntax error throws PackError with file:line:column.
+ * its parts spliced in (parts.ts) and the page layout (structure.ts). Otherwise `page` is the frontmatter of the page that
+ * imports the file, compiled as a fragment whose headings follow that page's display face. A syntax error throws PackError
+ * with file:line:column, in the part that has it.
  */
 export async function compileMdx(
 	path: string,
@@ -393,7 +444,14 @@ export async function compileMdx(
 	const value = readFileSync(path, "utf8");
 	const front = frontmatter(value, file);
 	const display = page === true ? front.display : page.display;
+	const sources = origins(file, value);
+	const loadPart = async (part: string) => {
+		const { tree, text } = await readPart(part);
+		sources.add(shownPath(part), text, tree);
+		return tree;
+	};
 	let h1: string | undefined;
+	const warnings: string[] = [];
 	try {
 		const compiled = await compile(
 			{ path, value },
@@ -404,9 +462,12 @@ export async function compileMdx(
 					remarkFrontmatter,
 					remarkGfm,
 					remarkMath,
-					() => (tree: Root) => {
-						linkExpressions(tree, file);
+					() => async (tree: Root, vfile: { value: unknown }) => {
+						fileChecks(tree, file);
 						if (page === true) {
+							warnings.push(...(await spliceParts(tree, path, loadPart)));
+							// Math reads a formula's source at its offsets, which for a part's nodes are in the joined text.
+							vfile.value = sources.text();
 							h1 = structurePage(tree);
 						}
 					},
@@ -414,18 +475,19 @@ export async function compileMdx(
 				rehypePlugins: [
 					() => drawnFences,
 					() => compareTables,
-					mathToMathml(file),
-					codeFences(file),
+					mathToMathml(sources.where),
+					codeFences(sources.where),
 					...(display ? [() => casedHeadings] : []),
 				],
 			},
 		);
-		return { js: String(compiled.value), front, title: front.title ?? h1 };
+		return { js: String(compiled.value), front, title: front.title ?? h1, warnings };
 	} catch (e) {
 		if (!isMdxMessage(e)) {
 			throw e;
 		}
-		const at = e.line === undefined ? "" : `:${e.line}:${e.column ?? 1}`;
-		throw new PackError(`${file}${at}: ${e.reason}`);
+		throw new PackError(
+			`${e.line === undefined ? file : sources.where({ line: e.line, column: e.column ?? 1 }, true)}: ${e.reason}`,
+		);
 	}
 }

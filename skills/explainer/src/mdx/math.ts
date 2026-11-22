@@ -3,6 +3,7 @@ import type { Element, ElementContent, Root as HastRoot, RootContent } from "has
 import type { MdxJsxAttribute, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { temml } from "../../vendor/math.js";
 import { PackError } from "../pack-error.ts";
+import type { Where } from "./origins.ts";
 
 /**
  * TeX math in an .mdx page, rendered once in pack to MathML, which the browser lays out with no script: remark-math reads
@@ -123,12 +124,9 @@ function dollarAmounts(markdown: string, node: Element): string | undefined {
 		: undefined;
 }
 
-/** The rehype step for one page file (its name as errors show it): every math code element becomes MathML. */
-export function mathToMathml(file: string) {
-	const where = (node: Element) => {
-		const start = node.position?.start;
-		return start ? `${file}:${start.line}:${start.column}` : file;
-	};
+/** The rehype step for one page file (`at` names a node's file, line and column): every math code element becomes MathML. */
+export function mathToMathml(at: Where) {
+	const where = (node: Element) => at(node.position?.start, true);
 	/** The MathML for a math code element (a display one is its `pre`), or undefined for any other node. */
 	const rendered = (node: RootContent, markdown: string): ElementContent | undefined => {
 		if (node.type !== "element") {
