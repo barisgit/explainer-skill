@@ -76,6 +76,21 @@ test("only a ref with a partner outside its own diagram lights, dims or takes fo
 	expect(await packAndRun(dir, "partners", PAGE(script))).toEqual([]);
 }, 30_000);
 
+test("lighting a wrapped inline code term does not move its text", async () => {
+	const body = `${DIAGRAM}
+<p style="max-inline-size: 9rem">Run <code id="wrapped" data-ref="cache">git diff --stat main</code> to see the changes.</p>`;
+	const script = `
+	const range = document.createRange();
+	range.selectNodeContents($("#wrapped"));
+	const boxes = () => [...range.getClientRects()];
+	const before = boxes();
+	expect(before.length > 1, "the inline code wraps before hover");
+	hover(node("cache"));
+	expect($("#wrapped").classList.contains("is-lit"), "the diagram lights the inline code");
+	expect(JSON.stringify(boxes()) === JSON.stringify(before), "the wrapped code's text stays in place while lit");`;
+	expect(await packAndRun(dir, "wrapped-code", PAGE(script, body))).toEqual([]);
+}, 30_000);
+
 test("a partner a page script writes after load links its ref, and removing it unlinks the ref", async () => {
 	const script = `
 	$("#prose").insertAdjacentHTML("beforeend", ' Every read passes the <span id="late" data-ref="api">api</span>, <span id="lone" data-ref="db">not the db</span>.');

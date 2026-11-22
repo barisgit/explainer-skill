@@ -2850,14 +2850,17 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 :is(.is-lit, [data-step].is-now, [data-kit-state][data-state~="now"]):not(svg *) {
 	background: var(--accent-soft);
 }
-/* Keep each line of a wrapped term outlined without moving the text. Code fences and number tags have their own outlines. */
+/* Clone the term's inline decorations before it lights, so repeated padding (e.g. on inline code) does not move its text. */
+:is(span, b, strong, em, code, mark):is([data-ref], [data-step]):not(svg *, pre *, [data-tag]) {
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+}
+/* Code fences and number tags have their own outlines. */
 :is(span, b, strong, em, code, mark):is(
 	.is-lit,
 	[data-step].is-now,
 	[data-kit-state][data-state~="now"]
 ):not(svg *, pre *, [data-tag]) {
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
 	box-shadow: 0 0 0 1px var(--accent);
 	text-decoration: underline solid var(--accent) 1px;
 	text-underline-offset: 0.22em;
