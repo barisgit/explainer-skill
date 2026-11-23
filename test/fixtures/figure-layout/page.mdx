@@ -1,0 +1,36 @@
+import bands from "./bands.png";
+
+# Figure layout
+
+The same 540 × 180 raster appears in three layouts without page CSS.
+
+## Image in a figure
+
+<figure class="fig" id="single">
+<img src={bands} alt="Three blue bands" />
+<figcaption>A direct child of a figure with the fig class.</figcaption>
+</figure>
+
+## Two plain figures in a split
+
+<div class="split fig" id="pair">
+<figure>
+<img src={bands} alt="Three blue bands" />
+<figcaption>First column.</figcaption>
+</figure>
+<figure>
+<img src={bands} alt="Three blue bands" />
+<figcaption>Second column.</figcaption>
+</figure>
+</div>
+
+## Plain figure in prose
+
+The figure below keeps the usual spacing in prose.
+
+<figure id="prose-figure">
+<img src={bands} alt="Three blue bands" />
+<figcaption>A plain figure outside the split.</figcaption>
+</figure>
+
+The paragraph after the figure.

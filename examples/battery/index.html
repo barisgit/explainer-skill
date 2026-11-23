@@ -351,6 +351,8 @@ h3 {
 .fig > * {
 	padding-inline: var(--pad);
 	margin: 0;
+}
+.fig > :where(:not(img)) {
 	max-inline-size: none;
 }
 .fig > :is(.bleed, .stage, .chart, .scroll, .compare, .mermaid, .schematic, .dg, .split) {
@@ -380,7 +382,7 @@ figure:not([class]) > figcaption {
 	line-height: 1.5;
 }
 /* A plain <figure> (an image and its caption) sits as a .fig does: on the column's start, its caption a label. */
-figure:not([class]) {
+:where(figure:not([class])) {
 	margin: 2rem 0;
 }
 figure:not([class]) > img {

@@ -1,5 +1,5 @@
-import { afterAll, expect, test } from "bun:test";
-import { packAndRun, pageContract, scratch } from "./support.ts";
+import { afterAll, beforeAll, expect, test } from "bun:test";
+import { inPage, packAndRun, pageContract, runCli, scratch, WIDTHS } from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -19,4 +19,67 @@ ${pageContract({
 			widths: [390, 700, 1000, 1440].map((width) => ({ width, height: 900, mobile: false })),
 		}),
 	).toEqual([]);
+}, 30_000);
+
+const figureLayout = dir.path("figure-layout.html");
+beforeAll(async () => {
+	const result = await runCli([
+		"pack",
+		`${import.meta.dir}/fixtures/figure-layout/page.mdx`,
+		"-o",
+		figureLayout,
+	]);
+	expect(result.stderr).toBe("");
+	expect(result.code).toBe(0);
+});
+
+test("a .fig image fits the phone column without stretching (#317)", async () => {
+	const image = await inPage(
+		figureLayout,
+		(cdp) =>
+			cdp.evaluate<{ width: number; height: number; column: number; overflow: number }>(`(() => {
+		const figure = document.querySelector("#single");
+		const { width, height } = figure.querySelector("img").getBoundingClientRect();
+		return {
+			width, height,
+			column: figure.getBoundingClientRect().width,
+			overflow: document.documentElement.scrollWidth - innerWidth,
+		};
+	})()`),
+		WIDTHS[1],
+	);
+	expect(Math.abs(image.width - image.column)).toBeLessThan(1);
+	expect(image.width / image.height).toBeCloseTo(3);
+	expect(image.overflow).toBe(0);
+}, 30_000);
+
+test("plain figures leave only hairlines in a split and keep prose spacing (#320)", async () => {
+	for (const viewport of WIDTHS) {
+		const spacing = await inPage(
+			figureLayout,
+			(cdp) =>
+				cdp.evaluate(`(() => {
+			const split = document.querySelector("#pair");
+			const style = getComputedStyle(split);
+			const blockMargins = (el) => {
+				const { marginBlockStart, marginBlockEnd } = getComputedStyle(el);
+				return [marginBlockStart, marginBlockEnd];
+			};
+			return {
+				columns: Array.from(split.children, blockMargins),
+				hairlines: [style.borderBlockStartWidth, style.gap, style.borderBlockEndWidth],
+				prose: blockMargins(document.querySelector("#prose-figure")),
+			};
+		})()`),
+			viewport,
+		);
+		expect(spacing).toEqual({
+			columns: [
+				["0px", "0px"],
+				["0px", "0px"],
+			],
+			hairlines: ["1px", "1px", "1px"],
+			prose: ["32px", "32px"],
+		});
+	}
 }, 30_000);
