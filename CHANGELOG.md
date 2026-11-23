@@ -3,6 +3,7 @@
 ## Unreleased
 
 - A direct image in `.fig` shrinks to fit the phone column without stretching. Plain figures in `.split` leave only the hairline dividers; plain figures in prose keep their spacing.
+- Dense stem plots shrink or omit endpoint dots and thin the default lines so neighbouring stems stay distinct, especially on phones. Each packed copy and the live plot use their own spacing (#315).
 
 ## v0.18.0
 

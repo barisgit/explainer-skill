@@ -156,6 +156,27 @@ declare var PlotPick: (env: {
 		box: { L: number; R: number; T: number; B: number },
 	): { start: number; end: number; count: number; vertical: boolean } | undefined;
 };
+interface PlotStemFrame {
+	X: (v: number) => number;
+	Y: (v: number) => number;
+	ya: PlotNumericAxis;
+	W: number;
+	textWidth: (s: unknown) => number;
+	shown: readonly boolean[];
+	texts: PlotOption;
+}
+declare var PlotStems: (
+	env: PlotSvg & {
+		size: () => number;
+		colour: (s: PlotSeries, i: number) => string;
+		labeller: ReturnType<typeof PlotFormat>["labeller"];
+		finite: (p: number | PlotPoint) => p is PlotPoint;
+		px: (v: number) => number;
+	},
+) => {
+	draw(s: PlotSeries, i: number, frame: PlotStemFrame): string;
+	values(series: readonly PlotSeries[], frame: PlotStemFrame): PlotBox[];
+};
 /** What PlotBars draws in: the category axis, the value axis, the plot's box, the series switched on, the text's measure and texts. */
 interface PlotBarFrame {
 	cat: {

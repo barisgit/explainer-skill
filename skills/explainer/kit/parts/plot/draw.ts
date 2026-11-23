@@ -52,7 +52,6 @@ window.PlotDraw = ({ lang, size }) => {
 	}
 	type Anchor = "start" | "middle" | "end";
 
-	const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
 	const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 	const px = (v: number) => +v.toFixed(1);
 	const finite = (p: number | PlotPoint): p is PlotPoint =>
@@ -114,6 +113,15 @@ window.PlotDraw = ({ lang, size }) => {
 		colour: seriesColor,
 		labeller,
 		pick,
+	});
+	const stems = window.PlotStems({
+		svgLine,
+		svgText,
+		size: () => FONT,
+		colour: seriesColor,
+		labeller,
+		finite,
+		px,
 	});
 	const barNames = window.PlotBarNames({ svgLine, svgText, place: placer, wrap: marks.wrap });
 	const legend = window.PlotLegend({
@@ -178,49 +186,6 @@ window.PlotDraw = ({ lang, size }) => {
 		}
 		const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2}`;
 		return `<path class="line" style="${style}"${attr("stroke-dasharray", dashOf(s, i))} d="M${pts.join("L")}"/>`;
-	}
-
-	/** A stem series' stems in px from `base` to each dot, with the value each prints (`t`) and where (x, y: its middle). */
-	function stemsOf(s: PlotSeries, i: number, { X, Y, ya, W, textWidth, texts }: PointCtx) {
-		const said = texts.series?.[i]?.data;
-		const base = Y(clamp(0, ya.lo, ya.hi));
-		const format: PlotLabeller | undefined = labeller(s.label, ya.format, true);
-		return s.data.flatMap((p, k) => {
-			if (!finite(p)) {
-				return [];
-			}
-			const [cx, cy] = [X(p[0]), Y(p[1])];
-			const [tx, ty] = (said?.[k] ?? p) as PlotPoint;
-			const t = format?.(ty, k, tx) ?? "";
-			const half = t ? textWidth(t) / 2 : 0;
-			const value = {
-				t,
-				x: clamp(cx, half + 4, W - half - 4),
-				y: cy <= base ? Math.max(cy - 14, FONT) : cy + 14,
-				half,
-			};
-			return [{ base, cx, cy, value }];
-		});
-	}
-	/** The boxes of the values the stems print, which names and notes keep off. */
-	const stemValues = (series: PlotSeries[], ctx: PointCtx) =>
-		series.flatMap((s, i) =>
-			ctx.shown[i] && s.type === "stem"
-				? stemsOf(s, i, ctx).flatMap(({ value: { t, x, y, half } }) =>
-						t ? [{ x0: x - half, x1: x + half, y0: y - FONT / 2, y1: y + FONT / 2 }] : [],
-					)
-				: [],
-		);
-
-	function stemMark(s: PlotSeries, i: number, ctx: PointCtx) {
-		const style = `--c:${seriesColor(s, i)};--w:${s.width ?? 2.5}`;
-		return stemsOf(s, i, ctx)
-			.map(({ base, cx, cy, value: { t, x, y } }) => {
-				const dot = `<circle class="dot" style="${style}" cx="${px(cx)}" cy="${px(cy)}" r="4.5"/>`;
-				const text = t ? svgText("value", x, y, "middle", t) : "";
-				return svgLine("stem", cx, cx, base, cy, style) + dot + text;
-			})
-			.join("");
 	}
 
 	/** Axes of a bar plot: the categories on one, the value range of all bars on the other. */
@@ -325,7 +290,7 @@ window.PlotDraw = ({ lang, size }) => {
 	/** Lines and stems of every series switched on. */
 	function pointMarks(series: PlotSeries[], ctx: PointCtx) {
 		return series
-			.map((s, i) => (ctx.shown[i] ? (s.type === "stem" ? stemMark : lineMark)(s, i, ctx) : ""))
+			.map((s, i) => (ctx.shown[i] ? (s.type === "stem" ? stems.draw : lineMark)(s, i, ctx) : ""))
 			.join("");
 	}
 
@@ -601,7 +566,7 @@ window.PlotDraw = ({ lang, size }) => {
 		const choose = (spots: PlotSpot[], placed: readonly PlotBox[]) =>
 			placer.cheapest(spots, labelFrame, placed);
 		const marked = marks.markers(option.marks ?? [], { ...markFrame(points), choose }, box.T - 6);
-		const placed = [...marked.boxes, ...stemValues(option.series ?? [], points)];
+		const placed = [...marked.boxes, ...stems.values(option.series ?? [], points)];
 		const named = ends.marks(option, points, { ...labelFrame, R: points.W - 2 }, placed);
 		return { points, marked, named, noted: areas.draw(option, frame, placed, goal) };
 	}

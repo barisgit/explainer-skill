@@ -7,7 +7,8 @@
      option  { series, categories, horizontal, stack, x, y, marks, legend }
        series  [{ name, type, data, color, width, dash, fill, label }]
          type "line"   data [[x, y], ...]; width in px (default 2); dash: true dashed, false solid, unset by its slot (below)
-         type "stem"   data [[x, y], ...]: a drop line from 0 with a dot, for spectra and samples
+         type "stem"   data [[x, y], ...]: a drop line from 0 with a dot, for spectra and samples.
+                       Close stems get smaller dots or none and thinner default lines, at the drawing's width.
          type "bar"    data [v, ...], one per category
          color  any CSS colour, default var(--c1)..var(--c6) in turn: muted inks, a line in each also dashed its own way.
                 Put "var(--accent)" on the series the page is about; color-mix(...) works too

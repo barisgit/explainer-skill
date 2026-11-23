@@ -190,7 +190,7 @@ window.PlotPlace = ({ wrap }) => {
 			return type === "line"
 				? [points]
 				: type === "stem"
-					? // A stem runs on through its dot (r 4.5), which a label keeps off as well.
+					? // Keep labels clear of the largest endpoint dot, even when a dense stem draws a smaller one.
 						points.map(([x, y]) => [[x, base] as const, [x, y < base ? y - 5 : y + 5] as const])
 					: [];
 		});

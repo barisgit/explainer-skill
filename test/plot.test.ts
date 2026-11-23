@@ -101,6 +101,40 @@ test("label: false draws bars and stems without value text instead of throwing",
 	expect(await packAndRun(dir, "unlabelled", UNLABELLED_PAGE)).toEqual([]);
 }, 60_000);
 
+test("a stem series fits its endpoint dots to the spacing of each copy (#315)", () => {
+	const data = Array.from({ length: 96 }, (_, x) => [x, 1]);
+	// A close neighbour out of data order must not take dots away from the rest of a wide copy.
+	data.push([-0.1, 1]);
+	const option = { x: { min: -1, max: 95 }, series: [{ type: "stem", data }] };
+	const radii = (svg: string) => {
+		expect(lines(svg, "stem")).toHaveLength(data.length);
+		return [...svg.matchAll(/<circle class="dot"[^>]* r="([^"]+)"/g)].map((m) => Number(m[1]));
+	};
+
+	expect(radii(draw(option, 356))).toEqual([]);
+	const half = radii(draw(option, 527));
+	expect(half).toHaveLength(data.length - 2);
+	expect(Math.min(...half)).toBeGreaterThan(1.25);
+	expect(Math.max(...half)).toBeLessThan(4.5);
+	expect(radii(draw(option, 1054))).toEqual(Array(data.length - 2).fill(4.5));
+});
+
+test("line-only dense stems stay thinner than the gap at phone width", () => {
+	const svg = draw(
+		{ series: [{ type: "stem", data: Array.from({ length: 170 }, (_, x) => [x, 1]) }] },
+		356,
+	);
+	const stems = [...svg.matchAll(/<line class="stem" x1="([^"]+)"[^>]*--w:([^"]+)"/g)].map(
+		([, x, w]) => ({ x: Number(x), width: Number(w) }),
+	);
+	expect(stems).toHaveLength(170);
+	const clear = stems.slice(1).every(({ x, width }, i) => {
+		const previous = stems[i];
+		return previous && x - previous.x > (width + previous.width) / 2;
+	});
+	expect(clear).toBe(true);
+});
+
 test("a plot's axes carry labels and one quiet baseline at zero, with no gridlines or ticks", () => {
 	const wave = draw({
 		series: [
