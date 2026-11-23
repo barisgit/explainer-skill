@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.18.0
 
 - Pages read closer to a documentation site. A hairline sits under the masthead. Sections, including chapters in Views, are separated by space alone: about 3rem instead of a gap that grew with the window's height to 8rem. Write `---` between blank lines where you want a quiet divider; `.minor` sections sit closer. Prose lines are a little further apart (1.65), an `h3` is a step larger than the text with room above it, a table's row names are no longer bold, and a table in the text's column takes the width its columns need instead of the column's. A page rule that relied on `--section-gap`'s old size may need a look.
 - A `<details>` fold in the text keeps the text's measure, and its summary is one line of text that wraps under itself: a formula in it (`<summary>Why the factor $2$?</summary>`) no longer splits the question into columns on a phone.

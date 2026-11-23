@@ -7541,7 +7541,7 @@ window.ViewsNav = ({ views, canonical, key, decode, kitText }) => {
     }
   }
   function grade(input) {
-    const text = input.value.trim();
+    const text = input.value.trim().replace(/^−/, "-");
     if (!text) {
       return "";
     }

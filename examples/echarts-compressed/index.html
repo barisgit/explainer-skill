@@ -6896,7 +6896,7 @@ window.PlotTween = () => {
     }
   }
   function grade(input) {
-    const text = input.value.trim();
+    const text = input.value.trim().replace(/^−/, "-");
     if (!text) {
       return "";
     }
