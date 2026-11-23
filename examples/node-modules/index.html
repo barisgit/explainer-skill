@@ -384,9 +384,12 @@ figure:not([class]) > figcaption {
 :where(figure:not([class])) {
 	margin: 2rem 0;
 }
+.fig > img,
+figure:not([class]) > img {
+	block-size: auto;
+}
 figure:not([class]) > img {
 	display: block;
-	block-size: auto;
 }
 /* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
    Two children: the text, then the figure. From 56rem they stand side by side, the text two fifths from the column's start like

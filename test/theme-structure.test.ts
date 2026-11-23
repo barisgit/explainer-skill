@@ -33,24 +33,33 @@ beforeAll(async () => {
 	expect(result.code).toBe(0);
 });
 
-test("a .fig image fits the phone column without stretching (#317)", async () => {
-	const image = await inPage(
-		figureLayout,
-		(cdp) =>
-			cdp.evaluate<{ width: number; height: number; column: number; overflow: number }>(`(() => {
-		const figure = document.querySelector("#single");
-		const { width, height } = figure.querySelector("img").getBoundingClientRect();
-		return {
-			width, height,
-			column: figure.getBoundingClientRect().width,
+test("figure images fit their columns without stretching (#317)", async () => {
+	for (const viewport of WIDTHS) {
+		const { images, overflow, position } = await inPage(
+			figureLayout,
+			(cdp) =>
+				cdp.evaluate<{
+					images: { id: string; width: number; height: number; column: number }[];
+					overflow: number;
+					position: string;
+				}>(`(() => ({
+			images: [...document.querySelectorAll("#single, #sized, #prose-figure, #beside-figure")].map(figure => {
+				const { width, height } = figure.querySelector("img").getBoundingClientRect();
+				return { id: figure.id, width, height, column: figure.getBoundingClientRect().width };
+			}),
 			overflow: document.documentElement.scrollWidth - innerWidth,
-		};
-	})()`),
-		WIDTHS[1],
-	);
-	expect(Math.abs(image.width - image.column)).toBeLessThan(1);
-	expect(image.width / image.height).toBeCloseTo(3);
-	expect(image.overflow).toBe(0);
+			position: getComputedStyle(document.querySelector("#beside-figure")).position,
+		}))()`),
+			viewport,
+		);
+		expect(images).toHaveLength(4);
+		for (const { id, width, height, column } of images) {
+			expect(Math.abs(width - Math.min(540, column)), id).toBeLessThan(1);
+			expect(width / height, id).toBeCloseTo(3);
+		}
+		expect(overflow).toBe(0);
+		expect(position).toBe(viewport.mobile ? "static" : "sticky");
+	}
 }, 30_000);
 
 test("plain figures leave only hairlines in a split and keep prose spacing (#320)", async () => {
