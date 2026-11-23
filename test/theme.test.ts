@@ -18,6 +18,63 @@ afterAll(dir.cleanup);
 const HEAD = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main class="page">`;
 
+test("scans opt into screen treatments without changing photos or print (#316)", async () => {
+	const output = await packedMdx(
+		dir,
+		"scans",
+		`# Scan treatments
+
+<div class="beside"><div>Text</div><figure><img class="ink" alt="Ink scan" /></figure></div>
+<img class="paper" alt="Paper scan" />
+<img alt="Plain photo" />
+`,
+	);
+	await inPage(output, async (cdp) => {
+		const styles = (media: string, preferred: string, forced = "") =>
+			cdp
+				.send("Emulation.setEmulatedMedia", {
+					media,
+					features: [{ name: "prefers-color-scheme", value: preferred }],
+				})
+				.then(() =>
+					cdp.evaluate(`(() => {
+				if (${JSON.stringify(forced)}) document.documentElement.dataset.scheme = ${JSON.stringify(forced)};
+				else delete document.documentElement.dataset.scheme;
+				const card = getComputedStyle(document.querySelector("img.paper"));
+				return {
+					images: Array.from(document.images, (img) => {
+						const { filter, mixBlendMode } = getComputedStyle(img);
+						return [filter, mixBlendMode];
+					}),
+					padded: parseFloat(card.paddingTop) > 0,
+					hairline: card.outlineStyle === "solid" && card.outlineColor !== "rgba(0, 0, 0, 0)",
+					pinnedBackdrop: getComputedStyle(document.querySelector("figure")).backgroundColor === getComputedStyle(document.body).backgroundColor,
+				};
+			})()`),
+				);
+		const photo = ["none", "normal"];
+		const levels = "contrast(1.3) brightness(1.1)";
+		const light = [[levels, "multiply"], [levels, "normal"], photo];
+		const dark = [
+			[`${levels} invert(1) hue-rotate(180deg)`, "screen"],
+			[`${levels} brightness(0.753) sepia(0.225)`, "normal"],
+			photo,
+		];
+		const lightCard = { images: light, padded: true, hairline: true, pinnedBackdrop: true };
+		const darkCard = { images: dark, padded: true, hairline: false, pinnedBackdrop: true };
+		expect(await styles("screen", "light")).toEqual(lightCard);
+		expect(await styles("screen", "dark")).toEqual(darkCard);
+		expect(await styles("screen", "light", "dark")).toEqual(darkCard);
+		expect(await styles("screen", "dark", "light")).toEqual(lightCard);
+		expect(await styles("print", "dark", "dark")).toEqual({
+			images: [photo, photo, photo],
+			padded: false,
+			hairline: false,
+			pinnedBackdrop: false,
+		});
+	});
+}, 30_000);
+
 /** One numeric column, as a .compare and as a .compare.table in .scroll. */
 const ROWS = `<thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
 <tbody><tr><th scope="row">Redis</th><td class="num" data-label="Latency">2 ms</td></tr></tbody>`;

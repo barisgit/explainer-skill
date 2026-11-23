@@ -27,6 +27,7 @@
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
    padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
+   Ink-on-white scans in <img> take class="ink" to blend into the background or class="paper" to stay a page; neither for photos.
    Rhythm: a hairline under the masthead, then space between sections, in Views too. Markdown --- on its own line between
    blank lines draws a quiet hairline with the section spacing. .band (once, where the reader acts) spans the window in the
    sunken tone; .minor sections (method, sources) sit closer, with the heading in its own column. A <details> fold keeps the text's measure; its summary is the question it answers.

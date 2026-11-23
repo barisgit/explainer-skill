@@ -88,6 +88,11 @@ D1 led lamp 0 green b@R_lim.b 0,4 v
 
 The <span data-ref="R_lim">series resistor</span> sets the lamp's current, about 16 mA.
 
+<figure>
+<img class="ink" src="./scan.jpg" alt="Scanned schematic of a resistor and capacitor feeding a unity-gain buffer" />
+<figcaption>A textbook-style scan of a low-pass filter for the inverter's signal path.</figcaption>
+</figure>
+
 <h2 data-nav="Meter">The meter reads the inverter every minute</h2>
 
 <Stepper start={1} label="One meter reading" captions={["The meter asks the inverter for a reading.", "The inverter asks the battery for its charge.", "The battery answers.", "The inverter answers, and the reading goes into the log."]} refs={["m1", "m2", "m3", "m4 logged"]}>

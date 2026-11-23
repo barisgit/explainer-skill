@@ -44,6 +44,8 @@ describe("pack warns when the page's own CSS styles a class the kit styles", () 
 
 	test.each([
 		[".chip", true],
+		[".ink", true],
+		[".paper", true],
 		[".verdict-label .chip", true],
 		[".chip.verdict", false],
 		[".plot.tall", true],

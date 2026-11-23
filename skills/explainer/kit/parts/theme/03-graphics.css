@@ -465,6 +465,46 @@
 	}
 }
 
+/* Level the scan's paper to white. Ink blends into the backdrop; Paper filters its white padding and the scan together.
+   These screen treatments leave the source pixels alone in print. */
+@media screen {
+	img.ink,
+	img.paper {
+		--_scan-levels: contrast(1.3) brightness(1.1);
+	}
+	img.ink {
+		filter: var(--_scan-levels) var(--_ink-invert,);
+		mix-blend-mode: var(--_ink-blend, multiply);
+	}
+	img.paper {
+		block-size: auto;
+		padding: clamp(0.5rem, 2vw, 1rem);
+		border-radius: var(--radius);
+		background: #fff;
+		outline: 1px solid light-dark(var(--rule), transparent);
+		filter: var(--_scan-levels) var(--_paper-dim,);
+	}
+	:root[data-scheme="dark"] {
+		--_ink-invert: invert(1) hue-rotate(180deg);
+		--_ink-blend: screen;
+		/* Brightness before sepia avoids clipping the warm highlights (~#cfc9bd). */
+		--_paper-dim: brightness(0.753) sepia(0.225);
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-scheme="light"]) {
+			--_ink-invert: invert(1) hue-rotate(180deg);
+			--_ink-blend: screen;
+			--_paper-dim: brightness(0.753) sepia(0.225);
+		}
+	}
+	/* A pinned .beside figure is a stacking context: give its ink the tone it would otherwise blend into. */
+	@media (width >= 56rem) {
+		.beside > :nth-child(2):has(img.ink) {
+			background-color: var(--under);
+		}
+	}
+}
+
 /* Diagram panels: build the svg at the container's pixel width (viewBox = that width) so text stays 1:1 */
 .dg {
 	display: block;
