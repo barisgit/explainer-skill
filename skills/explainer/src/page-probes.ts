@@ -39,7 +39,7 @@ export interface PageReport {
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
  * than their box and scrolls sideways (a wide data table, in a box or as its own box, or equation may, as may an SVG its min-width holds wider than the container's
  * content box, such as a diagram at its readable minimum, except in the pinned `.beside` column). `warnings`: content cut off inside an overflow hidden/clip box
- * (ellipsis truncation excepted), a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS
+ * (ellipsis truncation excepted), oversized pinned drawing columns, a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS
  * names), diagrams and charts (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players
  * with a log) are tall by design and are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to
  * the screen. `repeated`: ids on more than one element, as the page's scripts and `--do` steps left them (problems).
@@ -66,6 +66,18 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	const hides = (el) => { const o = getComputedStyle(el); return (o.overflowX === "hidden" || o.overflowX === "clip") && o.textOverflow !== "ellipsis"; };
 	const cut = all.filter((el) => hides(el) && region(el) && el.clientWidth > 1 && el.scrollWidth > el.clientWidth + 1);
 	const warnings = cut.slice(0, 6).map((el) => name(el) + " has content cut off: " + el.scrollWidth + "px of content in " + el.clientWidth + "px (overflow " + getComputedStyle(el).overflowX + "): let it wrap or shrink, or move it into a .scroll table");
+	const largeBand = 24 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+	for (const panel of document.querySelectorAll('.beside[data-width="full"] > :nth-child(2):is(figure, .fig)')) {
+		if (getComputedStyle(panel).position !== "sticky" || !panel.previousElementSibling?.matches("ol, ul")) continue;
+		// Match the simple drawing figures sized by the full-width .beside rules in 02-layout.css.
+		if (panel.querySelector(":scope > :not(h2, h3, figcaption, .mermaid, .schematic, img)")) continue;
+		const column = contentWidth(panel);
+		const drawings = panel.querySelectorAll(":scope > img, :scope > :is(.schematic, .mermaid) > svg");
+		const width = [...drawings].filter(shown).reduce((max, el) => Math.max(max, el.getBoundingClientRect().width), 0);
+		if (width > 0 && width < column / 2 && column - width > largeBand) {
+			warnings.push(name(panel.parentElement) + ": drawing uses only " + Math.round(width) + "px of its " + Math.round(column) + "px pinned column: repack with the current kit or remove a page rule stretching the column");
+		}
+	}
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
 	if (${narrow}) for (const svg of document.querySelectorAll("svg")) {
 		if (!shown(svg)) continue;

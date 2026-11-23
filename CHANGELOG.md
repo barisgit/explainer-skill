@@ -5,6 +5,7 @@
 - A direct image in `.fig` keeps its aspect ratio when it shrinks to fit the phone column, even with `width` and `height` attributes (#317). Plain figures in `.split` leave only the hairline dividers; plain figures in prose keep their spacing.
 - Dense stem plots shrink or omit endpoint dots and thin the default lines so neighbouring stems stay distinct, especially on phones. Each packed copy and the live plot use their own spacing (#315).
 - Give ink-on-white scans `class="ink"` to blend into the background in either scheme, or `class="paper"` to keep them on a paper card. Both print as-is; leave photos unclassed.
+- A captioned schematic, Mermaid diagram or image in a full-width `.beside` now stays next to its list on wide screens, with the list aligned to the prose column. An `<img>` directly in the figure fits the pinned area and stays within the column on phones; `check` warns when a pinned drawing occupies less than half of an excessively wide column.
 
 ## v0.18.0
 

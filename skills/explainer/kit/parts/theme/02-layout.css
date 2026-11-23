@@ -230,6 +230,11 @@ figure:not([class]) > img {
 .beside > :first-child > :first-child {
 	margin-block-start: 0;
 }
+.beside[data-width="full"] > :nth-child(2):is(figure, .fig) > img {
+	display: block;
+	block-size: auto;
+	max-inline-size: 100%;
+}
 @media screen and (min-width: 56rem) {
 	/* .wide's end margin: beside the contents rail --wide-reach (kit:views.js), else the reach to 88rem within the gutters. */
 	.beside {
@@ -242,26 +247,69 @@ figure:not([class]) > img {
 	/* Give the drawing only the width it can use at the pinned height. Keep 20rem for the list; if the drawing
 	   cannot fit either axis at its readable minimum, let it scroll instead of shrinking the labels further. */
 	.beside[data-width="full"] > :first-child:is(ul, ol) {
-		max-inline-size: none;
+		min-inline-size: 20rem;
+		max-inline-size: var(--beside-list-max, none);
 	}
 	.beside[data-width="full"]:has(> :nth-child(2):is(.mermaid, .schematic)) {
 		grid-template-columns: minmax(20rem, 1fr) minmax(0, max-content);
 	}
-	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) {
+	/* Keep the list at the prose start and use the full reach only on the drawing side. */
+	.beside[data-width="full"]:has(
+		> :nth-child(2):is(figure, .fig) > :is(.mermaid, .schematic, img)
+	):not(:has(> :nth-child(2) > :not(h2, h3, figcaption, .mermaid, .schematic, img))) {
+		--beside-list-max: 48rem;
+		display: flex;
+		margin-inline-start: 0;
+		/* Keep the text, not just the list box, at the heading's start; the markers hang outside. */
+		& > :first-child:is(ul, ol) {
+			padding-inline-start: 0;
+		}
+	}
+	.beside[data-width="full"]
+		> :nth-child(2):is(figure, .fig):has(> :is(.mermaid, .schematic, img)):not(
+			:has(> :not(h2, h3, figcaption, .mermaid, .schematic, img))
+		) {
+		/* Let the drawing contribute its intrinsic width. Reserve room for a short heading and caption;
+		   a longer caption remains reachable by scrolling the panel. */
+		container-type: normal;
+		--drawing-height: max(0px, var(--pin-height) - 6.5rem);
+	}
+	.beside[data-width="full"]
+		> :nth-child(2):is(figure, .fig):not(
+			:has(> :not(h2, h3, figcaption, .mermaid, .schematic, img))
+		)
+		> :is(h2, h3, figcaption) {
+		contain: inline-size;
+	}
+	.beside[data-width="full"] > :nth-child(2):is(figure, .fig) > img {
+		max-block-size: var(--drawing-height);
+	}
+	.beside :is(.mermaid, .schematic) {
+		text-align: start;
+	}
+	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic),
+	.beside[data-width="full"]
+		> :nth-child(2):is(figure, .fig):not(
+			:has(> :not(h2, h3, figcaption, .mermaid, .schematic, img))
+		)
+		> :is(.mermaid, .schematic) {
 		padding-block: 0;
 	}
-	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) > svg:not([data-phone]) {
+	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic) > svg:not([data-phone]),
+	.beside[data-width="full"]
+		> :nth-child(2):is(figure, .fig):not(
+			:has(> :not(h2, h3, figcaption, .mermaid, .schematic, img))
+		)
+		> :is(.mermaid, .schematic)
+		> svg:not([data-phone]) {
 		display: block;
 		inline-size: clamp(
 			var(--schematic-min, var(--mermaid-min)),
-			var(--pin-height) *
+			var(--drawing-height, var(--pin-height)) *
 			var(--diagram-ratio),
 			var(--schematic-max, var(--mermaid-max))
 		);
 		max-inline-size: 100%;
-	}
-	.beside :is(.mermaid, .schematic) {
-		text-align: start;
 	}
 	.beside > :nth-child(2) {
 		--pin-top: 1.5rem;

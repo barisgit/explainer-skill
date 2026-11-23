@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="2880" viewBox="0 0 1000 2880">
+  <title>Voltage scale</title>
+  <path fill="var(--sunken)" d="M0 0h1000v2880H0z"/>
+  <path fill="none" stroke="currentColor" stroke-width="6" d="M180 160v2560M180 160h140m-140 1280h140m-140 1280h140"/>
+  <g fill="currentColor" font-family="sans-serif" font-size="64" dominant-baseline="middle">
+    <text x="360" y="160">Supply</text>
+    <text x="360" y="1440">Half voltage</text>
+    <text x="360" y="2720">Ground</text>
+  </g>
+</svg>

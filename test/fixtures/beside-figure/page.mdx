@@ -1,0 +1,68 @@
+---
+contents: true
+---
+
+import signal from "./signal.svg";
+
+# A resistive divider
+
+Two resistors set the output voltage. Read the signal path alongside each drawing.
+
+## Schematic
+
+<div class="beside" data-width="full" id="circuit">
+
+1. The supply enters on the left and drives the first resistor.
+2. The first resistor and the load form the two legs of a divider.
+3. The output is the junction between those two legs. Measure it against ground.
+4. If the resistor values match, the unloaded output is half the supply voltage.
+
+<figure class="fig">
+<h3>Signal path</h3>
+
+```schematic
+R1 in out 10k @0,0
+R2 out 0 10k a@R1.b 0,74 v
+VIN port in Input @-18,0
+```
+
+<figcaption>The signal falls across the two resistors.</figcaption>
+</figure>
+</div>
+
+## Flowchart
+
+<div class="beside" data-width="full" id="flow">
+
+1. Start with the applied voltage and the resistance of each leg.
+2. Divide the voltage by the total resistance to obtain the current.
+3. Multiply the current by the resistance of the lower leg to obtain the output.
+4. Check that the result lies between the supply voltage and ground.
+
+<figure class="fig">
+<h3>Calculation order</h3>
+
+```mermaid
+flowchart LR
+  input["Read the supply voltage"] --> current["Calculate the divider current"] --> output["Find the output voltage"]
+```
+
+<figcaption>Calculate the current before the output.</figcaption>
+</figure>
+</div>
+
+## Image
+
+<div class="beside" data-width="full" id="image">
+
+1. The top of the strip is the supply end of the divider.
+2. The marker halfway down is the unloaded output for equal resistors.
+3. The bottom of the strip corresponds to ground.
+4. A smaller lower resistor moves the output marker toward ground.
+
+<figure class="fig">
+<h3>Voltage scale</h3>
+<img src={signal} alt="A vertical scale from supply through half voltage to ground" />
+<figcaption>The image scales down to fit the pinned area.</figcaption>
+</figure>
+</div>
