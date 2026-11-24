@@ -1,17 +1,17 @@
 import { Explore, Plot, Question, Stepper, View } from "kit";
 import { baseline, curve, fixes, fmt, loadFrame } from "./cafe.ts";
 
-{/* First screen: the answer, what it rests on, and the figure that shows it. */}
+{/* First screen: a title naming the subject, the finding in the first sentence, and the figure that shows it. */}
 
-# A second barista cuts an 18-minute wait to *30 seconds*.
+# Café queue with one or two baristas
 
-A queueing model for a café at 90% busy, with random arrivals and orders averaging 2 minutes, some much longer.
+With one barista busy 90% of the time, customers wait 18 minutes on average before ordering; a second barista cuts that to about 30 seconds. The model assumes random arrivals and orders averaging 2 minutes, some much longer.
 
 {/* frame comes from a module without "use client", so pack computes every slider position and the page carries no model code. */}
 
 <Explore label="Average wait against how busy the barista is" controls={[{ id: "load", label: "Barista busy", range: [50, 95, 1], value: 90, format: { unit: "%" } }]} frame={loadFrame} />
 
-<h2 data-nav="Clumps">Why one clump of customers costs an hour</h2>
+## Clumps of customers
 
 ```mermaid
 flowchart TD
@@ -30,7 +30,7 @@ flowchart TD
 3. The backlog shrinks only in <span data-ref="spare">spare time</span>, the minutes when nobody new is ordering.
 4. At 50% busy every other minute is spare: <span data-ref="calm">the 6 minutes are gone in about 12</span>. At 90% one minute in ten is: <span data-ref="slow">the same backlog takes about an hour</span>, and <span data-ref="stack">the next clump</span> lands on top.
 
-<h2 data-nav="Formula">Where the 18 minutes come from</h2>
+## The wait formula
 
 {/* A derivation is a case where the order is the point, so it steps. Study pages start at step 1. */}
 
@@ -60,7 +60,9 @@ Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ ord
 
 <section class="band">
 
-<h2 id="fixes" data-nav="Fixes">A second barista saves 97% of the wait; every other fix saves about half</h2>
+## Fixes
+
+A second barista saves 97% of the wait; every other fix saves about half.
 
 <Plot label="Average wait at 90% busy for each fix" option={{ categories: fixes.map((f) => f.name), horizontal: true, series: [{ name: "Average wait", type: "bar", data: fixes.map((f) => f.wait), fill: fixes.map((f) => (f.id === "second" ? "accent" : "")), label: { digits: 1, unit: "min" } }], x: { format: { unit: "min" } } }} />
 
@@ -88,10 +90,11 @@ Busy is still 0.9, so the average customer still finds $\frac{0.9}{0.1} = 9$ ord
 
 {fixes.map((f) => (
 	<View name="fix" param={f.id} back="All fixes">
-		<h1>{f.name}: {fmt(f.wait)} average wait at 90% busy</h1>
-		<p>{f.note}</p>
+		<h1>{f.name}</h1>
+		<p>{fmt(f.wait)} average wait at 90% busy. {f.note}</p>
 		<section>
-			<h2>Under 10 minutes up to {f.upTo}% busy</h2>
+			<h2>Wait against how busy</h2>
+			<p>Under 10 minutes up to {f.upTo}% busy.</p>
 			<Plot label={`Average wait with ${f.name}, against changing nothing`} option={{ series: [{ name: "Change nothing", data: baseline }, ...(f.id === "none" ? [] : [{ name: f.name, data: curve(f), ...(f.id === "second" ? { color: "var(--accent)" } : {}) }])], x: { format: { unit: "%" } }, y: { min: 0, max: 40, format: { unit: "min" } } }} />
 		</section>
 	</View>

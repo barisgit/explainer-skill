@@ -5,7 +5,7 @@
    an email sends its reply back), contents: true (the contents rail of the page's sections, for
    a long page; views inside views get it anyway), scheme: light or dark (forces it; else the page follows the system),
    display: condensed (poster capitals for the # and ##: kit display).
-   The # and the paragraph right under it are the masthead: the headline states the finding, the lede what it rests on. Each ##
+   The # is the masthead, the title naming what the page covers; paragraphs under it are body text. Each ##
    starts a section; to give one a short name in the contents rail, write its heading as
    <h2 data-nav="Price">The price is 40 €</h2>. A ### in a section is a topic indented under it in the rail (data-nav works there
    too), so a long page groups its rail by ## chapters. A <section> you write

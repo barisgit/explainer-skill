@@ -417,35 +417,32 @@ test("a finding-length headline takes two lines on a desktop", async () => {
 	expect(lines).toBe(2);
 }, 30_000);
 
-test("a masthead paragraph that starts with a bold label is the next action, set as body text in ink like the lede, the rest as labels (#141)", async () => {
+test("the masthead is the title alone: paragraphs under the # are body text, and an em in a heading is plain italic in ink (#329)", async () => {
 	const output = await packedMdx(
 		dir,
-		"next",
-		"# Flip one bit\n\nThe lede.\n\n**Start:** change one bit (2 minutes)\n\nIllustrative data\n",
+		"plain-title",
+		"# Flip *one* bit\n\nThe first paragraph.\n\n**Start:** change one bit\n\n## Steps\n\nA section's paragraph, with *an* em.\n",
 	);
 	const style = await inPage(output, (cdp) =>
 		cdp.evaluate(`(() => {
-			const masthead = [...document.querySelectorAll(".masthead > p")].map((p) => p.className);
-			const next = getComputedStyle(document.querySelector(".masthead .next"));
-			const lede = getComputedStyle(document.querySelector(".masthead .lede"));
-			const meta = getComputedStyle(document.querySelector(".masthead .meta"));
-			const body = getComputedStyle(document.body);
+			const look = (el) => { const s = getComputedStyle(el); return [s.color, s.fontSize, s.fontStyle, s.maxInlineSize].join(" "); };
+			const [first, start] = document.querySelectorAll("[data-overview] > p");
+			const body = document.querySelector("section > p");
+			const h1 = document.querySelector("h1");
+			const em = getComputedStyle(h1.querySelector("em"));
 			return {
-				masthead,
-				mono: [next, meta].some((p) => p.fontFamily.includes("Mono")),
-				ink: next.color === body.color && lede.color === body.color,
-				text: next.fontSize === body.fontSize && lede.fontSize === body.fontSize,
-				label: parseFloat(meta.fontSize) < parseFloat(body.fontSize),
+				masthead: [...document.querySelector(".masthead").children].map((el) => el.localName),
+				classes: [first.className, start.className],
+				body: [look(first), look(start)].every((l) => l === look(body)),
+				em: [em.color === getComputedStyle(h1).color, em.fontStyle],
 			};
 		})()`),
 	);
-	// Headline, then text, then labels: the lede and the next action share the text's size, so neither adds a level (#190).
 	expect(style).toEqual({
-		masthead: ["lede", "next", "meta"],
-		mono: false,
-		ink: true,
-		text: true,
-		label: true,
+		masthead: ["h1"],
+		classes: ["", ""],
+		body: true,
+		em: [true, "italic"],
 	});
 }, 30_000);
 

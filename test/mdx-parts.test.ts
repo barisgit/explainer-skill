@@ -32,7 +32,9 @@ describe("a page made of .mdx parts", () => {
 			`---\ncontents: true\n---\nimport { PEAK, rows } from "./parts/values.ts";\nimport { Table } from "kit";\n\n# Peak load is {PEAK} kW\n\nWhat it rests on.\n\n## First chapter\n\nThe peak is {PEAK}, over {rows.length} rows.\n\n### A topic\n\nText.\n\n### Another topic\n\n| Name | N |\n|---|---:|\n| x | 1 |\n\n## Second chapter\n\nCosts $5 or more.\n`,
 		);
 		const main = mainOf(split);
-		expect(main).toContain('<header class="masthead"><h1>Peak load is 42 kW</h1><p class="lede">');
+		expect(main).toContain(
+			'<header class="masthead"><h1>Peak load is 42 kW</h1></header><p>What it rests on.</p>',
+		);
 		expect(main?.match(/<section>\s*<h2>/g)).toHaveLength(2);
 		expect(main).toBe(mainOf(whole));
 	}, 30_000);

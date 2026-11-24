@@ -70,7 +70,7 @@ describe("an .mdx page packs to one prerendered file", () => {
 		expect(html).toContain('<html lang="de">');
 		expect(html).toContain("<title>Waits grow fast</title>");
 		expect(html).toMatch(
-			/<div data-overview(="")?><header class="masthead"><h1>Waits grow <em>fast<\/em><\/h1><p class="lede">The lede says what the page shows.<\/p><p class="meta">Simulated sample data<\/p><\/header><section><h2>The counter<\/h2>/,
+			/<div data-overview(="")?><header class="masthead"><h1>Waits grow <em>fast<\/em><\/h1><\/header><p>The lede says what the page shows.<\/p><p>Simulated sample data<\/p><section><h2>The counter<\/h2>/,
 		);
 		expect(html).toMatch(
 			/<!--island:0--><figure class="fig">.*<output id="count">3<\/output><div class="chart" role="img" aria-label="Bars"><div class="chart-drawn" aria-hidden="true"><svg viewBox="0 0 1054 416">.*<\/svg><\/div><\/div><\/figure><!--\/island-->/,

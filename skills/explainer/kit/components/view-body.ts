@@ -3,14 +3,7 @@
  * in the browser (kit/islands/client.ts, and kit/islands/server.ts, which tries each record at pack time). Plain h() calls, no
  * JSX, so the islands runtime can import it under the CLI's tsconfig too.
  */
-import {
-	type ComponentChildren,
-	cloneElement,
-	Fragment,
-	h,
-	toChildArray,
-	type VNode,
-} from "preact";
+import { type ComponentChildren, Fragment, h, toChildArray, type VNode } from "preact";
 import { useState } from "preact/hooks";
 import { anonymousPlace, PlaceContext } from "./parts/place.ts";
 
@@ -31,33 +24,26 @@ export interface Fillable {
 	fill(view: string, props: FillProps): void;
 }
 
-const isElement = (node: unknown, tag: unknown): node is VNode<{ class?: string }> =>
+const isElement = (node: unknown, tag: unknown): node is VNode =>
 	typeof node === "object" && node !== null && "type" in node && node.type === tag;
 
 /**
  * The view's content as views.js and the theme expect it: a `.view-head` with the Back link (an empty hash is the overview's
- * address in views.js), the leading `#` and the paragraphs right under it, the first marked `.lede` and later ones `.meta` (a
- * class the author gave a paragraph stays); then the rest.
+ * address in views.js) and the leading `#`; then the rest, paragraphs under the `#` included, as body text.
  */
 export function viewBody(children: ComponentChildren, back: string | undefined): VNode {
 	const nodes = toChildArray(children);
 	const head: ComponentChildren[] = back ? [h("a", { class: "back", href: "#" }, back)] : [];
-	let next = 0;
 	const heading = nodes[0];
-	if (isElement(heading, "h1")) {
+	const titled = isElement(heading, "h1");
+	if (titled) {
 		head.push(heading);
-		next = 1;
-		for (let node = nodes[next]; isElement(node, "p"); node = nodes[++next]) {
-			head.push(
-				node.props.class ? node : cloneElement(node, { class: next === 1 ? "lede" : "meta" }),
-			);
-		}
 	}
 	return h(
 		Fragment,
 		null,
 		head.length > 0 && h("div", { class: "view-head" }, head),
-		nodes.slice(next),
+		nodes.slice(titled ? 1 : 0),
 	);
 }
 

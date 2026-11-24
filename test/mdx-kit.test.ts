@@ -90,7 +90,7 @@ ${script}`;
 
 /** The same content as PAGE, written by hand as a v0.8 page: what PAGE must render to. */
 const V08_MAIN = `<main class="page"><div data-overview>
-<header class="masthead"><h1>The board ships in 72 hours</h1><p class="lede">Two phases, three people, one decision left.</p></header>
+<header class="masthead"><h1>The board ships in 72 hours</h1></header><p>Two phases, three people, one decision left.</p>
 <section data-nav="People"><h2>Three people share the work, <em>Ana</em> most of it</h2>
 <ul><li><a href="#person/ana">Ana Novak</a>: 52 h, <span data-ref="ana">ana</span></li><li><a href="#person/luka">Luka Kos</a>: 34 h, <span data-ref="luka">luka</span></li><li><a href="#person/mia">Mia Zupan</a>: 20 h, <span data-ref="mia">mia</span></li></ul></section>
 <section data-nav="Plan"><h2>The plan has two phases and 72 hours</h2>
@@ -108,11 +108,11 @@ ${PLAN.people
 	.map(
 		(
 			p,
-		) => `<section class="view" data-view="person/${p.id}"><div class="view-head"><a class="back" href="#">The board</a><h1>${p.name}</h1><p class="lede">${p.role}</p></div>
+		) => `<section class="view" data-view="person/${p.id}"><div class="view-head"><a class="back" href="#">The board</a><h1>${p.name}</h1></div><p>${p.role}</p>
 <section><h2>Hours</h2><p>${p.hours} h this quarter.</p></section></section>`,
 	)
 	.join("\n")}
-<section class="view" data-view="about"><div class="view-head"><a class="back" href="#">The board</a><h1>How the hours were counted</h1><p class="lede">From the work list.</p></div>
+<section class="view" data-view="about"><div class="view-head"><a class="back" href="#">The board</a><h1>How the hours were counted</h1></div><p>From the work list.</p>
 <section><h2>Sources</h2><p>The work list.</p></section></section></main>`;
 
 /** Packs `source` as `<name>.mdx` beside plan.json and `files`; returns the CLI result and the output path. */
