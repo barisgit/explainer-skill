@@ -1136,11 +1136,12 @@ figure:not([class]) > img {
 }
 .controls-state a {
 	color: inherit;
-	text-decoration: underline dotted;
+	text-decoration: none;
 	text-underline-offset: 0.25em;
 }
-.controls-state a:hover {
+.controls-state a:is(:hover, :focus-visible) {
 	color: var(--ink);
+	text-decoration: underline dotted 1px;
 }
 .controls-state span + span::before {
 	content: "· " / "";
@@ -1708,10 +1709,9 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 }
 .stat dd {
 	margin: 0.25rem 0 0;
-	font-size: var(--size-display);
+	font-size: var(--size-text);
 	font-weight: 600;
 	line-height: 1.15;
-	letter-spacing: -0.02em;
 	font-variant-numeric: tabular-nums;
 }
 .stat dd small {
@@ -3780,7 +3780,7 @@ pre [data-ref].is-lit {
 <span class="code-line code-deleted" style="--indent:2;"><span class="tok-deleted">-</span>	<span class="tok-keyword">if</span> (!window.echarts) {</span>
 <span class="code-line code-inserted" style="--indent:2;"><span class="tok-inserted">+</span>	<span class="tok-keyword">if</span> (!(window.echarts || <span data-ref="mount">window.echartsReady</span>)) {</span>
 <span class="code-line code-inserted" style="--indent:4;"><span class="tok-inserted">+</span>		<span data-ref="mount">window.echartsReady</span>,</span>
-</code></pre></section><section><h2>Deflate-raw ties for smallest on our browser baseline</h2><div class="scroll"><table class="compare"><thead><tr><th>Alternative</th><th>In the page</th><th>Why</th></tr></thead><tbody><tr data-state="fit"><th scope="row">deflate-raw in base64</th><td data-label="In the page">418 KB</td><td data-label="Why">Shipped: tied smallest for Chrome 103, Firefox 113 and Safari 16.4.</td></tr><tr data-state="out"><th scope="row">gzip</th><td data-label="In the page">418 KB</td><td data-label="Why">The same size as deflate-raw.</td></tr><tr data-state="out"><th scope="row">Brotli</th><td data-label="In the page">344 KB</td><td data-label="Why">Smaller, but DecompressionStream does not read it in those baseline versions.</td></tr><tr data-state="out"><th scope="row">Bytes as Latin-1 text</th><td data-label="In the page">470 KB</td><td data-label="Why">Larger than base64 once the page is UTF-8.</td></tr><tr data-state="out"><th scope="row">Island bundle, plain</th><td data-label="In the page">60 to 300 KB</td><td data-label="Why">Must run before the views and steps scripts; waiting to unpack would delay them.</td></tr><tr data-state="out"><th scope="row">CSS, plain</th><td data-label="In the page"></td><td data-label="Why">CSS cannot wait for a script.</td></tr></tbody></table></div></section><section><h2>A browser without deflate-raw support keeps the drawn charts</h2><p>The <code>deflate-raw</code> format needs Chrome 103, Firefox 113 or Safari 16.4. On older browsers the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.</p></section><section class="band"><h2>Approve shipping <span class="cased">ECharts</span> compressed?</h2><fieldset data-reply aria-label="Approve shipping ECharts compressed?"><div class="seg"><label><input type="radio" name="verdict" value="approve" id="verdict-approve"/><span data-recommended="Recommended">Approve</span></label><label><input type="radio" name="verdict" value="changes" id="verdict-changes"/><span>Request changes</span></label><label><input type="radio" name="verdict" value="ask" id="verdict-ask"/><span>Ask a question</span></label></div><textarea rows="1" data-grow class="note" id="verdict.note" data-note aria-label="Note: Approve shipping ECharts compressed?" placeholder="Note for the agent"></textarea></fieldset></section></div></main>
+</code></pre></section><section><h2>Deflate-raw ties for smallest on our browser baseline</h2><div class="scroll"><table class="compare"><thead><tr><th>Alternative</th><th>In the page</th><th>Why</th></tr></thead><tbody><tr data-state="fit"><th scope="row">deflate-raw in base64</th><td data-label="In the page">418 KB</td><td data-label="Why">Shipped: tied smallest for Chrome 103, Firefox 113 and Safari 16.4.</td></tr><tr data-state="out"><th scope="row">gzip</th><td data-label="In the page">418 KB</td><td data-label="Why">The same size as deflate-raw.</td></tr><tr data-state="out"><th scope="row">Brotli</th><td data-label="In the page">344 KB</td><td data-label="Why">Smaller, but DecompressionStream does not read it in those baseline versions.</td></tr><tr data-state="out"><th scope="row">Bytes as Latin-1 text</th><td data-label="In the page">470 KB</td><td data-label="Why">Larger than base64 once the page is UTF-8.</td></tr><tr data-state="out"><th scope="row">Island bundle, plain</th><td data-label="In the page">60 to 300 KB</td><td data-label="Why">Must run before the views and steps scripts; waiting to unpack would delay them.</td></tr><tr data-state="out"><th scope="row">CSS, plain</th><td data-label="In the page"></td><td data-label="Why">CSS cannot wait for a script.</td></tr></tbody></table></div></section><section><h2>A browser without deflate-raw support keeps the drawn charts</h2><p>The <code>deflate-raw</code> format needs Chrome 103, Firefox 113 or Safari 16.4. On older browsers the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.</p></section><section class="band"><h2>Approve shipping <span class="cased">ECharts</span> compressed?</h2><fieldset data-reply aria-label="Approve shipping ECharts compressed?"><div class="seg"><label><input type="radio" name="verdict" value="approve" id="verdict-approve"/><span data-recommended="Recommended">Approve</span></label><label><input type="radio" name="verdict" value="changes" id="verdict-changes"/><span>Request changes</span></label><label><input type="radio" name="verdict" value="ask" id="verdict-ask"/><span>Ask a question</span></label></div><textarea rows="1" data-grow class="note" id="verdict.note" data-note aria-label="Note: Approve shipping ECharts compressed?" placeholder="Note"></textarea></fieldset></section></div></main>
 <script type="application/json" id="explainer-islands">[{"m":0,"e":"Plot","p":{"label":"ECharts in a chart page: 931 KB plain, 418 KB compressed","height":"clamp(10rem, 16vw, 14rem)","option":{"horizontal":true,"categories":[{"name":"Plain","note":"kit/echarts.js"},{"name":"Compressed","note":"deflate-raw in base64"}],"series":[{"type":"bar","data":[931,418],"fill":["","accent"],"label":{"unit":"KB"}}],"x":{"min":0}}}}]</script>
 <script>/* plot areas: the areas a plot fills and the notes it writes on itself, not referenced from pages: pack joins it in front of
    plot.js with draw.ts, which uses it. PlotAreas({ svgText, svgLine, wrap, area, place }) gives draw(option, frame, taken):
@@ -8118,7 +8118,7 @@ ${content}`);
    reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearPrompt "Press again to clear all
    answers and notes." (announced; kit keep lists the confirm's other texts), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
-   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
+   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note", addNote "Add note",
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", deleteNote "Delete",
    done "Done", noteSaved "Note saved."
    (announced, and over the saved note's toReply "Go to Reply"), and in the caption over a
@@ -8147,7 +8147,7 @@ ${content}`);
     copyFailed: "Copy failed: select the text above and copy it.",
     remove: "Remove",
     note: "Note",
-    notePlaceholder: "Note for the agent",
+    notePlaceholder: "Note",
     addNote: "Add note",
     noteOn: "Note on",
     part: "Part",

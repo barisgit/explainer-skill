@@ -1135,11 +1135,12 @@ figure:not([class]) > img {
 }
 .controls-state a {
 	color: inherit;
-	text-decoration: underline dotted;
+	text-decoration: none;
 	text-underline-offset: 0.25em;
 }
-.controls-state a:hover {
+.controls-state a:is(:hover, :focus-visible) {
 	color: var(--ink);
+	text-decoration: underline dotted 1px;
 }
 .controls-state span + span::before {
 	content: "· " / "";
@@ -1707,10 +1708,9 @@ fieldset.self-check:has(> .seg input:checked) > .seg input[data-right] + span {
 }
 .stat dd {
 	margin: 0.25rem 0 0;
-	font-size: var(--size-display);
+	font-size: var(--size-text);
 	font-weight: 600;
 	line-height: 1.15;
-	letter-spacing: -0.02em;
 	font-variant-numeric: tabular-nums;
 }
 .stat dd small {

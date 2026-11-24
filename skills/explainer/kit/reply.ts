@@ -48,7 +48,7 @@
    reply "Reply" ("Reply (2)" with a count), clear "Clear answers and notes", clearPrompt "Press again to clear all
    answers and notes." (announced; kit keep lists the confirm's other texts), yourReply "Your reply" (the dialog),
    close "Close", copyReply "Copy reply", copied "Copied. Paste it to the agent.", copyFailed "Copy failed: select the text above and
-   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note for the agent", addNote "Add note",
+   copy it.", remove "Remove", note "Note" (a note field's accessible name), notePlaceholder "Note", addNote "Add note",
    noteOn "Note on" ("Note on “part”"), part "Part" ("Part: name"), cancel "Cancel", saveNote "Save note", deleteNote "Delete",
    done "Done", noteSaved "Note saved."
    (announced, and over the saved note's toReply "Go to Reply"), and in the caption over a
@@ -79,7 +79,7 @@
 		copyFailed: "Copy failed: select the text above and copy it.",
 		remove: "Remove",
 		note: "Note",
-		notePlaceholder: "Note for the agent",
+		notePlaceholder: "Note",
 		addNote: "Add note",
 		noteOn: "Note on",
 		part: "Part",

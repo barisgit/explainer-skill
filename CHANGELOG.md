@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reply popovers and Question note fields say “Note.” Explore stat values use body size and keep tabular numbers. Shared Controls’ chosen values are muted label text, with the link marked on hover or keyboard focus (#190).
 - A direct image in `.fig` keeps its aspect ratio when it shrinks to fit the phone column, even with `width` and `height` attributes (#317). Plain figures in `.split` leave only the hairline dividers; plain figures in prose keep their spacing.
 - Dense stem plots shrink or omit endpoint dots and thin the default lines so neighbouring stems stay distinct, especially on phones. Each packed copy and the live plot use their own spacing (#315).
 - Give ink-on-white scans `class="ink"` to blend into the background in either scheme, or `class="paper"` to keep them on a paper card. Both print as-is; leave photos unclassed.

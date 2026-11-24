@@ -273,17 +273,31 @@ describe("the line of chosen values", () => {
 
 Between the controls and the next figure.
 
-<Explore id="far" use="set" frame={(on, n) => ({ readout: on + " " + n })} />
+<Explore id="far" use="set" frame={(_on, n) => ({ stats: { Days: n } })} />
 `;
 		const output = await packedMdx(dir, "state", page);
 		const lines = `["near", "far"].map((id) => { const p = document.querySelector("#" + id + " > .controls-state"); return p && p.offsetParent !== null ? p.textContent : "hidden"; })`;
 		const state = await inPage(output, async (cdp) => {
+			const hierarchy = await cdp.evaluate(`(() => {
+				const style = (selector) => getComputedStyle(document.querySelector(selector));
+				const label = style("#far dt");
+				const value = style("#far dd");
+				const line = style("#far .controls-state a");
+				const body = style("body");
+				return {
+					bodyValue: value.fontSize === body.fontSize,
+					tabular: value.fontVariantNumeric,
+					quietLine: line.fontSize === label.fontSize && line.color === label.color && line.fontWeight === body.fontWeight,
+					decoration: line.textDecorationLine,
+				};
+			})()`);
 			const start = await cdp.evaluate<string[]>(lines);
 			const on = await act<string[]>(cdp, `document.getElementById("on").click()`, lines);
 			await cdp.send("Emulation.setEmulatedMedia", { media: "print" });
-			return { start, on, printed: await cdp.evaluate<string[]>(lines) };
+			return { hierarchy, start, on, printed: await cdp.evaluate<string[]>(lines) };
 		});
 		expect(state).toEqual({
+			hierarchy: { bodyValue: true, tabular: "tabular-nums", quietLine: true, decoration: "none" },
 			start: ["hidden", "Days 1"],
 			on: ["hidden", "Cached Days 1"],
 			printed: ["Cached Days 1", "Cached Days 1"],

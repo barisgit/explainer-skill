@@ -28,7 +28,7 @@ export const ENGLISH = {
 	copyFailed: "Copy failed: select the text above and copy it.",
 	remove: "Remove",
 	note: "Note",
-	notePlaceholder: "Note for the agent",
+	notePlaceholder: "Note",
 	addNote: "Add note",
 	noteOn: "Note on",
 	part: "Part",

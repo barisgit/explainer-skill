@@ -97,7 +97,7 @@ const LABELS = {
 	checkAnswer: "Check answer",
 	enterNumber: "Enter a number.",
 	note: "Note",
-	notePlaceholder: "Note for the agent",
+	notePlaceholder: "Note",
 };
 
 /**

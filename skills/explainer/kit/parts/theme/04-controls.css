@@ -35,11 +35,12 @@
 }
 .controls-state a {
 	color: inherit;
-	text-decoration: underline dotted;
+	text-decoration: none;
 	text-underline-offset: 0.25em;
 }
-.controls-state a:hover {
+.controls-state a:is(:hover, :focus-visible) {
 	color: var(--ink);
+	text-decoration: underline dotted 1px;
 }
 .controls-state span + span::before {
 	content: "· " / "";

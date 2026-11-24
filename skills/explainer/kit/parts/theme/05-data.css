@@ -29,10 +29,9 @@
 }
 .stat dd {
 	margin: 0.25rem 0 0;
-	font-size: var(--size-display);
+	font-size: var(--size-text);
 	font-weight: 600;
 	line-height: 1.15;
-	letter-spacing: -0.02em;
 	font-variant-numeric: tabular-nums;
 }
 .stat dd small {
