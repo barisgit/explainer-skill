@@ -35,9 +35,7 @@ test("pack and check warn on literal Markdown links in prose and list items, not
 	expect(result.stdout).not.toContain("[sample]");
 	const checked = await check(output);
 	expect(checked.code).toBe(0);
-	expect(checked.stdout).toContain(
-		"p.lede: Markdown link stayed literal: [x](docs/My Design Doc.md)",
-	);
+	expect(checked.stdout).toContain("p: Markdown link stayed literal: [x](docs/My Design Doc.md)");
 	expect(checked.stdout).toContain(
 		"li: Markdown link stayed literal: [list](docs/Another Design.md)",
 	);

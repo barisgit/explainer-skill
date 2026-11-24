@@ -1,5 +1,5 @@
 /* theme part: page shell, headings, section rhythm (band, minor, beside with its figure in view), figures, split columns. */
-/* Page shell: the masthead over a hairline, then sections. <p class="label"> is a plain caption over a group inside a section. */
+/* Page shell: the masthead (the title alone) over a hairline, then sections. <p class="label"> is a plain caption over a group inside a section. */
 .page {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
@@ -26,17 +26,6 @@ h1 {
 	letter-spacing: -0.022em;
 	text-wrap: balance;
 }
-/* The accent phrase stays on one line from tablet width up: a break at "18-minute" splits the one highlighted fact. Keep it a few words;
-   on a phone it wraps like the rest of the headline, since a long phrase would run off the screen. */
-h1 em {
-	font-style: normal;
-	color: var(--accent);
-}
-@media (min-width: 40rem) {
-	h1 em {
-		white-space: nowrap;
-	}
-}
 h2 {
 	margin: 0 0 1rem;
 	max-inline-size: 32ch;
@@ -45,10 +34,6 @@ h2 {
 	line-height: 1.15;
 	letter-spacing: -0.02em;
 	text-wrap: balance;
-}
-h2 em {
-	font-style: normal;
-	color: var(--accent);
 }
 /* A heading at the text's size, in its weight: a minor section's heading (it labels reference, not a finding). An h3, a topic
    inside a section, is a step larger, so it reads as a heading rather than a bold lead-in, with room above it. */
@@ -66,23 +51,12 @@ h3 {
 	font-size: 1.1875rem;
 	letter-spacing: -0.01em;
 }
-/* The masthead (and a view's head) is the headline and the lede under it, in text. The next action (a paragraph that opens with a
-   bold label) reads on from the lede in the same text, and the meta lines are labels, so neither adds a level. */
-:is(.masthead, .view-head) > p {
-	max-inline-size: 60ch;
-	margin: 0 0 0.75rem;
-}
+/* A small grey caption, such as the reply's status and a note's heading. */
 .meta {
 	font-size: var(--size-label);
 	line-height: 1.5;
 	color: var(--muted);
 	font-variant-numeric: tabular-nums;
-}
-:is(.masthead, .view-head) > .meta {
-	margin-block-end: 0.25rem;
-}
-.next > strong:first-child {
-	font-weight: 600;
 }
 .label {
 	margin: 0 0 0.375rem;

@@ -1,6 +1,6 @@
 # Explainer
 
-An agent skill that answers with a page: the finding as its headline, a figure you can move, and a question you answer on it. One HTML file that opens offline.
+An agent skill that answers with a page: the finding up front, a figure you can move, and a question you answer on it. One HTML file that opens offline.
 
 > “Three quotes for a home battery: 5, 10 or 15 kWh. Which one?”
 

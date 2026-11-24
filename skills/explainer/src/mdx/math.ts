@@ -192,7 +192,7 @@ export function mathToMathml(at: Where) {
 
 /**
  * Makes each paragraph that holds one `$$...$$` and nothing else a display equation, in the Markdown tree before the page is laid
- * out, so it ends a masthead and fills a list item as an equation on lines of its own does. remark-math reads `$$` as display
+ * out, so it is drawn, in a list item too, as an equation on lines of its own is. remark-math reads `$$` as display
  * math only on lines of its own and takes one written on a single line for inline math, which set alone would be a small
  * formula at the start of the line. `markdown` is the text the tree's offsets point into.
  */

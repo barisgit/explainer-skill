@@ -13,14 +13,14 @@
              escapes ? # % the way encodeURIComponent does: id "a?b" opens at #person/a%3Fb, what follows a route's first ? being
              the state of what the view holds
      back    the text of its Back link, naming the overview; it returns to the overview's last URL state
-   Its # and the paragraphs right under it are the view's head (the first one its lede), and each ## starts a section, as on
+   Its # is the view's head, with the Back link, and each ## starts a section, as on
    the page. pack puts every View after the overview wherever the page renders it, so one View per record works from data:
    {people.map((p) => <View name="person" param={p.id} back="Team"><h1>{p.name}</h1><p>{p.role}</p><section>...</section></View>)}
    That is a static view: its markup is in the page once per record, and it prints. For a dozen records or more, fill one view instead:
    <View name="item" records={items} render={Item} back="Plan" />
      records  the records, each with an id: #item/<id> opens it. They reach the browser as JSON, once
-     render   a function component from your "use client" module, given { record }. It returns the view's content: an <h1>, the
-              paragraphs of its head, then <section>s, each with its <h2>
+     render   a function component from your "use client" module, given { record }. It returns the view's content: an <h1>,
+              any paragraphs under it, then <section>s, each with its <h2>
    Only the open record is drawn, so a filled view prints only while it is open. A control in it is kept like any other when its id
    names the record: id={`note-${record.id}`}. pack draws every record once and fails on an id one repeats or shares with the page.
    Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it

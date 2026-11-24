@@ -1,4 +1,4 @@
-import type { BlockContent, DefinitionContent, Heading, Nodes, Paragraph, Root } from "mdast";
+import type { BlockContent, DefinitionContent, Heading, Nodes, Root } from "mdast";
 import type { MdxJsxFlowElement } from "mdast-util-mdx-jsx";
 import type {} from "mdast-util-to-hast"; // its Data fields (hName, hProperties, hChildren) shape what the nodes render as
 
@@ -31,28 +31,9 @@ const element = (
 	children,
 });
 
-const withClass = (paragraph: Paragraph, className: string) => {
-	paragraph.data = { ...paragraph.data, hProperties: { className: [className] } };
-	return paragraph;
-};
-
 /** The plain text of a node, as a title. */
 const textOf = (node: Nodes): string =>
 	"value" in node ? node.value : "children" in node ? node.children.map(textOf).join("") : "";
-
-/** The class of a masthead paragraph: the first is the `.lede`; a later one that opens with bold text (`**Start:** ...`) the `.next` action; the rest `.meta`. */
-const mastheadClass = (paragraph: Paragraph, first: boolean) =>
-	first ? "lede" : paragraph.children[0]?.type === "strong" ? "next" : "meta";
-
-/** A `#` and the paragraphs right under it, as the page's `header.masthead`, each paragraph classed by mastheadClass. */
-function mastheadOf(nodes: Flow[], at: number): { element: MdxJsxFlowElement; next: number } {
-	const children: Flow[] = nodes.slice(at, at + 1);
-	let next = at + 1;
-	for (let node = nodes[next]; node?.type === "paragraph"; node = nodes[++next]) {
-		children.push(withClass(node, mastheadClass(node, next === at + 1)));
-	}
-	return { element: element("header", { class: "masthead" }, children), next };
-}
 
 /**
  * The `<section>` a `##` starts. A heading written `<h2 data-nav="Price">The price is 40 €</h2>` starts one too, and its
@@ -90,34 +71,28 @@ const endsSection = (node: Flow) => isHeading(node, 1) || isJsx(node, "section")
 /**
  * The house layout of one flow container (the overview or a view): each `##` (or `<h2>`, or a component whose children open
  * with one) with what follows, up to the next `#`/`##` or a `<section>` the author wrote themselves, becomes a `<section>`.
- * With `masthead` (the overview), its first `#` with the paragraphs right under it becomes the masthead; a View lays out its
- * own head (kit/components/view.tsx), so that a view rendered from data gets one too.
+ * With `masthead` (the overview), its first `#` alone becomes the masthead, and the paragraphs under it stay body text; a View
+ * lays out its own head (kit/components/view.tsx), so that a view rendered from data gets one too.
  */
 function layout(nodes: Flow[], masthead: boolean): Flow[] {
 	const out: Flow[] = [];
 	let section: Flow[] | undefined;
 	let headDone = !masthead;
-	for (let i = 0; i < nodes.length; ) {
-		const node = nodes[i];
-		if (node && isHeading(node, 1) && !headDone) {
+	for (const node of nodes) {
+		const heading = sectionHeading(node);
+		if (isHeading(node, 1) && !headDone) {
 			headDone = true;
-			const taken = mastheadOf(nodes, i);
-			out.push(taken.element);
 			section = undefined;
-			i = taken.next;
-			continue;
-		}
-		const heading = node && sectionHeading(node);
-		if (node && heading) {
+			out.push(element("header", { class: "masthead" }, [node]));
+		} else if (heading) {
 			section = [node];
 			out.push(sectionOf(heading, section));
-		} else if (node && endsSection(node)) {
+		} else if (endsSection(node)) {
 			section = undefined;
 			out.push(node);
-		} else if (node) {
+		} else {
 			(section ?? out).push(node);
 		}
-		i++;
 	}
 	return out;
 }

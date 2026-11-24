@@ -507,7 +507,7 @@ const flows = () => getComputedStyle(bar()).position === "static" && getComputed
 const OVERVIEW_PAGE = (script: string) =>
 	`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><div data-overview>
-<header class="masthead"><h1>Bar</h1><p class="lede">The lede.</p></header>
+<header class="masthead"><h1>Bar</h1></header><p>The lede.</p>
 <section id="first"><h2>First</h2>${PROSE}${PROSE}${QUESTION("one")}<p>After the first question.</p></section>
 <section id="second"><h2>Second</h2>${QUESTION("two")}<p>After the last question.</p></section>
 <section id="third"><h2>Third</h2>${PROSE}</section></div></main>
@@ -540,7 +540,7 @@ test("a question an island draws keeps the bar outside the island, at the end of
 test("with reply: true and no question, the bar comes at the end of the page once there is something to send, moving nothing", async () => {
 	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main class="page" data-asks-reply><div data-overview>
-<header class="masthead"><h1>Notes</h1><p class="lede">The lede.</p></header>
+<header class="masthead"><h1>Notes</h1></header><p>The lede.</p>
 <section><h2>Only</h2>${PROSE}<input id="late" aria-label="Late">${PROSE}</section></div></main>
 <script src="kit:keep.js"></script><script src="kit:reply.js"></script><script>${BAR_PLACE}
 ${SETTLED}
@@ -564,7 +564,7 @@ var contract = settled.then(async () => {
 test("with questions in several views the bar follows the view shown: under its last question, else at its end once there is something to send", async () => {
 	const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main class="page"><div data-overview>
-<header class="masthead"><h1>Views</h1><p class="lede">The lede, with <a href="#a">A</a> and <a href="#b">B</a>.</p></header>
+<header class="masthead"><h1>Views</h1></header><p>The lede, with <a href="#a">A</a> and <a href="#b">B</a>.</p>
 <section id="s-home"><h2>Home</h2>${QUESTION("home")}</section><section><h2>More</h2>${PROSE}</section></div>
 <section class="view" data-view="a"><a class="back" href="#">Home</a><h1>A</h1><section id="s-in-a"><h2>Asked</h2>${QUESTION("in-a")}<p>After.</p></section><section><h2>Then</h2>${PROSE}</section></section>
 <section class="view" data-view="b" id="b"><a class="back" href="#">Home</a><h1>B</h1><section><h2>Nothing asked</h2>${PROSE}</section></section></main>
