@@ -147,7 +147,7 @@ flowchart TD
 | `data-ref` | Prose, table rows, diagram parts and marked code that share a name light up together; `.beside` keeps a figure in view while its text scrolls |
 | Frontmatter | `contents: true` for a contents rail, `display: condensed` for poster headings, `reply: true` for notes, `lang` and `labels` for a page in another language |
 
-Pages follow the system's light or dark setting. A `.tsx` component whose first line is `"use client"` covers behaviour no component does. [`skills/explainer/example/`](skills/explainer/example/page.mdx) is the page the skill ships as its example.
+Pages follow the system's light or dark setting. A `.tsx` component whose first line is `"use client"` covers behaviour no component does. The skill ships two examples: a decision page, [`skills/explainer/example/`](skills/explainer/example/page.mdx), and a system tour, [`skills/explainer/example/tour/`](skills/explainer/example/tour/page.mdx).
 
 ## Install
 

@@ -1,0 +1,153 @@
+import { Plot, Stepper, View } from "kit";
+import { batches, hitRate, redirect } from "./snip.ts";
+
+{/* A system tour: the map of the whole first, one drawn walkthrough, then each part in a view that opens with its own figure. */}
+
+# Snip: a link shortener in four packages
+
+Paste a long link, get a short one, and see how often it was clicked.
+
+## The whole system
+
+{/* List first, the map second: each item and its node share a data-ref, and the name opens that part's view. */}
+
+<div class="beside" data-width="full">
+
+- <span data-ref="web">1</span> [web](#part/web): the page where people paste a link and watch its clicks.
+- <span data-ref="api">2</span> [api](#part/api): answers every request, and keeps a redirect to about 2 ms.
+- <span data-ref="store">3</span> [store](#part/store): links in Postgres, the busy ones in a Redis cache.
+- <span data-ref="stats">4</span> [stats](#part/stats): counts clicks in batches, off the redirect's path.
+
+```mermaid tag:web=1 tag:api=2 tag:store=3 tag:stats=4
+flowchart LR
+	reader(["Browser"]) -->|"GET /x7k"| api["api<br>2.4k lines"]
+	web["web<br>3.0k lines"] -->|"POST /links"| api
+	api -->|"look up"| store["store<br>1.1k lines"]
+	api -->|"click event"| stats["stats<br>0.9k lines"]
+	store --> cache[("Redis")]
+	store --> db[("Postgres")]
+	stats -->|"hourly counts"| db
+```
+
+</div>
+
+## One click
+
+{/* The walkthrough follows one real request; each step lights the messages it names. */}
+
+<Stepper start={1} label="One redirect, step by step" refs={["m1", "m2", "m3", "m4", "m5"]} captions={["A reader opens snip.to/x7k: the api gets the code x7k.", "The api asks the store, which tries Redis first.", "Redis holds x7k (94% of redirects): 1.2 ms. A miss goes on to Postgres: 9.8 ms.", "The click is queued for stats in 0.2 ms; counting it waits for the next batch.", "The reader is sent on with a 302, about 2 ms after asking."]}>
+
+```mermaid
+sequenceDiagram
+	participant rd as Browser
+	participant ap as api
+	participant ca as Redis
+	participant st as stats
+	rd->>ap: GET /x7k
+	ap->>ca: get x7k
+	ca-->>ap: long URL
+	ap->>st: click x7k
+	ap-->>rd: 302 to long URL
+```
+
+</Stepper>
+
+## Packages
+
+{/* The register is reference behind the tour, not its spine. */}
+
+| Package | Lines | Entry | Tests |
+|---|---:|---|---:|
+| [web](#part/web) | 3,020 | `web/src/main.tsx` | 41 |
+| [api](#part/api) | 2,410 | `api/server.ts` | 88 |
+| [store](#part/store) | 1,130 | `store/index.ts` | 37 |
+| [stats](#part/stats) | 910 | `stats/worker.ts` | 19 |
+
+<View name="part" param="web" back="Snip">
+
+# web: one form and one chart
+
+The only package a person sees.
+
+## Two screens
+
+```mermaid
+flowchart LR
+	form["Paste form"] -->|"POST /links"| made["Short link shown"]
+	made --> report["Clicks page"]
+	report -->|"GET /links/x7k/stats"| chart["Clicks per hour"]
+```
+
+The form and the report call the api only; web never reads the database.
+
+</View>
+
+<View name="part" param="api" back="Snip">
+
+# api: four stages per request
+
+Every redirect passes the same stages; only the look-up's time depends on the cache.
+
+## Where 2 ms go
+
+<Plot label="Milliseconds per api stage of one redirect" option={{ categories: redirect.stages, horizontal: true, series: [{ name: "Cache hit", type: "bar", data: redirect.hit, fill: "accent", label: { digits: 1, unit: "ms" } }, { name: "Cache miss", type: "bar", data: redirect.miss, fill: "hollow", label: { digits: 1, unit: "ms" } }], x: { format: { unit: "ms" } } }} />
+
+A miss costs five times a hit, all of it in the look-up: the store is where speed is won.
+
+</View>
+
+<View name="part" param="store" back="Snip">
+
+# store: two tables behind a cache
+
+Links are written once and read thousands of times, so reads go to Redis first.
+
+## The data
+
+```mermaid
+erDiagram
+	LINK ||--o{ HOURLY_COUNT : "counted in"
+	LINK {
+		string code PK
+		string url
+		datetime created
+	}
+	HOURLY_COUNT {
+		string code FK
+		datetime hour
+		int clicks
+	}
+```
+
+## How big the cache is
+
+<Plot label="Share of redirects Redis answers, by links it holds" option={{ series: [{ name: "Hit rate", data: hitRate, color: "var(--accent)" }], x: { name: "links held", format: { unit: "k" } }, y: { min: 0.5, max: 1, format: { percent: true } }, marks: [{ x: 100, label: "today: 94%" }] }} />
+
+Past 100,000 links the cache gains little: most clicks go to recent links.
+
+</View>
+
+<View name="part" param="stats" back="Snip">
+
+# stats: clicks counted in batches
+
+A click is queued by the api and written later, one row per link and hour.
+
+## A click's life
+
+```mermaid
+stateDiagram-v2
+	[*] --> queued: api sends click
+	queued --> batched: every 5 s
+	batched --> written: add to hourly row
+	batched --> queued: write failed, retry
+	written --> [*]
+```
+
+## Load over a day
+
+<Plot label="Clicks per 5-second batch on a weekday" option={{ categories: batches.hours.map((h) => `${h}:00`), series: [{ name: "Clicks per batch", type: "bar", data: batches.clicks, fill: batches.clicks.map((c) => (c === Math.max(...batches.clicks) ? "accent" : "")), label: true }] }} />
+
+Even the noon peak is one write of 520 clicks every 5 seconds, well within one Postgres connection.
+
+</View>
