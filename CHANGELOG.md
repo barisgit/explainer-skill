@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- The masthead is the title alone. Paragraphs under the `#` (and under a View's `#`) are ordinary body text: they no longer become a `.lede`, a grey `.meta` line or a `.next` action, and the kit no longer styles those classes in the masthead. An `em` in a heading is plain italic in ink, no longer the accent. Name what the page or section covers in its title or heading, and put the finding in the first sentence or figure; the guide and example now do so, and step 4 ends with a pass that cuts what loses nothing (#329).
+- The masthead is the title alone. Paragraphs under the `#` (and under a View's `#`) are ordinary body text: they no longer become a `.lede`, a grey `.meta` line or a `.next` action, and the kit no longer styles those classes in the masthead. An `em` in a heading still marks its phrase in the accent. Name what the page or section covers in its title or heading, and put the finding in the first sentence or figure; the guide and example now do so, and step 4 ends with a pass that cuts what loses nothing (#329).
 
 ## v0.19.0
 

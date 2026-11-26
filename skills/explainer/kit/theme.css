@@ -7,8 +7,8 @@
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
    To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
    <html data-scheme="dark">; charts and diagrams follow it too.
-   The accent has one meaning, the finding: on a chart the series or bar the page is about (color: "var(--accent)"); headings
-   stay in ink, an em in them plain italic. Series default to --c1..--c6, muted inks told apart by lightness, a line also by its
+   The accent has one meaning, the finding: the phrase a heading marks with *em*, and on a chart the series or bar
+   the page is about (color: "var(--accent)"). Series default to --c1..--c6, muted inks told apart by lightness, a line also by its
    dash, and best by the names on them; keep each compared thing in the same one on every chart and view. Categories that are colours by nature
    (energy sources, parties) take real hues: --c1..--c6 on :root, as light-dark() pairs like the accent. A mark takes one of the
    accent's three states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as
