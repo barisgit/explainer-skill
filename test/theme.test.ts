@@ -417,7 +417,7 @@ test("a finding-length headline takes two lines on a desktop", async () => {
 	expect(lines).toBe(2);
 }, 30_000);
 
-test("the masthead is the title alone: paragraphs under the # are body text, and an em in a heading is plain italic in ink (#329)", async () => {
+test("the masthead is the title alone: paragraphs under the # are body text, and an em in a heading keeps the accent (#329)", async () => {
 	const output = await packedMdx(
 		dir,
 		"plain-title",
@@ -434,7 +434,7 @@ test("the masthead is the title alone: paragraphs under the # are body text, and
 				masthead: [...document.querySelector(".masthead").children].map((el) => el.localName),
 				classes: [first.className, start.className],
 				body: [look(first), look(start)].every((l) => l === look(body)),
-				em: [em.color === getComputedStyle(h1).color, em.fontStyle],
+				em: [em.color !== getComputedStyle(h1).color, em.fontStyle],
 			};
 		})()`),
 	);
@@ -442,7 +442,7 @@ test("the masthead is the title alone: paragraphs under the # are body text, and
 		masthead: ["h1"],
 		classes: ["", ""],
 		body: true,
-		em: [true, "italic"],
+		em: [true, "normal"],
 	});
 }, 30_000);
 

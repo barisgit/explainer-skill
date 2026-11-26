@@ -26,6 +26,17 @@ h1 {
 	letter-spacing: -0.022em;
 	text-wrap: balance;
 }
+/* The accent phrase stays on one line from tablet width up: a break at "18-minute" splits the one highlighted fact. Keep it a few words;
+   on a phone it wraps like the rest of the headline, since a long phrase would run off the screen. */
+h1 em {
+	font-style: normal;
+	color: var(--accent);
+}
+@media (min-width: 40rem) {
+	h1 em {
+		white-space: nowrap;
+	}
+}
 h2 {
 	margin: 0 0 1rem;
 	max-inline-size: 32ch;
@@ -34,6 +45,10 @@ h2 {
 	line-height: 1.15;
 	letter-spacing: -0.02em;
 	text-wrap: balance;
+}
+h2 em {
+	font-style: normal;
+	color: var(--accent);
 }
 /* A heading at the text's size, in its weight: a minor section's heading (it labels reference, not a finding). An h3, a topic
    inside a section, is a step larger, so it reads as a heading rather than a bold lead-in, with room above it. */
