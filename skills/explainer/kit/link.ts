@@ -125,7 +125,7 @@
 		}
 	}
 
-	/** Reads the joined inputs and which refs are stepped with motion, including refs whose state is "". */
+	/** Collects distinct non-empty states in page order for every declared ref, and separately refs named by a Stepper in motion, even with no state. */
 	function givenStates() {
 		const given = new Map<string, string[]>();
 		const stepped = new Set<string>();
@@ -171,9 +171,9 @@
 	}
 
 	/**
-	 * The one writer of data-state: every element carrying a ref some declaration names gets the states its refs are given,
-	 * marked data-kit-state (the kit styles now and not-yet only there), and loses both when none is given. Elements no
-	 * declaration names are left as they are, so a page's own data-state (a Table row's fit) stays.
+	 * The only runtime writer of data-state: applies each part's joined state with a data-kit-state marker, clears the pair
+	 * when no state is given, and leaves author states alone on parts no declaration names. Independently marks data-step-ref
+	 * on parts named by a Stepper in motion, including parts whose state was cleared so they can ease out.
 	 */
 	function writeStates() {
 		const { given, stepped } = givenStates();
