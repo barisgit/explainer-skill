@@ -17,21 +17,28 @@
 		}
 	};
 
-	// Read once, before styles render. The HTML attribute is also the default when scripting is off.
-	let choice = root.dataset.scheme ?? "system";
-	try {
-		const saved = localStorage.getItem(key);
-		if (saved === "system" || saved === "light" || saved === "dark") {
-			choice = saved;
-			apply(choice);
+	let storage: Storage | undefined;
+	const readChoice = () => {
+		try {
+			storage ??= localStorage;
+			const saved = storage.getItem(key);
+			if (saved === "system" || saved === "light" || saved === "dark") {
+				return saved;
+			}
+		} catch {
+			// A browser can refuse localStorage, including for local files.
 		}
-	} catch {
-		// A browser can refuse localStorage, including for local files. The control still works for this visit.
-	}
+		return undefined;
+	};
+
+	// Read before styles render. The HTML attribute is also the default when scripting is off.
+	const choice = readChoice() ?? root.dataset.scheme ?? "system";
+	apply(choice);
 
 	document.addEventListener("DOMContentLoaded", () => {
 		const picker = document.createElement("select");
 		picker.className = "scheme-picker";
+		picker.dataset.keep = "off"; // An origin preference, not one of the page's kept answers or controls.
 		picker.setAttribute("aria-label", text("theme"));
 		picker.add(new Option(text("themeSystem"), "system"));
 		picker.add(new Option(text("themeLight"), "light"));
@@ -40,9 +47,19 @@
 		picker.addEventListener("change", () => {
 			apply(picker.value);
 			try {
-				localStorage.setItem(key, picker.value);
+				storage?.setItem(key, picker.value);
 			} catch {
 				// The applied choice does not depend on storage.
+			}
+		});
+		addEventListener("storage", (event) => {
+			if (event.storageArea === storage && event.key === key) {
+				// Read the latest choice in case two tabs wrote before the event was delivered.
+				const saved = readChoice();
+				if (saved) {
+					picker.value = saved;
+					apply(saved);
+				}
 			}
 		});
 		document.body.prepend(picker);

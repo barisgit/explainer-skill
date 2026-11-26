@@ -22,17 +22,23 @@
       root.dataset.scheme = choice;
     }
   };
-  let choice = root.dataset.scheme ?? "system";
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved === "system" || saved === "light" || saved === "dark") {
-      choice = saved;
-      apply(choice);
-    }
-  } catch {}
+  let storage;
+  const readChoice = () => {
+    try {
+      storage ??= localStorage;
+      const saved = storage.getItem(key);
+      if (saved === "system" || saved === "light" || saved === "dark") {
+        return saved;
+      }
+    } catch {}
+    return;
+  };
+  const choice = readChoice() ?? root.dataset.scheme ?? "system";
+  apply(choice);
   document.addEventListener("DOMContentLoaded", () => {
     const picker = document.createElement("select");
     picker.className = "scheme-picker";
+    picker.dataset.keep = "off";
     picker.setAttribute("aria-label", text("theme"));
     picker.add(new Option(text("themeSystem"), "system"));
     picker.add(new Option(text("themeLight"), "light"));
@@ -41,8 +47,17 @@
     picker.addEventListener("change", () => {
       apply(picker.value);
       try {
-        localStorage.setItem(key, picker.value);
+        storage?.setItem(key, picker.value);
       } catch {}
+    });
+    addEventListener("storage", (event) => {
+      if (event.storageArea === storage && event.key === key) {
+        const saved = readChoice();
+        if (saved) {
+          picker.value = saved;
+          apply(saved);
+        }
+      }
     });
     document.body.prepend(picker);
   });

@@ -95,6 +95,70 @@ test("switching still works when storage is unavailable", async () => {
 	});
 }, 30_000);
 
+test("the reader theme is shared across files, not restored by Keep or counted among its controls", async () => {
+	const a = await packedMdx(
+		dir,
+		"keep-theme",
+		`# Page with Keep
+
+<input name="entry" aria-label="Entry" />
+<input id="stable" aria-label="Stable entry" />
+`,
+	);
+	const b = await packedMdx(dir, "other-theme", "# Another page\n");
+	await withTestPage(async (cdp) => {
+		await cdp.send("Page.enable");
+		const pageA = `file://${a}`;
+		const state = `[document.querySelector('${PICKER}').value, document.querySelector('[name=entry]').value]`;
+		await load(cdp, pageA);
+		await step(cdp, "set:input[name=entry]=Reader text");
+		await step(cdp, PICK("dark"));
+		await load(cdp, `file://${b}`);
+		expect(await cdp.evaluate(`document.querySelector('${PICKER}').value`)).toBe("dark");
+		await step(cdp, PICK("light"));
+		await load(cdp, pageA);
+		await load(cdp);
+		expect(await cdp.evaluate(state)).toEqual(["light", "Reader text"]);
+		expect(
+			await cdp.evaluate(
+				`Object.keys(JSON.parse(localStorage.getItem('explainer:' + location.href)).controls)`,
+			),
+		).toEqual(["text@0"]);
+	});
+}, 30_000);
+
+test("a theme choice in another document of the same origin updates the open picker and page", async () => {
+	const output = await packedMdx(dir, "shared-theme", "# Reader settings\n");
+	const server = Bun.serve({
+		hostname: "127.0.0.1",
+		port: 0,
+		fetch: () => new Response(Bun.file(output)),
+	});
+	try {
+		await withTestPage(async (cdp) => {
+			await cdp.send("Page.enable");
+			await load(cdp, server.url.href);
+			await cdp.evaluate(
+				`new Promise((done) => {
+				const frame = document.body.appendChild(document.createElement("iframe"));
+				frame.onload = done;
+				frame.src = "/other";
+			})`,
+				true,
+			);
+			await cdp.evaluate(`(() => {
+				const picker = document.querySelector("iframe").contentDocument.querySelector("${PICKER}");
+				picker.value = "dark";
+				picker.dispatchEvent(new Event("change"));
+			})()`);
+			expect(await until(cdp, `document.querySelector("${PICKER}").value === "dark"`)).toBe(true);
+			expect(await cdp.evaluate(READ)).toEqual(["dark", NIGHT]);
+		});
+	} finally {
+		await server.stop(true);
+	}
+}, 30_000);
+
 test("switching updates the existing SVG drawings, scans and code in place", async () => {
 	const scan = "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
 	const output = await packedMdx(

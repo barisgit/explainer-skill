@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Readers can pick System, Light or Dark at the top of any page, including offline. The browser remembers their choice where local storage is available. Frontmatter `scheme: light` or `scheme: dark` sets the initial choice, not a lock (#336).
+- Readers can pick System, Light or Dark at the top of any page, including offline. The browser remembers their choice and applies it to open tabs that share local storage. Frontmatter `scheme: light` or `scheme: dark` sets the initial choice, not a lock (#336).
 - The masthead is the title alone. Paragraphs under the `#` (and under a View's `#`) are ordinary body text: they no longer become a `.lede`, a grey `.meta` line or a `.next` action, and the kit no longer styles those classes in the masthead. An `em` in a heading still marks its phrase in the accent. Name what the page or section covers in its title or heading, and put the finding in the first sentence or figure; the guide and example now do so, and step 4 ends with a pass that cuts what loses nothing (#329).
 - Asked to explain a whole system, the skill now builds a visual tour rather than a census: one map of the whole first, each area and each part (a section or view) opening with its own diagram or chart, examples drawn as walkthroughs (a sequence diagram or Stepper following one request), and any register of every file or module kept as reference behind it. SKILL.md asks for a figure plan before writing, naming the diagram or chart that carries each section and each view, and a second example, `example/tour/page.mdx`, shows a short tour with its parts in views (#331).
 
