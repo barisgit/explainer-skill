@@ -7,9 +7,9 @@ import { COUNT, DEPRECATED, DUPLICATES, EXTRA_BYTES, EXTRA_COPIES, FETCHED, HEAV
 import { Package } from "./package.tsx";
 import "./colours.css";
 
-# {COUNT} packages installed for {LISTED.length} listed; *{HEAVY.size} of them* hold half the bytes.
+# What *npm install* put on disk
 
-A project listing `express`, `eslint` and `jest`, resolved from the npm registry on {FETCHED} for Linux x64: {MB(TOTAL)} unpacked.
+A project listing `express`, `eslint` and `jest`, resolved from the npm registry on {FETCHED} for Linux x64, installs {COUNT} packages for {LISTED.length} listed: {MB(TOTAL)} unpacked. {HEAVY.size} of them hold half the bytes.
 
 <div class="wide">
 <Opening links />
@@ -17,19 +17,21 @@ A project listing `express`, `eslint` and `jest`, resolved from the npm registry
 
 {HEAVY_FROM_JEST} of the {HEAVY.size} come with jest. Click a package to see what requires it.
 
-<h2 data-nav="Production">In production, express needs {tree("express").count} packages and {MB(tree("express").bytes)}</h2>
+## Production
 
-Listed as dependencies, eslint and jest install on every server, though only linting and tests use them. Moved to `devDependencies`, they stay out of `npm install --omit=dev`, which then installs express's own {tree("express").onlyCount} packages and the {tree("express").count - tree("express").onlyCount} it shares: {Math.round((tree("express").bytes / TOTAL) * 100)}% of the bytes.
+In production, express needs {tree("express").count} packages and {MB(tree("express").bytes)}. Listed as dependencies, eslint and jest install on every server, though only linting and tests use them. Moved to `devDependencies`, they stay out of `npm install --omit=dev`, which then installs express's own {tree("express").onlyCount} packages and the {tree("express").count - tree("express").onlyCount} it shares: {Math.round((tree("express").bytes / TOTAL) * 100)}% of the bytes.
 
-<h2 data-nav="Duplicates">{DUPLICATES.length} packages are on disk more than once; the {EXTRA_COPIES} extra copies hold {MB(EXTRA_BYTES)}</h2>
+## Duplicates
+
+{DUPLICATES.length} packages are on disk more than once; the {EXTRA_COPIES} extra copies hold {MB(EXTRA_BYTES)}.
 
 <Table rows={DUPLICATES.slice(0, 5)} cols={[{ head: "Package", value: "name" }, { head: "Versions", value: (d) => d.versions.join(", ") }, { head: "Copies", value: (d) => d.paths.length }, { head: "All copies", value: (d) => d.total / 1e6, format: { digits: 1, unit: "MB" } }]} />
 
 <a href={`#package/${DEPRECATED.pinner.id}`}>{DEPRECATED.pinner.label}</a>, which jest's coverage uses, keeps {DEPRECATED.nested} of those copies, {MB(DEPRECATED.nestedBytes)}, in its own folder: it pins <a href={`#package/${DEPRECATED.id}`}>{DEPRECATED.label}</a>, which brings older minimatch, path-scurry and lru-cache with it. npm marks that glob deprecated: "{DEPRECATED.message.split(". ")[0]}." [Every duplicate →](#packages?view=table&f.copies=more)
 
-<h2 data-nav="Licences">{UNUSUAL_COUNT} packages are under neither MIT, ISC, BSD nor Apache-2.0</h2>
+## Licences
 
-<a href="#package/caniuse-lite">caniuse-lite</a>, {MB(licence("CC-BY-4.0").bytes)} of browser-support data that browserslist reads for Babel, is under CC-BY-4.0, a Creative Commons licence that asks for attribution. <a href="#packages?view=table&f.license=BlueOak-1.0.0">The other {licence("BlueOak-1.0.0").count}</a>, among them {licence("BlueOak-1.0.0").names.slice(0, 4).join(", ")}, {MB(licence("BlueOak-1.0.0").bytes)} in all, are under BlueOak-1.0.0, a permissive licence. A check that allows only the usual four flags all {UNUSUAL_COUNT}.
+{UNUSUAL_COUNT} packages are under neither MIT, ISC, BSD nor Apache-2.0. <a href="#package/caniuse-lite">caniuse-lite</a>, {MB(licence("CC-BY-4.0").bytes)} of browser-support data that browserslist reads for Babel, is under CC-BY-4.0, a Creative Commons licence that asks for attribution. <a href="#packages?view=table&f.license=BlueOak-1.0.0">The other {licence("BlueOak-1.0.0").count}</a>, among them {licence("BlueOak-1.0.0").names.slice(0, 4).join(", ")}, {MB(licence("BlueOak-1.0.0").bytes)} in all, are under BlueOak-1.0.0, a permissive licence. A check that allows only the usual four flags all {UNUSUAL_COUNT}.
 
 ## Every installed package, by what brought it in
 

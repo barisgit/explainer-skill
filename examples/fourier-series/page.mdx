@@ -7,13 +7,13 @@ import { termsFrame } from "./terms.ts";
 import { LIMIT, JUMP, stems, fixed, overshoot, pct, peak, peakAt, sumLine, THOUSAND } from "./fourier.ts";
 import "./colours.css";
 
-# Add a thousand sines and the corner still overshoots by *{pct(overshoot(peak(THOUSAND)), 0)}*.
+# The *Gibbs overshoot* of a square wave
 
-The jump from −1 to +1 is {JUMP}; the sum peaks at {fixed(peak(THOUSAND))}, {fixed(peak(THOUSAND) - 1)} above the plateau, which is {pct(overshoot(peak(THOUSAND)), 2)} of the jump.
+A thousand sines still overshoot the corner by {pct(overshoot(peak(THOUSAND)), 0)}. The jump from −1 to +1 is {JUMP}; the sum peaks at {fixed(peak(THOUSAND))}, {fixed(peak(THOUSAND) - 1)} above the plateau, which is {pct(overshoot(peak(THOUSAND)), 2)} of the jump.
 
 <Opening />
 
-<h2 data-nav="More terms">More terms lower the peak towards {fixed(LIMIT)}</h2>
+## More terms
 
 <Explore
 	label="The square wave's sum against the limit of its peak"
@@ -21,7 +21,7 @@ The jump from −1 to +1 is {JUMP}; the sum peaks at {fixed(peak(THOUSAND))}, {f
 	frame={termsFrame}
 />
 
-<h2 data-nav="Coefficients">The sines shrink as 1/n, and only the odd ones are there</h2>
+## Coefficients
 
 <Plot
 	label="The sine amplitudes of the square wave for n from 1 to 15"
@@ -36,7 +36,7 @@ The jump from −1 to +1 is {JUMP}; the sum peaks at {fixed(peak(THOUSAND))}, {f
 
 Only odd harmonics appear, with $b_n = 4/(n\pi)$. Cutting the sum at $k$ terms throws away a tail that is still large near the corner.
 
-<h2 data-nav="Why">The peak narrows as 1/k but its height tends to {fixed(LIMIT)}</h2>
+## Derivation
 
 Differentiate the $k$-term sum: the cosines add up in closed form.
 

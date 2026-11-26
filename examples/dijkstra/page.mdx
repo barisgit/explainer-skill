@@ -7,13 +7,13 @@ import { Run } from "./run.tsx";
 import { BELLMAN, DIJKSTRA, EDGES, SHIFT, SHIFTED_COST, SHIFTED_PATH, TARGET } from "./model.ts";
 import "./colours.css";
 
-# One negative edge and Dijkstra answers *{DIJKSTRA.dist[TARGET]}* where the shortest path is {BELLMAN.dist[TARGET]}.
+# Dijkstra's algorithm with a *negative edge*
 
-The shortest distance from S to A in a graph of {EDGES.length} one-way edges, one of them negative.
+In a graph of {EDGES.length} one-way edges, one of them negative, Dijkstra gives the distance from S to {TARGET} as {DIJKSTRA.dist[TARGET]} where the shortest path is {BELLMAN.dist[TARGET]}.
 
 <Opening />
 
-## A is settled before B can lower it
+## Settling A before B
 
 <div class="beside">
 <div>
@@ -40,9 +40,9 @@ Settling a node means declaring its distance final. That holds only if every lat
 </div>
 </div>
 
-## Bellman–Ford checks {BELLMAN.checks} edges where Dijkstra checks {DIJKSTRA.checks}
+## Bellman–Ford
 
-It never settles: it relaxes every edge V − 1 times over, so any distance can still drop. That is O(V·E) against Dijkstra's O((V + E) log V), and it reports a negative cycle, where no shortest path exists.
+Bellman–Ford checks {BELLMAN.checks} edges where Dijkstra checks {DIJKSTRA.checks}. It never settles: it relaxes every edge V − 1 times over, so any distance can still drop. That is O(V·E) against Dijkstra's O((V + E) log V), and it reports a negative cycle, where no shortest path exists.
 
 ## Does adding {SHIFT} to every weight fix it?
 
