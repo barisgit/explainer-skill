@@ -108,7 +108,7 @@ ${pageContract({
 })}</script></body>`;
 
 describe("code fences", () => {
-	test("are coloured when the page packs, with no script, and marked text carries its ref (#154)", async () => {
+	test("are coloured when the page packs, without a highlighting runtime, and marked text carries its ref (#154)", async () => {
 		const html = readFileSync(await packedMdx(dir, "code", PAGE), "utf8");
 		const code = codeOf(html);
 		expect(code).toContain('<span class="tok-keyword">export</span>');
@@ -127,7 +127,7 @@ describe("code fences", () => {
 		);
 		expect(codeOf(plain)).toBe('<span class="code-line">++[>+&lt;-]</span>\n');
 		expect(plain).toContain(".code-line {");
-		expect(plain).not.toContain("<script");
+		expect(plain.match(/<script\b/g)).toHaveLength(1); // The shell's theme picker, not a code runtime.
 	});
 
 	test("cost a page with no fence nothing: no line layout, token colours or lit-code rules", async () => {

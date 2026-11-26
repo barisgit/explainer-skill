@@ -33,11 +33,13 @@
 		}
 	}
 
-	/** Resolves `var(--name)` on the page's root, for the current scheme (light-dark() included): what the scheme check reads. */
-	function color(name: string) {
+	/** Reads the page ink and the effective scheme, even when a page gives both schemes the same ink. */
+	function pageScheme() {
 		document.documentElement.append(probe);
-		probe.style.color = `var(--${name})`;
-		return getComputedStyle(probe).color;
+		probe.style.color = "var(--ink)";
+		probe.style.backgroundColor = "light-dark(black, white)";
+		const { color, backgroundColor } = getComputedStyle(probe);
+		return `${color} / ${backgroundColor}`;
 	}
 
 	// ECharts' canvas only parses rgb/hex, while computed color-mix() is color(srgb ...): such values are read back through a pixel.
@@ -284,9 +286,9 @@
 
 	// Remount callbacks of the live charts. One shared check, because the scheme can change by media query or by the page itself.
 	const remounts = new Set<() => void>();
-	let scheme = color("ink");
+	let scheme = pageScheme();
 	const checkScheme = () => {
-		const now = color("ink");
+		const now = pageScheme();
 		if (now === scheme) {
 			return;
 		}
@@ -322,7 +324,13 @@
 			// Nothing animates on arrival: the first draw takes the place of pack's drawing, or of this chart before the scheme
 			// changed, as it stands, and only the updates after it animate.
 			if (chart) {
+				keepReaderState(option, chart);
 				chart.dispose();
+				chart = null;
+			}
+			// A visited View may now be hidden. Its resize observer mounts it when the reader returns.
+			if (!el.clientWidth) {
+				return;
 			}
 			sizing = el;
 			const look = theme(el);
@@ -378,7 +386,7 @@
 				sizing = el;
 				respread(chart);
 			} else {
-				void fontReady.then(() => live && !chart && el.clientWidth && mount());
+				void fontReady.then(() => live && !chart && mount());
 			}
 		});
 		const remount = () => chart && mount();

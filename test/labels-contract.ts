@@ -2,6 +2,10 @@ import { SETTLED } from "./support.ts";
 
 /** Every text the kit scripts and components add, by kitLabels key, as an English page shows it. */
 export const ENGLISH = {
+	theme: "Theme",
+	themeSystem: "System",
+	themeLight: "Light",
+	themeDark: "Dark",
 	back: "Back",
 	play: "Play",
 	pause: "Pause",
@@ -74,6 +78,10 @@ export const ENGLISH = {
 };
 
 export const SLOVENIAN: typeof ENGLISH = {
+	theme: "Tema",
+	themeSystem: "Sistemska",
+	themeLight: "Svetla",
+	themeDark: "Temna",
 	back: "Nazaj",
 	play: "Predvajaj",
 	pause: "Premor",

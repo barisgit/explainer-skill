@@ -437,7 +437,7 @@ test("Plot exposes the named drawing and keyboard-operable legend as separate AX
 				});
 			}
 		};
-		await press("Tab", "Tab", 9);
+		await cdp.evaluate(`document.querySelector("#lines .plot-legend button").focus()`);
 		const state = () =>
 			cdp.evaluate(`[
 			document.activeElement.textContent.trim(),

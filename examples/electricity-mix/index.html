@@ -5,6 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="explainer-reply-to" content="">
 <title>Change in world electricity generation, by source</title>
+<script>/* scheme: restores the reader's colour scheme before the stylesheet, then adds the native picker. */
+(() => {
+  const LABELS = {
+    theme: "Theme",
+    themeSystem: "System",
+    themeLight: "Light",
+    themeDark: "Dark"
+  };
+  const text = (key) => window.kitLabels?.[key] || LABELS[key];
+  const key = "explainer-scheme";
+  const root = document.documentElement;
+  const apply = (choice) => {
+    if (choice === "system") {
+      delete root.dataset.scheme;
+    } else {
+      root.dataset.scheme = choice;
+    }
+  };
+  let choice = root.dataset.scheme ?? "system";
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === "system" || saved === "light" || saved === "dark") {
+      choice = saved;
+      apply(choice);
+    }
+  } catch {}
+  document.addEventListener("DOMContentLoaded", () => {
+    const picker = document.createElement("select");
+    picker.className = "scheme-picker";
+    picker.setAttribute("aria-label", text("theme"));
+    picker.add(new Option(text("themeSystem"), "system"));
+    picker.add(new Option(text("themeLight"), "light"));
+    picker.add(new Option(text("themeDark"), "dark"));
+    picker.value = choice;
+    picker.addEventListener("change", () => {
+      apply(picker.value);
+      try {
+        localStorage.setItem(key, picker.value);
+      } catch {}
+    });
+    document.body.prepend(picker);
+  });
+})();
+</script>
 <style>@layer kit {
 /* theme part: fonts, tokens, element defaults. Font urls resolve against kit/, where pack reads the theme from. */
 @font-face {
@@ -185,6 +229,26 @@ strong {
 	inline-size: min(100% - 2 * var(--gutter), 66rem);
 	margin: 0 auto;
 	padding-block: var(--page-top) 7rem;
+}
+/* Use the space above the masthead without changing the page's reading measure or title layout. */
+.scheme-picker {
+	position: absolute;
+	inset-block-start: calc((var(--page-top) - 1.5rem) / 2);
+	inset-inline-end: max(var(--gutter), (100% - 66rem) / 2);
+	max-inline-size: calc(100% - 2 * var(--gutter));
+	min-block-size: 1.5rem;
+	padding-inline: 0.375rem;
+	border: 1px solid var(--rule-strong);
+	border-radius: var(--radius);
+	background: var(--bg);
+	color: var(--muted);
+	font-size: var(--size-label);
+	cursor: pointer;
+}
+@media print {
+	.scheme-picker {
+		display: none;
+	}
 }
 .page :where(p, ul, ol) {
 	max-inline-size: 66ch;
@@ -2501,6 +2565,9 @@ details > :last-child:not(summary) {
 		margin-block: -0.75rem 1.75rem;
 		border-block-end: 1px solid var(--rule);
 	}
+	.scheme-picker + .page > .toc {
+		margin-block-start: 0.25rem;
+	}
 	.toc > ol {
 		max-block-size: 60vh;
 		overflow-y: auto;
@@ -2529,6 +2596,9 @@ details > :last-child:not(summary) {
 	.has-toc .page {
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
 		padding-inline-start: 15rem;
+	}
+	.has-toc .scheme-picker {
+		inset-inline-end: max(var(--gutter), (100% - 81rem) / 2);
 	}
 	.toc {
 		position: fixed;
@@ -3024,15 +3094,15 @@ details > :last-child:not(summary) {
 	}
 }
 
-/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
+/* theme: quiet warm-paper house style; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Three text roles: display, --size-text and --size-label (figures, controls, captions). Headings have their own scale:
    h1 at --size-headline, h2 at --size-display and h3 (a topic in a section) at 19px.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
    (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
-   To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
-   <html data-scheme="dark">; charts and diagrams follow it too.
+   Readers pick System, Light or Dark at the top of the page; the browser remembers their choice where it allows local storage.
+   System follows the device. Use scheme: dark (or light) in the frontmatter to set the default before a reader chooses.
    The accent has one meaning, the finding: the phrase a heading marks with *em*, and on a chart the series or bar
    the page is about (color: "var(--accent)"). Series default to --c1..--c6, muted inks told apart by lightness, a line also by its
    dash, and best by the names on them; keep each compared thing in the same one on every chart and view. Categories that are colours by nature
@@ -4234,10 +4304,12 @@ window.ChartsOption = ({ color, lang, size, text }) => {
       host.append(probe);
     }
   }
-  function color(name) {
+  function pageScheme() {
     document.documentElement.append(probe);
-    probe.style.color = `var(--${name})`;
-    return getComputedStyle(probe).color;
+    probe.style.color = "var(--ink)";
+    probe.style.backgroundColor = "light-dark(black, white)";
+    const { color, backgroundColor } = getComputedStyle(probe);
+    return `${color} / ${backgroundColor}`;
   }
   const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
   function resolve(expr) {
@@ -4393,9 +4465,9 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     }
   }
   const remounts = new Set;
-  let scheme = color("ink");
+  let scheme = pageScheme();
   const checkScheme = () => {
-    const now = color("ink");
+    const now = pageScheme();
     if (now === scheme) {
       return;
     }
@@ -4419,7 +4491,12 @@ window.ChartsOption = ({ color, lang, size, text }) => {
     const sizeOf = (on) => `${on.getWidth()}x${on.getHeight()}`;
     const mount = () => {
       if (chart) {
+        keepReaderState(option, chart);
         chart.dispose();
+        chart = null;
+      }
+      if (!el.clientWidth) {
+        return;
       }
       sizing = el;
       const look = theme(el);
@@ -4463,7 +4540,7 @@ window.ChartsOption = ({ color, lang, size, text }) => {
         sizing = el;
         respread(chart);
       } else {
-        fontReady.then(() => live && !chart && el.clientWidth && mount());
+        fontReady.then(() => live && !chart && mount());
       }
     });
     const remount = () => chart && mount();

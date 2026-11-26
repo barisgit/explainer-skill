@@ -69,11 +69,10 @@ describe("TeX math in an .mdx page", () => {
 		]);
 	}, 30_000);
 
-	test("renders to MathML in pack: no script ships, and only a page with math carries the math stylesheet", async () => {
+	test("renders to MathML in pack without a math runtime, and only a page with math carries the math stylesheet", async () => {
 		const math = await packMdx(dir, "math", PAGE);
 		expect(math.result.stderr).toBe("");
 		const html = readFileSync(math.output, "utf8");
-		expect(html).not.toContain("<script");
 		expect(html).toContain(', <span class="math-tail"><math><mrow><msub><mi>V</mi>');
 		expect(html).toContain('<div class="math"><math display="block" class="tml-display"');
 		expect(html).toContain("<mtable");
@@ -83,6 +82,7 @@ describe("TeX math in an .mdx page", () => {
 		expect(plain.result.stderr).toBe("");
 		const text = readFileSync(plain.output, "utf8");
 		expect(text).not.toMatch(/<math|Temml|tml-/);
+		expect(html.match(/<script\b/g)).toEqual(text.match(/<script\b/g));
 	});
 
 	test.each([

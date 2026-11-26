@@ -178,6 +178,9 @@
 		margin-block: -0.75rem 1.75rem;
 		border-block-end: 1px solid var(--rule);
 	}
+	.scheme-picker + .page > .toc {
+		margin-block-start: 0.25rem;
+	}
 	.toc > ol {
 		max-block-size: 60vh;
 		overflow-y: auto;
@@ -206,6 +209,9 @@
 	.has-toc .page {
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
 		padding-inline-start: 15rem;
+	}
+	.has-toc .scheme-picker {
+		inset-inline-end: max(var(--gutter), (100% - 81rem) / 2);
 	}
 	.toc {
 		position: fixed;

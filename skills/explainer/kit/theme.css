@@ -1,12 +1,12 @@
-/* theme: quiet warm-paper house style, light and dark from the system setting; page shell, figures, controls, charts, diagrams, views, trees.
+/* theme: quiet warm-paper house style; page shell, figures, controls, charts, diagrams, views, trees.
    One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Three text roles: display, --size-text and --size-label (figures, controls, captions). Headings have their own scale:
    h1 at --size-headline, h2 at --size-display and h3 (a topic in a section) at 19px.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
    (--accent-ink sets the text on it):
      :root { --accent: light-dark(#1f5fbf, #7fb0ff); }   (soft tints, focus, charts and diagrams follow it; links are ink, and --link: var(--accent) on :root colours them)
-   To force one scheme instead of following the system: scheme: dark (or light) in the page's frontmatter, which pack writes as
-   <html data-scheme="dark">; charts and diagrams follow it too.
+   Readers pick System, Light or Dark at the top of the page; the browser remembers their choice where it allows local storage.
+   System follows the device. Use scheme: dark (or light) in the frontmatter to set the default before a reader chooses.
    The accent has one meaning, the finding: the phrase a heading marks with *em*, and on a chart the series or bar
    the page is about (color: "var(--accent)"). Series default to --c1..--c6, muted inks told apart by lightness, a line also by its
    dash, and best by the names on them; keep each compared thing in the same one on every chart and view. Categories that are colours by nature

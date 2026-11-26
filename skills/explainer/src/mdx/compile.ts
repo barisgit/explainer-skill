@@ -20,7 +20,7 @@ export interface Frontmatter {
 	lang: string;
 	/** kitLabels: the texts the kit scripts add, in the page's language. */
 	labels?: Record<string, string>;
-	/** The colour scheme the page is forced into (`<html data-scheme>`); unset, it follows the reader's system. */
+	/** The page's default colour scheme (`<html data-scheme>`); unset, it starts at System. */
 	scheme?: "light" | "dark";
 	/** Include reply.js (the reader's notes) on a page with no question. */
 	reply: boolean;
