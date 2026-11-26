@@ -29,10 +29,13 @@
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
    replacing content, whether or not the event fires. The opening step is announced once the page has loaded (after its scripts and
    DOMContentLoaded handlers), so a listener added while loading hears it, also with data-start; one added after load misses it.
-   Under reduced motion there are no transitions; Play still advances because the reader asked for it. */
+   The parts and caption ease when the reader steps, not on opening or restore. Under reduced motion there are no transitions;
+   Play still advances because the reader asked for it. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the IIFE only scopes the kit file's names away from the page; the code in it is split into small functions
 (() => {
 	const PLAY_MS = 3000;
+	// The 220 ms transition starts at the next paint; leave it time to finish before disarming.
+	const MOTION_WINDOW_MS = 280;
 	const steppers = new WeakMap<Element, Stepper>();
 	// Until the page's own scripts have run, steppers show their state but announce nothing: a listener the page adds later must hear the opening step.
 	let loaded = false;
@@ -72,6 +75,7 @@
 		total = 0;
 		step = 0;
 		timer: number | undefined;
+		motionTimer: number | undefined;
 		announced = "";
 		wired = false;
 		readonly root: HTMLElement;
@@ -108,8 +112,12 @@
 			this.watcher = new MutationObserver(() => this.refresh());
 		}
 
-		show(target: number) {
-			this.step = Math.max(1, Math.min(this.total, target));
+		show(target: number, animate = false) {
+			const step = Math.max(1, Math.min(this.total, target));
+			if (step !== this.step) {
+				this.stepMotion(animate && this.step > 0);
+			}
+			this.step = step;
 			for (const { el, steps } of this.parts) {
 				el.classList.toggle("is-on", Math.min(...steps) <= this.step);
 				el.classList.toggle("is-now", steps.includes(this.step));
@@ -124,6 +132,18 @@
 			this.readout.textContent = `${this.step} / ${this.total}`;
 			if (loaded) {
 				this.announce();
+			}
+		}
+
+		/** Scopes the transitions to a step change, so later hovering and theme changes stay instant. */
+		stepMotion(on: boolean) {
+			clearTimeout(this.motionTimer);
+			this.root.toggleAttribute("data-step-motion", on);
+			if (on) {
+				this.motionTimer = window.setTimeout(
+					() => delete this.root.dataset.stepMotion,
+					MOTION_WINDOW_MS,
+				);
 			}
 		}
 
@@ -188,23 +208,23 @@
 				const go = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-go]") : null;
 				if (go) {
 					this.stop();
-					this.show(this.step + Number(go.dataset.go));
+					this.show(this.step + Number(go.dataset.go), e.isTrusted);
 				}
 			});
-			this.range.addEventListener("input", () => {
+			this.range.addEventListener("input", (e) => {
 				this.stop();
-				this.show(Number(this.range.value));
+				this.show(Number(this.range.value), e.isTrusted);
 			});
-			this.play.addEventListener("click", () => {
+			this.play.addEventListener("click", (e) => {
 				if (this.timer) {
 					return this.stop();
 				}
 				if (this.step === this.total) {
-					this.show(1);
+					this.show(1, e.isTrusted);
 				}
 				this.play.textContent = kitText("pause");
 				this.timer = setInterval(
-					() => (this.step < this.total ? this.show(this.step + 1) : this.stop()),
+					() => (this.step < this.total ? this.show(this.step + 1, e.isTrusted) : this.stop()),
 					PLAY_MS,
 				);
 			});
@@ -234,7 +254,7 @@
 				}
 				e.preventDefault();
 				this.stop();
-				this.show(target);
+				this.show(target, e.isTrusted);
 			});
 		}
 
@@ -299,6 +319,7 @@
 				// Too short to step through: no controls, and without data-live everything shows (the no-JS picture).
 				this.stop();
 				delete this.root.dataset.live;
+				this.stepMotion(false);
 				this.step = this.total = 0; // so growing again reopens on the last step
 				this.announced = "";
 				this.declareStates();

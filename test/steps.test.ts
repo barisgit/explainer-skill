@@ -1,6 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+	inPage,
+	load,
 	packAndRun,
 	packHtml,
 	packMdx,
@@ -138,6 +140,91 @@ var contract = settled.then(async () => {
 	expect(await packAndRun(dir, "sequence", SEQUENCE(checks))).toEqual([]);
 	// The file shows the stepper whole: only the running script gives its refs a state.
 	expect(readFileSync(dir.path("sequence.out.html"), "utf8")).not.toMatch(/<[^>]*\sdata-state=/);
+}, 30_000);
+
+const MOTION_PAGE = SEQUENCE(`${SETTLED}
+const saved = document.getElementById("saved-step");
+saved.addEventListener("input", () => Steps.refresh(document.getElementById("seq"), Number(saved.value)));
+const moving = () => document.getAnimations().flatMap((animation) => {
+	const el = animation.effect.target;
+	if (el.matches("[data-captions] > li")) return ["caption"];
+	const name = el.id || el.closest("[data-ref]")?.getAttribute("data-ref") || "";
+	return name ? [name + ":" + animation.transitionProperty] : [];
+});
+const stepState = () => [state(), opacity("m2"), moving()];
+const onStep = () => {
+	window.seen = new Promise((resolve) => document.getElementById("seq").addEventListener("stepchange", () => {
+		queueMicrotask(() => resolve(stepState()));
+	}, {once: true}));
+};`)
+	.replace('id="call" data-ref="call"', 'id="call" data-ref="m1 call"')
+	.replace(
+		'<script src="kit:steps.js">',
+		'<input id="saved-step" type="number" value="1" aria-label="Saved step"><script src="kit:keep.js"></script><script src="kit:steps.js">',
+	);
+
+test("only a reader's step changes ease parts and the caption, in both directions", async () => {
+	const output = dir.path("motion.out.html");
+	expect((await packHtml(dir.write("motion.html", MOTION_PAGE), output)).error).toBe("");
+	const seen = await inPage(output, async (cdp) => {
+		const media = (value: string) =>
+			cdp.send("Emulation.setEmulatedMedia", {
+				features: [{ name: "prefers-reduced-motion", value }],
+			});
+		const snapshot = () => cdp.evaluate("settled.then(stepState)", true);
+		const arrow = async (key: string, windowsVirtualKeyCode: number) => {
+			await cdp.evaluate(`document.getElementById("seq").focus(); onStep()`);
+			for (const type of ["keyDown", "keyUp"]) {
+				await cdp.send("Input.dispatchKeyEvent", { type, key, code: key, windowsVirtualKeyCode });
+			}
+			return cdp.evaluate("seen", true);
+		};
+		await media("no-preference");
+		const opening = await snapshot();
+		const forward = await arrow("ArrowRight", 39);
+		// Once the step is settled, a linked term still lights at once on hover.
+		const point = await cdp.evaluate<{ x: number; y: number }>(
+			`settled.then(async () => {
+				await Promise.allSettled(document.getAnimations().map((a) => a.finished));
+				await new Promise((done) => setTimeout(done, 120));
+				const term = document.getElementById("call");
+				term.scrollIntoView({ block: "center" });
+				const { x, y, width, height } = term.getBoundingClientRect();
+				return { x: x + width / 2, y: y + height / 2 };
+			})`,
+			true,
+		);
+		await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+		const hover = await cdp.evaluate(
+			`[document.getElementById("call").matches(".is-lit"), moving()]`,
+		);
+		await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 0, y: 0 });
+		const back = await arrow("ArrowLeft", 37);
+		await media("reduce");
+		const reduced = await arrow("ArrowRight", 39);
+		await cdp.evaluate(
+			`saved.value = "2"; saved.dispatchEvent(new Event("input", { bubbles: true }))`,
+		);
+		await media("no-preference");
+		await load(cdp);
+		return { opening, forward, hover, back, reduced, restored: await snapshot() };
+	});
+	expect(seen).toEqual({
+		opening: ["now,not-yet,now", "0.15", []],
+		forward: [
+			",now,",
+			"0.15",
+			expect.arrayContaining(["m2:opacity", "m2:stroke", "call:background-color", "caption"]),
+		],
+		back: [
+			"now,not-yet,now",
+			"1",
+			expect.arrayContaining(["m2:opacity", "m2:stroke", "call:background-color", "caption"]),
+		],
+		reduced: [",now,", "1", []],
+		restored: [",now,", "1", []],
+		hover: [true, []],
+	});
 }, 30_000);
 
 test("print shows every part a stepper's refs ghost", async () => {

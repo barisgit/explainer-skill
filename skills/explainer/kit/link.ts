@@ -125,11 +125,16 @@
 		}
 	}
 
-	/** The states the declarations give each ref they name, in page order, each once; a ref named with "" alone gets none. */
-	function givenStates(): Map<string, string[]> {
+	/** Reads the joined inputs and which refs are stepped with motion, including refs whose state is "". */
+	function givenStates() {
 		const given = new Map<string, string[]>();
+		const stepped = new Set<string>();
 		for (const el of document.querySelectorAll<Part>("[data-ref-states]")) {
+			const moving = el.matches("[data-stepper][data-step-motion]");
 			for (const [ref, state] of declared(el)) {
+				if (moving) {
+					stepped.add(ref);
+				}
 				const states = given.get(ref) ?? [];
 				if (typeof state === "string" && state && !states.includes(state)) {
 					states.push(state);
@@ -137,7 +142,7 @@
 				given.set(ref, states);
 			}
 		}
-		return given;
+		return { given, stepped };
 	}
 
 	/** The joined state of a part's refs, each once in page order; the kit's now wins over not-yet when two steppers name one part. */
@@ -170,24 +175,28 @@
 	 * marked data-kit-state (the kit styles now and not-yet only there), and loses both when none is given. Elements no
 	 * declaration names are left as they are, so a page's own data-state (a Table row's fit) stays.
 	 */
-	function writeStates(parts: Part[]) {
-		const given = givenStates();
-		const named = given.size ? parts.filter((el) => refsOf(el).some((ref) => given.has(ref))) : [];
-		const still = new Set(named);
-		for (const el of document.querySelectorAll<Part>("[data-kit-state]")) {
-			if (!still.has(el)) {
+	function writeStates() {
+		const { given, stepped } = givenStates();
+		const marked = "[data-kit-state], [data-step-ref]";
+		const selector = given.size ? `[data-ref], ${marked}` : marked;
+		for (const el of document.querySelectorAll<Part>(selector)) {
+			const refs = refsOf(el);
+			el.toggleAttribute(
+				"data-step-ref",
+				refs.some((ref) => stepped.has(ref)),
+			);
+			if (refs.some((ref) => given.has(ref))) {
+				state(el, joined(refs.flatMap((ref) => given.get(ref) ?? [])));
+			} else if (el.dataset.kitState !== undefined) {
 				unstate(el);
 			}
-		}
-		for (const el of named) {
-			state(el, joined(refsOf(el).flatMap((ref) => given.get(ref) ?? [])));
 		}
 	}
 
 	/** Recounts the places of every ref, re-marks the elements and repaints, since the lit part may have gained or lost its partners. */
 	function refresh() {
 		const parts = [...document.querySelectorAll<Part>("[data-ref]")];
-		writeStates(parts);
+		writeStates();
 		linked = linkingRefs(parts);
 		// Unmark the previous set, then mark the new one (the sets overlap, so the order matters). The previous set also holds
 		// elements removed from the page or stripped of their data-ref, which the query no longer finds.
@@ -256,13 +265,17 @@
 			)
 		) {
 			refresh();
-		} else if (records.some((r) => r.attributeName === "data-ref-states")) {
-			writeStates([...document.querySelectorAll<Part>("[data-ref]")]);
+		} else if (
+			records.some(
+				(r) => r.attributeName === "data-ref-states" || r.attributeName === "data-step-motion",
+			)
+		) {
+			writeStates();
 		}
 	}).observe(document.documentElement, {
 		subtree: true,
 		childList: true,
-		attributeFilter: ["data-ref", "data-ref-states"],
+		attributeFilter: ["data-ref", "data-ref-states", "data-step-motion"],
 	});
 	refresh();
 
