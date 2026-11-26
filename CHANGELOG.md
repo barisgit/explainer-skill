@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A `Stepper` shows the scrubber by default from five steps. Shorter steppers still show Back, Next and the count. Set `scrubber` to show it sooner or `scrubber={false}` to hide it; Play is still opt-in (revises #190).
 - A Stepper eases changes in its diagram parts and linked terms and fades in the new caption when the reader steps. Opening, restoring saved controls, reduced motion and print stay still. Explore's ref-state changes no longer fade; Plot still tweens between frames (#337).
 - Readers can pick System, Light or Dark at the top of any page, including offline. The browser remembers their choice and applies it to open tabs that share local storage. Frontmatter `scheme: light` or `scheme: dark` sets the initial choice, not a lock (#336).
 - A bare Mermaid or schematic fence in a full-width `.beside` now aligns its list to the prose column, like a drawing in a figure. Spare width stays after the diagram; phones still stack (#319).

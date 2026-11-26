@@ -116,6 +116,7 @@ async function pack(name: string, source: string): Promise<string> {
 /** The Queue island as the reader sees it, and whether steps.js's controls and root attributes survived Preact's renders. */
 const QUEUE_STATE = `({
 	step: document.querySelector("#queue .player output").textContent,
+	scrubber: document.querySelector("#queue .player input[type=range]").checkVisibility(),
 	caption: document.querySelector("#queue [data-captions] li.is-now")?.textContent,
 	readout: document.getElementById("readout").textContent,
 	bars: echarts.getInstanceByDom(document.querySelector("#queue .chart"))?.getOption().series[0].data.join(" "),
@@ -125,10 +126,18 @@ const QUEUE_STATE = `({
 })`;
 
 /** QUEUE_STATE's value for a scenario, scale and labels setting on `step` of `steps`; `shown` is what the readout and chart hold. */
-const queue = (step: number, steps: number, caption: string, controls: string, shown: string) => {
+const queue = (
+	step: number,
+	steps: number,
+	caption: string,
+	controls: string,
+	shown: string,
+	scrubber: boolean,
+) => {
 	const [scenario, scale, labels] = controls.split(",");
 	return {
 		step: `${step} / ${steps}`,
+		scrubber,
 		caption,
 		readout: `${scenario} ×${scale}: ${shown}`,
 		bars: shown,
@@ -154,14 +163,26 @@ describe("Stepper", () => {
 		expect(state).toEqual({ opening: "is-on is-now,,", next: "is-on,is-on is-now," });
 	}, 30_000);
 
-	test("play and scrubber ask for those controls; without them the markup asks for none", async () => {
-		const asked = readFileSync(
-			await pack("asked-controls", STATIC_STEPPER.replace("start={1}", "start={1} play scrubber")),
-			"utf8",
+	test("the scrubber starts at five steps unless the author overrides it", async () => {
+		const output = await pack(
+			"scrubber-default",
+			`import { Stepper } from "kit";
+
+# Steps
+
+<Stepper id="four" captions={[1, 2, 3, 4]} />
+<Stepper id="five" captions={[1, 2, 3, 4, 5]} />
+<Stepper id="forced" captions={[1, 2]} play scrubber />
+<Stepper id="disabled" captions={[1, 2, 3, 4, 5]} scrubber={false} />`,
 		);
-		const plain = readFileSync(await pack("plain-controls", STATIC_STEPPER), "utf8");
-		expect(asked).toContain('data-stepper data-start="1" data-controls="play scrubber"');
-		expect(plain).toContain('<figure class="fig" id="s" data-stepper data-start="1">');
+		const visible = await inPage(output, (cdp) =>
+			cdp.evaluate(
+				`["input[type=range]", "[data-play]"].map((selector) =>
+					[...document.querySelectorAll("figure[data-stepper]")].filter((el) => el.querySelector(selector).checkVisibility()).map((el) => el.id)
+				)`,
+			),
+		);
+		expect(visible).toEqual([["five", "forced"], ["forced"]]);
 	}, 30_000);
 
 	test("captionsFirst puts the captions, and the controls over them, before the parts", async () => {
@@ -181,8 +202,10 @@ describe("Stepper", () => {
 		}));
 		expect(state).toEqual({ order: "player,ol,svg", caption: "two" });
 	}, 30_000);
+});
 
-	test("in a client component: onStep redraws the chart, a scenario switch changes the captions and count, nothing spins", async () => {
+describe("Stepper in an island", () => {
+	test("onStep redraws the chart, a scenario switch changes the captions and count, nothing spins", async () => {
 		const output = await pack("queue", queuePage("title: Queues"));
 		const state = await inPage(output, async (cdp) => {
 			const opening = await cdp.evaluate(QUEUE_STATE);
@@ -209,13 +232,18 @@ describe("Stepper", () => {
 			const heard = await act(cdp, "", "heard");
 			return { opening, next, burst, end, calm, heard };
 		});
-		expect(state.opening).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2"));
+		expect(state.opening).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2", false));
 		// Next keeps its focus: Preact's render does not move the controls steps.js inserted.
-		expect(state.next).toEqual([queue(2, 3, "Hour 2: 3 waiting", "calm,1,false", "2 3"), true]);
-		expect(state.burst).toEqual(queue(2, 5, "Hour 2: 9 waiting", "burst,1,false", "2 9"));
-		expect(state.end).toEqual(queue(5, 5, "Hour 5: 3 waiting", "burst,1,false", "2 9 14 6 3"));
+		expect(state.next).toEqual([
+			queue(2, 3, "Hour 2: 3 waiting", "calm,1,false", "2 3", false),
+			true,
+		]);
+		expect(state.burst).toEqual(queue(2, 5, "Hour 2: 9 waiting", "burst,1,false", "2 9", true));
+		expect(state.end).toEqual(
+			queue(5, 5, "Hour 5: 3 waiting", "burst,1,false", "2 9 14 6 3", true),
+		);
 		// On the last step, a shorter scenario keeps it on the new last step.
-		expect(state.calm).toEqual(queue(3, 3, "Hour 3: 4 waiting", "calm,1,false", "2 3 4"));
+		expect(state.calm).toEqual(queue(3, 3, "Hour 3: 4 waiting", "calm,1,false", "2 3 4", false));
 		expect(state.heard).toEqual(["2/3", "2/5", "5/5", "3/3"]);
 	}, 30_000);
 
@@ -224,8 +252,6 @@ describe("Stepper", () => {
 		const checked = await runCli([
 			"check",
 			output,
-			"--out",
-			dir.path("queue-shots"),
 			"--do",
 			'click:[data-go="1"]',
 			"--do",
@@ -386,8 +412,8 @@ describe("keeping inside an island", () => {
 			const cleared = await act(cdp, clear, QUEUE_STATE);
 			return { reloaded, cleared };
 		});
-		expect(state.reloaded).toEqual(queue(1, 5, "Hour 1: 2 waiting", "burst,3,true", "6"));
-		expect(state.cleared).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2"));
+		expect(state.reloaded).toEqual(queue(1, 5, "Hour 1: 2 waiting", "burst,3,true", "6", true));
+		expect(state.cleared).toEqual(queue(1, 3, "Hour 1: 2 waiting", "calm,1,false", "2", false));
 	}, 30_000);
 
 	test("without reply the controls are kept by keep.js alone, and no reply bar shows", async () => {

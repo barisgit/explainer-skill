@@ -13,7 +13,7 @@
      start     the opening step. By default the stepper opens on the last step (the complete picture, same as print and without JS);
                study pages start at 1
      play      a Play button, for a sequence that is really time (a day, a run): it restarts from step 1 and never starts by itself
-     scrubber  a slider over the steps, for many of them
+     scrubber  a slider over the steps. Shown from five steps by default; scrubber forces it on and scrubber={false} hides it
      label     the accessible name, else kitLabels.stepper ("Step-through; use the arrow keys")
      class     the figure's classes, default "fig"; id as on any element
      onStep    (step, steps) => void, on the opening step and whenever the step or the count changes. A function, so only inside
@@ -25,7 +25,7 @@
    or a number; when it changes, the stepper goes back to step 1.
    A stepper with fewer than 2 steps hides its controls and shows everything; they return when it grows.
    The controls: <button data-go="-1"> Back, <button data-go="1"> Next (check --do click:'[data-go="1"]' steps forward), the
-   count, and Play and the scrubber when asked for. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Their
+   count, optional Play, and the scrubber. Focus the stepper (Tab or click inside) and use Left/Right/Home/End. Their
    texts are the labels back, play, pause, next, stepControls and step in the page's frontmatter labels. Under reduced motion there are no transitions; Play still
    advances because the reader asked for it. */
 import type { ComponentChildren } from "preact";
@@ -40,7 +40,7 @@ export interface StepperProps {
 	start?: number;
 	/** A Play button, for a sequence that is really time. */
 	play?: boolean;
-	/** A slider over the steps. */
+	/** Show or hide the slider; defaults to showing it from five steps. */
 	scrubber?: boolean;
 	/**
 	 * A key for the content: a new value sends the stepper back to step 1. Text or a number, so a fresh array is never new; undefined
@@ -74,7 +74,7 @@ export function Stepper({
 	captionsFirst = false,
 	start,
 	play = false,
-	scrubber = false,
+	scrubber,
 	restartOn,
 	label,
 	class: classes = "fig",
@@ -127,7 +127,9 @@ export function Stepper({
 			data-stepper=""
 			data-start={start}
 			data-controls={
-				[play && "play", scrubber && "scrubber"].filter(Boolean).join(" ") || undefined
+				[play && "play", scrubber === false ? "no-scrubber" : scrubber && "scrubber"]
+					.filter(Boolean)
+					.join(" ") || undefined
 			}
 			aria-label={label}
 		>

@@ -135,7 +135,7 @@ flowchart TD
 | `Plot` | Line, stem and bar plots as SVG with no chart library: names and values on the marks, one accent with hollow and hatch states, labelled reference markers, filled and annotated areas |
 | `Chart` | ECharts in the page theme: treemap, sankey, heatmap, zoom, click-to-drill; about 0.4 MB compressed, only on pages that use it |
 | `Explore`, `Controls` | A slider, choice or toggle over a plot, chart, readout or the page's own parts; `axis: true` makes a choice the plot's columns; one set of controls can drive figures in several sections |
-| `Stepper` | Back, Next, a count and arrow keys over HTML, hand-built SVG or a Mermaid diagram's parts; Play and a scrubber on request |
+| `Stepper` | Back, Next, a count and arrow keys over HTML, hand-built SVG or Mermaid parts; scrubber from five steps by default; opt-in Play |
 | `View` | Drill-down views inside the one file, with Back, breadcrumbs, previous and next, and a contents rail |
 | `Records` | One collection as a grouped tree, sortable table or board, with search, facets, subtotals and an answer per row |
 | `Question` | Choices, the rows of a comparison table, a self-check or a written answer, with a recommendation and a note; answers join the reply |

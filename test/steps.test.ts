@@ -58,7 +58,7 @@ const count = (id) => document.querySelector("#" + id + " .player output").textC
 const press = (id, key) => document.getElementById(id).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 ${checks}</script></body></html>`;
 
-test("a stepper shows Back, Next and the count; Play and the scrubber only where the page asks for them", async () => {
+test("a short stepper shows Back, Next and the count, with opt-in Play and scrubber", async () => {
 	const checks = pageContract({
 		"by default Back, Next and the count show": `shown('#plain [data-go="-1"]') && shown('#plain [data-go="1"]') && count("plain") === "1 / 3"`,
 		"by default there is no Play and no scrubber": `!shown("#plain [data-play]") && !shown("#plain input[type=range]")`,
