@@ -663,8 +663,12 @@ test("a chart arrives drawn: no entrance animation, even where motion is allowed
 		"arrival-drawn",
 		`import { Chart } from "kit";\n\n# Arrival\n\n<Chart label="Base" option={{ baseOption: { animation: true, animationDuration: 1000, xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "line", data: [1] }] } }} />\n\n<Chart label="Root" option={{ animation: true, xAxis: { type: "category", data: ["a"] }, yAxis: {}, series: [{ type: "line", data: [1] }] }} />\n`,
 	);
-	// pack's drawings are still: no entrance keyframes, whatever the option asks for.
-	expect(readFileSync(drawn, "utf8")).not.toContain("@keyframes");
+	// Both options draw, and neither drawing carries entrance keyframes. Ignore the page-wide kit stylesheet.
+	const drawings = [
+		...readFileSync(drawn, "utf8").matchAll(/<div class="chart-drawn"[^>]*>([\s\S]*?)<\/div>/g),
+	].map((match) => match[1]);
+	expect(drawings).toHaveLength(2);
+	expect(drawings.join("")).not.toContain("@keyframes");
 	const output = await packedMdx(dir, "arrival", WITH_CHART);
 	// A chart made after load has no drawing in front of it, as one in a client component or a hidden view may not.
 	const result = await inPage(output, async (cdp) => {
