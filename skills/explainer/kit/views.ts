@@ -14,7 +14,7 @@
    (DOMContentLoaded), so state declared anywhere in them is ready, whatever order Views.on is called in. Views.on called after that
    (an async callback) runs its handler at once if the current hash is its view.
    Navigation needs no markup of its own. Link every view from the overview with a table or list whose link text names it briefly
-   ("Blaž", "1.6.3 Login form"): an aria-label names a link explicitly; otherwise tree links use their first cell, other links their
+   ("Nivž", "1.6.3 Login form"): an aria-label names a link explicitly; otherwise tree links use their first cell, other links their
    text, and a shared generic text ("Open") gives way to the view's heading. Start each view with <a class="back" href="#">Overview</a>, its text naming the overview. Then a view shows
    breadcrumbs of the views the reader came through, with previous and next among the views of its kind (the ones the view it
    was opened from links to, else all of them); a page with views inside views (two or more view names) gets a contents rail of
@@ -78,7 +78,7 @@
 
 	/**
 	 * A hash in the form location.hash reports it: spaces and non-ASCII percent-encoded, escapes already written (%2F among them)
-	 * kept. A page writes href="#kdo/blaž" and data-view="kdo/blaž" where location.hash reads "#kdo/bla%C5%BE"; hashes are
+	 * kept. A page writes href="#kdo/nivž" and data-view="kdo/nivž" where location.hash reads "#kdo/niv%C5%BE"; hashes are
 	 * compared in this form.
 	 */
 	function canonical(hash: string) {
@@ -121,8 +121,8 @@
 	}
 
 	/**
-	 * A hash's route as one string to compare: the part before its first ?, decoded, so #s/a%3Fb, #s/100%25 and #kdo/blaž name
-	 * the views data-view="s/a%3Fb" (or "s/a?b"), "s/100%" and "kdo/blaž". Routing, sibling lists and labels all compare these.
+	 * A hash's route as one string to compare: the part before its first ?, decoded, so #s/a%3Fb, #s/100%25 and #kdo/nivž name
+	 * the views data-view="s/a%3Fb" (or "s/a?b"), "s/100%" and "kdo/nivž". Routing, sibling lists and labels all compare these.
 	 */
 	function key(hash: string) {
 		return decode(split(canonical(hash)).path);

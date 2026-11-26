@@ -142,8 +142,8 @@ test("a reload onto an in-view anchor drawn by a late handler lands on it", asyn
 /** Static views whose param has a non-ASCII letter or a space, which location.hash reports percent-encoded. */
 const STATIC_RAW_PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="kit:theme.css"></head><body><main>
-<div data-overview><h1>Kdo</h1><a href="#kdo/blaž">Blaž</a> <a href="#kdo/ana marija">Ana Marija</a></div>
-<section class="view" data-view="kdo/blaž"><a class="back" href="#">Vsi</a><h2>Blaž</h2><a href="#kdo/ana marija">Ana Marija</a></section>
+<div data-overview><h1>Kdo</h1><a href="#kdo/nivž">Nivž</a> <a href="#kdo/ana marija">Ana Marija</a></div>
+<section class="view" data-view="kdo/nivž"><a class="back" href="#">Vsi</a><h2>Nivž</h2><a href="#kdo/ana marija">Ana Marija</a></section>
 <section class="view" data-view="kdo/ana marija"><a class="back" href="#">Vsi</a><h2>Ana Marija</h2></section></main>
 <script src="kit:views.js"></script>
 <script>
@@ -161,11 +161,11 @@ addEventListener("hashchange", () => expectShown("by link"));
 test("a static view whose param has a non-ASCII letter or a space opens by link and by deep link", async () => {
 	await packAndCheck(dir, "static-raw", STATIC_RAW_PAGE, "views contract", [
 		"--view",
-		"kdo/blaž",
+		"kdo/nivž",
 		"--view",
 		"kdo/ana marija",
 		"--do",
-		"click:a[href='#kdo/blaž']",
+		"click:a[href='#kdo/nivž']",
 		"--do",
 		"click:.view.active a[href='#kdo/ana marija']",
 	]);
