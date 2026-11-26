@@ -311,6 +311,16 @@ function screenshotDir(out: string | undefined, shots: boolean, steps: string[])
 		: undefined;
 }
 
+/** Report unused capture settings on stderr, even when stdout is JSON. */
+function warnIgnoredScreenshotFlags(flags: Map<string, string[]>) {
+	const ignored = ["--out", "--tag"].filter((flag) => flags.has(flag));
+	if (ignored.length) {
+		console.error(
+			`warning: ${ignored.join(" and ")} ${ignored.length === 1 ? "is" : "are"} ignored without --shots or --do shot:<css>.`,
+		);
+	}
+}
+
 /** One spec per command: drives dispatch, flag validation and --help. Exit codes: 0 ok, 1 problems found, 2 usage. */
 export const COMMANDS: Record<string, Command> = {
 	kit: {
@@ -445,6 +455,9 @@ export const COMMANDS: Record<string, Command> = {
 				shots: takeShots,
 				...schedule,
 			});
+			if (!out) {
+				warnIgnoredScreenshotFlags(flags);
+			}
 			const ok = shots.every((s) => !s.problems.length);
 			if (flags.has("--json")) {
 				console.log(JSON.stringify({ ok, out, shots, views, stepNotes, replies }, null, 2));

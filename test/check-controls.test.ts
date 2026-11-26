@@ -42,9 +42,13 @@ test("default check catches a kit choice error once, attributed, without writing
 		"--json",
 		"--out",
 		dir.path("broken-shots"),
+		"--tag",
+		"unused",
 	]);
 	expect(result.code).toBe(1);
-	expect(result.stderr).toBe("");
+	expect(result.stderr).toBe(
+		"warning: --out and --tag are ignored without --shots or --do shot:<css>.\n",
+	);
 	const checked = JSON.parse(result.stdout) as CheckResult;
 	expect(checked).not.toHaveProperty("out");
 	const { shots } = checked;
@@ -130,7 +134,7 @@ import { FreshChoices } from "./fresh.tsx";
 </View>`,
 		{ "fresh.tsx": FRESH_CHOICES },
 	);
-	const result = await runCli(["check", file, "--json", "--out", dir.path("fresh-shots")]);
+	const result = await runCli(["check", file, "--json"]);
 	expect(result.code).toBe(1);
 	expect(result.stderr).toBe("");
 	const { shots } = JSON.parse(result.stdout) as CheckResult;
@@ -340,7 +344,7 @@ test.each([
 		why: "8s total budget; stopped at #sample-0-One",
 	},
 ])(
-	"$name stops coverage once and lets every normal screenshot finish",
+	"$name stops coverage once and lets every normal page check finish",
 	async ({ name, count, hang, completed, why }) => {
 		const file = await packedMdx(
 			dir,
@@ -352,15 +356,7 @@ test.each([
 <ManyChoices count={${count}} hang={${hang}} />`,
 			{ "many.tsx": MANY_CHOICES },
 		);
-		const result = await runCli([
-			"check",
-			file,
-			"--view",
-			"none",
-			"--json",
-			"--out",
-			dir.path(name),
-		]);
+		const result = await runCli(["check", file, "--view", "none", "--json"]);
 		expect(result.code).toBe(0);
 		expect(result.stderr).toBe("");
 		const { shots } = JSON.parse(result.stdout) as CheckResult;
@@ -383,15 +379,7 @@ test("an explicit sweep budget lets controls beyond the default cap run", async 
 		`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">
 ${Array.from({ length: 13 }, (_, i) => `<div data-stepper><button data-go="1" id="step-${i}" onclick="console.warn(this.id)">Next</button></div>`).join("")}`,
 	);
-	const result = await runCli([
-		"check",
-		file,
-		"--budget",
-		"60",
-		"--out",
-		dir.path("extra-controls-shots"),
-		"--json",
-	]);
+	const result = await runCli(["check", file, "--budget", "60", "--json"]);
 	expect(result.stderr).toBe("");
 	expect(result.code).toBe(0);
 	const { shots } = JSON.parse(result.stdout) as CheckResult;

@@ -109,7 +109,7 @@ function verifyCli(installed: string, home: string, outDir: string): void {
 		home,
 	);
 	record(pack.code === 0 && existsSync(packed), "bun cli.ts pack example/page.mdx", pack.out);
-	const check = run(["bun", cli, "check", packed, "--out", join(outDir, "shots")], elsewhere, home);
+	const check = run(["bun", cli, "check", packed], elsewhere, home);
 	record(check.code === 0, "bun cli.ts check", check.out);
 	verifyTypes(cli, installed, home, outDir);
 	const node = run(["node", cli, "kit"], elsewhere, home);

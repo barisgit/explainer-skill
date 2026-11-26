@@ -462,6 +462,7 @@ ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}
 	]);
 
 	expect(result.code).toBe(0);
+	expect(result.stderr).toBe("");
 	for (const width of ["desktop", "narrow"]) {
 		const box = join(out, `shot1-box-${width}.png`);
 		expect(result.stdout).toContain(box);
@@ -502,7 +503,17 @@ ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}
 			`--do shot:.gone@all: no PNG at ${width} px wide: match 0, 1, 2 is not shown`,
 		);
 	}
-	expect(readdirSync(out)).toHaveLength(13);
+	expect(readdirSync(out).sort()).toEqual(
+		["desktop", "narrow"]
+			.flatMap((width) => [
+				`shot1-box-${width}.png`,
+				`shot2-tall-${width}.png`,
+				...[0, 1, 2].map((index) => `shot3-card-${index}-${width}.png`),
+				`shot6-ghost-${width}.png`,
+			])
+			.concat("shot4-wide-only-desktop.png")
+			.sort(),
+	);
 	expect(result.stdout).not.toContain("Open the PNGs");
 	for (const width of ["desktop", "narrow"]) {
 		expect(pngSize(join(out, `shot6-ghost-${width}.png`))).toEqual([80, 40]);

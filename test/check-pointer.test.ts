@@ -241,8 +241,6 @@ test("an observed click keeps its hit note beside a settle failure in JSON and t
 		"--do",
 		"click:#open",
 		"--json",
-		"--out",
-		dir.path("unsettled-shots"),
 	]);
 	expect(result.code).toBe(1);
 	expect(result.stderr).toBe("");

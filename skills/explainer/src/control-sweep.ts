@@ -79,7 +79,7 @@ interface Findings {
 	warnings: string[];
 }
 
-/** Clicks only initial-state kit samples in a disposable default-context page; no control state reaches screenshots. */
+/** Clicks only initial-state kit samples in a disposable default-context page; the checked overview is untouched. */
 export async function sweepControls(
 	owner: CheckedPage,
 	screen: Screen,
@@ -89,7 +89,7 @@ export async function sweepControls(
 	const findings: Findings = { problems: [], warnings: [] };
 	const limit = new AbortController();
 	const reason = new ChromeError("the kit control sweep exhausted its work budget");
-	// Reserve target disposal inside the total ceiling; timeout never poisons the caller's screenshot session.
+	// Reserve target disposal inside the total ceiling; timeout never poisons the caller's overview session.
 	const timer = setTimeout(() => limit.abort(reason), budget - DISPOSE_DEADLINE_MS);
 	let controls: Control[] | undefined;
 	let completed = 0;

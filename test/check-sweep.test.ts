@@ -251,15 +251,7 @@ new IntersectionObserver(entries => {
 }).observe(document.getElementById('end'));`,
 		),
 	);
-	const result = await runCli([
-		"check",
-		file,
-		"--quick",
-		"--budget",
-		"60s",
-		"--out",
-		dir.path("long-sweep-shots"),
-	]);
+	const result = await runCli(["check", file, "--quick", "--budget", "60s"]);
 	expect(result.stderr).toBe("");
 	expect(result.code).toBe(0);
 	expect(result.stdout).toContain("console.warning: saw the end");

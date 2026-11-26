@@ -153,7 +153,7 @@ function chooseViews(requested: string[], found: string[]): { check: string[]; s
 /** Everything one check run shares: the page, its log, where files go, and what has been collected. */
 interface Run {
 	page: CheckedPage;
-	/** Where the run writes its PNGs: the staging directory (see staged), whose files move into --out once the run has succeeded. */
+	/** Staging directory for requested PNGs, if any; staged moves them into --out when the run completes. */
 	outDir: string | undefined;
 	stem: string;
 	opts: CheckOptions;
@@ -304,7 +304,7 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 }
 
 /** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, inspection. */
-async function checkOverview(run: Run, screen: Screen) {
+async function shootOverview(run: Run, screen: Screen) {
 	const { theme, name } = screen;
 	const { opts } = run;
 	run.where = `at ${theme} ${name}, overview`;
@@ -359,7 +359,7 @@ async function checkOverview(run: Run, screen: Screen) {
 }
 
 /** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
-async function checkView(run: Run, screen: Screen, hash: string) {
+async function shootView(run: Run, screen: Screen, hash: string) {
 	const { theme, name } = screen;
 	run.where = `at ${theme} ${name}, view ${hash}`;
 	await run.page.open(hash);
@@ -396,7 +396,7 @@ async function checkView(run: Run, screen: Screen, hash: string) {
 }
 
 /** Every theme x viewport: the overview, then each chosen view. */
-async function checkAll(run: Run, themes: readonly string[]) {
+async function shootAll(run: Run, themes: readonly string[]) {
 	const custom = new Map(run.opts.viewports.map((vp) => [`${vp.width}x${vp.height}`, vp]));
 	const viewports = [...VIEWPORTS, ...[...custom].map(([name, vp]) => ({ name, vp }))];
 	await run.page.start();
@@ -404,9 +404,9 @@ async function checkAll(run: Run, themes: readonly string[]) {
 		for (const viewport of viewports) {
 			const screen = { theme, ...viewport };
 			await run.page.screen(screen);
-			await checkOverview(run, screen);
+			await shootOverview(run, screen);
 			for (const hash of run.viewHashes) {
-				await checkView(run, screen, hash);
+				await shootView(run, screen, hash);
 			}
 		}
 	}
@@ -416,12 +416,12 @@ async function checkAll(run: Run, themes: readonly string[]) {
 const STARTING = "while starting Chrome";
 
 /**
- * Runs checkAll; a ChromeError other than the overall limit's (`limit.reason`, which says where the run was itself) gets the run's
+ * Runs shootAll; a ChromeError other than the overall limit's (`limit.reason`, which says where the run was itself) gets the run's
  * `where` added, so a stalled call names the screen it stalled on.
  */
-async function checkNamingWhere(run: Run, themes: readonly string[], limit: AbortSignal) {
+async function shootNamingWhere(run: Run, themes: readonly string[], limit: AbortSignal) {
 	try {
-		await checkAll(run, themes);
+		await shootAll(run, themes);
 	} catch (error) {
 		if (error instanceof ChromeError && error !== limit.reason) {
 			throw new ChromeError(`${error.message} (${run.where})`);
@@ -509,7 +509,7 @@ export async function check(
 					where: STARTING,
 				};
 				current = run;
-				await checkNamingWhere(run, themes, limit.signal);
+				await shootNamingWhere(run, themes, limit.signal);
 				return {
 					shots: run.shots,
 					views: run.views,
