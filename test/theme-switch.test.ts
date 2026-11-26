@@ -75,9 +75,7 @@ labels:
 		await system("dark");
 		expect(await cdp.evaluate(READ)).toEqual(["system", NIGHT]);
 		await system("dark", "print");
-		expect(
-			await cdp.evaluate(`getComputedStyle(document.querySelector('${PICKER}')).display`),
-		).toBe("none");
+		expect(await cdp.evaluate(`document.querySelector('${PICKER}').checkVisibility()`)).toBe(false);
 	});
 }, 30_000);
 

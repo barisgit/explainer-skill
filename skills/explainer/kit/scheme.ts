@@ -62,6 +62,9 @@
 				}
 			}
 		});
-		document.body.prepend(picker);
+		const control = document.createElement("div");
+		control.className = "scheme-control";
+		control.append(picker);
+		document.body.prepend(control);
 	});
 })();

@@ -178,7 +178,7 @@
 		margin-block: -0.75rem 1.75rem;
 		border-block-end: 1px solid var(--rule);
 	}
-	.scheme-picker + .page > .toc {
+	.scheme-control + .page > .toc {
 		margin-block-start: 0.25rem;
 	}
 	.toc > ol {
@@ -210,7 +210,7 @@
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
 		padding-inline-start: 15rem;
 	}
-	.has-toc .scheme-picker {
+	.has-toc .scheme-control {
 		inset-inline-end: max(var(--gutter), (100% - 81rem) / 2);
 	}
 	.toc {

@@ -59,7 +59,10 @@
         }
       }
     });
-    document.body.prepend(picker);
+    const control = document.createElement("div");
+    control.className = "scheme-control";
+    control.append(picker);
+    document.body.prepend(control);
   });
 })();
 </script>
@@ -245,22 +248,43 @@ strong {
 	padding-block: var(--page-top) 7rem;
 }
 /* Use the space above the masthead without changing the page's reading measure or title layout. */
-.scheme-picker {
+.scheme-control {
+	--_scheme-pad: 0.5rem;
 	position: absolute;
-	inset-block-start: calc((var(--page-top) - 1.5rem) / 2);
+	inset-block-start: max(0.25rem, (var(--page-top) - 1.75rem) / 2);
 	inset-inline-end: max(var(--gutter), (100% - 66rem) / 2);
 	max-inline-size: calc(100% - 2 * var(--gutter));
-	min-block-size: 1.5rem;
-	padding-inline: 0.375rem;
-	border: 1px solid var(--rule-strong);
-	border-radius: var(--radius);
-	background: var(--bg);
 	color: var(--muted);
+}
+.scheme-picker {
+	display: block;
+	appearance: none;
+	max-inline-size: 100%;
+	min-block-size: 1.75rem;
+	padding-block: 0.25rem;
+	padding-inline: var(--_scheme-pad) calc(2 * var(--_scheme-pad) + 0.5rem);
 	font-size: var(--size-label);
+	line-height: 1.25;
 	cursor: pointer;
 }
+/* Keep the native select's interaction, but draw its closed chevron at the text's inset. */
+.scheme-control::after {
+	content: "";
+	position: absolute;
+	pointer-events: none;
+	inset-block-start: 50%;
+	inset-inline-end: calc(var(--_scheme-pad) + 2px);
+	inline-size: 0.375rem;
+	block-size: 0.375rem;
+	border: solid currentColor;
+	border-width: 0 1.5px 1.5px 0;
+	transform: translateY(-80%) rotate(45deg);
+}
+.scheme-picker:focus-visible {
+	outline-offset: -1px;
+}
 @media print {
-	.scheme-picker {
+	.scheme-control {
 		display: none;
 	}
 }
@@ -2579,7 +2603,7 @@ details > :last-child:not(summary) {
 		margin-block: -0.75rem 1.75rem;
 		border-block-end: 1px solid var(--rule);
 	}
-	.scheme-picker + .page > .toc {
+	.scheme-control + .page > .toc {
 		margin-block-start: 0.25rem;
 	}
 	.toc > ol {
@@ -2611,7 +2635,7 @@ details > :last-child:not(summary) {
 		inline-size: min(100% - 2 * var(--gutter), 81rem);
 		padding-inline-start: 15rem;
 	}
-	.has-toc .scheme-picker {
+	.has-toc .scheme-control {
 		inset-inline-end: max(var(--gutter), (100% - 81rem) / 2);
 	}
 	.toc {
