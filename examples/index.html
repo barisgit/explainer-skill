@@ -490,8 +490,9 @@ figure:not([class]) > img {
    from it. Stacked on phones: a figure pinned above the text there hid most of a flowchart or code block in its share of the
    screen. It follows the .fig rules so its margin reset and scrolling win over the figure's own. */
 .beside {
+	--beside-gap: 2.5rem;
 	display: grid;
-	gap: 1rem 2.5rem;
+	gap: 1rem var(--beside-gap);
 	align-items: start;
 	margin-block: 1.5rem;
 }
@@ -514,18 +515,17 @@ figure:not([class]) > img {
 		margin-inline-end: calc(-1 * var(--wide-reach, (min(44rem, 50vw - var(--gutter)) - 50%)));
 	}
 	.beside[data-width="full"] {
+		--beside-list-min: 20rem;
 		margin-inline: calc(-1 * var(--full-reach, (50vw - var(--gutter) - 50%)));
 	}
 	/* Give the drawing only the width it can use at the pinned height. Keep 20rem for the list; if the drawing
 	   cannot fit either axis at its readable minimum, let it scroll instead of shrinking the labels further. */
 	.beside[data-width="full"] > :first-child:is(ul, ol) {
-		min-inline-size: 20rem;
+		min-inline-size: var(--beside-list-min);
 		max-inline-size: var(--beside-list-max, none);
 	}
-	.beside[data-width="full"]:has(> :nth-child(2):is(.mermaid, .schematic)) {
-		grid-template-columns: minmax(20rem, 1fr) minmax(0, max-content);
-	}
 	/* Keep the list at the prose start and use the full reach only on the drawing side. */
+	.beside[data-width="full"]:has(> :nth-child(2):is(.mermaid, .schematic)),
 	.beside[data-width="full"]:has(
 		> :nth-child(2):is(figure, .fig) > :is(.mermaid, .schematic, img)
 	):not(:has(> :nth-child(2) > :not(h2, h3, figcaption, .mermaid, .schematic, img))) {
@@ -558,6 +558,12 @@ figure:not([class]) > img {
 	}
 	.beside :is(.mermaid, .schematic) {
 		text-align: start;
+	}
+	/* A bare SVG's readable minimum is on the SVG, not the flex item. Use the drawing's
+	   intrinsic width up to the space left by the minimum list, rather than shrinking both. */
+	.beside[data-width="full"] > :first-child:is(ul, ol) + :is(.mermaid, .schematic) {
+		flex-shrink: 0;
+		max-inline-size: calc(100% - var(--beside-list-min) - var(--beside-gap));
 	}
 	.beside[data-width="full"] > :nth-child(2):is(.mermaid, .schematic),
 	.beside[data-width="full"]

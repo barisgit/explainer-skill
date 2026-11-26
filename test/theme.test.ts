@@ -486,9 +486,11 @@ VIN port in Input @-18,0`,
 };
 
 for (const [kind, drawing] of Object.entries(BESIDE_DRAWINGS)) {
-	test(`full-width .beside fits a ${kind} beside the rail and gives spare width to the list (#265)`, async () => {
+	test(`full-width .beside aligns its list when a bare ${kind} follows it (#319)`, async () => {
 		const tag = kind === "mermaid" ? "ol" : "ul";
-		const text = `<${tag} id="list">${"<li>Follow the circuit from the input to the output.</li>".repeat(90)}</${tag}>`;
+		const item = "Follow the drawing from the input to the output.";
+		const longItem = `${item} `.repeat(8);
+		const text = `<${tag} id="list"><li>${longItem}</li>${`<li>${item}</li>`.repeat(89)}</${tag}>`;
 		const page = `${HEAD.replace('<main class="page">', '<main class="page" data-contents><div data-overview>')}
 <h1>Filter</h1><section id="signal"><h2>Signal path</h2><p id="prose">The circuit below has one signal path.</p>
 <div class="beside" data-width="full" id="beside">${text}<pre class="${kind}" id="panel">${drawing}</pre></div>
@@ -496,21 +498,23 @@ for (const [kind, drawing] of Object.entries(BESIDE_DRAWINGS)) {
 <script src="kit:views.js"></script><script>
 const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
 const stacked = innerWidth < 896;
-const fixedRail = innerWidth >= 1024;
 const beside = rect("#beside");
 const list = rect("#list");
 const panel = rect("#panel");
 const prose = rect("#signal");
+const firstItem = document.createRange();
+firstItem.selectNodeContents(document.querySelector("#list li"));
 const pin = () => scrollTo({ top: scrollY + list.top + list.height / 3, behavior: "instant" });
 const readable = () => [...document.querySelectorAll("#panel svg:not([data-phone]) text")].every((t) =>
 	parseFloat(getComputedStyle(t).fontSize) * t.ownerSVGElement.getScreenCTM().a >= 9.99);
 ${pageContract({
-	"reaches both sides like a full-width block without crowding the rail": `stacked || ((!fixedRail || beside.left < prose.left - 30) && Math.abs(prose.left - beside.left - (beside.right - prose.right)) < 1 && Math.abs(beside.right - (innerWidth - 32)) < 1 && (!fixedRail || beside.left - rect(".toc").right >= 39))`,
-	"the text gets the remaining width and the drawing keeps its labels readable": `stacked || (list.width >= (fixedRail ? beside.width / 2 : 320) && Math.abs(rect("#panel svg").width - panel.width) < 1 && readable())`,
+	"the list text starts at the prose column, with room for the drawing past its end": `stacked || (Math.abs(firstItem.getBoundingClientRect().left - prose.left) < 1 && Math.abs(beside.right - (innerWidth - 32)) < 1)`,
+	"the drawing starts beside a capped list, with readable labels and spare width at the end": `stacked || (list.width >= 320 && list.width <= 768 && Math.abs(panel.left - list.right - 40) < 1 && Math.abs(rect("#panel svg").width - panel.width) < 1 && readable() && (innerWidth < 3840 || beside.right - panel.right > 64))`,
 	"the phone stacks drawing after the list without widening the page": `!stacked || (panel.top >= list.bottom && Math.abs(beside.left - prose.left) < 1 && document.documentElement.scrollWidth <= innerWidth)`,
 	"after scrolling the whole drawing is visible in its pinned panel": `stacked || (() => { pin(); const p = rect("#panel"); const svg = rect("#panel svg"); return Math.abs(p.top - 24) < 1 && svg.top >= p.top && svg.bottom <= p.bottom + 1 && p.bottom <= innerHeight; })()`,
 })}</script></body></html>`;
 		const widths = [
+			{ width: 3840, height: 2160, mobile: false },
 			{ width: 1920, height: 1080, mobile: false },
 			{ width: 960, height: 900, mobile: false },
 			...WIDTHS,
