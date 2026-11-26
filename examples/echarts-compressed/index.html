@@ -3204,12 +3204,10 @@ details > :last-child:not(summary) {
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js), keep's Clear (kit:keep.js). Tokens only.
    Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed, and write data-state (marked data-kit-state) on the parts of a ref a step names (now, not-yet);
+   steps.js marks data-step-motion during a step change; link.js marks its linked parts with data-step-ref.
    page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture.
    A ref a step names, anywhere on the page, does the same through data-state, which kit:link.js writes and marks data-kit-state; a page's own data-state is not the kit's. */
-:is([data-live] [data-step], [data-kit-state]:is([data-state~="now"], [data-state~="not-yet"])) {
-	transition: opacity 0.3s var(--ease);
-}
 :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 	opacity: 0.15;
 }
@@ -3231,6 +3229,33 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 }
 [data-live] [data-captions] > li:not(.is-now) {
 	display: none;
+}
+
+/* Keep transitions on the parts between steps, including when a ref loses its state. The old caption leaves the flow at once. */
+@media screen {
+	:where(
+		svg
+			:is([data-step-motion] [data-step], [data-step-ref])
+			:is(path, rect, circle, ellipse, line, polyline, polygon)
+	) {
+		transition: stroke 220ms var(--ease);
+	}
+	:where([data-step-motion] [data-step], [data-step-ref]) {
+		transition-property: opacity, color, stroke, background-color, box-shadow;
+		transition-duration: 220ms;
+		transition-timing-function: var(--ease);
+	}
+	[data-step-motion] [data-captions] > li.is-now {
+		animation: step-caption 160ms var(--ease);
+	}
+}
+@keyframes step-caption {
+	from {
+		opacity: 0.72;
+	}
+	to {
+		opacity: 1;
+	}
 }
 
 /* Linked highlighting: parts that share a data-ref are lit together, the same way whichever one is hovered: a term takes the
@@ -6524,8 +6549,13 @@ window.PlotTween = () => {
   }
   function givenStates() {
     const given = new Map;
+    const stepped = new Set;
     for (const el of document.querySelectorAll("[data-ref-states]")) {
+      const moving = el.matches("[data-stepper][data-step-motion]");
       for (const [ref, state] of declared(el)) {
+        if (moving) {
+          stepped.add(ref);
+        }
         const states = given.get(ref) ?? [];
         if (typeof state === "string" && state && !states.includes(state)) {
           states.push(state);
@@ -6533,7 +6563,7 @@ window.PlotTween = () => {
         given.set(ref, states);
       }
     }
-    return given;
+    return { given, stepped };
   }
   function joined(states) {
     const set = new Set(states);
@@ -6554,22 +6584,23 @@ window.PlotTween = () => {
       el.dataset.kitState = "";
     }
   }
-  function writeStates(parts) {
-    const given = givenStates();
-    const named = given.size ? parts.filter((el) => refsOf(el).some((ref) => given.has(ref))) : [];
-    const still = new Set(named);
-    for (const el of document.querySelectorAll("[data-kit-state]")) {
-      if (!still.has(el)) {
+  function writeStates() {
+    const { given, stepped } = givenStates();
+    const marked = "[data-kit-state], [data-step-ref]";
+    const selector = given.size ? `[data-ref], ${marked}` : marked;
+    for (const el of document.querySelectorAll(selector)) {
+      const refs = refsOf(el);
+      el.toggleAttribute("data-step-ref", refs.some((ref) => stepped.has(ref)));
+      if (refs.some((ref) => given.has(ref))) {
+        state(el, joined(refs.flatMap((ref) => given.get(ref) ?? [])));
+      } else if (el.dataset.kitState !== undefined) {
         unstate(el);
       }
-    }
-    for (const el of named) {
-      state(el, joined(refsOf(el).flatMap((ref) => given.get(ref) ?? [])));
     }
   }
   function refresh() {
     const parts = [...document.querySelectorAll("[data-ref]")];
-    writeStates(parts);
+    writeStates();
     linked = linkingRefs(parts);
     for (const el of linkedParts) {
       mark(el, false);
@@ -6618,13 +6649,13 @@ window.PlotTween = () => {
   new MutationObserver((records) => {
     if (records.some((r) => r.attributeName === "data-ref" || [...r.addedNodes, ...r.removedNodes].some(holdsRef))) {
       refresh();
-    } else if (records.some((r) => r.attributeName === "data-ref-states")) {
-      writeStates([...document.querySelectorAll("[data-ref]")]);
+    } else if (records.some((r) => r.attributeName === "data-ref-states" || r.attributeName === "data-step-motion")) {
+      writeStates();
     }
   }).observe(document.documentElement, {
     subtree: true,
     childList: true,
-    attributeFilter: ["data-ref", "data-ref-states"]
+    attributeFilter: ["data-ref", "data-ref-states", "data-step-motion"]
   });
   refresh();
   const partOf = (e) => {

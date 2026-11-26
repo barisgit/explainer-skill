@@ -3203,12 +3203,10 @@ details > :last-child:not(summary) {
 
 /* features: stepper (kit:steps.js), linked highlighting (kit:link.js), replies (kit:reply.js), keep's Clear (kit:keep.js). Tokens only.
    Scripts toggle the classes is-on, is-now, is-linked, is-lit, has-lit, is-annotatable and is-armed, and write data-state (marked data-kit-state) on the parts of a ref a step names (now, not-yet);
+   steps.js marks data-step-motion during a step change; link.js marks its linked parts with data-step-ref.
    page markup carries data-stepper, data-step, data-captions, data-ref, data-reply. */
 /* Stepper: a part ghosts until its first step and is lit on the steps that list it. Gated on [data-live], which the script sets, so without JS the page is the full picture.
    A ref a step names, anywhere on the page, does the same through data-state, which kit:link.js writes and marks data-kit-state; a page's own data-state is not the kit's. */
-:is([data-live] [data-step], [data-kit-state]:is([data-state~="now"], [data-state~="not-yet"])) {
-	transition: opacity 0.3s var(--ease);
-}
 :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-yet"]) {
 	opacity: 0.15;
 }
@@ -3230,6 +3228,33 @@ pre :is([data-live] [data-step]:not(.is-on), [data-kit-state][data-state~="not-y
 }
 [data-live] [data-captions] > li:not(.is-now) {
 	display: none;
+}
+
+/* Keep transitions on the parts between steps, including when a ref loses its state. The old caption leaves the flow at once. */
+@media screen {
+	:where(
+		svg
+			:is([data-step-motion] [data-step], [data-step-ref])
+			:is(path, rect, circle, ellipse, line, polyline, polygon)
+	) {
+		transition: stroke 220ms var(--ease);
+	}
+	:where([data-step-motion] [data-step], [data-step-ref]) {
+		transition-property: opacity, color, stroke, background-color, box-shadow;
+		transition-duration: 220ms;
+		transition-timing-function: var(--ease);
+	}
+	[data-step-motion] [data-captions] > li.is-now {
+		animation: step-caption 160ms var(--ease);
+	}
+}
+@keyframes step-caption {
+	from {
+		opacity: 0.72;
+	}
+	to {
+		opacity: 1;
+	}
 }
 
 /* Linked highlighting: parts that share a data-ref are lit together, the same way whichever one is hovered: a term takes the
@@ -3728,9 +3753,11 @@ pre [data-ref].is-lit {
    stepchange fires when the step or the count changes, never for a refresh that changes neither: the page redraws its own state after
    replacing content, whether or not the event fires. The opening step is announced once the page has loaded (after its scripts and
    DOMContentLoaded handlers), so a listener added while loading hears it, also with data-start; one added after load misses it.
-   Under reduced motion there are no transitions; Play still advances because the reader asked for it. */
+   The parts and caption ease when the reader steps, not on opening or restore. Under reduced motion there are no transitions;
+   Play still advances because the reader asked for it. */
 (() => {
   const PLAY_MS = 3000;
+  const MOTION_WINDOW_MS = 280;
   const steppers = new WeakMap;
   let loaded = false;
   const LABELS = {
@@ -3759,6 +3786,7 @@ pre [data-ref].is-lit {
     total = 0;
     step = 0;
     timer;
+    motionTimer;
     announced = "";
     wired = false;
     root;
@@ -3788,8 +3816,12 @@ pre [data-ref].is-lit {
       this.bindKeys();
       this.watcher = new MutationObserver(() => this.refresh());
     }
-    show(target) {
-      this.step = Math.max(1, Math.min(this.total, target));
+    show(target, animate = false) {
+      const step = Math.max(1, Math.min(this.total, target));
+      if (step !== this.step) {
+        this.stepMotion(animate && this.step > 0);
+      }
+      this.step = step;
       for (const { el, steps } of this.parts) {
         el.classList.toggle("is-on", Math.min(...steps) <= this.step);
         el.classList.toggle("is-now", steps.includes(this.step));
@@ -3804,6 +3836,13 @@ pre [data-ref].is-lit {
       this.readout.textContent = `${this.step} / ${this.total}`;
       if (loaded) {
         this.announce();
+      }
+    }
+    stepMotion(on) {
+      clearTimeout(this.motionTimer);
+      this.root.toggleAttribute("data-step-motion", on);
+      if (on) {
+        this.motionTimer = window.setTimeout(() => delete this.root.dataset.stepMotion, MOTION_WINDOW_MS);
       }
     }
     declareStates() {
@@ -3847,22 +3886,22 @@ pre [data-ref].is-lit {
         const go = e.target instanceof Element ? e.target.closest("[data-go]") : null;
         if (go) {
           this.stop();
-          this.show(this.step + Number(go.dataset.go));
+          this.show(this.step + Number(go.dataset.go), e.isTrusted);
         }
       });
-      this.range.addEventListener("input", () => {
+      this.range.addEventListener("input", (e) => {
         this.stop();
-        this.show(Number(this.range.value));
+        this.show(Number(this.range.value), e.isTrusted);
       });
-      this.play.addEventListener("click", () => {
+      this.play.addEventListener("click", (e) => {
         if (this.timer) {
           return this.stop();
         }
         if (this.step === this.total) {
-          this.show(1);
+          this.show(1, e.isTrusted);
         }
         this.play.textContent = kitText("pause");
-        this.timer = setInterval(() => this.step < this.total ? this.show(this.step + 1) : this.stop(), PLAY_MS);
+        this.timer = setInterval(() => this.step < this.total ? this.show(this.step + 1, e.isTrusted) : this.stop(), PLAY_MS);
       });
     }
     bindKeys() {
@@ -3883,7 +3922,7 @@ pre [data-ref].is-lit {
         }
         e.preventDefault();
         this.stop();
-        this.show(target);
+        this.show(target, e.isTrusted);
       });
     }
     readContent() {
@@ -3937,6 +3976,7 @@ pre [data-ref].is-lit {
       if (!this.wired) {
         this.stop();
         delete this.root.dataset.live;
+        this.stepMotion(false);
         this.step = this.total = 0;
         this.announced = "";
         this.declareStates();
@@ -4076,8 +4116,13 @@ pre [data-ref].is-lit {
   }
   function givenStates() {
     const given = new Map;
+    const stepped = new Set;
     for (const el of document.querySelectorAll("[data-ref-states]")) {
+      const moving = el.matches("[data-stepper][data-step-motion]");
       for (const [ref, state] of declared(el)) {
+        if (moving) {
+          stepped.add(ref);
+        }
         const states = given.get(ref) ?? [];
         if (typeof state === "string" && state && !states.includes(state)) {
           states.push(state);
@@ -4085,7 +4130,7 @@ pre [data-ref].is-lit {
         given.set(ref, states);
       }
     }
-    return given;
+    return { given, stepped };
   }
   function joined(states) {
     const set = new Set(states);
@@ -4106,22 +4151,23 @@ pre [data-ref].is-lit {
       el.dataset.kitState = "";
     }
   }
-  function writeStates(parts) {
-    const given = givenStates();
-    const named = given.size ? parts.filter((el) => refsOf(el).some((ref) => given.has(ref))) : [];
-    const still = new Set(named);
-    for (const el of document.querySelectorAll("[data-kit-state]")) {
-      if (!still.has(el)) {
+  function writeStates() {
+    const { given, stepped } = givenStates();
+    const marked = "[data-kit-state], [data-step-ref]";
+    const selector = given.size ? `[data-ref], ${marked}` : marked;
+    for (const el of document.querySelectorAll(selector)) {
+      const refs = refsOf(el);
+      el.toggleAttribute("data-step-ref", refs.some((ref) => stepped.has(ref)));
+      if (refs.some((ref) => given.has(ref))) {
+        state(el, joined(refs.flatMap((ref) => given.get(ref) ?? [])));
+      } else if (el.dataset.kitState !== undefined) {
         unstate(el);
       }
-    }
-    for (const el of named) {
-      state(el, joined(refsOf(el).flatMap((ref) => given.get(ref) ?? [])));
     }
   }
   function refresh() {
     const parts = [...document.querySelectorAll("[data-ref]")];
-    writeStates(parts);
+    writeStates();
     linked = linkingRefs(parts);
     for (const el of linkedParts) {
       mark(el, false);
@@ -4170,13 +4216,13 @@ pre [data-ref].is-lit {
   new MutationObserver((records) => {
     if (records.some((r) => r.attributeName === "data-ref" || [...r.addedNodes, ...r.removedNodes].some(holdsRef))) {
       refresh();
-    } else if (records.some((r) => r.attributeName === "data-ref-states")) {
-      writeStates([...document.querySelectorAll("[data-ref]")]);
+    } else if (records.some((r) => r.attributeName === "data-ref-states" || r.attributeName === "data-step-motion")) {
+      writeStates();
     }
   }).observe(document.documentElement, {
     subtree: true,
     childList: true,
-    attributeFilter: ["data-ref", "data-ref-states"]
+    attributeFilter: ["data-ref", "data-ref-states", "data-step-motion"]
   });
   refresh();
   const partOf = (e) => {
