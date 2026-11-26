@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.20.0
 
 - A `Stepper` shows the scrubber by default from five steps. Shorter steppers still show Back, Next and the count. Set `scrubber` to show it sooner or `scrubber={false}` to hide it; Play is still opt-in (revises #190).
 - A Stepper eases changes in its diagram parts and linked terms and fades in the new caption when the reader steps. Opening, restoring saved controls, reduced motion and print stay still. Explore's ref-state changes no longer fade; Plot still tweens between frames (#337).
