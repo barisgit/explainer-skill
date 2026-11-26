@@ -10,25 +10,27 @@ import { JULY, july } from "./july.ts";
 import { BLOCKS, BUSIEST, LIFE, PARTS, QUOTES, SECOND_SEASONS, SIZES, TARIFF, months } from "./model.ts";
 import "./colours.css";
 
-# The first 5 kWh pays for itself in *{BLOCKS[0].years} years*. The second would take {BLOCKS[1].years}.
+# Home battery *payback* by size
 
-Three quotes for a 6 kW roof on a four-person house: {QUOTES.map((q) => `${q.kwh} kWh for ${euro(q.price)}`).join(", ")}.
+The first 5 kWh pays for itself in {BLOCKS[0].years} years. The second would take {BLOCKS[1].years} years. Three quotes for a 6 kW roof on a four-person house: {QUOTES.map((q) => `${q.kwh} kWh for ${euro(q.price)}`).join(", ")}.
 
 <Opening />
 
-## A July night needs {r1(JULY.night)} kWh
+## A July night
 
-That is what the house draws between the roof falling short in the evening and covering it again in the morning. Whatever the battery holds beyond it stays in the battery.
+A July night needs {r1(JULY.night)} kWh: what the house draws between the roof falling short in the evening and covering it again in the morning. Whatever the battery holds beyond it stays in the battery.
 
 <Explore label="A typical July day: what the roof makes, what the house uses, and what the battery moves to the evening" controls={[{ id: "battery", label: "Battery", range: [0, 15, 1], value: 5, format: { unit: "kWh" } }]} frame={july} height="clamp(20rem, 30vw, 26rem)" />
 
-## The second 5 kWh mostly works in {SECOND_SEASONS.join(" and ")}
+## The second 5 kWh
 
-In summer the first 5 kWh usually carries the night, and in winter the roof hardly fills it. The second block takes over on longer nights after a sunny day.
+It mostly works in {SECOND_SEASONS.join(" and ")}. In summer the first 5 kWh usually carries the night, and in winter the roof hardly fills it. The second block takes over on longer nights after a sunny day.
 
 <Explore label="kWh the second and third 5 kWh blocks add to what the house gets from the battery, month by month" controls={[{ id: "month", label: "Month", choice: MONTHS, value: BUSIEST, axis: true }]} frame={months} />
 
-## The {euro(QUOTES[0].price)} is a battery, a new inverter and a new meter
+## What the quote includes
+
+The {euro(QUOTES[0].price)} is a battery, a new inverter and a new meter.
 
 ```mermaid tag:bat=1 tag:inv=2 tag:meter=3
 flowchart LR

@@ -9,13 +9,15 @@ import places from "./places.ts";
 import { PlaceView } from "./place.tsx";
 import "./colours.css";
 
-# Wind and solar added <em>{fmt(WS)} TWh</em> in {Y1}. Total generation added {fmt(TOTAL)}.
+# Change in world electricity generation, by source
 
-World electricity generation, change on the year before in TWh, from Our World in Data (Ember and the Energy Institute).
+Wind and solar added {fmt(WS)} TWh in {Y1}. Total generation added {fmt(TOTAL)} TWh. World electricity generation, change on the year before in TWh, from Our World in Data (Ember and the Energy Institute).
 
 <Opening />
 
-## {OTHERS.slice(0, 3).map((s, i) => (i ? s.name.toLowerCase() : s.name)).join(", ").replace(/, ([^,]+)$/, " and $1")} supplied most of the other {fmt(REST)} TWh. Coal grew {fmt(COAL)}.
+## By source
+
+{OTHERS.slice(0, 3).map((s, i) => (i ? s.name.toLowerCase() : s.name)).join(", ").replace(/, ([^,]+)$/, " and $1")} supplied most of the other {fmt(REST)} TWh. Coal grew {fmt(COAL)}.
 
 <Plot
 	height="22rem"
@@ -30,7 +32,9 @@ World electricity generation, change on the year before in TWh, from Our World i
 	}}
 />
 
-## Coal fell in {FELL.n} countries ({signed(FELL.twh)} TWh) and rose in {ROSE.n} ({signed(ROSE.twh)}).
+## Coal by country
+
+Coal fell in {FELL.n} countries ({signed(FELL.twh)} TWh) and rose in {ROSE.n} ({signed(ROSE.twh)}).
 
 <Plot
 	height="44rem"

@@ -8,13 +8,13 @@ import { alternatives } from "./rows.ts";
 import Opening from "./opening.mdx";
 import "./colours.css";
 
-# Shipping ECharts compressed takes *{data.saved} KB* off every chart page and costs {Object.values(data.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms.
+# Shipping ECharts *compressed*
 
-Commit 7d4f018 makes pack inline `kit/echarts.js` as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.
+Compressing ECharts takes {data.saved} KB off every chart page and costs {Object.values(data.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms. Commit 7d4f018 makes pack inline `kit/echarts.js` as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.
 
 <Opening />
 
-## Four files change, and the charts wait for ECharts
+## What changes
 
 ```mermaid tag:file=1 tag:atob=2 tag:inflate=3 tag:run=4 tag:mount=5
 flowchart LR
@@ -51,11 +51,11 @@ flowchart LR
 +		window.echartsReady,
 ```
 
-## Deflate-raw ties for smallest on our browser baseline
+## Alternatives
 
 <Table rows={alternatives} state={(a) => a.state} cols={[{ head: "Alternative", value: "name" }, { head: "In the page", value: "size" }, { head: "Why", value: "why" }]} />
 
-## A browser without deflate-raw support keeps the drawn charts
+## Older browsers
 
 The `deflate-raw` format needs Chrome 103, Firefox 113 or Safari 16.4. On older browsers the unpack fails and logs the failure. The charts pack drew stay; the live ones that replace them never mount.
 

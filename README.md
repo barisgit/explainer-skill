@@ -7,7 +7,7 @@ An agent skill that answers with a page: the finding up front, a figure you can 
 <a href="https://barisgit.github.io/explainer-skill/battery/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/battery-hero-dark.webp">
-  <img alt="The page an agent answered with: its headline says the first 5 kWh pays for itself in 10 years and the second would take 62, over three bars on one scale; a slider then grows the battery on a July day until most of it is never used, the reader picks 5 kWh in the comparison table, and the reply is ready to send back" src="examples/media/battery-hero-light.webp">
+  <img alt="The page an agent answered with: its title is Home battery payback by size and its first sentence says the first 5 kWh pays for itself in 10 years and the second would take 62, over three bars on one scale; a slider then grows the battery on a July day until most of it is never used, the reader picks 5 kWh in the comparison table, and the reply is ready to send back" src="examples/media/battery-hero-light.webp">
 </picture>
 </a>
 
@@ -25,7 +25,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <a href="https://barisgit.github.io/explainer-skill/echarts-compressed/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/echarts-compressed-card-dark.webp">
-  <img alt="First screen of the page: Shipping ECharts compressed takes 513 KB off every chart page, over two bars for the plain and the compressed size" src="examples/media/echarts-compressed-card-light.webp">
+  <img alt="First screen of the page: Shipping ECharts compressed: it takes 513 KB off every chart page, over two bars for the plain and the compressed size" src="examples/media/echarts-compressed-card-light.webp">
 </picture>
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/echarts-compressed/"><b>Code review</b></a>: the change that ships ECharts compressed
@@ -34,7 +34,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <a href="https://barisgit.github.io/explainer-skill/i2c-pull-ups/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/i2c-pull-ups-card-dark.webp">
-  <img alt="First screen of the page: the 10 kΩ pull-ups take 847 ns to raise the line, over the rise curves against the 300 ns limit" src="examples/media/i2c-pull-ups-card-light.webp">
+  <img alt="First screen of the page: I²C pull-up resistors at 400 kHz: the 10 kΩ pull-ups take 847 ns to raise the line, over the rise curves against the 300 ns limit" src="examples/media/i2c-pull-ups-card-light.webp">
 </picture>
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/i2c-pull-ups/"><b>Engineering page</b></a>: I²C pull-ups, with the schematic
@@ -45,7 +45,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <a href="https://barisgit.github.io/explainer-skill/electricity-mix/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/electricity-mix-card-dark.webp">
-  <img alt="First screen of the page: wind and solar added 669 TWh in 2024, over yearly columns of added generation" src="examples/media/electricity-mix-card-light.webp">
+  <img alt="First screen of the page: change in world electricity generation by source: wind and solar added 669 TWh in 2024, over yearly columns of added generation" src="examples/media/electricity-mix-card-light.webp">
 </picture>
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/electricity-mix/"><b>Data report</b></a>: world electricity, 223 places from Our World in Data
@@ -54,7 +54,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <a href="https://barisgit.github.io/explainer-skill/node-modules/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/node-modules-card-dark.webp">
-  <img alt="First screen of the page: 406 packages installed for 3 listed, over a treemap of their bytes" src="examples/media/node-modules-card-light.webp">
+  <img alt="First screen of the page: what npm install put on disk: 406 packages for 3 listed, over a treemap of their bytes" src="examples/media/node-modules-card-light.webp">
 </picture>
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/node-modules/"><b>Drill-down over records</b></a>: what one <code>npm install</code> puts on disk
@@ -65,7 +65,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <a href="https://barisgit.github.io/explainer-skill/fourier-series/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/fourier-series-card-dark.webp">
-  <img alt="First screen of the page: add a thousand sines and the corner still overshoots by 9%, over the sum zoomed on the jump" src="examples/media/fourier-series-card-light.webp">
+  <img alt="First screen of the page: the Gibbs overshoot of a square wave: a thousand sines still overshoot the corner by 9%, over the sum zoomed on the jump" src="examples/media/fourier-series-card-light.webp">
 </picture>
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/fourier-series/"><b>Study page</b></a>: the Gibbs overshoot
@@ -74,7 +74,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <a href="https://barisgit.github.io/explainer-skill/dijkstra/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/dijkstra-card-dark.webp">
-  <img alt="First screen of the page: one negative edge and Dijkstra answers 2 where the shortest path is 1, over the three-node graph" src="examples/media/dijkstra-card-light.webp">
+  <img alt="First screen of the page: Dijkstra's algorithm with a negative edge: it answers 2 where the shortest path is 1, over the three-node graph" src="examples/media/dijkstra-card-light.webp">
 </picture>
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/dijkstra/"><b>Algorithm</b></a>: Dijkstra with a negative edge

@@ -6,13 +6,13 @@ import Opening from "./opening.mdx";
 import { LIMITS, N, VALUES, stripFrame } from "./bus.ts";
 import "./colours.css";
 
-# The {N.found} pull-ups take *{N.foundTr} ns* to raise the line. At 400 kHz the bus allows {N.fastTr}.
+# I²C *pull-up* resistors at 400 kHz
 
-A {N.vdd} V bus with about {N.cb} pF on each line, timed from 0.3 to 0.7 VDD as the I²C specification times it.
+The {N.found} pull-ups take {N.foundTr} ns to raise the line. At 400 kHz the bus allows {N.fastTr} ns. A {N.vdd} V bus with about {N.cb} pF on each line, timed from 0.3 to 0.7 VDD as the I²C specification times it.
 
 <Opening />
 
-## Nothing drives the line high but a resistor
+## Rise time
 
 <div class="beside">
 <div>
@@ -35,11 +35,11 @@ VDD port vbus 3.3 V @R_SDA.a -4,-2
 
 </div>
 
-## Any standard value from {N.low} to {N.high} fits; {N.fix} leaves room
+## Choosing a pull-up
 
 <Explore label="Rise time of each E12 pull-up from 680 Ω to 10 kΩ against the 300 ns limit" controls={[{ id: "r", label: "Pull-up", choice: VALUES, value: "2200", axis: true }]} frame={stripFrame} />
 
-{N.high} only just fits, at {N.highTr} ns, if the {N.cb} pF estimate is right. {N.fix} still fits up to {N.fixCbMax} pF.
+Any standard value from {N.low} to {N.high} fits; {N.fix} leaves room. {N.high} only just fits, at {N.highTr} ns, if the {N.cb} pF estimate is right. {N.fix} still fits up to {N.fixCbMax} pF.
 
 ## Where 0.8473 comes from
 
