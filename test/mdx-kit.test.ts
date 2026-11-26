@@ -138,7 +138,7 @@ describe("the kit's static components render a v0.8 page", () => {
 	test("check --view all finds no problems in light and dark, on desktop and phone", async () => {
 		const { output } = await pack("checked", PAGE());
 		const checked = await runCli(["check", output, "--view", "all", "--out", dir.path("shots")]);
-		expect(checked.stdout).toContain("Views captured (4)");
+		expect(checked.stdout).toContain("Views checked (4)");
 		expect(checked.stdout).toContain("0 problems");
 		expect(checked.code).toBe(0);
 	}, 90_000);

@@ -151,6 +151,7 @@ test("a load that never ends stops check with one error line naming the screen a
 	writeFileSync(join(out, "desktop.png"), "before");
 	writeFileSync(join(out, "notes.txt"), "mine");
 	const result = await runCheck(stalledReload, tempDir("tmp-stalled"), [
+		"--shots",
 		"--do",
 		"reload",
 		"--out",
@@ -313,7 +314,7 @@ test("check ended by SIGTERM while Chrome starts stops that Chrome and deletes i
 test("check ended by SIGTERM stops Chrome and deletes its profile and unfinished shots before it exits", async () => {
 	const tmp = tempDir("tmp-term");
 	const out = tempDir("out-term");
-	const proc = startCheck(stalled, tmp, ["--out", out]);
+	const proc = startCheck(stalled, tmp, ["--shots", "--out", out]);
 	// The held page keeps check running until the signal.
 	await chromeStarted(tmp);
 	proc.kill("SIGTERM");
@@ -330,7 +331,7 @@ test("check ended by SIGTERM stops Chrome and deletes its profile and unfinished
 async function startGroup(tmp: string, out: string) {
 	const proc = spawn(
 		process.execPath,
-		[join(SKILL_DIR, "cli.ts"), "check", stalled, "--quick", "--out", out],
+		[join(SKILL_DIR, "cli.ts"), "check", stalled, "--quick", "--shots", "--out", out],
 		{
 			detached: true,
 			stdio: ["ignore", "ignore", "pipe"],

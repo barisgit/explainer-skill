@@ -502,7 +502,8 @@ ${[0, 1, 2].map((n) => `<p class="card" style="width:100px;height:${50 + n * 10}
 			`--do shot:.gone@all: no PNG at ${width} px wide: match 0, 1, 2 is not shown`,
 		);
 	}
-	expect(readdirSync(out).filter((png) => png.includes("gone"))).toEqual([]);
+	expect(readdirSync(out)).toHaveLength(13);
+	expect(result.stdout).not.toContain("Open the PNGs");
 	for (const width of ["desktop", "narrow"]) {
 		expect(pngSize(join(out, `shot6-ghost-${width}.png`))).toEqual([80, 40]);
 	}
@@ -595,7 +596,16 @@ test("check refuses a --tag that is not a file name before it starts Chrome, so 
 	const beside = dir.path("escape-desktop.png");
 	writeFileSync(beside, "before");
 
-	const result = await runCli(["check", file, "--quick", "--tag", "../escape", "--out", out]);
+	const result = await runCli([
+		"check",
+		file,
+		"--quick",
+		"--shots",
+		"--tag",
+		"../escape",
+		"--out",
+		out,
+	]);
 
 	expect(result.code).toBe(2);
 	expect(result.stderr).toBe(

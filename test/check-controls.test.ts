@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { ChromeError } from "../skills/explainer/src/cdp.ts";
 import type { CheckResult } from "../skills/explainer/src/check.ts";
 import { CheckedPage } from "../skills/explainer/src/checked-page.ts";
@@ -33,7 +33,7 @@ beforeAll(async () => {
 	);
 });
 
-test("default check catches a kit choice error once, attributed, without extra screenshots", async () => {
+test("default check catches a kit choice error once, attributed, without writing screenshots", async () => {
 	const result = await runCli([
 		"check",
 		broken,
@@ -45,7 +45,9 @@ test("default check catches a kit choice error once, attributed, without extra s
 	]);
 	expect(result.code).toBe(1);
 	expect(result.stderr).toBe("");
-	const { shots } = JSON.parse(result.stdout) as CheckResult;
+	const checked = JSON.parse(result.stdout) as CheckResult;
+	expect(checked).not.toHaveProperty("out");
+	const { shots } = checked;
 	const failed = shots.filter((s) => s.problems.some((p) => p.includes("kit choice exploded")));
 	expect(failed.map((s) => [s.theme, s.viewport, s.view])).toEqual([
 		["light", "desktop 1440x900", ""],
@@ -53,7 +55,13 @@ test("default check catches a kit choice error once, attributed, without extra s
 	expect(failed[0]?.problems.join("\n")).toContain(
 		"control #probe-One: page error: Error: kit choice exploded",
 	);
-	expect(readdirSync(dir.path("broken-shots")).filter((p) => p.endsWith(".png"))).toHaveLength(8);
+	expect(existsSync(dir.path("broken-shots"))).toBe(false);
+	expect(shots).toHaveLength(4);
+	for (const page of shots) {
+		expect(page.png).toBeUndefined();
+		expect(page.first?.headline).toBe("A kit control");
+		expect(page.first?.png).toBeUndefined();
+	}
 }, 30_000);
 
 test.each([

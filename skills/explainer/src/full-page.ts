@@ -80,7 +80,7 @@ const PREPARE_JS = `(() => {
 
 /**
  * Returns the base64 document PNG and short selectors of visible author viewport-fixed boxes omitted only for this capture.
- * The kit's contents rail is omitted silently; first-screen shots already show this known chrome.
+ * The kit's contents rail is omitted silently; first-screen shots, when taken, show this known chrome.
  * Chrome's beyond-viewport scrollbar workaround briefly resizes the layout. Stop at a debugger statement while capturing:
  * page tasks defer rather than being discarded by script-execution suppression. Restore styles before resuming, even on failure.
  * First-screen and element shots stay live.

@@ -26,11 +26,11 @@ const VIEWPORTS: Viewport[] = [
 ];
 const THEMES = ["light", "dark"] as const;
 /**
- * The first viewport before any `--do` step: its PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
+ * The first viewport before any `--do` step: its optional PNG, the headline, the figures a reader sees without scrolling, and `links`: the most
  * in-page links (href="#...") that one list shows in the viewport, i.e. a text map of the page's questions or sections.
  */
 export interface FirstScreen {
-	png: string;
+	png?: string | undefined;
 	headline: string;
 	figures: string[];
 	links: number;
@@ -53,7 +53,7 @@ export interface Shot {
 	theme: string;
 	viewport: string;
 	view: string;
-	png: string;
+	png?: string | undefined;
 	first?: FirstScreen | undefined;
 	/** The overview's reading load, on the light desktop screen only. */
 	reading?: ReadingLoad | undefined;
@@ -62,7 +62,7 @@ export interface Shot {
 	warnings: string[];
 }
 /**
- * `quick`: light theme only, no first-viewport shots, overview PNGs named desktop.png and narrow.png. `views` are --view values:
+ * `quick`: light theme only, no first-screen info, overview PNGs (when requested) named desktop.png and narrow.png. `views` are --view values:
  * hashes, "all" or "none". `timeoutSeconds`: the whole run's limit, past which check stops Chrome and throws a ChromeError.
  */
 export interface CheckOptions {
@@ -70,6 +70,8 @@ export interface CheckOptions {
 	views: string[];
 	tag: string;
 	quick: boolean;
+	/** Save first-screen and full-page PNGs in addition to any explicit element shots. */
+	shots: boolean;
 	timeoutSeconds: number;
 	/** Additional desktop-mode viewports, named by their dimensions. */
 	viewports: Screen["vp"][];
@@ -77,9 +79,9 @@ export interface CheckOptions {
 	sweepBudgetMs: number | undefined;
 }
 
-/** The overall limit of one check run when --timeout gives none: far above a page with every view captured and many steps. */
+/** The overall limit of one check run when --timeout gives none: far above a page with every view checked and many steps. */
 export const DEFAULT_TIMEOUT_SECONDS = 600;
-/** `found`: every drill-down hash the overview links to or declares; `uncaptured`: those not captured; `templates`: view names with a param that no link reaches. */
+/** `found`: every drill-down hash the overview links to or declares; `captured` / `uncaptured`: checked / skipped hashes (legacy JSON names, independent of PNGs); `templates`: view names with a param that no link reaches. */
 export interface ViewReport {
 	found: string[];
 	captured: string[];
@@ -119,48 +121,45 @@ export async function kitReferences(html: string): Promise<string[]> {
 	return [...refs];
 }
 
-/** The most views a check captures when `--view` names none. */
+/** The most views a check visits when `--view` names none. */
 const MAX_DISCOVERED = 6;
 
 /** The view a hash belongs to: "#repo/mobile" is a link into the view "repo". */
 const viewName = (hash: string) => hash.slice(1).split("/")[0] ?? "";
 
 /**
- * Which views to capture from the `--view` values: none given = the first hash of each view (at most 6 views), `all` = every hash found,
+ * Which views to check from the `--view` values: none given = the first hash of each view (at most 6 views), `all` = every hash found,
  * `none` = overview only, hashes = exactly those (added to the found ones with `all`).
  */
-function chooseViews(
-	requested: string[],
-	found: string[],
-): { capture: string[]; skipped: string[] } {
+function chooseViews(requested: string[], found: string[]): { check: string[]; skipped: string[] } {
 	const hashes = requested
 		.filter((v) => v !== "all" && v !== "none")
 		.map((v) => (v.startsWith("#") ? v : `#${v}`));
 	if (requested.includes("none")) {
-		return { capture: [], skipped: found };
+		return { check: [], skipped: found };
 	}
 	if (requested.includes("all")) {
-		return { capture: [...new Set([...hashes, ...found])], skipped: [] };
+		return { check: [...new Set([...hashes, ...found])], skipped: [] };
 	}
 	if (hashes.length) {
-		return { capture: hashes, skipped: found.filter((f) => !hashes.includes(f)) };
+		return { check: hashes, skipped: found.filter((f) => !hashes.includes(f)) };
 	}
 	const firsts = found
 		.filter((h, i) => found.findIndex((o) => viewName(o) === viewName(h)) === i)
 		.slice(0, MAX_DISCOVERED);
-	return { capture: firsts, skipped: found.filter((h) => !firsts.includes(h)) };
+	return { check: firsts, skipped: found.filter((h) => !firsts.includes(h)) };
 }
 
 /** Everything one check run shares: the page, its log, where files go, and what has been collected. */
 interface Run {
 	page: CheckedPage;
 	/** Where the run writes its PNGs: the staging directory (see staged), whose files move into --out once the run has succeeded. */
-	outDir: string;
+	outDir: string | undefined;
 	stem: string;
 	opts: CheckOptions;
 	shots: Shot[];
 	views: ViewReport;
-	/** The drill-down hashes to capture, set once by the first overview pass (light, desktop) and reused for every other screen. */
+	/** The drill-down hashes to check, set once by the first overview pass (light, desktop) and reused for every other screen. */
 	viewHashes: string[];
 	stepNotes: Set<string>;
 	replies: ReplyCapture[];
@@ -169,12 +168,12 @@ interface Run {
 }
 
 /**
- * Full-page PNG plus the page analysis for whatever the page currently shows; returns the warnings. `drawn`: what the overview's
+ * The page analysis for whatever the page currently shows, with an optional full-page PNG; returns the warnings. `drawn`: what the overview's
  * script-free load found in pack's drawings, reported with the live figures' text so a figure that shows the same is named once.
  */
-async function capture(
+async function inspect(
 	run: Run,
-	png: string,
+	png: string | undefined,
 	screen: Screen,
 	view = "",
 	drawn: FigureText[] = [],
@@ -184,18 +183,30 @@ async function capture(
 	// Where text sits is the same in both themes.
 	const live = screen.theme === THEMES[0] ? await run.page.liveFigureText() : [];
 	const figures = figureTextWarnings(screen.vp.width, drawn, live);
-	const cdp = run.page.cdp;
-	const { data, omitted } = await fullPageScreenshot(cdp, screen.vp.width);
-	writeFileSync(png, Buffer.from(data, "base64"));
-	const inspect = view ? "open this view to inspect them" : "use --do shot:<css> to capture them";
+	const omitted = png ? await captureFullPage(run, screen, png) : [];
+	const hint = view ? "open this view to inspect them" : "use --do shot:<css> to capture them";
 	return [
 		...page.warnings,
 		...figures,
 		...links,
-		...(omitted.length ? [`${OMITTED_FIXED_WARNING}: ${omitted.join(", ")}; ${inspect}`] : []),
+		...(omitted.length ? [`${OMITTED_FIXED_WARNING}: ${omitted.join(", ")}; ${hint}`] : []),
 		...page.scrolls,
 		...new Set(run.page.warnings),
 	];
+}
+
+async function captureFullPage(run: Run, screen: Screen, png: string): Promise<string[]> {
+	const { data, omitted } = await fullPageScreenshot(run.page.cdp, screen.vp.width);
+	writeFileSync(png, Buffer.from(data, "base64"));
+	return omitted;
+}
+
+/** Only screenshot actions ask for paths, after staging has been allocated. */
+function pngPath(run: Run, name: string): string {
+	if (!run.outDir) {
+		throw new Error("PNG capture requires an output directory");
+	}
+	return join(run.outDir, `${name}.png`);
 }
 
 /**
@@ -205,20 +216,18 @@ async function capture(
 function overviewPng(run: Run, { theme, name }: Screen, part = "") {
 	const { tag, quick } = run.opts;
 	const parts = quick ? [tag, part, name] : [run.stem, part, theme, name];
-	return join(run.outDir, `${parts.filter(Boolean).join("-")}.png`);
+	return pngPath(run, parts.filter(Boolean).join("-"));
 }
 
-/** The first viewport before any step: PNG, headline and the figures in view. */
+/** The first viewport before any step: headline, figures in view and an optional PNG. */
 async function firstScreen(run: Run, screen: Screen): Promise<FirstScreen> {
-	const png = overviewPng(run, screen, "first");
-	const { data } = await run.page.cdp.send<{ data: string }>("Page.captureScreenshot", {
-		format: "png",
-	});
-	writeFileSync(png, Buffer.from(data, "base64"));
-	return {
-		png,
-		...(await run.page.cdp.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)),
-	};
+	const { cdp } = run.page;
+	const png = run.opts.shots ? overviewPng(run, screen, "first") : undefined;
+	if (png) {
+		const { data } = await cdp.send<{ data: string }>("Page.captureScreenshot", { format: "png" });
+		writeFileSync(png, Buffer.from(data, "base64"));
+	}
+	return { png, ...(await cdp.evaluate<Omit<FirstScreen, "png">>(FIRST_SCREEN_JS)) };
 }
 
 /** Sweeps the document and inner scrollers under one per-load budget, recording incomplete coverage as one warning. */
@@ -244,7 +253,7 @@ async function discoverViews(run: Run) {
 	run.views.found = found.hashes;
 	run.views.uncaptured = chosen.skipped;
 	run.views.templates = found.templates;
-	run.viewHashes = chosen.capture;
+	run.viewHashes = chosen.check;
 }
 
 /**
@@ -294,8 +303,8 @@ async function runSteps(run: Run, screen: Screen): Promise<ElementShot[]> {
 	return elements;
 }
 
-/** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, full-page shot. */
-async function shootOverview(run: Run, screen: Screen) {
+/** The overview page for one theme and viewport: first screen, view discovery (first screen only), `--do` steps, inspection. */
+async function checkOverview(run: Run, screen: Screen) {
 	const { theme, name } = screen;
 	const { opts } = run;
 	run.where = `at ${theme} ${name}, overview`;
@@ -317,12 +326,12 @@ async function shootOverview(run: Run, screen: Screen) {
 			? await run.page.cdp.evaluate<string[]>(LINKED_JS)
 			: [];
 	const elements = await runSteps(run, screen);
-	const png = overviewPng(run, screen);
+	const png = opts.shots ? overviewPng(run, screen) : undefined;
 	const warnings = [
 		...stepperWarnings,
 		...linkedWarnings,
 		...(reading ? readingWarnings(reading) : []),
-		...(await capture(run, png, screen, "", drawn)),
+		...(await inspect(run, png, screen, "", drawn)),
 	];
 	const problems = [...run.page.problems];
 	if (firstPass && !opts.quick && !opts.steps.length) {
@@ -350,7 +359,7 @@ async function shootOverview(run: Run, screen: Screen) {
 }
 
 /** One drill-down view, loaded fresh from its hash so no `--do` state applies. */
-async function shootView(run: Run, screen: Screen, hash: string) {
+async function checkView(run: Run, screen: Screen, hash: string) {
 	const { theme, name } = screen;
 	run.where = `at ${theme} ${name}, view ${hash}`;
 	await run.page.open(hash);
@@ -368,8 +377,10 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 			? await run.page.cdp.evaluate<string[]>(LINKED_JS)
 			: [];
 	const slug = hash.slice(1).replace(/[^\w-]+/g, "-");
-	const png = join(run.outDir, `${run.stem}-view-${slug}-${theme}-${name}.png`);
-	const warnings = [...linkedWarnings, ...(await capture(run, png, screen, hash))];
+	const png = run.opts.shots
+		? pngPath(run, `${run.stem}-view-${slug}-${theme}-${name}`)
+		: undefined;
+	const warnings = [...linkedWarnings, ...(await inspect(run, png, screen, hash))];
 	run.shots.push({
 		theme,
 		viewport: reportedViewport(screen),
@@ -385,7 +396,7 @@ async function shootView(run: Run, screen: Screen, hash: string) {
 }
 
 /** Every theme x viewport: the overview, then each chosen view. */
-async function shootAll(run: Run, themes: readonly string[]) {
+async function checkAll(run: Run, themes: readonly string[]) {
 	const custom = new Map(run.opts.viewports.map((vp) => [`${vp.width}x${vp.height}`, vp]));
 	const viewports = [...VIEWPORTS, ...[...custom].map(([name, vp]) => ({ name, vp }))];
 	await run.page.start();
@@ -393,9 +404,9 @@ async function shootAll(run: Run, themes: readonly string[]) {
 		for (const viewport of viewports) {
 			const screen = { theme, ...viewport };
 			await run.page.screen(screen);
-			await shootOverview(run, screen);
+			await checkOverview(run, screen);
 			for (const hash of run.viewHashes) {
-				await shootView(run, screen, hash);
+				await checkView(run, screen, hash);
 			}
 		}
 	}
@@ -405,12 +416,12 @@ async function shootAll(run: Run, themes: readonly string[]) {
 const STARTING = "while starting Chrome";
 
 /**
- * Runs shootAll; a ChromeError other than the overall limit's (`limit.reason`, which says where the run was itself) gets the run's
+ * Runs checkAll; a ChromeError other than the overall limit's (`limit.reason`, which says where the run was itself) gets the run's
  * `where` added, so a stalled call names the screen it stalled on.
  */
-async function shootNamingWhere(run: Run, themes: readonly string[], limit: AbortSignal) {
+async function checkNamingWhere(run: Run, themes: readonly string[], limit: AbortSignal) {
 	try {
-		await shootAll(run, themes);
+		await checkAll(run, themes);
 	} catch (error) {
 		if (error instanceof ChromeError && error !== limit.reason) {
 			throw new ChromeError(`${error.message} (${run.where})`);
@@ -425,6 +436,7 @@ async function shootNamingWhere(run: Run, themes: readonly string[], limit: Abor
  * Staging inside `outDir` keeps the move a rename within one file system.
  */
 async function staged<T>(outDir: string, write: (staging: string) => Promise<T>): Promise<T> {
+	mkdirSync(outDir, { recursive: true });
 	const staging = mkdtempSync(join(outDir, ".check-"));
 	const remove = async () => rmSync(staging, { recursive: true, force: true });
 	const release = cleanUpOnSignal(remove);
@@ -445,14 +457,14 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
 	const moved = (png: string) => join(outDir, basename(png));
 	return shots.map((shot) => ({
 		...shot,
-		png: moved(shot.png),
-		first: shot.first && { ...shot.first, png: moved(shot.first.png) },
+		png: shot.png && moved(shot.png),
+		first: shot.first && { ...shot.first, png: shot.first.png && moved(shot.first.png) },
 		elements: shot.elements.map((element) => ({ ...element, png: moved(element.png) })),
 	}));
 }
 
 /**
- * Opens `file` in headless Chrome for every theme x viewport and writes PNGs to `outDir`:
+ * Opens `file` in headless Chrome for every theme x viewport and optionally writes PNGs to `outDir`:
  * the first viewport before any step, the full page after a scroll sweep (see scrollSweepJs) and the `--do` steps (their state persists into those shots), and a full-page shot
  * of each chosen drill-down view (see chooseViews), each loaded fresh from its hash, so no `--do` state applies to views.
  * Each load and step is followed by a wait until the page has settled (settlePage: frames, fonts, charts drawn, short timers), not a fixed time.
@@ -460,16 +472,15 @@ function inOutDir(shots: Shot[], outDir: string): Shot[] {
  * still not drawn at the settle deadline; as warnings console warnings, sideways-scrolling containers, cut-off content, tiny diagram text, a
  * missing viewport meta, tall diagrams and charts, figure text crossing its box or other text (FIGURE_TEXT_JS, light theme), steppers that change only their captions, linked parts more than a screen apart
  * (LINKED_JS, light desktop and custom viewports), colour tokens under the contrast their use needs (CONTRAST_JS, desktop and custom viewports) and incomplete scroll sweeps. Reduced motion is emulated so animations are
- * finished in the shots.
+ * settled for checks and shots.
  * A ChromeError ends the run with no result and no PNG written: Chrome failed to start or stalled, or the run passed
  * `opts.timeoutSeconds`. The PNGs of a run that succeeds replace those of the same name in `outDir`.
  */
 export async function check(
 	file: string,
-	outDir: string,
+	outDir: string | undefined,
 	opts: CheckOptions,
 ): Promise<CheckResult> {
-	mkdirSync(outDir, { recursive: true });
 	const themes = opts.quick ? THEMES.slice(0, 1) : THEMES;
 	const stem = `${basename(file).replace(/\.html?$/, "")}${opts.tag ? `-${opts.tag}` : ""}`;
 	// The limit runs from before Chrome starts, so a Chrome that hangs while starting is stopped at it too.
@@ -483,7 +494,7 @@ export async function check(
 		);
 	}, opts.timeoutSeconds * 1000);
 	try {
-		const result = await staged(outDir, (staging) =>
+		const runCheck = (staging?: string) =>
 			withPage(async (cdp) => {
 				const run: Run = {
 					page: new CheckedPage(cdp, `file://${resolve(file)}`),
@@ -498,15 +509,18 @@ export async function check(
 					where: STARTING,
 				};
 				current = run;
-				await shootNamingWhere(run, themes, limit.signal);
+				await checkNamingWhere(run, themes, limit.signal);
 				return {
 					shots: run.shots,
 					views: run.views,
 					stepNotes: [...run.stepNotes],
 					replies: run.replies,
 				};
-			}, limit.signal),
-		);
+			}, limit.signal);
+		if (!outDir) {
+			return await runCheck();
+		}
+		const result = await staged(outDir, runCheck);
 		return { ...result, shots: inOutDir(result.shots, outDir) };
 	} finally {
 		clearTimeout(timer);

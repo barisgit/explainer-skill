@@ -26,12 +26,10 @@ function firstScreens(shots: Shot[]): string[] {
 		const { png, headline, figures, links } = s.first;
 		const seen = firstContent(figures, links);
 		out.push(
-			`  ${s.theme.padEnd(5)} ${s.viewport.padEnd(17)} ${png}\n${" ".repeat(8)}${headline ? `"${headline}"` : "no h1"} | ${seen}`,
+			`  ${s.theme.padEnd(5)} ${s.viewport.padEnd(17)}${png ? ` ${png}` : ""}\n${" ".repeat(8)}${headline ? `"${headline}"` : "no h1"} | ${seen}`,
 		);
 	}
-	return out.length
-		? ["First screens (taken before any --do step; open these first):", ...out, ""]
-		: [];
+	return out.length ? ["First screens (before any --do step):", ...out, ""] : [];
 }
 
 function readingLoad(shots: Shot[]): string[] {
@@ -42,8 +40,10 @@ function readingLoad(shots: Shot[]): string[] {
 function pages(shots: Shot[], stepNotes: string[]): string[] {
 	const out = ["Pages:"];
 	for (const s of shots) {
+		const name = s.view || "overview";
+		const page = s.png ? `${name.padEnd(14)} ${s.png}` : name;
 		out.push(
-			`  ${s.problems.length ? "FAIL" : "ok  "} ${s.theme.padEnd(5)} ${s.viewport.padEnd(17)} ${(s.view || "overview").padEnd(14)} ${s.png}${s.problems.map((p) => `\n         ${p}`).join("")}`,
+			`  ${s.problems.length ? "FAIL" : "ok  "} ${s.theme.padEnd(5)} ${s.viewport.padEnd(17)} ${page}${s.problems.map((p) => `\n         ${p}`).join("")}`,
 			...s.elements.map((e) => `         ${e.step}  ${e.png}`),
 		);
 	}
@@ -91,11 +91,11 @@ function viewsSection(views: ViewReport): string[] {
 	const out = [
 		"",
 		`Views found (${views.found.length}): ${views.found.join(", ") || "none"}`,
-		`Views captured (${views.captured.length}): ${views.captured.join(", ") || "none"}`,
+		`Views checked (${views.captured.length}): ${views.captured.join(", ") || "none"}`,
 	];
 	if (views.uncaptured.length) {
 		out.push(
-			`Views not captured: ${views.uncaptured.length} of those (--view all captures every hash found; --view <hash> one)`,
+			`Views not checked: ${views.uncaptured.length} of those (--view all checks every hash found; --view <hash> one)`,
 		);
 	}
 	for (const t of views.templates) {
@@ -113,17 +113,16 @@ function verdict(shots: Shot[]): string {
 	return `Verdict: ${problems ? "FAIL" : "ok"}, ${count(problems, "problem")}, ${count(warned, "warning")}.`;
 }
 
-/** The check result as text: first screens, then pass/fail per shot with problems, then warnings grouped by message, then a one-line verdict. */
+/** The check result as text: first screens, then pass/fail per checked page with problems, then warnings grouped by message, then a one-line verdict. */
 export function report(
-	outDir: string,
+	outDir: string | undefined,
 	shots: Shot[],
 	views: ViewReport,
 	stepNotes: string[],
 	replies: ReplyCapture[] = [],
 ): string {
 	return [
-		`Screenshots: ${outDir}`,
-		"",
+		...(outDir ? [`Screenshots: ${outDir}`, ""] : []),
 		...firstScreens(shots),
 		...readingLoad(shots),
 		...pages(shots, stepNotes),
@@ -134,7 +133,11 @@ export function report(
 		]),
 		...warnings(shots),
 		...viewsSection(views),
-		"Open the PNGs (first-screen ones first) and look for clipped text, empty regions, weak contrast, broken layout.",
+		...(shots.some((s) => s.png)
+			? [
+					"Open the PNGs (first-screen ones first) and look for clipped text, empty regions, weak contrast, broken layout.",
+				]
+			: []),
 		verdict(shots),
 	].join("\n");
 }

@@ -69,6 +69,7 @@ test("full-page shots keep the sticky footer in flow and preserve the scrolling 
 	const result = await runCli([
 		"check",
 		fixture,
+		"--shots",
 		"--view",
 		"none",
 		"--out",
@@ -276,6 +277,7 @@ test("omitted overlays opened by a step or confined to a view are grouped in tex
 	const result = await runCli([
 		"check",
 		join(import.meta.dir, "fixtures/check-overlays.html"),
+		"--shots",
 		"--quick",
 		"--view",
 		"all",

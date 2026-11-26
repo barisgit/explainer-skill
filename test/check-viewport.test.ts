@@ -29,6 +29,7 @@ test("repeatable custom viewports check layout and capture first screens and ste
 	const result = await runCli([
 		"check",
 		file,
+		"--shots",
 		"--viewport",
 		"1920x1080",
 		"--viewport",
@@ -54,7 +55,7 @@ test("repeatable custom viewports check layout and capture first screens and ste
 		] as const) {
 			const size = `${width}x${height}`;
 			const shot = shots.find((s) => s.theme === theme && s.viewport === size);
-			if (!shot?.first) {
+			if (!shot?.first?.png) {
 				throw new Error(`No first screen for ${theme} ${size}`);
 			}
 			expect(pngSize(shot.first.png)).toEqual([width, height]);

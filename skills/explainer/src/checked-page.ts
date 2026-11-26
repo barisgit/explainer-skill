@@ -126,7 +126,7 @@ export class CheckedPage {
 		return this.cdp.evaluate<FigureText[]>(FIGURE_TEXT_JS(false));
 	}
 
-	/** Checks each captured document state, not every control-sweep reload of that same document. */
+	/** Checks each inspected document state, not every control-sweep reload of that same document. */
 	async inspectLinks(): Promise<string[]> {
 		const links = await this.cdp.evaluate<LinkReport>(LINKS_JS);
 		this.problems.push(...links.problems);

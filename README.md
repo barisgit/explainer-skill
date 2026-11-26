@@ -113,7 +113,7 @@ The agent reads [`SKILL.md`](skills/explainer/SKILL.md) and drives a small CLI, 
 
 1. **Write** `page.mdx`: Markdown prose, the kit's components and the `.ts` or `.json` data it imports. `kit` lists what is available and `kit <name>` documents one; [`guide.md`](skills/explainer/guide.md) records what made earlier pages better or worse for their readers.
 2. **Pack**: `pack page.mdx -o out.html` renders the page to static HTML, draws charts, diagrams, circuits, formulas and code colours into it, and inlines the fonts, local images and only the kit scripts the page uses, so the result is one offline file.
-3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it and tries its kit controls from fresh states, reports errors, network use, dead links and clipped or overflowing content, and saves screenshots for the agent to look at. `--do` runs the clicks, drags, hovers, keys and field values you name instead, and `--do reply` prints the reply the page would send.
+3. **Check**: `check out.html` opens it in headless Chrome in light and dark at 1440 and 390 px wide, scrolls it and tries its kit controls from fresh states, reports errors, network use, dead links, clipping and overflow. Add `--shots` for screenshots, or `--do shot:<css>` for one element. `--do` runs the clicks, drags, hovers, keys and field values you name instead, and `--do reply` prints the reply the page would send.
 
 A diagram whose parts light up from the text, for illustration:
 

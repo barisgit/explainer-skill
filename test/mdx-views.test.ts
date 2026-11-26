@@ -226,7 +226,7 @@ describe("a filled view in the browser", () => {
 });
 
 describe("a filled view in pack and check", () => {
-	test("check --view all opens and captures each record", async () => {
+	test("check --view all checks each record without screenshots", async () => {
 		const output = await packed(
 			"checked",
 			FILLED.replace("records={items}", "records={items.slice(0, 3)}").replace(
@@ -243,7 +243,8 @@ describe("a filled view in pack and check", () => {
 			"--out",
 			dir.path("shots"),
 		]);
-		expect(checked.stdout).toContain("Views captured (4): #item/t1, #item/t2, #item/t3, #about");
+		expect(checked.stdout).toContain("Views checked (4): #item/t1, #item/t2, #item/t3, #about");
+		expect(checked.stdout).not.toMatch(/Screenshots:|Open the PNGs|\.png/);
 		expect(checked.stdout).toContain("0 problems");
 		expect(checked.code).toBe(0);
 	}, 90_000);

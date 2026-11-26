@@ -222,7 +222,7 @@ export function figureTextWarnings(
 			.map((f) => `${at(f, " live")}${findings(f)}${fix}`),
 	];
 	const cutShort = (f: FigureText, where: string) =>
-		`${at(f, where)}figure text not fully measured, the page's ${BUDGET_MS / 1000} s ran out: look at its texts in the PNGs`;
+		`${at(f, where)}figure text not fully measured, the page's ${BUDGET_MS / 1000} s ran out: inspect its text visually (check --shots)`;
 	warnings.push(
 		...drawn.filter((f) => !f.complete).map((f) => cutShort(f, " as pack drew it")),
 		...live.filter((f) => !f.complete).map((f) => cutShort(f, " live")),
