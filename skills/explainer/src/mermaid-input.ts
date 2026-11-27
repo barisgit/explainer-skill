@@ -73,19 +73,31 @@ export function stripPreamble(source: string): string {
 		.trim();
 }
 
-/** The statements after the header, one per entry: Mermaid reads `;` outside quotes as a line break in flowcharts and states. */
+/**
+ * The statements after the header, one per entry. In flowcharts and states Mermaid reads `;` outside quotes as a line break,
+ * the header's included (`flowchart LR; A --> B`), and a quoted label may run over lines, which stay one statement.
+ */
 function statementsOf(family: Family, body: string): string[] {
-	const lines = body.split("\n").slice(1);
 	if (!flows(family)) {
-		return lines.map((line) => line.trim());
+		return body
+			.split("\n")
+			.slice(1)
+			.map((line) => line.trim());
 	}
 	let quoted = false;
 	let out = "";
-	for (const ch of lines.join("\n")) {
+	for (const ch of body) {
 		quoted = ch === '"' ? !quoted : quoted;
-		out += ch === ";" && !quoted ? "\n" : ch;
+		if (quoted) {
+			out += ch === "\n" ? " " : ch;
+		} else {
+			out += ch === ";" ? "\n" : ch;
+		}
 	}
-	return out.split("\n").map((line) => line.trim());
+	return out
+		.split("\n")
+		.slice(1)
+		.map((line) => line.trim());
 }
 
 /** A flowchart link (`-->`, `---`, `-.->`, `==>`, `--x`, `<-->`), with its optional `|label|`. */
@@ -127,6 +139,10 @@ const BLOCKS: Record<Family, { opens: RegExp; closer: string } | undefined> = {
 	xychart: undefined,
 };
 
+/** Whether a statement ends a block: its closer alone, or a `}` after a block's last member (`+String name }`). */
+const closes = (closer: string, line: string) =>
+	line === closer || (closer === "}" && line.endsWith("}") && !line.includes("{"));
+
 /** The first block problem: a closer with no block open, else the innermost block never closed. */
 function blockProblem(family: Family, statements: string[]): string | undefined {
 	const blocks = BLOCKS[family];
@@ -135,7 +151,7 @@ function blockProblem(family: Family, statements: string[]): string | undefined 
 	}
 	const open: string[] = [];
 	for (const line of statements) {
-		if (line === blocks.closer) {
+		if (closes(blocks.closer, line)) {
 			if (!open.pop()) {
 				return `"${line}" closes no block; remove it, or open the block it ends`;
 			}

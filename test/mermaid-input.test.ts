@@ -116,6 +116,21 @@ const drawn = [
 		input: "sequenceDiagram\n  A->>B: ask\n  activate A\n  B-->>A: ok\n  deactivate A",
 		has: 'class="pele-activation"',
 	},
+	{
+		name: "a subgraph opened on the header's line",
+		input: "flowchart LR; subgraph Group\n  A --> B\n  end",
+		has: ">Group<",
+	},
+	{
+		name: "a markdown label whose lines read like statements",
+		input: 'flowchart TD\n  A["`start\nend\nthen -->`"]',
+		has: ">start<",
+	},
+	{
+		name: "a class body closed after its last member",
+		input: "classDiagram\n  class A {\n    +String name }\n  A --> B",
+		has: "name",
+	},
 ];
 
 test.each(drawn)("$name draws", ({ input, has }) => {
