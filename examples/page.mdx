@@ -4,21 +4,17 @@ contents: true
 ---
 import { Ask } from "./ask.tsx";
 import { prompts } from "./prompts.ts";
-import Battery from "./battery/opening.mdx";
-import * as battery from "./battery/model.ts";
-import Compressed from "./echarts-compressed/opening.mdx";
-import compressed from "./echarts-compressed/data.json";
-import Pullups from "./i2c-pull-ups/opening.mdx";
-import * as bus from "./i2c-pull-ups/bus.ts";
-import Electricity from "./electricity-mix/opening.mdx";
-import * as added from "./electricity-mix/facts.ts";
-import * as mix from "./electricity-mix/model.ts";
+import Btree from "./btree-index/opening.mdx";
+import Prices from "./negative-prices/opening.mdx";
 import Modules from "./node-modules/opening.mdx";
-import * as modules from "./node-modules/model.ts";
+import Litestream from "./litestream-tour/opening.mdx";
+import Database from "./saas-database/opening.mdx";
+import Battery from "./battery/opening.mdx";
+import Pullups from "./i2c-pull-ups/opening.mdx";
 import Fourier from "./fourier-series/opening.mdx";
-import * as fourier from "./fourier-series/fourier.ts";
+import Compressed from "./echarts-compressed/opening.mdx";
+import Electricity from "./electricity-mix/opening.mdx";
 import Dijkstra from "./dijkstra/opening.mdx";
-import * as paths from "./dijkstra/model.ts";
 import "./page.css";
 
 # Explainer examples
@@ -27,28 +23,16 @@ An agent wrote each page with [the explainer skill](https://github.com/barisgit/
 
 **Install:** `npx skills add barisgit/explainer-skill`
 
-<section class="entry battery">
-<Ask prompt={prompts.battery} />
-<h2 data-nav="A decision"><a href="battery/">Home battery <em>payback</em> by size</a></h2>
-<Battery />
+<section class="entry btree-index">
+<Ask prompt={prompts.btree} />
+<h2 data-nav="How it works"><a href="btree-index/">How a B-tree <em>index</em> finds a row</a></h2>
+<Btree />
 </section>
 
-<section class="entry echarts-compressed">
-<Ask prompt={prompts.echarts} />
-<h2 data-nav="A code review"><a href="echarts-compressed/">Shipping ECharts <em>compressed</em></a></h2>
-<Compressed />
-</section>
-
-<section class="entry i2c-pull-ups">
-<Ask prompt={prompts.i2c} />
-<h2 data-nav="An engineering page"><a href="i2c-pull-ups/">I²C <em>pull-up</em> resistors at 400 kHz</a></h2>
-<Pullups />
-</section>
-
-<section class="entry electricity-mix">
-<Ask prompt={prompts.electricity} />
-<h2 data-nav="A data report"><a href="electricity-mix/">Change in world electricity generation, by source</a></h2>
-<Electricity />
+<section class="entry negative-prices">
+<Ask prompt={prompts.prices} />
+<h2 data-nav="A data report"><a href="negative-prices/">Why German electricity prices go <em>negative</em></a></h2>
+<Prices />
 </section>
 
 <section class="entry node-modules">
@@ -57,10 +41,46 @@ An agent wrote each page with [the explainer skill](https://github.com/barisgit/
 <Modules />
 </section>
 
+<section class="entry litestream-tour">
+<Ask prompt={prompts.litestream} />
+<h2 data-nav="A system tour"><a href="litestream-tour/">How <em>Litestream</em> works</a></h2>
+<Litestream />
+</section>
+
+<section class="entry saas-database">
+<Ask prompt={prompts.database} />
+<h2 data-nav="A team decision"><a href="saas-database/">The database for a <em>multi-tenant</em> SaaS</a></h2>
+<Database />
+</section>
+
+<section class="entry battery">
+<Ask prompt={prompts.battery} />
+<h2 data-nav="A purchase decision"><a href="battery/">Home battery <em>payback</em> by size</a></h2>
+<Battery />
+</section>
+
+<section class="entry i2c-pull-ups">
+<Ask prompt={prompts.i2c} />
+<h2 data-nav="An engineering page"><a href="i2c-pull-ups/">I²C <em>pull-up</em> resistors at 400 kHz</a></h2>
+<Pullups />
+</section>
+
 <section class="entry fourier-series">
 <Ask prompt={prompts.fourier} />
 <h2 data-nav="A study page"><a href="fourier-series/">The <em>Gibbs overshoot</em> of a square wave</a></h2>
 <Fourier />
+</section>
+
+<section class="entry echarts-compressed">
+<Ask prompt={prompts.echarts} />
+<h2 data-nav="A code review"><a href="echarts-compressed/">Shipping ECharts <em>compressed</em></a></h2>
+<Compressed />
+</section>
+
+<section class="entry electricity-mix">
+<Ask prompt={prompts.electricity} />
+<h2 data-nav="A data set by place"><a href="electricity-mix/">Change in world electricity generation, by source</a></h2>
+<Electricity />
 </section>
 
 <section class="entry dijkstra">
