@@ -5,7 +5,8 @@ import { ELEMENT_NAME_JS } from "./page-js.ts";
  * scope that falls short of the contrast the kit tunes its own colours to: --accent as text on --bg, --surface and --sunken (4.5:1,
  * the worst named), --accent-ink as text on --accent (4.5:1), and each series ink --c1..--c6 as a mark on --bg (3:1). The scopes are
  * :root and every element, body and SVG included, that sets one of those tokens to another value than its parent (a page may give a
- * block its own accent); an element is measured only for the tokens it changes, on the tones it inherits or sets. Values are resolved in one detached probe that takes the scope's
+ * block its own accent); an element is measured only for the tokens it changes, on the tones it inherits or sets, unless it changes
+ * the color-scheme (the kit's .hero), where every token is measured. Values are resolved in one detached probe that takes the scope's
  * color-scheme, so light-dark() and color-mix() resolve as there, and read back through a 1 px canvas, so any colour syntax ends as
  * sRGB (an invalid value reads as transparent, which measures as the tone under it). The probe is added to the page, so check runs
  * this last on a load. Not measured: translucent tones (composited over white) and currentColor in a token. The scheme is the one the scope resolves light-dark() to, so a page with a fixed scheme names that scheme in both themes.
@@ -34,7 +35,8 @@ export const CONTRAST_JS = `(() => {
 	const styles = new Map();
 	const style = (el) => { if (!styles.has(el)) styles.set(el, getComputedStyle(el)); return styles.get(el); };
 	const token = (el, t) => style(el).getPropertyValue(t).trim();
-	const changed = (el) => FOREGROUND.filter((t) => token(el, t) !== token(el.parentElement, t));
+	// An element that turns the scheme (a .hero) resolves every light-dark() token anew, so all of them are measured there.
+	const changed = (el) => style(el).colorScheme !== style(el.parentElement).colorScheme ? FOREGROUND : FOREGROUND.filter((t) => token(el, t) !== token(el.parentElement, t));
 	const root = document.documentElement;
 	const scopes = [[root, FOREGROUND], ...[...document.querySelectorAll("body, body *")].map((el) => [el, changed(el)]).filter(([, tokens]) => tokens.length)];
 	const warnings = [];

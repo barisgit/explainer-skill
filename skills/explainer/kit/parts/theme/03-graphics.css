@@ -437,6 +437,15 @@
 	:is(.mermaid, .schematic) > svg {
 		--_diagram-scale: 1.4;
 	}
+	/* A Stepper's diagram is its stage: at least the text's width, short of doubling its labels or passing 60% of the window's
+	   height. */
+	[data-stepper] :is(.mermaid, .schematic) > svg {
+		min-width: max(
+			var(--mermaid-min, 0px),
+			var(--schematic-min, 0px),
+			min(100%, 66ch, var(--_diagram-base) * 2, 60vh * var(--diagram-ratio))
+		);
+	}
 }
 .schematic > svg .value {
 	fill: var(--muted);

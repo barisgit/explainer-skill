@@ -22,9 +22,14 @@
 .controls:has(+ .controls) {
 	padding-block-end: 0.25rem;
 }
-/* Explore's readout is a block, so it can hold a paragraph or a div; it keeps the spacing of a figure's own paragraph. */
+/* Explore's readout is a block, so it can hold a paragraph or a div; it keeps the spacing of a figure's own paragraph. It is the
+   figure's key number, set a step above the text so it reads first. */
 .fig > [data-readout] {
 	padding-block: 0.75rem;
+	font-size: clamp(1.07rem, 2vw, 1.36rem);
+	font-weight: 600;
+	line-height: 1.3;
+	font-variant-numeric: tabular-nums;
 }
 /* What a figure that follows a Controls shows, and the way back to them. On screen it is left out of a figure right under its
    Controls (pack marks it, data-under), where the controls are in sight; printed, the controls are not, so every figure says it. */

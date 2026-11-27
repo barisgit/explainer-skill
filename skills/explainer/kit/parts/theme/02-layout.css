@@ -241,6 +241,33 @@ figure:not([class]) > img {
 figure:not([class]) > img {
 	display: block;
 }
+/* A hero: the one figure that carries the page's answer, on a dark navy panel as wide as the column in both schemes (to the
+   window's edges on a phone). Inside it every token resolves as in dark mode, on the panel's own tones, so drawn charts, Mermaid
+   roles and a page's light-dark() accent follow it. Paper prints it as any figure. */
+@media screen {
+	.hero {
+		--bg: #13294a;
+		--surface: var(--bg);
+		--sunken: var(--bg);
+		--under: var(--bg);
+		--ink: #f3f7ff;
+		--muted: #c6d2e7;
+		--rule: #34496b;
+		--rule-strong: #8195b6;
+		color-scheme: dark;
+		color: var(--ink);
+		background: var(--bg);
+		border-radius: var(--radius);
+		padding: 0.25rem var(--inset);
+	}
+}
+@media screen and (width < 40rem) {
+	.hero {
+		margin-inline: calc(-1 * var(--gutter));
+		padding-inline: var(--gutter);
+		border-radius: 0;
+	}
+}
 /* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
    Two children: the text, then the figure. From 56rem they stand side by side, the text two fifths from the column's start like
    the prose around it, the figure out to .wide's end, and the figure stays in view while longer text scrolls past it, scrolling

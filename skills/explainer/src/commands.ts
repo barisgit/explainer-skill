@@ -158,7 +158,7 @@ const FEATURES: Feature[] = [
 	{
 		name: "theme.css",
 		files: ["theme.css", "scheme.js"],
-		line: "warm-paper classes and tokens; reader selects System, Light or Dark.",
+		line: "warm-paper classes, tokens and a .hero panel; System/Light/Dark picker.",
 		doc: () => kitHeader("theme.css"),
 	},
 	{
