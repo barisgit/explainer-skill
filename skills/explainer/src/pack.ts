@@ -89,11 +89,12 @@ function collectTags(tags: Map<string, string>, n: number, seen: Map<string, Tag
  * renderMermaid makes one. The source is the block's text, decoded, as Mermaid reads it in a browser: a ```mermaid fence
  * becomes such a block with its source escaped, so a `<br>` in a label breaks the line, and its meta as data-meta. Syntax errors, unsupported types and data-steps or data-step on a block (a diagram steps through refs)
  * are returned as problems, as is a node id an earlier block tags with another number. `diagramRefs` collects every part id,
- * `diagramTags` every number tag by node id with the block that gave it.
+ * `diagramTags` every number tag by node id with the block that gave it. Fixed node paint is a warning.
  */
 function renderMermaidBlocks(
 	html: string,
 	problems: string[],
+	warnings: string[],
 	diagramRefs: Set<string>,
 	diagramTags: Map<string, TagSource>,
 ): Promise<string> {
@@ -120,6 +121,7 @@ function renderMermaidBlocks(
 						diagramRefs.add(id);
 					}
 					problems.push(...collectTags(diagram.tags, n, diagramTags));
+					warnings.push(...diagram.warnings.map((warning) => `mermaid block ${n}: ${warning}`));
 					end.before(diagram.svg + (diagram.phone ?? ""), { html: true });
 				});
 			},
@@ -344,11 +346,12 @@ export async function packPage(
 	) => Promise<{ html: string; records?: PlacedRecord[] }>,
 ): Promise<{ html: string; warnings: string[] }> {
 	const problems: string[] = [];
+	const diagramWarnings: string[] = [];
 	const diagramRefs = new Set<string>();
 	const diagramTags = new Map<string, TagSource>();
 	const { html: rendered, records } = await render(async (html) =>
 		renderSchematicBlocks(
-			await renderMermaidBlocks(html, problems, diagramRefs, diagramTags),
+			await renderMermaidBlocks(html, problems, diagramWarnings, diagramRefs, diagramTags),
 			problems,
 			diagramRefs,
 		),
@@ -378,6 +381,7 @@ export async function packPage(
 		throw new PackError(unaddressed.map((p) => `- ${p}`).join("\n"));
 	}
 	const warnings = [
+		...diagramWarnings,
 		...recalls.warnings,
 		...tagWarnings,
 		...(await literalLinkWarnings(html)),

@@ -374,6 +374,7 @@ const PIPELINE = `flowchart LR
 
 /** A flowchart a phone shows top-down but A4 paper fits as written. */
 const SHORT_FLOW = "flowchart LR\n  a[Collect] --> b[Clean] --> c[Model] --> d[Report]";
+const SMALL_FLOW = "flowchart LR\n  a[Input] --> b[Output]";
 
 const SEQUENCE = `sequenceDiagram
 	participant B as Browser
@@ -408,7 +409,8 @@ const diagramPage = (body: string, checks: Record<string, string>) =>
 
 test("on a phone a wide flowchart shows its top-down copy, and a wide sequence keeps 10 px text and scrolls sideways", async () => {
 	const page = diagramPage(
-		`<pre class="mermaid" id="flow">${PIPELINE}</pre>\n<pre class="mermaid" id="seq">${SEQUENCE}</pre>`,
+		`<pre class="mermaid" id="flow">${PIPELINE}</pre>\n<pre class="mermaid" id="seq">${SEQUENCE}</pre>
+		<pre class="mermaid" id="small">${SMALL_FLOW}</pre>`,
 		{
 			"the phone copy shows on phones only, in the diagram's place": `(() => {
 			const phone = innerWidth < 640;
@@ -421,6 +423,21 @@ test("on a phone a wide flowchart shows its top-down copy, and a wide sequence k
 			.every((svg) => [...svg.querySelectorAll("text")].every((t) => parseFloat(getComputedStyle(t).fontSize) * svg.getScreenCTM().a > 9.99))`,
 			"the sequence scrolls sideways on phones only": `(innerWidth < 640) === (document.querySelector("#seq").scrollWidth > document.querySelector("#seq").clientWidth + 1)`,
 			"a diagram and its phone copy do not link each other's parts": `!document.querySelector(".is-linked")`,
+			"a small drawing grows to the desktop cap, stays centred, and never outgrows the column": `(() => {
+				const block = document.querySelector("#small");
+				const svg = block.querySelector("svg");
+				const [b, s] = [block, svg].map((el) => el.getBoundingClientRect());
+				const textSize = 13 * svg.getScreenCTM().a;
+				if (Math.abs(b.x + b.width / 2 - s.x - s.width / 2) > 1) return false;
+				if (innerWidth < 640) return textSize > 12.9 && textSize <= 13;
+				if (textSize < 18.1 || textSize > 18.21) return false;
+				block.style.width = svg.viewBox.baseVal.width * 1.2 + "px";
+				if (Math.abs(svg.getBoundingClientRect().width - block.clientWidth) > 1) return false;
+				const cap = svg.viewBox.baseVal.width * 1.1;
+				block.style.setProperty("--schematic-max", svg.viewBox.baseVal.width + "px");
+				svg.style.setProperty("--mermaid-max", cap + "px");
+				return Math.abs(svg.getBoundingClientRect().width - cap) <= 1;
+			})()`,
 		},
 	);
 
@@ -438,6 +455,7 @@ test("on paper every diagram prints whole as one copy, the top-down one where th
 			`<pre class="mermaid" id="seq">sequenceDiagram\n${[...participants, ...messages].join("\n")}</pre>`,
 			`<pre class="mermaid" id="flow">${PIPELINE}</pre>`,
 			`<pre class="mermaid" id="short">${SHORT_FLOW}</pre>`,
+			`<pre class="mermaid" id="small">${SMALL_FLOW}</pre>`,
 		].join("\n"),
 		{
 			"each diagram prints one copy": `[...document.querySelectorAll(".mermaid")].every((block) =>
@@ -450,6 +468,10 @@ test("on paper every diagram prints whole as one copy, the top-down one where th
 			})`,
 			"a flowchart too wide to read on paper prints top-down": `getComputedStyle(document.querySelector("#flow > svg[data-phone]")).display !== "none"`,
 			"one that reads at the paper's width prints as on a wide screen": `getComputedStyle(document.querySelector("#short > svg:not([data-phone])")).display !== "none"`,
+			"a small drawing still prints at its original size": `(() => {
+				const scale = document.querySelector("#small > svg").getScreenCTM().a;
+				return scale > 0.99 && scale <= 1;
+			})()`,
 		},
 	);
 
@@ -514,16 +536,10 @@ test("a two-way edge ends in an arrowhead at both ends, the start one pointing o
 	}
 });
 
-/** The size in px a diagram's smallest and largest text is drawn at, as page expressions over the shown copies of `selector`. */
-const SHOWN_TEXT = (selector: string) => `[...document.querySelectorAll("${selector} > svg")]
-	.filter((svg) => getComputedStyle(svg).display !== "none")
-	.flatMap((svg) => [...svg.querySelectorAll("text")].map((t) => parseFloat(getComputedStyle(t).fontSize) * svg.getScreenCTM().a))`;
-
-test("on wide screens a diagram's text is drawn at 13 px and its boxes have no fill", async () => {
+test("nodes without a class keep their plain unfilled boxes", async () => {
 	const page = diagramPage(
 		`<pre class="mermaid" id="flow">${SHORT_FLOW.replace("-->", "-->|go|")}</pre>`,
 		{
-			"text is 13 px, not larger": `(innerWidth < 640) || ${SHOWN_TEXT("#flow")}.every((px) => px > 12.8 && px < 13.001)`,
 			"node boxes are unfilled": `[...document.querySelectorAll("#flow .node rect")].every((r) => getComputedStyle(r).fill === "rgba(0, 0, 0, 0)")`,
 		},
 	);

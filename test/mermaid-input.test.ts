@@ -1,5 +1,37 @@
 import { expect, test } from "bun:test";
-import { failureOf, svgOf } from "./support.ts";
+import { readFileSync } from "node:fs";
+import { failureOf, packMdx, scratch, svgOf } from "./support.ts";
+
+test("explicit classDef and style paint still draw, with warnings if they do not adapt", async () => {
+	const dir = scratch();
+	try {
+		const { result, output } = await packMdx(
+			dir,
+			"fixed-paint",
+			`# Diagram
+
+\`\`\`mermaid
+flowchart LR
+  a[Start]:::info --> b[Work]:::themed --> c[End]
+  classDef info fill:#fff,stroke:#777,color:#111
+  classDef themed stroke:var(--accent),fill:none,stroke-width:2
+  style b stroke:var(--info)
+  style c fill:#eee
+\`\`\`
+`,
+		);
+		expect(result.code).toBe(0);
+		const html = readFileSync(output, "utf8");
+		expect(html).toContain('fill="#fff" stroke="#777"');
+		expect(html).toContain('fill="#eee"');
+		expect(result.stdout).toContain('mermaid block 1: classDef "info" uses fixed paint');
+		expect(result.stdout).toContain('mermaid block 1: style "c" uses fixed paint');
+		expect(result.stdout).not.toContain('classDef "themed"');
+		expect(result.stdout).not.toContain('style "b"');
+	} finally {
+		dir.cleanup();
+	}
+});
 
 // What the renderer's parsers read: every line is drawn as written, drawn as Mermaid draws it, or fails naming what pack
 // cannot read and what to write instead. Nothing is dropped.

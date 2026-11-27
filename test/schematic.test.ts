@@ -351,14 +351,16 @@ test("ground named on its own lights its symbols and stubs in the accent, as a n
 	expect(await packAndRun(dir, "ground", page)).toEqual([]);
 }, 30_000);
 
-test("on a wide screen the drawing fills the column up to part names at the label size, and no text is larger", async () => {
+test("a schematic grows up to an 18.2 px part name on desktop and keeps its old cap on phones", async () => {
 	const page = circuitPage({
-		"names read at 13 px, the largest text anywhere, in a drawing narrower than the column": `(() => {
+		"names are the largest text in a drawing narrower than the desktop column": `(() => {
+			document.querySelector(".schematic").style.setProperty("--mermaid-max", "1px");
 			const svg = document.querySelector(".schematic svg");
 			const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
 			const sizes = [...svg.querySelectorAll("text")].map((t) => parseFloat(getComputedStyle(t).fontSize) * scale);
+			const max = Math.max(...sizes);
 			const narrow = svg.getBoundingClientRect().width < document.querySelector(".schematic").clientWidth;
-			return Math.max(...sizes) <= 13.01 && (innerWidth < 640 || (narrow && Math.max(...sizes) >= 12.9));
+			return innerWidth < 640 ? max <= 13.01 : narrow && max >= 18.1 && max <= 18.21;
 		})()`,
 	});
 	expect(await packAndRun(dir, "wide", page)).toEqual([]);

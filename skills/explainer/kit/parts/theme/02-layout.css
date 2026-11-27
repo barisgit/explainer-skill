@@ -343,7 +343,7 @@ figure:not([class]) > img {
 			var(--schematic-min, var(--mermaid-min)),
 			var(--drawing-height, var(--pin-height)) *
 			var(--diagram-ratio),
-			var(--schematic-max, var(--mermaid-max))
+			var(--_diagram-max)
 		);
 		max-inline-size: 100%;
 	}

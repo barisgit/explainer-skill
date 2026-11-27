@@ -1,7 +1,15 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderMermaid } from "../skills/explainer/src/mermaid.ts";
-import { inPage, packAndRun, packedMdx, packMdx, pageContract, scratch } from "./support.ts";
+import {
+	inPage,
+	packAndRun,
+	packedMdx,
+	packMdx,
+	pageContract,
+	scratch,
+	WIDTHS,
+} from "./support.ts";
 
 const dir = scratch();
 afterAll(dir.cleanup);
@@ -64,6 +72,89 @@ test("a tagged path keeps its values: a stage's second line and an edge's label"
 		expect(copy).toMatch(/<g class="edge-label"[^>]*>[\s\S]*?>418 KB inlined</);
 	}
 });
+
+test("native node roles tint both copies, follow the theme picker and local tokens, and keep text readable", async () => {
+	const flow = `${SYSTEM.replace('inv["hybrid inverter"]', 'inv["hybrid inverter"]:::info')}
+	class roof,house warn
+	class bat ok
+	class grid bad`;
+	const output = await packedMdx(
+		dir,
+		"roles",
+		`# Power\n\n\`\`\`mermaid ${TAGS}\n${flow}\n\`\`\`\n`,
+	);
+	expect(readFileSync(output, "utf8")).not.toContain("--_mermaid-");
+	for (const viewport of WIDTHS) {
+		const looks = await inPage(
+			output,
+			(cdp) =>
+				cdp.evaluate(`(() => {
+					const svg = [...document.querySelectorAll(".mermaid > svg")]
+						.find((copy) => getComputedStyle(copy).display !== "none");
+					const ctx = document.createElement("canvas").getContext("2d");
+					const rgb = (el, prop) => {
+						ctx.clearRect(0, 0, 1, 1);
+						ctx.fillStyle = getComputedStyle(el)[prop];
+						ctx.fillRect(0, 0, 1, 1);
+						return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+					};
+					const luminance = (channels) => channels.map((c) => c / 255)
+						.map((c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+						.reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+					const contrast = (a, b) => {
+						const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+						return (x + 0.05) / (y + 0.05);
+					};
+					const nodes = (id) => svg.querySelector('.node[data-id="' + id + '"]');
+					const body = (id) => nodes(id).querySelector("rect");
+					const picker = document.querySelector(".scheme-picker");
+					const set = (scheme) => { picker.value = scheme; picker.dispatchEvent(new Event("change")); };
+					const snapshot = () => {
+						const edge = svg.querySelector("polyline.edge");
+						const ink = rgb(edge, "stroke").join(",");
+						const ids = ["inv", "roof", "house", "bat", "grid"];
+						const fills = ids.map((id) => rgb(body(id), "fill"));
+						const strokes = ids.map((id) => rgb(body(id), "stroke").join(","));
+						return {
+							fills, strokes,
+							textReadable: ids.every((id, i) => [...nodes(id).querySelectorAll("text")]
+								.every((label) => contrast(fills[i], rgb(label, "fill")) >= 4.5)),
+							edgesNeutral: [...svg.querySelectorAll("polyline.edge")]
+								.every((line) => rgb(line, "stroke").join(",") === ink) && !strokes.includes(ink),
+							unassignedPlain: getComputedStyle(body("meter")).fill === "rgba(0, 0, 0, 0)",
+						};
+					};
+					set("light");
+					const light = snapshot();
+					set("dark");
+					const dark = snapshot();
+					nodes("inv").style.setProperty("--info", "#e98bce");
+					const override = snapshot();
+					return {
+						light, dark, override,
+						tintChanges: light.fills[0].join() !== dark.fills[0].join() &&
+							dark.fills[0].join() !== override.fills[0].join(),
+						tag: nodes("inv").querySelector("[data-tag]").getAttribute("aria-label"),
+					};
+				})()`),
+			viewport,
+		);
+		expect(looks).toMatchObject({
+			light: {
+				textReadable: true,
+				edgesNeutral: true,
+				unassignedPlain: true,
+				strokes: ["53,96,156", "138,90,0", "138,90,0", "24,116,75", "179,50,42"],
+			},
+			dark: { textReadable: true, edgesNeutral: true, unassignedPlain: true },
+			override: { textReadable: true },
+			tintChanges: true,
+			tag: "2, hybrid inverter",
+		});
+		expect(looks).toHaveProperty("dark.strokes.0", "143,178,232");
+		expect(looks).toHaveProperty("override.strokes.0", "233,139,206");
+	}
+}, 30_000);
 
 test("a node's tag widens its box by the tag, leaving the label's room as it was", () => {
 	const width = (svg: string, id: string) =>
@@ -196,14 +287,15 @@ test("a tag and its mention light each other on hover and focus, read at the 13 
 			const style = getComputedStyle(document.querySelector("#mention"));
 			return style.fontSize === "13px" && style.borderTopWidth === "1px" && parseFloat(style.borderTopLeftRadius) >= 9;
 		})()`,
-		"each shown tag is 13 px text in a ring inside its node, before its label": `[...document.querySelectorAll(".mermaid > svg")]
+		"each shown tag uses the label's text size and keeps its ring inside its node, before its label": `[...document.querySelectorAll(".mermaid > svg")]
 			.filter((svg) => getComputedStyle(svg).display !== "none")
 			.every((svg) => [...svg.querySelectorAll("[data-tag]")].every((tag) => {
 				const node = tag.closest(".node");
 				const [ring, label] = [tag.querySelector("rect").getBBox(), node.querySelector(":scope > text").getBBox()];
 				const box = node.querySelector(":scope > rect").getBBox();
-				const px = parseFloat(getComputedStyle(tag.querySelector("text")).fontSize) * svg.getScreenCTM().a;
-				return px > 12.8 && px < 13.001 && ring.x >= box.x && ring.y >= box.y && ring.y + ring.height <= box.y + box.height
+				const font = (text) => getComputedStyle(text).fontSize;
+				return font(tag.querySelector("text")) === font(node.querySelector(":scope > text"))
+					&& ring.x >= box.x && ring.y >= box.y && ring.y + ring.height <= box.y + box.height
 					&& ring.x + ring.width < label.x && label.x + label.width <= box.x + box.width;
 			}))`,
 	})}</script></body></html>`;

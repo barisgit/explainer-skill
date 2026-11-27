@@ -11,11 +11,12 @@ export interface Diagram {
 	phone?: string | undefined;
 	refs: string[];
 	tags: Map<string, string>;
+	warnings: string[];
 }
 
 /**
- * The renderer sets all its text at 13 px, the kit's label size, and a diagram is never drawn larger. It shrinks with its column
- * until its smallest text is this size in px; in a narrower column it scrolls sideways.
+ * The renderer lays out text at the kit's 13 px label size. A diagram shrinks with its column until its smallest text is
+ * this size in px; in a narrower column it scrolls sideways.
  */
 export const READABLE_PX = 10;
 /** The width a diagram block gives its SVG on a 390 px phone: the viewport less the page's and the block's 16 px insets. */
@@ -172,6 +173,37 @@ function firstMisrender(family: Family, statements: string[]): string | undefine
 	return undefined;
 }
 
+const NODE_ROLES = ["info", "ok", "warn", "bad"];
+/** Let Mermaid resolve roles like any other class. Its last classDef wins, so authors can still define their own classes. */
+const ROLE_DEFAULTS = NODE_ROLES.map(
+	(role) =>
+		`\nclassDef ${role} fill:var(--_mermaid-tint-${role}),stroke:var(--${role}),color:var(--_mermaid-ink-${role})`,
+).join("");
+
+/** Mermaid splits classDef values at commas. Resolve its comma-free placeholders to CSS paints on the SVG. */
+const ROLE_PAINTS = new Map(
+	NODE_ROLES.flatMap((role) => [
+		[`var(--_mermaid-tint-${role})`, `color-mix(in srgb, var(--${role}) 14%, var(--under))`],
+		[`var(--_mermaid-ink-${role})`, `color-mix(in srgb, var(--${role}) 40%, var(--ink))`],
+	]),
+);
+
+/** Fixed node paint still draws as written, but cannot follow the reader's scheme. */
+function fixedNodePaintWarnings(source: string): string[] {
+	return [...source.matchAll(/^[ \t]*(classDef|style)[ \t]+([\w,-]+)[ \t]+(.+)/gm)].flatMap(
+		([, statement, target, body = ""]) => {
+			const paints = [...body.matchAll(/(?:^|,)\s*(?:fill|stroke|color)\s*:\s*([^,]+)/g)];
+			return paints.some(
+				([, paint = ""]) => !/^(?:var\(|none$|transparent$|currentcolor$)/i.test(paint.trim()),
+			)
+				? [
+						`${statement} "${target}" uses fixed paint; check both themes, or use info, ok, warn or bad`,
+					]
+				: [];
+		},
+	);
+}
+
 /**
  * data-ref on nodes, groups, classes, entities and participants (their id), edges and their labels (the edge id the parser
  * gives both: the author's `e1@`, else `L_<from>_<to>_<n>`), lifelines (their participant) and messages (m1, m2, ...). A node's
@@ -252,13 +284,13 @@ function readableWidth(svg: string): number {
 }
 
 /**
- * The width limits theme.css reads from a diagram's custom properties: at most its drawn size, and at least the width that
- * keeps its smallest text readable (never more than the most), below which its block scrolls sideways. Custom properties
+ * The drawn width theme.css caps on phones and in print (and scales up on desktops), and the width that keeps the smallest
+ * text readable, below which its block scrolls sideways. Custom properties
  * rather than an inline max-width, so one page rule on `.mermaid > svg` can still size it.
  */
 function sizeStyle(svg: string, width: number, height: number): string {
 	const most = Math.floor(width);
-	return `--mermaid-max: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px; --diagram-ratio: ${width / height}`;
+	return `--_diagram-base: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px; --diagram-ratio: ${width / height}`;
 }
 
 /**
@@ -269,7 +301,8 @@ function sizeStyle(svg: string, width: number, height: number): string {
  */
 function inline(svg: string, id: string): string {
 	return editMarkup(svg.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, ""), {
-		attribute: (name, value) => (name === "id" ? `${id}-${value}` : localUrls(value, id)),
+		attribute: (name, value) =>
+			name === "id" ? `${id}-${value}` : (ROLE_PAINTS.get(value) ?? localUrls(value, id)),
 		css: (text) =>
 			scopeRules(localUrls(text, id), id).replace(
 				/--xychart-color-(\d+): [^;]+;/g,
@@ -364,7 +397,12 @@ function renderOne(source: string, n: number, meta: string): Diagram {
 	}
 
 	// Elsewhere ";" can be message or label text.
-	const text = flows(family) ? statements : body;
+	const text =
+		family === "flowchart"
+			? statements.replace("\n", `${ROLE_DEFAULTS}\n`)
+			: family === "state"
+				? statements
+				: body;
 	const draw = (transpose: boolean) =>
 		renderMermaidSVG(text, {
 			transparent: true,
@@ -390,7 +428,13 @@ function renderOne(source: string, n: number, meta: string): Diagram {
 	const refs = [svg, phone ?? ""].flatMap((copy) =>
 		[...copy.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""),
 	);
-	return { svg, phone, refs: [...new Set(refs)], tags };
+	return {
+		svg,
+		phone,
+		refs: [...new Set(refs)],
+		tags,
+		warnings: family === "flowchart" ? fixedNodePaintWarnings(statements) : [],
+	};
 }
 
 /**

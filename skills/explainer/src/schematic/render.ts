@@ -10,9 +10,9 @@ import type { PlacedLabel } from "./labels.ts";
 import { extentOf, type Part, pinsOf, type Scene } from "./scene.ts";
 import { FONT, LINE, runsOf, SUB, VALUE_FONT } from "./text.ts";
 
-/** The size, in px, a part's name reads at when the drawing is as large as it gets: the label size, never larger. */
+/** The part name's size at the base width, before any desktop enlargement. */
 const LABEL_PX = 13;
-/** The most a drawing grows past its drawn size; a column narrower than that scales it down instead. */
+/** Scale the drawing units to the base width. */
 const SCALE = LABEL_PX / FONT;
 const MARGIN = 6;
 const STROKE = 1.5;
@@ -142,8 +142,8 @@ export function refsOf(scene: Scene): string[] {
 }
 
 /**
- * The SVG, as wide as its column up to SCALE times its drawn width (names at the label size, unless that would put its smallest text under READABLE_PX), and at least the width that keeps its smallest
- * text at READABLE_PX, below which its block scrolls sideways (theme.css reads both from --schematic-max and --schematic-min).
+ * The SVG carries its base width (part names at LABEL_PX unless the smallest text needs more room) and the minimum width
+ * that keeps the smallest text at READABLE_PX. The theme sets its desktop cap and scrolls below the minimum.
  */
 export function renderSvg(
 	scene: Scene,
@@ -159,7 +159,7 @@ export function renderSvg(
 	const byPart = new Map(labels.map((l) => [l.part, l]));
 	return [
 		`<svg viewBox="${num(box.x0)} ${num(box.y0)} ${num(w)} ${num(h)}" width="100%"`,
-		` style="--schematic-max: ${most}px; --schematic-min: ${least}px; --diagram-ratio: ${w / h}" fill="currentColor" role="img" aria-label="${escapeHtml(title)}">`,
+		` style="--_diagram-base: ${most}px; --schematic-min: ${least}px; --diagram-ratio: ${w / h}" fill="currentColor" role="img" aria-label="${escapeHtml(title)}">`,
 		`<g fill="none" stroke="currentColor" stroke-width="${STROKE}" stroke-linejoin="round">${wiresSvg(scene, dots)}</g>`,
 		scene.parts.map((p) => partSvg(p, byPart.get(p.id))).join(""),
 		"</svg>",

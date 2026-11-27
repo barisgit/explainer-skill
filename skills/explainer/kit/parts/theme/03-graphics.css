@@ -325,6 +325,7 @@
 /* The renderer fills edge-label boxes, hollow markers and end states with --bg: here the tone under the diagram, so a diagram in a
    band or panel has no page-coloured boxes. */
 .mermaid > svg {
+	--_diagram-max: var(--mermaid-max, var(--_diagram-default-max));
 	--bg: var(--under);
 	--fg: var(--ink);
 	--_text: var(--ink);
@@ -341,9 +342,7 @@
 	--_key-badge: var(--sunken);
 	font-family: var(--font);
 	overflow: visible;
-	/* pack sets both on the svg: the drawn size at most (text at the 13 px label size), and at least the width that keeps its
-	   smallest text at 10 px, below which the block scrolls sideways. */
-	max-width: var(--mermaid-max);
+	/* Below this width the block scrolls to keep text at 10 px. */
 	min-width: var(--mermaid-min);
 }
 /* An edge label's box masks the line under it, so a dimmed label dims by colour, its text mixed toward the tone as far as the
@@ -409,9 +408,8 @@
 	border-color: var(--accent);
 }
 
-/* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's tokens;
-   a part's value and its sub-labels are secondary. As wide as the column, but no wider than part names at the label size (13 px); at
-   least the width that keeps its smallest text at 10 px, below which the block scrolls sideways; on paper fitted to the column. */
+/* Schematic blocks: pack draws each to one SVG in currentColor, so ink on the tone around it follows light, dark and a page's
+   tokens; a part's value and its sub-labels are secondary. As with Mermaid, the block scrolls below its 10 px text floor. */
 .schematic {
 	display: block;
 	margin: 1.5rem 0;
@@ -423,11 +421,22 @@
 	margin: 0;
 }
 .schematic > svg {
+	--_diagram-max: var(--schematic-max, var(--_diagram-default-max));
 	color: var(--ink);
 	font-family: var(--font);
 	overflow: visible;
-	max-width: var(--schematic-max);
 	min-width: var(--schematic-min);
+}
+/* Fit the SVG to the column and the same cap in a pinned .beside. Wide screens can use 40% more room: 13 px labels reach
+   about 18 px, still on the scale of prose. Keep the packed cap on phones and paper. */
+:is(.mermaid, .schematic) > svg {
+	--_diagram-default-max: calc(var(--_diagram-base) * var(--_diagram-scale, 1));
+	max-width: var(--_diagram-max);
+}
+@media screen and (width >= 40rem) {
+	:is(.mermaid, .schematic) > svg {
+		--_diagram-scale: 1.4;
+	}
 }
 .schematic > svg .value {
 	fill: var(--muted);

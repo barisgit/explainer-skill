@@ -34,8 +34,8 @@ The {euro(QUOTES[0].price)} is a battery, a new inverter and a new meter.
 
 ```mermaid tag:bat=1 tag:inv=2 tag:meter=3
 flowchart LR
-  roof["roof panels, 6 kW"] --> inv["hybrid inverter"]
-  inv <--> bat["5 kWh battery"]
+  roof["roof panels, 6 kW"] --> inv["hybrid inverter"]:::info
+  inv <--> bat["5 kWh battery"]:::ok
   inv --> house["house"]
   house <--> meter["two-way meter"]
   meter <--> grid["grid"]

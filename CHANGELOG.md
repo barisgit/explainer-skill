@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Mermaid and schematic drawings can grow up to 40% beyond their base size on wide screens, with typical labels reaching 18.2 px. Phone and print sizing stays the same.
+- Use `:::info`, `:::ok`, `:::warn` or `:::bad` on a Mermaid flowchart node, or assign the role with `class a,b info`. It tints the node and colours its outline and label from the kit tokens in both themes. Explicit `classDef` and `style` statements still work; `pack` warns when they use fixed paint.
+
 ## v0.20.0
 
 - A `Stepper` shows the scrubber by default from five steps. Shorter steppers still show Back, Next and the count. Set `scrubber` to show it sooner or `scrubber={false}` to hide it; Play is still opt-in (revises #190).
