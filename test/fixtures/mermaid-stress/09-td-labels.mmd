@@ -1,0 +1,11 @@
+flowchart TD
+  req[Request arrives] -->|has token| check[Check token]
+  req -->|no token| login[Show login]
+  login -->|credentials| verify[Verify password]
+  verify -->|wrong| login
+  verify -->|right| issue[Issue token]
+  issue -->|set cookie| check
+  check -->|expired| refresh[Refresh token]
+  refresh -->|ok| check
+  refresh -->|revoked| login
+  check -->|valid| serve[Serve page]

@@ -1,0 +1,12 @@
+flowchart TD
+  start([Start]) --> fetch[Fetch job]
+  fetch --> run[Run job]
+  run --> ok{Passed?}
+  ok -->|yes| report[Report]
+  ok -->|no| retry{Retries left?}
+  retry -->|yes| backoff[Back off]
+  backoff --> run
+  retry -->|no| alert[Alert on-call]
+  alert --> fetch
+  report --> fetch
+  report --> finish([Stop])

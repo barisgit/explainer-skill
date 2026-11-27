@@ -1,0 +1,9 @@
+flowchart LR
+  s1[Fetch] --> s2[Parse] --> s3[Validate] --> s4[Normalise] --> s5[Enrich] --> s6[Score] --> s7[Store]
+  s1 --> s4
+  s1 --> s6
+  s2 --> s5
+  s2 --> s7
+  s3 -.-> s7
+  s1 -.-> s7
+  s4 --> s7

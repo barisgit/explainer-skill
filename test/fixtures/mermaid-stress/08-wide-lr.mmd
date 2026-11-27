@@ -1,0 +1,7 @@
+flowchart LR
+  r1[Idea] --> r2[Sketch] --> r3[Prototype] --> r4[User test] --> r5[Revise] --> r6[Spec] --> r7[Build] --> r8[QA] --> r9[Beta] --> r10[Launch] --> r11[Measure] --> r12[Iterate]
+  r2 --> r4
+  r5 --> r3
+  r7 --> r9
+  r8 -.-> r7
+  r11 --> r5

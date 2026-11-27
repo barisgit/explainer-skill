@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant U as User
+  participant B as Browser
+  participant G as Gateway
+  participant A as Auth
+  participant O as Orders
+  participant P as Payments
+  participant Q as Queue
+  participant M as Mailer
+  U->>B: Place order
+  B->>G: POST /orders
+  G->>A: Check session
+  A-->>G: OK
+  G->>O: Create order
+  O->>P: Charge card
+  P-->>O: Charged
+  O->>Q: Order created
+  Q->>M: Send receipt
+  M-->>U: Email
+  O-->>G: 201 Created
+  G-->>B: Order id
+  B-->>U: Show receipt
