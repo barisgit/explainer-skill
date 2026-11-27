@@ -1,0 +1,17 @@
+import { Explore } from "kit";
+import { MARKS, needs, options } from "./db.ts";
+import { controls, needsFrame } from "./needs.ts";
+
+<Explore label="Which options meet what you need" controls={controls} frame={needsFrame} />
+
+<div class="scroll"><table class="compare">
+<thead><tr><th>Option</th>{needs.map((n) => <th>{n.label}</th>)}</tr></thead>
+<tbody>
+{options.map((o) => (
+	<tr data-ref={o.id}><th scope="row">{o.name}</th>{needs.map((n) => {
+		const cell = o.cells[n.id];
+		return <td data-label={n.label}><span class={`mark ${MARKS[cell.grade].class}`}>{MARKS[cell.grade].word}</span><span class="why">{cell.note}</span></td>;
+	})}</tr>
+))}
+</tbody>
+</table></div>

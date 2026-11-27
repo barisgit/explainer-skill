@@ -1,0 +1,1 @@
+We're a 4-person team starting a B2B SaaS (multi-tenant, maybe 200 customers in year one, mostly CRUD plus some reporting). Help me decide the database: Postgres, SQLite (with Litestream or Turso), or MySQL. Lay out the trade-offs with evidence and let me pick.
