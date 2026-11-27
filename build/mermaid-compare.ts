@@ -182,6 +182,9 @@ async function capture(file: string, out: string, names: string[]) {
 		) {
 			await Bun.sleep(100);
 		}
+		if (!(await cdp.evaluate<boolean>("Boolean(window.officialDone)"))) {
+			throw new Error("official Mermaid did not finish rendering within 10 s");
+		}
 		for (const [row, name] of names.entries()) {
 			await shoot(cdp, `#row-${row}`, join(out, `${name}.png`));
 			const cells = await cdp.evaluate<number>(
