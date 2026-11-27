@@ -4,6 +4,8 @@ title: "How Litestream works"
 import { Plot, Stepper, View } from "kit";
 import Opening from "./opening.mdx";
 import "./colours.css";
+// CLI and control: cmd/litestream (6,140 lines) plus server.go, the control socket's server (683).
+export const CLI_AND_CONTROL = 6140 + 683;
 
 # How *Litestream* works
 
@@ -52,7 +54,7 @@ sequenceDiagram
 
 ## Size of each part
 
-<Plot label="Non-test Go lines per part" option={{ categories: ["Backends (8)", "CLI and control", "VFS", "Capture", "Replicate", "Store and compact"], horizontal: true, series: [{ name: "Lines", type: "bar", data: [5582, 6140 + 683, 3886, 3927, 2856, 1633], fill: ["", "", "", "accent", "", ""], label: true }] }} />
+<Plot label="Non-test Go lines per part" option={{ categories: ["Backends (8)", "CLI and control", "VFS", "Capture", "Replicate", "Store and compact"], horizontal: true, series: [{ name: "Lines", type: "bar", data: [5582, CLI_AND_CONTROL, 3886, 3927, 2856, 1633], fill: ["", "", "", "accent", "", ""], label: true }] }} />
 
 Capture is the densest logic. The CLI is large because of configuration, not replication.
 
@@ -235,7 +237,7 @@ flowchart TB
 	tmp --> r(["Rename into place"])
 ```
 
-Files stream through resumable readers, fetched with 8-way parallelism by default. The plan is checked for contiguity, and a gap is an error instead of a silent hole.
+Files stream through resumable readers, fetched one after another in plan order; the `-parallelism` flag is still accepted but has no effect. The plan is checked for contiguity, and a gap is an error instead of a silent hole.
 
 ## Variants
 
