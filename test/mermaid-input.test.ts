@@ -131,6 +131,16 @@ const drawn = [
 		input: "classDiagram\n  class A {\n    +String name }\n  A --> B",
 		has: "name",
 	},
+	{
+		name: "a transition label ending in a brace",
+		input: "stateDiagram-v2\n  state S {\n    A --> B: done }\n  }",
+		has: ">done }<",
+	},
+	{
+		name: "a relation label ending in a brace",
+		input: "classDiagram\n  A --> B : uses }",
+		has: ">uses }<",
+	},
 ];
 
 test.each(drawn)("$name draws", ({ input, has }) => {

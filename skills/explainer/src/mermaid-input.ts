@@ -139,9 +139,13 @@ const BLOCKS: Record<Family, { opens: RegExp; closer: string } | undefined> = {
 	xychart: undefined,
 };
 
-/** Whether a statement ends a block: its closer alone, or a `}` after a block's last member (`+String name }`). */
-const closes = (closer: string, line: string) =>
-	line === closer || (closer === "}" && line.endsWith("}") && !line.includes("{"));
+/** A label pele reads to the end of the line, `}` included: a state's or transition's after `:`, a relation's after its link. */
+const LABELLED: Partial<Record<Family, RegExp>> = { state: /:/, class: /(?:--|\.\.)[^:]*:/ };
+
+/** Whether a statement ends a block: its closer alone, or a `}` after a block's last member (`+String name }`) but not in a label. */
+const closes = (family: Family, closer: string, line: string) =>
+	line === closer ||
+	(closer === "}" && line.endsWith("}") && !line.includes("{") && !LABELLED[family]?.test(line));
 
 /** The first block problem: a closer with no block open, else the innermost block never closed. */
 function blockProblem(family: Family, statements: string[]): string | undefined {
@@ -151,7 +155,7 @@ function blockProblem(family: Family, statements: string[]): string | undefined 
 	}
 	const open: string[] = [];
 	for (const line of statements) {
-		if (closes(blocks.closer, line)) {
+		if (closes(family, blocks.closer, line)) {
 			if (!open.pop()) {
 				return `"${line}" closes no block; remove it, or open the block it ends`;
 			}
