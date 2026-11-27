@@ -1,6 +1,9 @@
 "use client";
 
-/* Sizes for a B-tree index of an 8 KB-page database; page.mdx computes its figures from these when it packs. */
+/*
+ * Sizes for a B-tree index of an 8 KB-page database, and the Explore frames page.mdx draws from them. A client module: pack
+ * draws the first frame, and the browser runs the frame functions again each time the reader moves a control.
+ */
 
 export const ROWS_PER_PAGE = 200;
 export const TABLE_ROWS = 1_000_000;
