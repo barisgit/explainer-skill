@@ -4,13 +4,13 @@ display: condensed
 ---
 import { Question, Table } from "kit";
 import data from "./data.json";
-import { alternatives } from "./rows.ts";
+import { encodings } from "./rows.ts";
 import Opening from "./opening.mdx";
 import "./colours.css";
 
 # Shipping ECharts *compressed*
 
-Compressing ECharts takes {data.saved} KB off every chart page and costs {Object.values(data.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms. Commit 7d4f018 makes pack inline `kit/echarts.js` as deflate-raw and the page unpack it on load; sizes are measured from the file, timings are the ones AGENTS.md records.
+Compressing ECharts takes {data.saved} KB off every chart page and costs {Object.values(data.unpackMs).reduce((sum, ms) => sum + ms, 0)} ms on load. Commit 7d4f018 makes pack inline `kit/echarts.js` as deflate-raw and the page unpack it on load.
 
 <Opening />
 
@@ -18,9 +18,9 @@ Compressing ECharts takes {data.saved} KB off every chart page and costs {Object
 
 ```mermaid tag:file=1 tag:atob=2 tag:inflate=3 tag:run=4 tag:mount=5
 flowchart LR
-	file["page file<br>418 KB inlined"] --> atob["atob<br>11 ms"]
-	atob -->|313 KB| inflate["inflate<br>3 ms"]
-	inflate -->|931 KB| run["parse and run<br>17 ms"]
+	file["page file<br>418 KB inlined"]:::ok --> atob["atob<br>11 ms"]:::info
+	atob -->|313 KB| inflate["inflate<br>3 ms"]:::info
+	inflate -->|931 KB| run["parse and run<br>17 ms"]:::info
 	run --> mount["charts mount"]
 ```
 
@@ -53,7 +53,9 @@ flowchart LR
 
 ## Alternatives
 
-<Table rows={alternatives} state={(a) => a.state} cols={[{ head: "Alternative", value: "name" }, { head: "In the page", value: "size" }, { head: "Why", value: "why" }]} />
+<Table rows={encodings} state={(e) => e.state} cols={[{ head: "Encoding", value: "name", note: "why" }, { head: "In the page", value: "size", format: { unit: "KB" } }, { head: "Baseline browsers decode it", value: (e) => (e.decodes ? <span class="mark yes">Yes</span> : <span class="mark no">No</span>) }]} />
+
+The island bundle (60 to 300 KB) stays plain: it must run before the views and steps scripts, and unpacking it would delay them. CSS stays plain because it cannot wait for a script.
 
 ## Older browsers
 
@@ -64,5 +66,13 @@ The `deflate-raw` format needs Chrome 103, Firefox 113 or Safari 16.4. On older 
 ## Approve shipping ECharts compressed?
 
 <Question name="verdict" recommended="approve" note options={{ approve: "Approve", changes: "Request changes", ask: "Ask a question" }} />
+
+</section>
+
+<section class="minor">
+
+## Basis
+
+Sizes are measured from `kit/echarts.js` by `measure.ts`; the timings are the ones the repository's AGENTS.md records.
 
 </section>

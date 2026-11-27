@@ -1,32 +1,35 @@
 import data from "./data.json";
 
-/** Sizes in KB come from data.json (measure.ts); the island and CSS ranges and every reason are AGENTS.md, "ECharts ships compressed". */
-export const alternatives = [
+/** Sizes in KB come from data.json (measure.ts); every reason is AGENTS.md, "ECharts ships compressed". `decodes`: whether
+    Chrome 103, Firefox 113 and Safari 16.4, the kit's baseline, can turn the text back into ECharts. */
+export const encodings = [
 	{
 		name: "deflate-raw in base64",
-		size: `${data.packed} KB`,
-		why: "Shipped: tied smallest for Chrome 103, Firefox 113 and Safari 16.4.",
+		size: data.packed,
+		decodes: true,
+		why: "shipped: tied smallest",
 		state: "fit",
 	},
-	{ name: "gzip", size: `${data.gzip} KB`, why: "The same size as deflate-raw.", state: "out" },
 	{
-		name: "Brotli",
-		size: `${data.brotli} KB`,
-		why: "Smaller, but DecompressionStream does not read it in those baseline versions.",
+		name: "gzip in base64",
+		size: data.gzip,
+		decodes: true,
+		why: "the same size as deflate-raw",
 		state: "out",
 	},
 	{
-		name: "Bytes as Latin-1 text",
-		size: `${data.latin1} KB`,
-		why: "Larger than base64 once the page is UTF-8.",
+		name: "Brotli in base64",
+		size: data.brotli,
+		decodes: false,
+		why: "DecompressionStream does not read it",
 		state: "out",
 	},
 	{
-		name: "Island bundle, plain",
-		size: "60 to 300 KB",
-		why: "Must run before the views and steps scripts; waiting to unpack would delay them.",
+		name: "deflate-raw as Latin-1 text",
+		size: data.latin1,
+		decodes: true,
+		why: "larger once the page is UTF-8",
 		state: "out",
 	},
-	{ name: "CSS, plain", size: "", why: "CSS cannot wait for a script.", state: "out" },
 ];
-export type Alternative = (typeof alternatives)[number];
+export type Encoding = (typeof encodings)[number];
