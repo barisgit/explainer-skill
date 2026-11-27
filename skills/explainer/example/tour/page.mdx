@@ -20,10 +20,10 @@ Paste a long link, get a short one, and see how often it was clicked.
 
 ```mermaid tag:web=1 tag:api=2 tag:store=3 tag:stats=4
 flowchart LR
-	reader(["Browser"]) -->|"GET /x7k"| api["api<br>2.4k lines"]
-	web["web<br>3.0k lines"] -->|"POST /links"| api
-	api -->|"look up"| store["store<br>1.1k lines"]
-	api -->|"click event"| stats["stats<br>0.9k lines"]
+	reader(["Browser"]) -->|"GET /x7k"| api["api<br>2.4k lines"]:::info
+	web["web<br>3.0k lines"]:::info -->|"POST /links"| api
+	api -->|"look up"| store["store<br>1.1k lines"]:::info
+	api -->|"click event"| stats["stats<br>0.9k lines"]:::info
 	store --> cache[("Redis")]
 	store --> db[("Postgres")]
 	stats -->|"hourly counts"| db

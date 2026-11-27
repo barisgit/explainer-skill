@@ -303,6 +303,10 @@
 .mark.unk::before {
 	border-style: dotted;
 }
+/* A muted row mutes its marks too; the dot's shape still tells them apart. */
+.compare tr[data-state="out"] .mark {
+	color: var(--muted);
+}
 /* On phones a table stays a table, and one too wide for the column scrolls sideways rather than crush its columns: in its
    .scroll box (pack writes one around a Markdown table, and Table draws one) it keeps its natural width, a cell wrapping only
    past 18rem and a row name past 9rem, so a row stays a few lines tall; its numbers stay on one line, and its row names stay at

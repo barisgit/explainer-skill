@@ -117,26 +117,56 @@ test("check flags a captioned drawing stranded in an oversized pinned column at 
 	expect(result.stdout).not.toContain("div#image.beside: drawing uses only");
 }, 30_000);
 
-test("check flags a pinned map laid out taller than wide, not the same map laid out wide or a short portrait one", async () => {
+test("check flags a pinned drawing laid out taller than wide once per panel, with a fix for its kind", async () => {
 	const nodes = ["a", "b", "c", "d", "e", "f", "g", "h"];
+	const fence = (lang: string, source: string) => `\`\`\`${lang}\n${source}\n\`\`\``;
 	const map = (direction: string, count = nodes.length) =>
-		`flowchart ${direction}\n${nodes
-			.slice(1, count)
-			.map((n, i) => `\t${nodes[i]}["Part ${nodes[i]}"] -->|"sends"| ${n}["Part ${n}"]`)
-			.join("\n")}`;
-	const section = (id: string, direction: string, count?: number) =>
-		`## Map ${id}\n\n<div class="beside" data-width="full" id="${id}">\n\n${nodes.map((n) => `- <span data-ref="${n}">Part ${n}</span>`).join("\n")}\n\n\`\`\`mermaid\n${map(direction, count)}\n\`\`\`\n\n</div>\n`;
+		fence(
+			"mermaid",
+			`flowchart ${direction}\n${nodes
+				.slice(1, count)
+				.map((n, i) => `\t${nodes[i]}["Part ${nodes[i]}"] -->|"sends"| ${n}["Part ${n}"]`)
+				.join("\n")}`,
+		);
+	const circuit = fence(
+		"schematic",
+		[
+			"VIN port in Input @-18,0",
+			"R1 in n1 10k @0,0 v",
+			...[2, 3, 4, 5, 6, 7].map((i) => `R${i} n${i - 1} n${i} 10k a@R${i - 1}.b 0,60 v`),
+			"R8 n7 0 10k a@R7.b 0,60 v",
+		].join("\n"),
+	);
+	const list = nodes.map((n) => `- <span data-ref="${n}">Part ${n}</span>`).join("\n");
+	const section = (id: string, drawing: string) =>
+		`## Map ${id}\n\n<div class="beside" data-width="full" id="${id}">\n\n${list}\n\n${drawing}\n\n</div>\n`;
+	const framed = `<figure class="fig">\n<h3>Parts</h3>\n\n${map("TB")}\n\n<figcaption>The parts.</figcaption>\n</figure>`;
 	const page = dir.write(
 		"maps/page.mdx",
-		`# Two maps\n\n${section("tall", "TB")}\n${section("wide", "LR")}\n${section("short", "TB", 3)}`,
+		`# Maps\n\n${[
+			section("tall", map("TB")),
+			section("wide", map("LR")),
+			section("short", map("TB", 3)),
+			section("framed", framed),
+			section("circuit", circuit),
+		].join("\n")}`,
 	);
 	const output = dir.path("maps.html");
 	expect((await runCli(["pack", page, "-o", output])).code).toBe(0);
 	const result = await runCli(["check", output, "--quick"]);
 	expect(result.code).toBe(0);
-	expect(result.stdout).toMatch(
-		/div#tall\.beside: its pinned drawing is \d+x\d+ px, taller than wide .*: lay it out wider than tall \(flowchart LR/,
-	);
-	expect(result.stdout).not.toContain("div#wide.beside: its pinned drawing");
-	expect(result.stdout).not.toContain("div#short.beside: its pinned drawing");
+	const warned = (id: string) =>
+		result.stdout
+			.split("\n")
+			.filter((line) => line.includes(`div#${id}.beside: its pinned drawing is`));
+	for (const id of ["tall", "framed"]) {
+		expect(warned(id), id).toHaveLength(1);
+		expect(warned(id)[0]).toMatch(
+			/taller than wide .*: lay it out wider than tall \(direction LR, or parts grouped in subgraphs\), or split it/,
+		);
+	}
+	expect(warned("circuit")).toHaveLength(1);
+	expect(warned("circuit")[0]).toMatch(/: place its parts along a wider row, or split it/);
+	expect(warned("wide")).toEqual([]);
+	expect(warned("short")).toEqual([]);
 }, 30_000);

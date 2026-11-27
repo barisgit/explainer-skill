@@ -83,11 +83,14 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	for (const panel of document.querySelectorAll(".beside > :nth-child(2)")) {
 		if (getComputedStyle(panel).position !== "sticky") continue;
 		const room = parseFloat(getComputedStyle(panel).maxBlockSize) || innerHeight;
-		for (const drawing of [...panel.querySelectorAll(":scope:is(.mermaid, .schematic) > svg, :is(.mermaid, .schematic) > svg")].filter(shown)) {
-			const box = drawing.getBoundingClientRect();
-			if (box.height <= box.width || box.height <= room * ${TALL_PIN}) continue;
-			warnings.push(name(panel.parentElement) + ": its pinned drawing is " + Math.round(box.width) + "x" + Math.round(box.height) + " px, taller than wide and filling the " + Math.round(room) + " px window, so its section's first screen shows only part of it: lay it out wider than tall (flowchart LR, or parts grouped in subgraphs)");
-		}
+		const drawing = [...panel.querySelectorAll(":is(.mermaid, .schematic) > svg")].filter(shown).find((svg) => {
+			const box = svg.getBoundingClientRect();
+			return box.height > box.width && box.height > room * ${TALL_PIN};
+		});
+		if (!drawing) continue;
+		const box = drawing.getBoundingClientRect();
+		const fix = drawing.parentElement.matches(".schematic") ? "place its parts along a wider row" : "lay it out wider than tall (direction LR, or parts grouped in subgraphs)";
+		warnings.push(name(panel.parentElement) + ": its pinned drawing is " + Math.round(box.width) + "x" + Math.round(box.height) + " px, taller than wide and filling the " + Math.round(room) + " px window, so its section's first screen shows only part of it: " + fix + ", or split it if it cannot fit");
 	}
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
 	if (${narrow}) for (const svg of document.querySelectorAll("svg")) {
@@ -109,7 +112,7 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	const repeated = [...ids].filter(([, els]) => els.length > 1).map(([id, els]) => 'the id "' + id + '" is on ' + els.length + " elements (" + els.map(name).join(", ") + "): scripts, label for, #links and --do steps find only the first; give each its own id");
 	return {
 		overflow: document.documentElement.scrollWidth > vw + 1, culprits: bad.slice(0, 4).map(name), warnings, repeated,
-		scrolls: inner.slice(0, 6).map((el) => name(el) + " (content " + el.scrollWidth + "px in " + el.clientWidth + "px)" + (pinnedDrawing(el) ? ": lay the drawing out tall to fit the .beside column, or give it the full width" : "")),
+		scrolls: inner.slice(0, 6).map((el) => name(el) + " (content " + el.scrollWidth + "px in " + el.clientWidth + "px)" + (pinnedDrawing(el) ? ": lay the drawing out again to fit the .beside column, or give it the full width" : "")),
 	};
 })()`;
 
