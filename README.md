@@ -2,12 +2,10 @@
 
 An agent skill that answers with a page: the finding up front, a figure you can move, and a question you answer on it. One HTML file that opens offline.
 
-> “Three quotes for a home battery: 5, 10 or 15 kWh. Which one?”
-
-<a href="https://barisgit.github.io/explainer-skill/battery/">
+<a href="https://barisgit.github.io/explainer-skill/">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="examples/media/battery-hero-dark.webp">
-  <img alt="The page an agent answered with: its title is Home battery payback by size and its first sentence says the first 5 kWh pays for itself in 10 years and the second would take 62, over three bars on one scale; a slider then grows the battery on a July day until most of it is never used, the reader picks 5 kWh in the comparison table, and the reply is ready to send back" src="examples/media/battery-hero-light.webp">
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/hero-dark.webp">
+  <img alt="Three pages agents answered with, used in turn: Next steps a lookup for key 71 down a B-tree from the root to its leaf; a heatmap shows German negative electricity prices clustering at spring and summer middays, and a day picker switches from a January weekday that stays above zero to a May Sunday whose price falls to minus 250; the theme picker flips a treemap of npm packages between light and dark, and a click on the largest package opens why it is installed" src="examples/media/hero-light.webp">
 </picture>
 </a>
 
@@ -17,9 +15,89 @@ npx skills add barisgit/explainer-skill --global --agent claude-code --agent cod
 
 Then ask your agent to show you: “explain this pull request as a page”. [More ways to install](#install).
 
-Six more questions, each answered with a page. The [gallery](https://barisgit.github.io/explainer-skill/) shows all seven; sources are in [`examples/`](examples/), each with the prompt it answers in `prompt.md`.
+Eleven questions, each answered with a page. The [gallery](https://barisgit.github.io/explainer-skill/) shows them with their first figures; sources are in [`examples/`](examples/), each with the prompt it answers in `prompt.md`.
 
 <table>
+<tr>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/btree-index/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/btree-index-card-dark.webp">
+  <img alt="First screen of the page: How a B-tree index finds a row: a lookup reads one page per level, so a million rows take three reads, over a tree whose path to key 71 lights up step by step" src="examples/media/btree-index-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/btree-index/"><b>How it works</b></a>: how a B-tree index finds a row
+</td>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/negative-prices/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/negative-prices-card-dark.webp">
+  <img alt="First screen of the page: Why German electricity prices go negative: 576 hours in 2025, up from 211 in 2019, over yearly bars with 2025 in the accent" src="examples/media/negative-prices-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/negative-prices/"><b>Data report</b></a>: negative electricity prices in Germany, from Energy-Charts data
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/node-modules/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/node-modules-card-dark.webp">
+  <img alt="First screen of the page: What npm install put on disk: 406 packages for 3 listed, over a treemap of their bytes with the 15 heaviest in red" src="examples/media/node-modules-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/node-modules/"><b>Drill-down over records</b></a>: what one <code>npm install</code> puts on disk
+</td>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/litestream-tour/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/litestream-tour-card-dark.webp">
+  <img alt="First screen of the page: How Litestream works: a map of your app and SQLite, the Litestream process and object storage, its seven numbered parts coloured by role" src="examples/media/litestream-tour-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/litestream-tour/"><b>System tour</b></a>: how Litestream works, part by part
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/saas-database/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/saas-database-card-dark.webp">
+  <img alt="First screen of the page: The database for a multi-tenant SaaS: needs as toggles over Postgres, MySQL and two SQLite options, each cell a Yes, Partial or No mark with its reason" src="examples/media/saas-database-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/saas-database/"><b>Team decision</b></a>: the database for a multi-tenant SaaS
+</td>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/battery/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/battery-card-dark.webp">
+  <img alt="First screen of the page: Home battery payback by size: the first 5 kWh pays back in 10 years and the second in 62, over three bars on one scale against the cells' 16-year life" src="examples/media/battery-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/battery/"><b>Purchase decision</b></a>: home battery payback by size
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/i2c-pull-ups/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/i2c-pull-ups-card-dark.webp">
+  <img alt="First screen of the page: I²C pull-up resistors at 400 kHz: the 10 kΩ pull-ups take 847 ns to raise the line, over the rise curves against the 300 ns limit" src="examples/media/i2c-pull-ups-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/i2c-pull-ups/"><b>Engineering page</b></a>: I²C pull-ups, with the schematic
+</td>
+<td width="50%" valign="top">
+<a href="https://barisgit.github.io/explainer-skill/fourier-series/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="examples/media/fourier-series-card-dark.webp">
+  <img alt="First screen of the page: The Gibbs overshoot of a square wave: a thousand sines still overshoot the corner by 9%, over the sum zoomed on the jump" src="examples/media/fourier-series-card-light.webp">
+</picture>
+</a>
+<br><a href="https://barisgit.github.io/explainer-skill/fourier-series/"><b>Study page</b></a>: the Gibbs overshoot
+</td>
+</tr>
 <tr>
 <td width="50%" valign="top">
 <a href="https://barisgit.github.io/explainer-skill/echarts-compressed/">
@@ -31,45 +109,16 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 <br><a href="https://barisgit.github.io/explainer-skill/echarts-compressed/"><b>Code review</b></a>: the change that ships ECharts compressed
 </td>
 <td width="50%" valign="top">
-<a href="https://barisgit.github.io/explainer-skill/i2c-pull-ups/">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="examples/media/i2c-pull-ups-card-dark.webp">
-  <img alt="First screen of the page: I²C pull-up resistors at 400 kHz: the 10 kΩ pull-ups take 847 ns to raise the line, over the rise curves against the 300 ns limit" src="examples/media/i2c-pull-ups-card-light.webp">
-</picture>
-</a>
-<br><a href="https://barisgit.github.io/explainer-skill/i2c-pull-ups/"><b>Engineering page</b></a>: I²C pull-ups, with the schematic
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
 <a href="https://barisgit.github.io/explainer-skill/electricity-mix/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/electricity-mix-card-dark.webp">
-  <img alt="First screen of the page: change in world electricity generation by source: wind and solar added 669 TWh in 2024, over yearly columns of added generation" src="examples/media/electricity-mix-card-light.webp">
+  <img alt="First screen of the page: Change in world electricity generation by source: wind and solar added 669 TWh in 2024, over yearly columns of added generation" src="examples/media/electricity-mix-card-light.webp">
 </picture>
 </a>
-<br><a href="https://barisgit.github.io/explainer-skill/electricity-mix/"><b>Data report</b></a>: world electricity, 223 places from Our World in Data
-</td>
-<td width="50%" valign="top">
-<a href="https://barisgit.github.io/explainer-skill/node-modules/">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="examples/media/node-modules-card-dark.webp">
-  <img alt="First screen of the page: what npm install put on disk: 406 packages for 3 listed, over a treemap of their bytes" src="examples/media/node-modules-card-light.webp">
-</picture>
-</a>
-<br><a href="https://barisgit.github.io/explainer-skill/node-modules/"><b>Drill-down over records</b></a>: what one <code>npm install</code> puts on disk
+<br><a href="https://barisgit.github.io/explainer-skill/electricity-mix/"><b>Data set by place</b></a>: world electricity, 223 places from Our World in Data
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top">
-<a href="https://barisgit.github.io/explainer-skill/fourier-series/">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="examples/media/fourier-series-card-dark.webp">
-  <img alt="First screen of the page: the Gibbs overshoot of a square wave: a thousand sines still overshoot the corner by 9%, over the sum zoomed on the jump" src="examples/media/fourier-series-card-light.webp">
-</picture>
-</a>
-<br><a href="https://barisgit.github.io/explainer-skill/fourier-series/"><b>Study page</b></a>: the Gibbs overshoot
-</td>
 <td width="50%" valign="top">
 <a href="https://barisgit.github.io/explainer-skill/dijkstra/">
 <picture>
@@ -79,6 +128,7 @@ Six more questions, each answered with a page. The [gallery](https://barisgit.gi
 </a>
 <br><a href="https://barisgit.github.io/explainer-skill/dijkstra/"><b>Algorithm</b></a>: Dijkstra with a negative edge
 </td>
+<td width="50%"></td>
 </tr>
 </table>
 
@@ -203,7 +253,7 @@ bun run media             # regenerates the README media from examples/ (Chrome,
 bun run verify:install    # before a release: installs with both installers into a temp HOME (network, Chrome)
 ```
 
-`bun run media` needs all seven packed `examples/<name>/index.html` pages, Chrome or Chromium (`CHROME=/path` overrides discovery), and ffmpeg on PATH with both `libwebp` and `libwebp_anim` encoders (`ffmpeg -encoders | grep webp`). Keep the machine awake while recording. `--keep` retains the captured frames for inspection; example names limit the run, such as `bun run media --keep battery`.
+`bun run media` needs all eleven packed `examples/<name>/index.html` pages, Chrome or Chromium (`CHROME=/path` overrides discovery), and ffmpeg on PATH with both `libwebp` and `libwebp_anim` encoders (`ffmpeg -encoders | grep webp`). Keep the machine awake while recording. `--keep` retains the captured frames for inspection; example names limit the run, such as `bun run media --keep hero`.
 
 Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are published from `examples/` by `.github/workflows/pages.yml`.
 
@@ -218,7 +268,7 @@ Layout, decisions and limits are in [AGENTS.md](AGENTS.md). The examples are pub
 - [refractor](https://github.com/wooorm/refractor) by Titus Wormer with [Prism](https://prismjs.com)'s grammars by Lea Verou and others (MIT), and the hast packages it uses (MIT): code fence colours in `pack`, not shipped in pages.
 - [Geist and Geist Mono](https://vercel.com/font) by Vercel and [Barlow Condensed](https://github.com/jpt/barlow) by The Barlow Project Authors (SIL OFL 1.1).
 
-Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data).
+Licence texts are in `skills/explainer/kit/licenses/`. The examples cite their own sources; the electricity data is from [Our World in Data](https://github.com/owid/energy-data) and [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE, CC BY 4.0).
 
 ## Licence
 
