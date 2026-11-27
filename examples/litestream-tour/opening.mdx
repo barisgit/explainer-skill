@@ -1,0 +1,19 @@
+```mermaid tag:cap=1 tag:ltx=2 tag:rep=3 tag:cmp=4 tag:res=5 tag:ctl=6 tag:vfs=7
+flowchart LR
+	subgraph server["Your server"]
+		direction TB
+		app(["Your app"]) -->|"writes"| sql[("SQLite DB<br>+ WAL")]:::ok
+	end
+	subgraph lit["Litestream process"]
+		direction TB
+		ctl["CLI and control"]:::info -->|"runs"| cmp["Store: compact"]:::info
+		cap["Capture"]:::info -.->|"one per DB"| cmp
+		cap -->|"writes L0"| ltx["LTX files"]:::ok
+		ltx -->|"queued"| rep["Replicate"]:::info
+	end
+	sql -->|"WAL"| cap
+	rep -->|"uploads"| store[("Object<br>storage")]:::ok
+	cmp -->|"merges"| store
+	store --> res["Restore<br>to a new DB"]:::info
+	store --> vfs["VFS<br>read-only apps"]:::info
+```

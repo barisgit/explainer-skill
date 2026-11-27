@@ -1,0 +1,1 @@
+Build me a comprehensive explainer of Litestream (github.com/benbjohnson/litestream): in about 15 minutes I want to understand how it works, top level then each part. I'm an engineer who has never seen it.

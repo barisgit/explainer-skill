@@ -1,0 +1,4 @@
+/* SQLite-adjacent blue. */
+:root {
+	--accent: light-dark(#0f6496, #7cc0ec);
+}
