@@ -1,0 +1,17 @@
+import { Stepper } from "kit";
+
+<Stepper start={1} label="Looking up key 71, one page at a time" captions={["Read the root: 71 is at least 50, so take the right branch.", "Read the right branch: 71 is at least 65 and under 80, so take the middle leaf.", "Read the leaf and find 71. Three pages read; the other five leaves were never touched.", "A leaf holds the key and a pointer to the table row: one more read fetches the row itself."]} refs={["l_r", "l_r l_i2", "l_r l_i2 l_e", "l_e"]}>
+
+```mermaid
+flowchart TB
+	l_r["50"] --> l_i1["20 | 35"]
+	l_r --> l_i2["65 | 80"]
+	l_i1 --> l_a["5 12 18"]:::info
+	l_i1 --> l_b["20 27 33"]:::info
+	l_i1 --> l_c["35 41 47"]:::info
+	l_i2 --> l_d["50 58 62"]:::info
+	l_i2 --> l_e["65 71 74"]:::info
+	l_i2 --> l_f["80 85 93"]:::info
+```
+
+</Stepper>

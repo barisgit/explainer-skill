@@ -1,0 +1,1 @@
+Explain how a database B-tree index works: why a lookup in a million rows takes a handful of page reads, what happens on insert when a page fills up and splits, and why a range scan is cheap. I know SQL but not storage internals.
