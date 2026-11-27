@@ -215,7 +215,7 @@ Several agents share one copy in `~/.agents/skills/explainer` and the others get
 <summary>Install with Caplet (verified with 0.1.0)</summary>
 
 ```sh
-caplet add github:barisgit/explainer-skill --pin v0.20.0 --scope user
+caplet add github:barisgit/explainer-skill --pin v0.21.0 --scope user
 ```
 
 Caplet needs a ref for GitHub sources. `main` follows the latest commit on each `caplet update`; pin a tag such as `v0.15.0` instead to hold a version.

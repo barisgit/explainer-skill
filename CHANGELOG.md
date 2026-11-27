@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.21.0
 
 - The guide asks for a system map wider than tall (`flowchart LR`, parts grouped in subgraphs) so it fits the first screen beside its list, and `check` warns when a pinned `.beside` drawing is taller than wide and fills most of the window. Role colours are a rule for every diagram of the subject, not only the tour map: `:::info` its own parts, `:::ok`, `:::warn` or `:::bad` a path or state that succeeds, is at risk or fails, external parts plain. A matrix cell is a status mark (`<span class="mark yes">Yes</span>`, also `part`, `no`, `unk`, now documented in `kit theme`) with its reason in a `Table` `note` or a fold, not a phrase. A mark in an `out` row is muted with the row.
 - Mermaid diagrams are drawn by pele, the renderer T3 Code uses, instead of beautiful-mermaid with ELK. Many edges into one node no longer stack their arrowheads, and pack draws a diagram about 20x faster. pack now reads Mermaid 12's syntax, so notes, titles, `@{ shape: ... }`, `--x`/`--o` edge ends and markdown strings (``"`**bold** label`"``) draw instead of failing. Node text is 15 px and edge labels 13 px; on wide screens they grow up to 18 and 15.6 px. A pair's second unnamed edge keeps the id `L_a_b_1`, and a nested state's start is now `<state>_start` (was `_start2`). `classDef` and `style` take plain colours only: use `:::info`, `:::ok`, `:::warn` or `:::bad` for the kit's colours.
