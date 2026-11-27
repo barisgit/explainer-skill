@@ -7,7 +7,7 @@
        format  how the numbers are written in the page's lang: { digits: 1 }, { unit: "min" }, { percent: true }, { currency: "EUR" }
                (grouped as 4,200, without cents on a whole amount unless digits asks; digits: 0 rounds to whole units). A column whose values are all numbers is numeric: right-aligned, digits lined up
        link    the key, or (record) => href, that makes each value a link
-       note    the key, or (record) => text, of a muted line under the value
+       note    the key, or (record) => text, of a muted line under the value, such as a status mark's reason (kit theme)
      state   (record) => "fit", "maybe" or "out": fit and maybe rows get a coloured edge, out rows are muted
      class   more classes after "compare"
    On a phone a table of two columns (a list of names and values) stacks each name over its value under the stacked column heads;

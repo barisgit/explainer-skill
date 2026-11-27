@@ -52,6 +52,9 @@
    gives a row an ok or info edge, or mutes it:
      <div class="scroll"><table class="compare"><thead><tr><th>Store</th><th class="num">Latency</th></tr></thead>
        <tbody><tr><th scope="row">Redis</th><td class="num">2 ms</td></tr></tbody></table></div>
+   A matrix cell's verdict is a status mark, its reason in a Table note or a fold:
+   <span class="mark yes">Yes</span> (also part, no, unk) sets a filled, half, open or dotted dot in the ok, warn, bad or info colour
+   before its word.
    Rankings: ol.rank > li > details, with a summary containing .name, .bar > i (style="--w: 75%"), and .val, followed by .more.
    Click, Enter or Space on the summary opens and closes its detail natively; no script or aria-expanded is needed. Keep other
    controls outside the summary. Replace older button + .more rows with this details/summary wrapper (omit hidden on .more).

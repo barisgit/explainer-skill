@@ -116,3 +116,26 @@ test("check flags a captioned drawing stranded in an oversized pinned column at 
 	expect(result.stdout).not.toContain("div#flow.beside: drawing uses only");
 	expect(result.stdout).not.toContain("div#image.beside: drawing uses only");
 }, 30_000);
+
+test("check flags a pinned map laid out taller than wide, not the same map laid out wide", async () => {
+	const nodes = ["a", "b", "c", "d", "e", "f", "g", "h"];
+	const map = (direction: string) =>
+		`flowchart ${direction}\n${nodes
+			.slice(1)
+			.map((n, i) => `\t${nodes[i]}["Part ${nodes[i]}"] -->|"sends"| ${n}["Part ${n}"]`)
+			.join("\n")}`;
+	const section = (id: string, direction: string) =>
+		`## Map ${id}\n\n<div class="beside" data-width="full" id="${id}">\n\n${nodes.map((n) => `- <span data-ref="${n}">Part ${n}</span>`).join("\n")}\n\n\`\`\`mermaid\n${map(direction)}\n\`\`\`\n\n</div>\n`;
+	const page = dir.write(
+		"maps/page.mdx",
+		`# Two maps\n\n${section("tall", "TB")}\n${section("wide", "LR")}`,
+	);
+	const output = dir.path("maps.html");
+	expect((await runCli(["pack", page, "-o", output])).code).toBe(0);
+	const result = await runCli(["check", output, "--quick"]);
+	expect(result.code).toBe(0);
+	expect(result.stdout).toMatch(
+		/div#tall\.beside: its pinned drawing is \d+x\d+ px, taller than wide .*: lay it out wider than tall \(flowchart LR/,
+	);
+	expect(result.stdout).not.toContain("div#wide.beside: its pinned drawing");
+}, 30_000);

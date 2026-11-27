@@ -8,6 +8,8 @@ import { ELEMENT_NAME_JS, PAGE_ROUTES_JS, PAINTS_JS, REGION_VISIBLE_JS } from ".
 
 const TINY_TEXT_PX = 9;
 const TALL_FIGURE = 1.5;
+/** A pinned portrait drawing taller than this share of its window crowds out the section above it. */
+const TALL_PIN = 0.75;
 
 /**
  * Page-side function: what to do about an SVG whose smallest text renders at `px`. A diagram or schematic pack drew has a readable minimum
@@ -39,7 +41,7 @@ export interface PageReport {
  * ancestor contains (only auto/scroll counts: hidden/clip would silently cut the content off). `scrolls`: containers whose content is wider
  * than their box and scrolls sideways (a wide data table, in a box or as its own box, or equation may, as may an SVG its min-width holds wider than the container's
  * content box, such as a diagram at its readable minimum, except in the pinned `.beside` column). `warnings`: content cut off inside an overflow hidden/clip box
- * (ellipsis truncation excepted), oversized pinned drawing columns, a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS
+ * (ellipsis truncation excepted), oversized pinned drawing columns, portrait pinned drawings filling most of their window, a missing viewport meta and SVG text rendered under 9 px (narrow only, with the fix TINY_TEXT_FIX_JS
  * names), diagrams and charts (Mermaid, .chart, svg, canvas) taller than 1.5 viewports. Interactive panels (tables, matrices, players
  * with a log) are tall by design and are not measured. SVG text is measured at its on-screen size: font size times the svg's scale to
  * the screen. `repeated`: ids on more than one element, as the page's scripts and `--do` steps left them (problems).
@@ -76,6 +78,14 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 		const width = [...drawings].filter(shown).reduce((max, el) => Math.max(max, el.getBoundingClientRect().width), 0);
 		if (width > 0 && width < column / 2 && column - width > largeBand) {
 			warnings.push(name(panel.parentElement) + ": drawing uses only " + Math.round(width) + "px of its " + Math.round(column) + "px pinned column: repack with the current kit or remove a page rule stretching the column");
+		}
+	}
+	for (const panel of document.querySelectorAll(".beside > :nth-child(2)")) {
+		if (getComputedStyle(panel).position !== "sticky") continue;
+		const drawing = [...panel.querySelectorAll(":scope:is(.mermaid, .schematic) > svg, :is(.mermaid, .schematic) > svg")].find(shown);
+		const box = drawing?.getBoundingClientRect();
+		if (box && box.height > box.width && box.height > panel.clientHeight * ${TALL_PIN}) {
+			warnings.push(name(panel.parentElement) + ": its pinned drawing is " + Math.round(box.width) + "x" + Math.round(box.height) + " px, taller than wide and filling the " + panel.clientHeight + " px window, so its section's first screen shows only part of it: lay it out wider than tall (flowchart LR, or parts grouped in subgraphs)");
 		}
 	}
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
