@@ -47,6 +47,10 @@ export interface ParsedModel {
 	type: string;
 	rootDoc?: StateStatement[];
 	edges?: FlowEdge[];
+	/** A flowchart's nodes by id, with the label text they are drawn with. */
+	nodes?: Map<string, { text: string }>;
+	/** A state diagram's laid-out states, with the label each is drawn with. */
+	graph?: { nodes: Array<{ id: string; label: string }> };
 }
 
 export declare class PeleError extends Error {

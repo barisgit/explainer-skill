@@ -68,6 +68,29 @@ test("tag:id=n in a flowchart fence's meta draws n as a tag inside that node, in
 	}
 });
 
+test.each([
+	{
+		name: "a shape definition",
+		source: 'flowchart TD\n  a@{ shape: rect, label: "Pump" } --> b',
+		id: "a",
+	},
+	{
+		name: "a node whose id another label mentions",
+		source: 'flowchart TD\n  a["see b[1]"] --> b["Target"]',
+		id: "b",
+	},
+	{
+		name: "a state named only in a transition",
+		source: "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Busy",
+		id: "Busy",
+	},
+])("a tag lands on its own node for $name", ({ source, id }) => {
+	for (const copy of copies(source, `tag:${id}=7`).filter(Boolean)) {
+		expect(copy.match(/<g class="tag" /g)).toHaveLength(1);
+		expect(nodeOf(copy, id)).toContain(`<g class="tag" data-id="${id}"`);
+	}
+});
+
 test("a tagged path keeps its values: a stage's second line and an edge's label", () => {
 	for (const copy of copies(PATH, PATH_TAGS).filter(Boolean)) {
 		const atob = nodeOf(copy, "atob");

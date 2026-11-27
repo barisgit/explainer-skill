@@ -109,40 +109,24 @@ function tagsOf(meta: string, family: Family): Map<string, string> {
 	return tags;
 }
 
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /**
- * The source with each tagged node's label led by `$$tag:id=n$$`, which pele hands to tagMarkup as inline math and sizes the
- * node for. A flowchart node takes it in its first labelled definition (`a["..."]`, `a(...)`), else at its bare id's first use
- * with its id as label, as Mermaid shows a node without one; a state in its `state "..." as id`, else in one added for it.
+ * Leads each tagged node's label with `$$tag:id=n$$`, which pele hands to tagMarkup as inline math and sizes the node for. It
+ * goes through the parsed model, so a label's own text (`a["see b[1]"]`) and every way of declaring a node (`b@{ shape: ... }`,
+ * a bare id, a state named only in transitions) take it alike; a tag no node carries is left for `untagged` to name.
  */
-function withTags(body: string, tags: Map<string, string>, family: Family): string {
-	let text = body;
+function tagNodes(model: ParsedModel, tags: Map<string, string>) {
 	for (const [id, number] of tags) {
-		const mark = `$$tag:${id}=${number}$$`;
-		const name = escapeRegExp(id);
-		if (family === "state") {
-			const alias = new RegExp(String.raw`^(\s*state\s+")([^"]*"\s+as\s+${name})\s*$`, "m");
-			text = alias.test(text)
-				? text.replace(alias, `$1${mark} $2`)
-				: `${text}\n  state "${mark} ${id}" as ${id}`;
-			continue;
+		const mark = `$$tag:${id}=${number}$$ `;
+		const node = model.nodes?.get(id);
+		if (node) {
+			node.text = mark + node.text;
 		}
-		const shaped = new RegExp(
-			String.raw`(^|[\s;&>|])(${name})(\[\[|\[\(|\(\[|\(\(\(|\(\(|\[\/|\[\\|\[|\(|\{\{|\{|>)("?)`,
-			"m",
-		);
-		const bare = new RegExp(String.raw`(^|[\s;&>|])(${name})(?=\s|;|$|:::|-->|---|-\.|==|<)`, "m");
-		text = shaped.test(text)
-			? text.replace(shaped, (_, before: string, node: string, open: string, quote: string) =>
-					quote ? `${before}${node}${open}"${mark} ` : `${before}${node}${open}${mark} `,
-				)
-			: text.replace(
-					bare,
-					(_, before: string, node: string) => `${before}${node}["${mark} ${id}"]`,
-				);
+		for (const state of model.graph?.nodes ?? []) {
+			if (state.id === id) {
+				state.label = mark + state.label;
+			}
+		}
 	}
-	return text;
 }
 
 /**
@@ -348,12 +332,13 @@ function untagged(svg: string, tags: Map<string, string>): string | undefined {
 }
 
 /** One layout of `text` as pele draws it for the page, with its parts' refs and tags named; `id` is its root's id. */
-function draw(text: string, family: Family, id: string): string {
+function draw(text: string, family: Family, id: string, tags: Map<string, string>): string {
 	let model: ParsedModel;
 	let drawn: string;
 	try {
 		model = parse(text);
 		renumberEdges(model.edges);
+		tagNodes(model, tags);
 		drawn = render(model, {
 			measurer: MEASURER,
 			fontFamily: "Geist",
@@ -381,13 +366,14 @@ function renderOne(source: string, n: number, meta: string): Diagram {
 	if (problem) {
 		throw new Error(problem);
 	}
-	const text = withTags(body, tags, family);
-	const svg = draw(text, family, `mm${n}`);
+	const svg = draw(body, family, `mm${n}`, tags);
 	const unknown = untagged(svg, tags);
 	if (unknown) {
 		throw new Error(unknown);
 	}
-	const turned = phoneLayout(family, svg, () => draw(across(text, family), family, `mm${n}-phone`));
+	const turned = phoneLayout(family, svg, () =>
+		draw(across(body, family), family, `mm${n}-phone`, tags),
+	);
 	const phone = turned?.replace(/^<svg /, `<svg data-phone ${printAttr(svg)}`);
 	const refs = [svg, phone ?? ""].flatMap((copy) =>
 		[...copy.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""),
