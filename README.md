@@ -5,7 +5,7 @@ An agent skill that answers with a page: the finding up front, a figure you can 
 <a href="https://barisgit.github.io/explainer-skill/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="examples/media/hero-dark.webp">
-  <img alt="Three pages agents answered with, used in turn: Next steps a lookup for key 71 down a B-tree from the root to its leaf; a heatmap shows German negative electricity prices clustering at spring and summer middays, and a day picker switches from a January weekday that stays above zero to a May Sunday whose price falls to minus 250; the theme picker flips a treemap of npm packages between light and dark, and a click on the largest package opens why it is installed" src="examples/media/hero-light.webp">
+  <img alt="A clip over three pages, in turn: Next steps a lookup for key 71 down a B-tree from the root to its leaf; a heatmap shows German negative electricity prices clustering at spring and summer middays, and a day picker switches from a January weekday that stays above zero to a May Sunday whose price falls to minus 250; the theme picker flips a treemap of npm packages between light and dark, and a click on the largest package opens why it is installed" src="examples/media/hero-light.webp">
 </picture>
 </a>
 
