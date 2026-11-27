@@ -98,13 +98,34 @@
 	/* Links are ink with a quiet underline, so the accent keeps its one meaning; a page rule --link: var(--accent) brings it back. */
 	--link: var(--ink);
 	--accent-ink: light-dark(#fff, #1b1208);
-	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
-	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
 	--ok: light-dark(#18744b, #5fcf99);
 	--bad: light-dark(#b3322a, #f2776b);
 	--warn: light-dark(#8a5a00, #e8b94a);
+	--info: light-dark(#345e8f, #9fbeed);
+	/* Three text roles: display (headings have their own scale), text, and label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
+	--size-headline: clamp(2.1rem, 3.8vw, 3.4rem);
+	--size-display: clamp(1.48rem, 2.3vw, 2rem);
+	--size-text: 1.0625rem;
+	--size-label: 0.8125rem;
+	--lift: light-dark(rgb(40 28 10 / 0.12), rgb(0 0 0 / 0.45));
+	--gutter: clamp(1rem, 4vw, 2rem);
+	--inset: clamp(1rem, 2.5vw, 1.25rem);
+	/* Above the masthead, and above the contents rail beside it. */
+	--page-top: clamp(2.35rem, 4vw, 3.5rem);
+	/* Between sections: the same space on every window height. */
+	--section-gap: clamp(2.25rem, 4.5vw, 3rem);
+	--radius: 0.125rem;
+	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */
+	--under: var(--bg);
+	--ease: cubic-bezier(0.25, 1, 0.5, 1);
+}
+/* Tokens mixed from the ones above, declared again on a .hero so they mix its own tones. A page that sets them itself (real
+   hues for categories) sets them on both: :root, .hero { --c1: ... }. */
+:root,
+.hero {
+	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
+	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
 	--warn-soft: color-mix(in oklab, var(--warn) 11%, var(--surface));
-	--info: light-dark(#35609c, #8fb2e8);
 	/* Series colours: muted inks, so colour shows only where the author puts the accent (var(--accent) on the finding). Each is
 	   --ink mixed into --bg, from 44% (3:1 on --bg, as an axis) to 84%, in the order that keeps neighbours furthest apart in
 	   lightness, the last beside the first as in a pie; lines also take a dash per slot (Chart and Plot), and touching fills a
@@ -120,22 +141,6 @@
 	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
 	--hatch: color-mix(in oklab, var(--ink) 60%, var(--bg));
 	--hatch-fill: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 6px);
-	/* Three text roles: display (headings have their own scale), text, and label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
-	--size-headline: clamp(1.875rem, 3.3vw, 2.875rem);
-	--size-display: clamp(1.375rem, 2vw, 1.75rem);
-	--size-text: 1.0625rem;
-	--size-label: 0.8125rem;
-	--lift: light-dark(rgb(40 28 10 / 0.12), rgb(0 0 0 / 0.45));
-	--gutter: clamp(1rem, 4vw, 2rem);
-	--inset: clamp(1rem, 2.5vw, 1.25rem);
-	/* Above the masthead, and above the contents rail beside it. */
-	--page-top: clamp(2rem, 6vw, 4rem);
-	/* Between sections: the same space on every window height. */
-	--section-gap: clamp(2.25rem, 4.5vw, 3rem);
-	--radius: 0.125rem;
-	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */
-	--under: var(--bg);
-	--ease: cubic-bezier(0.25, 1, 0.5, 1);
 }
 :root[data-scheme="light"] {
 	color-scheme: light;
@@ -483,6 +488,33 @@ figure:not([class]) > img {
 }
 figure:not([class]) > img {
 	display: block;
+}
+/* A hero: the one figure that carries the page's answer, on a dark navy panel as wide as the column in both schemes (to the
+   window's edges on a phone). Inside it every token resolves as in dark mode, on the panel's own tones, so drawn charts, Mermaid
+   roles and a page's light-dark() accent follow it. Paper prints it as any figure. */
+@media screen {
+	.hero {
+		--bg: #13294a;
+		--surface: var(--bg);
+		--sunken: var(--bg);
+		--under: var(--bg);
+		--ink: #f3f7ff;
+		--muted: #c6d2e7;
+		--rule: #34496b;
+		--rule-strong: #8195b6;
+		color-scheme: dark;
+		color: var(--ink);
+		background: var(--bg);
+		border-radius: var(--radius);
+		padding: 0.25rem var(--inset);
+	}
+}
+@media screen and (width < 40rem) {
+	.hero {
+		margin-inline: calc(-1 * var(--gutter));
+		padding-inline: var(--gutter);
+		border-radius: 0;
+	}
 }
 /* Text beside what it explains (a figure, a diagram, code), for prose linked to it: the reader sees both ends of a link at once.
    Two children: the text, then the figure. From 56rem they stand side by side, the text two fifths from the column's start like
@@ -1060,6 +1092,15 @@ figure:not([class]) > img {
 	:is(.mermaid, .schematic) > svg {
 		--_diagram-scale: 1.4;
 	}
+	/* A Stepper's diagram is its stage: at least the text's width, short of doubling its labels or passing 60% of the window's
+	   height. */
+	[data-stepper] :is(.mermaid, .schematic) > svg {
+		min-width: max(
+			var(--mermaid-min, 0px),
+			var(--schematic-min, 0px),
+			min(100%, 66ch, var(--_diagram-base) * 2, 60vh * var(--diagram-ratio))
+		);
+	}
 }
 .schematic > svg .value {
 	fill: var(--muted);
@@ -1230,9 +1271,14 @@ figure:not([class]) > img {
 .controls:has(+ .controls) {
 	padding-block-end: 0.25rem;
 }
-/* Explore's readout is a block, so it can hold a paragraph or a div; it keeps the spacing of a figure's own paragraph. */
+/* Explore's readout is a block, so it can hold a paragraph or a div; it keeps the spacing of a figure's own paragraph. It is the
+   figure's key number, set a step above the text so it reads first. */
 .fig > [data-readout] {
 	padding-block: 0.75rem;
+	font-size: clamp(1.07rem, 2vw, 1.36rem);
+	font-weight: 600;
+	line-height: 1.3;
+	font-variant-numeric: tabular-nums;
 }
 /* What a figure that follows a Controls shows, and the way back to them. On screen it is left out of a figure right under its
    Controls (pack marks it, data-under), where the controls are in sight; printed, the controls are not, so every figure says it. */
@@ -3149,7 +3195,7 @@ details > :last-child:not(summary) {
 }
 
 /* theme: quiet warm-paper house style; page shell, figures, controls, charts, diagrams, views, trees.
-   One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
+   One loud thing per screen, the headline (or the page's one .hero figure); everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Three text roles: display, --size-text and --size-label (figures, controls, captions). Headings have their own scale:
    h1 at --size-headline, h2 at --size-display and h3 (a topic in a section) at 19px.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
@@ -3163,7 +3209,7 @@ details > :last-child:not(summary) {
    (energy sources, parties) take real hues: --c1..--c6 on :root, as light-dark() pairs like the accent. A mark takes one of the
    accent's three states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as
    a background), for done, planned and estimated, say.
-   Classes: page masthead meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
+   Classes: page masthead meta label cols wide band beside minor | fig hero panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend callout caveat procedure detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input
@@ -3175,6 +3221,8 @@ details > :last-child:not(summary) {
    <i class="hatch"></i> mark the accent's other two states.
    Figures: a .fig sits plain on the page with no fill or frame, its controls right above what they act on; .split is a row of
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
+   .hero sets the one figure carrying the page's answer on a dark navy panel in both schemes, its tokens resolving dark inside;
+   series hues of your own go on :root, .hero.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
    padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
    Ink-on-white scans in <img> take class="ink" to blend into the background or class="paper" to stay a page; neither for photos.
