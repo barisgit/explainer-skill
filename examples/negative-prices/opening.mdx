@@ -1,0 +1,4 @@
+import { Plot } from "kit";
+import { years } from "./model.ts";
+
+<Plot label="Hours with a negative day-ahead price per year, Germany–Luxembourg" height="18rem" option={{ categories: years.map((y) => String(y.year)), series: [{ name: "Negative hours", type: "bar", data: years.map((y) => y.neg), fill: years.map((y) => (y.year === 2025 ? "accent" : "")), label: true }], y: { name: "hours with price below 0 EUR/MWh" } }} />

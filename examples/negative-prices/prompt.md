@@ -1,0 +1,1 @@
+Why are electricity prices in Germany sometimes negative, and how often does it happen? Use real public data (e.g. Energy-Charts / Fraunhofer ISE, SMARD or ENTSO-E day-ahead prices; download it, cite it) and show me what drives it: solar, wind, demand, hours of the day, seasons.

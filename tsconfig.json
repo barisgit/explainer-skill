@@ -28,7 +28,8 @@
 		"skills/explainer/src",
 		"build",
 		"test",
-		"examples/*/measure.ts"
+		"examples/*/measure.ts",
+		"examples/negative-prices/fetch.ts"
 	],
 	// The fixture pages are browser code, checked with the kit (tsconfig.kit.json).
 	"exclude": ["test/fixtures"]

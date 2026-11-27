@@ -1,0 +1,5 @@
+/* Burnt orange: the one meaning on this page, negative prices. */
+:root {
+	--accent: light-dark(#9c4413, #f0a070);
+	--accent-ink: light-dark(#fff, #1a1208);
+}
