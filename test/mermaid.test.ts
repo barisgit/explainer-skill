@@ -471,10 +471,10 @@ test("on a phone a wide flowchart shows its top-down copy, and a wide sequence k
 				const textSize = 15 * svg.getScreenCTM().a;
 				if (Math.abs(b.x + b.width / 2 - s.x - s.width / 2) > 1) return false;
 				if (innerWidth < 640) return textSize > 14.9 && textSize <= 15;
-				if (textSize < 20.9 || textSize > 21.01) return false;
-				block.style.width = svg.viewBox.baseVal.width * 1.2 + "px";
+				if (textSize < 17.9 || textSize > 18.01) return false;
+				block.style.width = svg.viewBox.baseVal.width * 1.15 + "px";
 				if (Math.abs(svg.getBoundingClientRect().width - block.clientWidth) > 1) return false;
-				const cap = svg.viewBox.baseVal.width * 1.1;
+				const cap = svg.viewBox.baseVal.width * 1.05;
 				block.style.setProperty("--schematic-max", svg.viewBox.baseVal.width + "px");
 				svg.style.setProperty("--mermaid-max", cap + "px");
 				return Math.abs(svg.getBoundingClientRect().width - cap) <= 1;

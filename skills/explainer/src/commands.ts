@@ -55,7 +55,7 @@ Number tags key a drawing of parts to the text: \`\`\`mermaid tag:inv=2 tag:bat=
   pack warns when it says another number, and one part keeps one number in every drawing. Mentions a client component or filled view draws link but are not ringed.
   A measured value sits in its stage's label or on the edge: atob["atob<br>11 ms"], file -->|418 KB| atob.
 Flowchart nodes are unfilled unless styled. Use a["Label"]:::info or class a,b info (also ok, warn, bad) for a themed outline, tint and label; edges stay neutral. Override the matching kit token (e.g. --info) to recolour a role. Explicit classDef and style still win but take plain colours only, not var(); pack warns about fixed paint in either.
-Node text is laid out at 15 px, edge labels and smaller text at 13 px; both can grow 1.4x on wide screens (to 21 and 18.2 px), if the column fits it. Phones keep the original size cap and use a narrower, transposed flowchart or state layout when available. Diagrams scroll below the readable width; print fits the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
+Node text is laid out at 15 px, edge labels and smaller text at 13 px; both can grow 1.2x on wide screens (to 18 and 15.6 px), if the column fits it. Phones keep the original size cap and use a narrower, transposed flowchart or state layout when available. Diagrams scroll below the readable width; print fits the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {
