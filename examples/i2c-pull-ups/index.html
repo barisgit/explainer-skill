@@ -1096,14 +1096,18 @@ figure:not([class]) > img {
 	overflow: visible;
 	min-width: var(--schematic-min);
 }
-/* Fit the SVG to the column and the same cap in a pinned .beside. Wide screens can use 40% more room: 13 px labels reach
-   about 18 px, still on the scale of prose. Keep the packed cap on phones and paper. */
+/* Fit the SVG to the column and the same cap in a pinned .beside. Wide screens can use more room, so a diagram's main text
+   reaches about 18 px, still on the scale of prose: Mermaid's 15 px node text 18 px (edge labels 15.6 px), a schematic's 13 px
+   part names 18.2 px. Keep the packed cap on phones and paper. */
 :is(.mermaid, .schematic) > svg {
 	--_diagram-default-max: calc(var(--_diagram-base) * var(--_diagram-scale, 1));
 	max-width: var(--_diagram-max);
 }
 @media screen and (width >= 40rem) {
-	:is(.mermaid, .schematic) > svg {
+	.mermaid > svg {
+		--_diagram-scale: 1.2;
+	}
+	.schematic > svg {
 		--_diagram-scale: 1.4;
 	}
 	/* A Stepper's diagram is its stage: at least the text's width, short of doubling its labels or passing 60% of the window's
