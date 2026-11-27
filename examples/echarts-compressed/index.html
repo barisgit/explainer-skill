@@ -1104,6 +1104,11 @@ figure:not([class]) > img {
 	--_diagram-default-max: calc(var(--_diagram-base) * var(--_diagram-scale, 1));
 	max-width: var(--_diagram-max);
 }
+@property --_stage-measure {
+	syntax: "<length>";
+	inherits: true;
+	initial-value: 0px;
+}
 @media screen and (width >= 40rem) {
 	.mermaid > svg {
 		--_diagram-scale: 1.2;
@@ -1111,13 +1116,17 @@ figure:not([class]) > img {
 	.schematic > svg {
 		--_diagram-scale: 1.4;
 	}
-	/* A Stepper's diagram is its stage: at least the text's width, short of doubling its labels or passing 60% of the window's
+	/* A Stepper's diagram is its stage: at least the text's width (66ch in the block's font, resolved there since the drawing's own
+	   text is smaller than the prose's), short of doubling its labels or passing 60% of the window's
 	   height. */
+	[data-stepper] :is(.mermaid, .schematic) {
+		--_stage-measure: 66ch;
+	}
 	[data-stepper] :is(.mermaid, .schematic) > svg {
 		min-width: max(
 			var(--mermaid-min, 0px),
 			var(--schematic-min, 0px),
-			min(100%, 66ch, var(--_diagram-base) * 2, 60vh * var(--diagram-ratio))
+			min(100%, var(--_stage-measure), var(--_diagram-base) * 2, 60vh * var(--diagram-ratio))
 		);
 	}
 }

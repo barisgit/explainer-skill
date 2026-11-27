@@ -5,7 +5,7 @@ const dir = scratch();
 afterAll(dir.cleanup);
 
 const flow =
-	"```mermaid\nflowchart LR\n  a[Commit] --> b[Capture] --> c[Upload] --> d[Restore]\n```";
+	"```mermaid\nflowchart LR\n  a[Commit] --> b[Capture the state] --> c[Upload it] --> d[Restore it]\n```";
 
 test("a Stepper's diagram is at least the text's width on desktop, a plain one keeps its own", async () => {
 	const output = await packedMdx(
