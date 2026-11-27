@@ -82,10 +82,11 @@ export const PAGE_JS = (narrow: boolean) => `(() => {
 	}
 	for (const panel of document.querySelectorAll(".beside > :nth-child(2)")) {
 		if (getComputedStyle(panel).position !== "sticky") continue;
-		const drawing = [...panel.querySelectorAll(":scope:is(.mermaid, .schematic) > svg, :is(.mermaid, .schematic) > svg")].find(shown);
-		const box = drawing?.getBoundingClientRect();
-		if (box && box.height > box.width && box.height > panel.clientHeight * ${TALL_PIN}) {
-			warnings.push(name(panel.parentElement) + ": its pinned drawing is " + Math.round(box.width) + "x" + Math.round(box.height) + " px, taller than wide and filling the " + panel.clientHeight + " px window, so its section's first screen shows only part of it: lay it out wider than tall (flowchart LR, or parts grouped in subgraphs)");
+		const room = parseFloat(getComputedStyle(panel).maxBlockSize) || innerHeight;
+		for (const drawing of [...panel.querySelectorAll(":scope:is(.mermaid, .schematic) > svg, :is(.mermaid, .schematic) > svg")].filter(shown)) {
+			const box = drawing.getBoundingClientRect();
+			if (box.height <= box.width || box.height <= room * ${TALL_PIN}) continue;
+			warnings.push(name(panel.parentElement) + ": its pinned drawing is " + Math.round(box.width) + "x" + Math.round(box.height) + " px, taller than wide and filling the " + Math.round(room) + " px window, so its section's first screen shows only part of it: lay it out wider than tall (flowchart LR, or parts grouped in subgraphs)");
 		}
 	}
 	if (${narrow} && !document.querySelector('meta[name="viewport"]')) warnings.push('no <meta name="viewport" content="width=device-width, initial-scale=1">: phones lay the page out at desktop width and shrink it');
