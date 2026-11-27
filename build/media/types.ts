@@ -23,13 +23,25 @@ export interface Rect extends Size {
  */
 export type Action =
 	| { do: "wait"; ms: number }
-	| { do: "click"; target: string; travel?: number; hold?: number }
-	/** Moves the cursor onto the target and leaves it there, for what a page shows under the pointer. */
-	| { do: "hover"; target: string; travel?: number; hold?: number }
+	/** Clicks the target's centre, or the point `at` that many widths and heights into its box: a mark on a canvas. */
+	| { do: "click"; target: string; at?: [number, number]; travel?: number; hold?: number }
+	/** Moves the cursor onto the target (its centre or `at`) and leaves it there, for what a page shows under the pointer. */
+	| { do: "hover"; target: string; at?: [number, number]; travel?: number; hold?: number }
 	/** Presses a range input's thumb at the first value and drags it through the others, `ms` per leg. */
 	| { do: "drag"; selector: string; values: number[]; ms: number; travel?: number; hold?: number }
 	/** Scrolls the page over `ms` until the first element matching `to` is at the top of the viewport; the cursor is put away. */
-	| { do: "scroll"; to: string; ms: number; hold?: number };
+	| { do: "scroll"; to: string; ms: number; hold?: number }
+	/**
+	 * Clicks a `<select>` and picks `value`, or the value for the clip's theme. A native list draws outside the page, so
+	 * the click is shown with the cursor and the value set as the reader's choice would set it.
+	 */
+	| {
+			do: "select";
+			target: string;
+			value: string | Record<Theme, string>;
+			travel?: number;
+			hold?: number;
+	  };
 
 export const DEFAULT_TRAVEL = 600;
 export const DEFAULT_HOLD = 600;
@@ -62,10 +74,28 @@ export interface Clip {
 	actions: Action[];
 }
 
+/** One page's part of a clip that plays several pages in turn: opened fresh, scrolled to `scrollTo`, then played. */
+export interface Scene {
+	/** Directory name under `examples/`. */
+	page: string;
+	hash?: string;
+	scrollTo?: string;
+	actions: Action[];
+}
+
+/** A clip of scenes from several pages, cut together in order: `examples/media/<name>-<theme>.webp`. */
+export interface Reel extends Omit<Clip, "scrollTo" | "region" | "hash" | "actions"> {
+	scenes: Scene[];
+}
+
 export interface Example {
 	/** Directory name under `examples/`; the page is `examples/<name>/index.html`. */
 	name: string;
-	/** Whether the README shows the headline and complete opening figure as a card. The hero's page needs none. */
-	card: boolean;
+	/**
+	 * Whether the README shows the headline and complete opening figure as a card. `window` replaces the default for a
+	 * figure that needs a wider screen to keep its layout; `until` names the opening's last element when it is not the
+	 * first figure.
+	 */
+	card: boolean | { window?: Size; until?: string };
 	clips: Clip[];
 }

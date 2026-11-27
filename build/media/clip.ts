@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Cdp } from "../../skills/explainer/src/cdp.ts";
 import { settle } from "../../skills/explainer/src/chrome.ts";
 import { boxOf, resolveRegion, SCALE, screenshot, scrollToTop, TOP_MARGIN } from "./page.ts";
-import type { Action, Clip, Frame, Rect } from "./types.ts";
+import type { Action, Clip, Frame, Rect, Theme } from "./types.ts";
 import { DEFAULT_HOLD, DEFAULT_TRAVEL } from "./types.ts";
 
 /** How long the mouse button stays down in a click, long enough to show in at least one frame. */
@@ -149,12 +149,44 @@ class Recorder {
 	async release() {
 		await this.button("mouseReleased");
 	}
+
+	/** Shows a press at the cursor without sending one: what a click on a control looks like when the page is told otherwise. */
+	async showPress() {
+		const at = this.cursor;
+		if (!at) {
+			throw new Error("a press was shown before the cursor appeared");
+		}
+		this.pressed = true;
+		await this.drawDot(at);
+		await this.hold(PRESS_MS);
+		this.pressed = false;
+		await this.drawDot(at);
+	}
 }
 
-/** Where a click on the first element matching `target` lands, in viewport coordinates. */
-async function centreOf(cdp: Cdp, target: string): Promise<Point> {
+/** Sets the `<select>` matching `target` to `value` and tells the page, as a reader's pick does. */
+async function choose(cdp: Cdp, target: string, value: string) {
+	const done = await cdp.evaluate<boolean>(`(() => {
+		const select = document.querySelector(${JSON.stringify(target)});
+		if (!(select instanceof HTMLSelectElement)) return false;
+		select.value = ${JSON.stringify(value)};
+		select.dispatchEvent(new Event("input", { bubbles: true }));
+		select.dispatchEvent(new Event("change", { bubbles: true }));
+		return select.value === ${JSON.stringify(value)};
+	})()`);
+	if (!done) {
+		throw new Error(`${target} is no select with the value ${value}`);
+	}
+}
+
+/** Where a click on the first element matching `target` lands, in viewport coordinates: its centre, or `at` into its box. */
+async function centreOf(
+	cdp: Cdp,
+	target: string,
+	at: [number, number] = [0.5, 0.5],
+): Promise<Point> {
 	const box = await boxOf(cdp, target);
-	return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+	return { x: box.x + box.width * at[0], y: box.y + box.height * at[1] };
 }
 
 /** Where the thumb of the range input `selector` sits when its value is `value`. */
@@ -180,19 +212,29 @@ async function scrollTopOf(cdp: Cdp, selector: string): Promise<number> {
 	return Math.max(0, Math.min(max, y + box.y - TOP_MARGIN));
 }
 
-async function perform(cdp: Cdp, rec: Recorder, action: Action) {
+async function perform(cdp: Cdp, rec: Recorder, action: Action, theme: Theme) {
 	const travel = "travel" in action ? (action.travel ?? DEFAULT_TRAVEL) : 0;
 	switch (action.do) {
 		case "wait":
 			await rec.hold(action.ms);
 			return;
 		case "click":
-			await rec.travel(await centreOf(cdp, action.target), travel);
+			await rec.travel(await centreOf(cdp, action.target, action.at), travel);
 			await rec.click();
 			await rec.hold(action.hold ?? DEFAULT_HOLD);
 			return;
 		case "hover":
+			await rec.travel(await centreOf(cdp, action.target, action.at), travel);
+			await rec.hold(action.hold ?? DEFAULT_HOLD);
+			return;
+		case "select":
 			await rec.travel(await centreOf(cdp, action.target), travel);
+			await rec.showPress();
+			await choose(
+				cdp,
+				action.target,
+				typeof action.value === "string" ? action.value : action.value[theme],
+			);
 			await rec.hold(action.hold ?? DEFAULT_HOLD);
 			return;
 		case "scroll":
@@ -216,7 +258,7 @@ async function perform(cdp: Cdp, rec: Recorder, action: Action) {
 /**
  * Plays `clip` on the page that is already open and writes its frames into `dir`; returns them in order.
  */
-export async function record(cdp: Cdp, clip: Clip, dir: string): Promise<Frame[]> {
+export async function record(cdp: Cdp, clip: Clip, dir: string, theme: Theme): Promise<Frame[]> {
 	mkdirSync(dir, { recursive: true });
 	if (clip.scrollTo) {
 		await scrollToTop(cdp, clip.scrollTo);
@@ -228,7 +270,7 @@ export async function record(cdp: Cdp, clip: Clip, dir: string): Promise<Frame[]
 	await settle(300);
 	const rec = new Recorder(cdp, dir, region, clip.width / (region.width * SCALE), clip.fps);
 	for (const action of clip.actions) {
-		await perform(cdp, rec, action);
+		await perform(cdp, rec, action, theme);
 	}
 	return rec.frames;
 }
