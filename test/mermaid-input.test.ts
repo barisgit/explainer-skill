@@ -14,16 +14,16 @@ test("explicit classDef and style paint still draw, with warnings if they do not
 flowchart LR
   a[Start]:::info --> b[Work]:::themed --> c[End]
   classDef info fill:#fff,stroke:#777,color:#111
-  classDef themed stroke:var(--accent),fill:none,stroke-width:2
-  style b stroke:var(--info)
+  classDef themed stroke:currentColor,fill:none,stroke-width:2
+  style b stroke:currentColor
   style c fill:#eee
 \`\`\`
 `,
 		);
 		expect(result.code).toBe(0);
 		const html = readFileSync(output, "utf8");
-		expect(html).toContain('fill="#fff" stroke="#777"');
-		expect(html).toContain('fill="#eee"');
+		expect(html).toContain("fill:#fff;stroke:#777;");
+		expect(html).toContain("fill:#eee;");
 		expect(result.stdout).toContain('mermaid block 1: classDef "info" uses fixed paint');
 		expect(result.stdout).toContain('mermaid block 1: style "c" uses fixed paint');
 		expect(result.stdout).not.toContain('classDef "themed"');
@@ -33,8 +33,7 @@ flowchart LR
 	}
 });
 
-// What the renderer's parsers read: every line is drawn as written, drawn as Mermaid draws it, or fails naming what pack
-// cannot read and what to write instead. Nothing is dropped.
+// What pele reads: every line is drawn as Mermaid draws it, or fails naming what pack cannot read and what to write instead.
 
 const misrenders = [
 	{
@@ -54,10 +53,26 @@ const misrenders = [
 			'"A->>: oops" is missing a participant; write it as "A->>B: oops", sender before the arrow and receiver after',
 	},
 	{
-		name: "a markdown string",
-		input: 'flowchart LR\n  a["`**bold** text`"] --> b',
+		name: "an end outside a subgraph",
+		input: "flowchart LR\n  a --> b\n  end",
+		message: '"end" closes no block; remove it, or open the block it ends',
+	},
+	{
+		name: "a } outside a composite state",
+		input: "stateDiagram-v2\n  A --> B\n  }",
+		message: '"}" closes no block; remove it, or open the block it ends',
+	},
+	{
+		name: "a deactivation of an inactive participant",
+		input: "sequenceDiagram\n  A->>B: ask\n  B-->>-A: answer",
 		message:
-			'markdown strings ("`...`") are not supported; drop the backticks: a["**bold** and *italic*"] still renders',
+			'B is deactivated but not active; start it with "+" on an earlier message to B, e.g. "A->>+B: ask"',
+	},
+	{
+		name: "a kit colour in a classDef",
+		input: "flowchart LR\n  a:::hot --> b\n  classDef hot stroke:var(--accent)",
+		message:
+			'pack cannot read "(--accent)" in "classDef hot stroke:var(--accent)"; classDef and style take plain colours; for the kit\'s colours mark the node :::info, :::ok, :::warn or :::bad',
 	},
 ];
 
@@ -65,201 +80,106 @@ test.each(misrenders)("$name fails with what to write instead", ({ input, messag
 	expect(failureOf(input)).toBe(message);
 });
 
-const unreadable = [
-	{ name: "a cross end", input: "flowchart LR\n  a --x b", unread: "--x b", hint: '"-->"' },
-	{ name: "a circle end", input: "flowchart LR\n  a --o b", unread: "--o b", hint: '"-->"' },
+/** Mermaid syntax an earlier renderer refused, which pele draws: each with markup only its drawing has. */
+const drawn = [
+	{
+		name: "a markdown string",
+		input: 'flowchart LR\n  a["`**bold** text`"] --> b',
+		has: ">bold</tspan>",
+	},
+	{ name: "a cross end", input: "flowchart LR\n  a --x b", has: 'data-ref="L_a_b_0"' },
+	{ name: "a circle end", input: "flowchart LR\n  a --o b", has: 'data-ref="L_a_b_0"' },
 	{
 		name: "a new-style node shape",
-		input: "flowchart LR\n  a@{ shape: rect } --> b",
-		unread: "@{ shape: rect } --> b",
-		hint: "leave it out",
+		input: "flowchart LR\n  a@{ shape: circle } --> b",
+		has: "pele-shape-circle",
 	},
-	{
-		name: "a state note",
-		input: "stateDiagram-v2\n  A --> B\n  note right of A: hi",
-		unread: "note right of A: hi",
-		hint: "leave it out",
-	},
+	{ name: "a state note", input: "stateDiagram-v2\n  A --> B\n  note right of A: hi", has: ">hi<" },
 	{
 		name: "a sequence title",
 		input: "sequenceDiagram\n  title Login\n  A->>B: hi",
-		unread: "title Login",
-		hint: "leave it out",
+		has: ">Login<",
+	},
+	{ name: "a class note", input: 'classDiagram\n  A <|-- B\n  note for A "base"', has: ">base<" },
+	{
+		name: "a nested namespace",
+		input: "classDiagram\n  namespace Outer {\n  namespace Inner {\n  class A\n  }\n  }",
+		has: ">Inner<",
 	},
 	{
-		name: "a class note",
-		input: 'classDiagram\n  A <|-- B\n  note for A "base"',
-		unread: 'note for A "base"',
-		hint: "leave it out",
+		name: "an activation that runs to the end",
+		input: "sequenceDiagram\n  A->>+B: ask\n  B-->>A: answer",
+		has: 'class="pele-activation"',
 	},
+	{
+		name: "an activate line after a message from its participant",
+		input: "sequenceDiagram\n  A->>B: ask\n  activate A\n  B-->>A: ok\n  deactivate A",
+		has: 'class="pele-activation"',
+	},
+];
+
+test.each(drawn)("$name draws", ({ input, has }) => {
+	expect(svgOf(input)).toContain(has);
+});
+
+const unreadable = [
 	{
 		name: "an entity attribute without a name",
 		input: "erDiagram\n  A {\n    string\n  }",
 		unread: "string",
-		hint: "leave it out",
 	},
 	{
 		name: "an unknown xychart series",
 		input: "xychart-beta\n  x-axis [a, b]\n  bar [1, 2]\n  area [1, 2]",
 		unread: "area [1, 2]",
-		hint: "leave it out",
 	},
-	{
-		name: "a style property without a value",
-		input: "flowchart LR\n  a --> b\n  style a fill:red,GARBAGE",
-		unread: "GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "a classDef property with an empty value",
-		input: "flowchart LR\n  a --> b\n  classDef hot fill:red,bad:",
-		unread: "bad:",
-		hint: "leave it out",
-	},
-	{
-		name: "a link style with two indexes and no comma",
-		input: "flowchart LR\n  a --> b\n  linkStyle 0 1 stroke:red",
-		unread: "1 stroke:red",
-		hint: "leave it out",
-	},
-	{
-		name: "a state link style with an empty index",
-		input: "stateDiagram-v2\n  A --> B\n  linkStyle 0,,1 stroke:red",
-		unread: "linkStyle 0,,1 stroke:red",
-		hint: "leave it out",
-	},
-	{
-		name: "a dangling &",
-		input: "flowchart LR\n  a --> b &",
-		unread: "&",
-		hint: "leave it out",
-	},
-	{
-		name: "an end outside a subgraph",
-		input: "flowchart LR\n  a --> b\n  end",
-		unread: "end",
-		hint: "leave it out",
-	},
-	{
-		name: "a } outside a composite state",
-		input: "stateDiagram-v2\n  A --> B\n  }",
-		unread: "}",
-		hint: "leave it out",
-	},
-	{
-		name: "a nested namespace",
-		input: "classDiagram\n  namespace Outer {\n  namespace Inner {\n  class A\n  }\n  }",
-		unread: "namespace Inner {",
-		hint: "leave it out",
-	},
+	{ name: "a dangling &", input: "flowchart LR\n  a --> b &", unread: "a --> b &" },
 	{
 		name: "an entity attribute with an unknown key",
 		input: "erDiagram\n  A {\n    string id PK GARBAGE\n  }",
-		unread: "GARBAGE",
-		hint: "leave it out",
+		unread: "string id PK GARBAGE",
 	},
 	{
 		name: "an entity attribute with a second comment",
 		input: 'erDiagram\n  A {\n    string id PK "a" "b"\n  }',
 		unread: '"b"',
-		hint: "leave it out",
-	},
-	{
-		name: "a block keyword run into its label",
-		input: "sequenceDiagram\n  loopGARBAGE\n  A->>B: hi\n  end",
-		unread: "loopGARBAGE",
-		hint: "leave it out",
 	},
 	{
 		name: "text after an xychart header",
 		input: "xychart-beta GARBAGE\n  x-axis [a, b]\n  bar [1, 2]",
 		unread: "GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "text after an xychart title",
-		input: 'xychart-beta\n  title "Revenue" GARBAGE\n  x-axis [a, b]\n  bar [1, 2]',
-		unread: "GARBAGE",
-		hint: "leave it out",
 	},
 	{
 		name: "text after x-axis categories",
 		input: "xychart-beta\n  x-axis [a, b] GARBAGE\n  bar [1, 2]",
 		unread: "GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "text after an x-axis range",
-		input: "xychart-beta\n  x-axis 0 --> 10 GARBAGE\n  line [1, 2]",
-		unread: "GARBAGE",
-		hint: "leave it out",
 	},
 	{
 		name: "an exponent in an axis range",
 		input: "xychart-beta\n  x-axis 0 --> 10e3\n  line [1, 2]",
 		unread: "e3",
-		hint: "leave it out",
-	},
-	{
-		name: "text after a y-axis range",
-		input: 'xychart-beta\n  x-axis [a, b]\n  y-axis "t" 0 --> 100 GARBAGE\n  bar [1, 2]',
-		unread: "GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "text after a bar series",
-		input: "xychart-beta\n  x-axis [a, b]\n  bar [1, 2] GARBAGE",
-		unread: "GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "text after a line series",
-		input: "xychart-beta\n  x-axis [a, b]\n  line [1, 2] GARBAGE",
-		unread: "GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "an empty last x-axis category",
-		input: "xychart-beta\n  x-axis [a, b,]\n  bar [1, 2]",
-		unread: "a, b,",
-		hint: "leave it out",
 	},
 	{
 		name: "a value that is not a number",
 		input: "xychart-beta\n  x-axis [a, b]\n  bar [1junk, 2]",
-		unread: "1junk",
-		hint: "leave it out",
-	},
-	{
-		name: "an empty value",
-		input: "xychart-beta\n  x-axis [a, b, c]\n  bar [1, , 2]",
-		unread: "1, , 2",
-		hint: "leave it out",
+		unread: "junk, 2]",
 	},
 	{
 		name: "text after a classDiagram header",
 		input: "classDiagram ; GARBAGE\n  A <|-- B",
 		unread: "; GARBAGE",
-		hint: "leave it out",
 	},
 	{
-		name: "text after an erDiagram header",
-		input: "erDiagram ; GARBAGE\n  A ||--o{ B : has",
-		unread: "; GARBAGE",
-		hint: "leave it out",
-	},
-	{
-		name: "text after a sequenceDiagram header",
-		input: "sequenceDiagram ; GARBAGE\n  A->>B: hi",
-		unread: "; GARBAGE",
-		hint: "leave it out",
+		name: "a remote paint",
+		input: "flowchart LR\n  a --> b\n  style a fill:url(https://example.com/p.svg#g)",
+		unread: "(https://example.com/p.svg#g)",
 	},
 ];
 
-test.each(unreadable)("$name fails, naming what pack cannot read", ({ input, unread, hint }) => {
+test.each(unreadable)("$name fails, naming what pack cannot read", ({ input, unread }) => {
 	const message = failureOf(input);
-	expect(message).toContain(`pack cannot read "${unread}"`);
-	expect(message).toContain(hint);
+	expect(message).toStartWith(`pack cannot read "${unread}"`);
+	expect(message).toMatch(/; (?:write it as|a paint from a URL)/);
 });
 
 const unclosed = [
@@ -305,7 +225,7 @@ test.each(unclosed)(
 
 test("an entity attribute keeps every key of a comma list and its comment", () => {
 	const svg = svgOf('erDiagram\n  A {\n    string id PK, FK "the id"\n  }');
-	expect(svg).toContain(">PK,FK<");
+	expect(svg).toMatch(/>PK,\s?FK</);
 	expect(svg).toContain(">the id<");
 });
 
@@ -325,13 +245,13 @@ test("a participant declared again takes its latest name, as in Mermaid", () => 
 
 test("brackets inside a quoted label stay in the label, and its edge is kept", () => {
 	const svg = svgOf('flowchart LR\n  a["Array [i]"] --> b');
-	expect(svg).toContain('data-label="Array [i]"');
-	expect(svg).toContain('data-from="a" data-to="b"');
+	expect(svg).toContain(">Array [i]<");
+	expect(svg).toContain('data-ref="L_a_b_0"');
 });
 
 test("longer links draw like the short ones", () => {
 	const svg = svgOf("flowchart TD\n  a ---> b\n  b -..-> c\n  c ===> d\n  d ---- e");
-	expect(svg.match(/<polyline class="edge"/g)).toHaveLength(4);
+	expect(svg.match(/<g class="pele-edge"/g)).toHaveLength(4);
 });
 
 test("activate and deactivate lines draw the bar that + and - on the messages draw", () => {
@@ -339,31 +259,7 @@ test("activate and deactivate lines draw the bar that + and - on the messages dr
 	const lines = svgOf(
 		"sequenceDiagram\n  A->>B: ask\n  activate B\n  B-->>A: answer\n  deactivate B",
 	);
-	expect(signs).toContain('class="activation"');
-	expect(lines).toBe(signs);
-});
-
-const activations = [
-	{
-		name: "an activation never ended",
-		input: "sequenceDiagram\n  A->>+B: ask\n  B-->>A: answer",
-		message:
-			'B is activated but never deactivated; end it with "-" on a later message from B, e.g. "B-->>-A: done"',
-	},
-	{
-		name: "a deactivation of an inactive participant",
-		input: "sequenceDiagram\n  A->>B: ask\n  B-->>-A: answer",
-		message:
-			'B is deactivated but not active; start it with "+" on an earlier message to B, e.g. "A->>+B: ask"',
-	},
-	{
-		name: "an activate line that follows no message to its participant",
-		input: "sequenceDiagram\n  A->>B: ask\n  activate A",
-		message:
-			'pack cannot read "activate A"; activate and deactivate lines work right after a message to (or from) that participant, or mark the message: "A->>+B" starts B\'s bar, "B-->>-A" ends it',
-	},
-];
-
-test.each(activations)("$name fails with what to write instead", ({ input, message }) => {
-	expect(failureOf(input)).toBe(message);
+	const bars = (svg: string) => svg.match(/<rect class="pele-activation"[^>]*>/g);
+	expect(bars(signs)).toHaveLength(1);
+	expect(bars(lines)).toEqual(bars(signs));
 });

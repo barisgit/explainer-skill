@@ -1,4 +1,19 @@
-import { renderMermaidSVG, UnreadInputError } from "../vendor/beautiful-mermaid.js";
+import {
+	type FlowEdge,
+	type ParsedModel,
+	parse,
+	render,
+	type StateStatement,
+} from "../vendor/pele.js";
+import { textWidth } from "./geist.ts";
+import {
+	type Family,
+	familyOf,
+	flows,
+	peleMessage,
+	sourceProblem,
+	stripPreamble,
+} from "./mermaid-input.ts";
 
 /**
  * A rendered diagram: its SVG, which follows light and dark through the kit's tokens; for a wide flowchart or state diagram the
@@ -15,9 +30,12 @@ export interface Diagram {
 }
 
 /**
- * The renderer lays out text at the kit's 13 px label size. A diagram shrinks with its column until its smallest text is
- * this size in px; in a narrower column it scrolls sideways.
+ * Node text is laid out at 15 px, so pele's edge labels (7/8 of it) come out at the kit's 13 px label size. A diagram shrinks
+ * with its column until its smallest text is READABLE_PX; in a narrower column it scrolls sideways.
  */
+const NODE_PX = 15;
+/** The smallest text a diagram draws: pele's smaller texts (a sequence block's kind, ER keys, class cardinalities) are raised to it. */
+const LABEL_PX = 13;
 export const READABLE_PX = 10;
 /** The width a diagram block gives its SVG on a 390 px phone: the viewport less the page's and the block's 16 px insets. */
 const PHONE_COLUMN_PX = 326;
@@ -27,166 +45,13 @@ const PHONE_COLUMN_PX = 326;
  */
 const PRINT_COLUMN_PX = 627;
 
-/** What pack does with a supported type beyond drawing it: misrender checks for flowcharts and sequences, and see `flows`. */
-type Family = "flowchart" | "state" | "sequence" | "other";
-
-/** Flowcharts and state diagrams: Mermaid reads `;` in them as a line break, and they can be laid out across their direction. */
-const flows = (family: Family) => family === "flowchart" || family === "state";
-
-/** The header keywords pack draws, with their family. */
-const SUPPORTED = new Map<string, Family>([
-	["flowchart", "flowchart"],
-	["graph", "flowchart"],
-	["stateDiagram", "state"],
-	["stateDiagram-v2", "state"],
-	["sequenceDiagram", "sequence"],
-	["classDiagram", "other"],
-	["erDiagram", "other"],
-	["xychart", "other"],
-	["xychart-beta", "other"],
-]);
-
-/** SUPPORTED as the author is told it: the older stateDiagram and xychart headers still draw but are not advertised. */
-const SUPPORTED_LIST =
-	"flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram, xychart-beta";
-
-/**
- * What to draw instead, per Mermaid type pack cannot render. The kit names are the components `kit <Name>` documents. A Map, unlike
- * an object literal, finds nothing for a header such as `constructor`.
- */
-const INSTEAD = new Map([
-	["pie", "a pie or, better for comparing, a bar chart with the kit's Chart (ECharts)"],
-	["gantt", "a horizontal bar chart on a time axis with the kit's Chart, or a table of dates"],
-	["timeline", "an ordered list or a table, or a flowchart LR with one node per period"],
-	["journey", "a line chart of the scores per step with the kit's Plot or Chart"],
-	["quadrantChart", "a scatter chart with the kit's Chart, with markLine at the two midpoints"],
-	["gitGraph", "a flowchart LR with one node per commit and a subgraph per branch"],
-	["sankey-beta", "a sankey chart with the kit's Chart"],
-	["sankey", "a sankey chart with the kit's Chart"],
-	["architecture-beta", "a flowchart with a subgraph per group"],
-	["packet-beta", "a table with one column per bit range"],
-	["packet", "a table with one column per bit range"],
-	["mindmap", "a flowchart LR or a nested list"],
-	["block-beta", "a flowchart with a subgraph per block group, or a CSS grid of boxes"],
-	["block", "a flowchart with a subgraph per block group, or a CSS grid of boxes"],
-]);
-/** What to draw instead of a type INSTEAD does not name. */
-const INSTEAD_OTHERWISE = "a flowchart for parts and links, or the kit's Chart for numbers";
-
-/** The family of the source's header keyword; throws, saying what to draw instead, for a type pack cannot draw. */
-function familyOf(body: string): Family {
-	const type = /^\S+/.exec(body)?.[0] ?? "";
-	const family = SUPPORTED.get(type);
-	if (!family) {
-		throw new Error(
-			`"${type}" diagrams are not supported (pack draws ${SUPPORTED_LIST}); draw it as ${INSTEAD.get(type) ?? INSTEAD_OTHERWISE}`,
-		);
-	}
-	return family;
-}
-
-/** The source without front matter and `%%` comment lines; the header keyword is the first word left. */
-function stripPreamble(source: string): string {
-	return source
-		.replace(/^\s*---\n[\s\S]*?\n---\s*\n/, "")
-		.split("\n")
-		.filter((line) => !line.trim().startsWith("%%"))
-		.join("\n")
-		.trim();
-}
-
-/** Mermaid's `;` statement separator, outside quoted labels, as a new line: the renderer reads one statement per line. */
-function splitStatements(source: string): string {
-	let quoted = false;
-	let out = "";
-	for (const ch of source) {
-		quoted = ch === '"' ? !quoted : quoted;
-		out += ch === ";" && !quoted ? "\n" : ch;
-	}
-	return out;
-}
-
-/** A flowchart link (`-->`, `---`, `-.->`, `==>`, `--x`, `<-->`), with its optional `|label|`. */
-const LINK = String.raw`<?(?:-{2,}|={2,}|-\.+-)[->ox]?(?:\|[^|]*\|)?`;
-const NO_TARGET = new RegExp(`${LINK}\\s*$`);
-const NO_SOURCE = new RegExp(`^\\s*${LINK}`);
-/** A sequence message: sender, arrow (`->>`, `-->`, `-x`, `-)` and their dashed forms), receiver with an optional activation sign, text. */
-const MESSAGE = /^([^:]*?)\s*(--?>>|--?>|--?x|--?\))\s*([+-]?)([^:]*?)\s*(:.*)?$/;
-
-/**
- * Statements the renderer draws wrong without an error, each with what to write instead: a markdown string (it prints the
- * backticks), a link missing an end (it drops the arrow), a message missing a participant (it invents one named after the arrow).
- */
-const MISRENDERS: Array<(family: Family, line: string) => string | undefined> = [
-	(_, line) =>
-		line.includes('"`')
-			? 'markdown strings ("`...`") are not supported; drop the backticks: a["**bold** and *italic*"] still renders'
-			: undefined,
-	(family, line) =>
-		family === "flowchart" && NO_TARGET.test(line)
-			? `"${line}" has no target node; write it as "${line} next", naming the node it points to`
-			: undefined,
-	(family, line) =>
-		family === "flowchart" && NO_SOURCE.test(line)
-			? `"${line}" has no source node; write it as "prev ${line}", naming the node it starts from`
-			: undefined,
-	(family, line) => {
-		const [, from, arrow, sign, to, text = ""] =
-			(family === "sequence" && MESSAGE.exec(line)) || [];
-		return arrow && !(from && to)
-			? `"${line}" is missing a participant; write it as "${from || "A"}${arrow}${sign}${to || "B"}${text}", sender before the arrow and receiver after`
-			: undefined;
+/** Geist's advances for pele's text, bold at 600 as the kit draws it; monospace (style bit 4) at the 0.6 em of a mono face. */
+const MEASURER = {
+	width: (text: string, size: number, style: number) => {
+		const px = Math.max(size, LABEL_PX);
+		return style & 4 ? text.length * px * 0.6 : textWidth(text, px, style & 1 ? 600 : 400);
 	},
-];
-
-/** What to write instead of input the renderer does not read, by what the unread part starts with; else UNREAD_DEFAULT. */
-const UNREAD_HINTS: Array<[RegExp, string]> = [
-	[
-		/^<?[-=.]+[xo]\b|^[xo][-=.]/,
-		'cross and circle ends (--x, --o) are not drawn; write "-->" and say what the end means in the label: a -->|stops| b',
-	],
-	[
-		/^(?:de)?activate\s/,
-		'activate and deactivate lines work right after a message to (or from) that participant, or mark the message: "A->>+B" starts B\'s bar, "B-->>-A" ends it',
-	],
-];
-const UNREAD_DEFAULT =
-	"pack draws a subset of Mermaid: leave it out, or say it with the nodes, edges and labels it reads";
-
-/** The author's message for input the renderer's parser left unread: what it is, and what to write instead. */
-function unreadMessage({ unread, line }: UnreadInputError): string {
-	const hint = UNREAD_HINTS.find(([pattern]) => pattern.test(unread))?.[1] ?? UNREAD_DEFAULT;
-	return `pack cannot read "${unread}"${unread === line ? "" : ` in "${line}"`}; ${hint}`;
-}
-
-/** The first misrender among the statements after the header, as its message. */
-function firstMisrender(family: Family, statements: string[]): string | undefined {
-	for (const statement of statements) {
-		const line = statement.trim();
-		for (const check of MISRENDERS) {
-			const problem = check(family, line);
-			if (problem) {
-				return problem;
-			}
-		}
-	}
-	return undefined;
-}
-
-const NODE_ROLES = ["info", "ok", "warn", "bad"];
-/** Let Mermaid resolve roles like any other class. Its last classDef wins, so authors can still define their own classes. */
-const ROLE_DEFAULTS = NODE_ROLES.map(
-	(role) =>
-		`\nclassDef ${role} fill:var(--_mermaid-tint-${role}),stroke:var(--${role}),color:var(--_mermaid-ink-${role})`,
-).join("");
-
-/** Mermaid splits classDef values at commas. Resolve its comma-free placeholders to CSS paints on the SVG. */
-const ROLE_PAINTS = new Map(
-	NODE_ROLES.flatMap((role) => [
-		[`var(--_mermaid-tint-${role})`, `color-mix(in srgb, var(--${role}) 14%, var(--under))`],
-		[`var(--_mermaid-ink-${role})`, `color-mix(in srgb, var(--${role}) 40%, var(--ink))`],
-	]),
-);
+};
 
 /** Fixed node paint still draws as written, but cannot follow the reader's scheme. */
 function fixedNodePaintWarnings(source: string): string[] {
@@ -194,7 +59,7 @@ function fixedNodePaintWarnings(source: string): string[] {
 		([, statement, target, body = ""]) => {
 			const paints = [...body.matchAll(/(?:^|,)\s*(?:fill|stroke|color)\s*:\s*([^,]+)/g)];
 			return paints.some(
-				([, paint = ""]) => !/^(?:var\(|none$|transparent$|currentcolor$)/i.test(paint.trim()),
+				([, paint = ""]) => !/^(?:none$|transparent$|currentcolor$)/i.test(paint.trim()),
 			)
 				? [
 						`${statement} "${target}" uses fixed paint; check both themes, or use info, ok, warn or bad`,
@@ -204,140 +69,8 @@ function fixedNodePaintWarnings(source: string): string[] {
 	);
 }
 
-/**
- * data-ref on nodes, groups, classes, entities and participants (their id), edges and their labels (the edge id the parser
- * gives both: the author's `e1@`, else `L_<from>_<to>_<n>`), lifelines (their participant) and messages (m1, m2, ...). A node's
- * number tag carries its node's ref and data-tag, which kit:link.js makes focusable.
- */
-function annotateParts(svg: string): string {
-	let message = 0;
-	return svg
-		.replace(
-			/<(?:g|polyline) class="(?:node|subgraph|class-node|entity|actor|edge|edge-label|(tag))" data-id="([^"]*)"/g,
-			(tag, isTag: string | undefined, id: string) =>
-				`${tag} data-ref="${id}"${isTag ? " data-tag" : ""}`,
-		)
-		.replace(
-			/<line class="lifeline" data-actor="([^"]*)"/g,
-			(tag, id: string) => `${tag} data-ref="${id}"`,
-		)
-		.replace(/<g class="message"/g, (tag) => `${tag} data-ref="m${++message}"`);
-}
-
-/**
- * The renderer's markup as stylesheets, tags and text. Its text and attribute values are escaped, so a raw `<` only opens a tag
- * and a `"` only ends a value: attributes and CSS can be read and edited without touching the labels.
- */
-const MARKUP = /<style\b[^>]*>[\s\S]*?<\/style>|<[^>]*>|[^<]+/g;
-const STYLESHEET = /^(<style\b[^>]*>)([\s\S]*?)(<\/style>)$/;
-const ATTRIBUTE = /(\s)([\w:-]+)="([^"]*)"/g;
-
-/**
- * Each attribute value and stylesheet of the markup, through `attribute` and `css`. Text content and data-* attributes (the
- * renderer copies labels into data-label) stay as written: they are text, never fetched or styled.
- */
-function editMarkup(
-	svg: string,
-	{
-		attribute = (_name, value) => value,
-		css = (text) => text,
-	}: { attribute?: (name: string, value: string) => string; css?: (text: string) => string },
-): string {
-	const editTag = (tag: string) =>
-		tag.replace(ATTRIBUTE, (whole: string, space: string, name: string, value: string) =>
-			name.startsWith("data-") ? whole : `${space}${name}="${attribute(name, value)}"`,
-		);
-	return svg.replace(MARKUP, (part) => {
-		const [, open = "", text = "", close = ""] = STYLESHEET.exec(part) ?? [];
-		if (open) {
-			return `${editTag(open)}${css(text)}${close}`;
-		}
-		return part.startsWith("<") ? editTag(part) : part;
-	});
-}
-
-/** `url(#x)` pointing at the diagram's own `x`, whose id inline() prefixed. */
-const localUrls = (value: string, id: string) =>
-	value.replace(/url\(#([^)]+)\)/g, `url(#${id}-$1)`);
-
-/**
- * A stylesheet whose every selector, in comma lists too, applies inside `#id` only: `svg` becomes the diagram's root, any
- * other selector its descendant. The renderer's sheets are flat rule lists (no at-rules or nesting), which this relies on.
- */
-const scopeRules = (css: string, id: string) =>
-	css.replace(/(^|[{}])([^{}]+)\{/g, (_, before: string, selectors: string) => {
-		const scoped = selectors
-			.split(",")
-			.map((selector) =>
-				selector.trim().replace(/^svg\b|^/, (root) => (root ? `#${id}` : `#${id} `)),
-			);
-		return `${before}\n  ${scoped.join(", ")} {`;
-	});
-
-/** The renderer's drawn width of `svg`, in px. */
-const drawnWidth = (svg: string) => Number(/^<svg [^>]*?width="([\d.]+)"/.exec(svg)?.[1]);
-
-/** The width at which the smallest text of `svg` (an attribute or stylesheet font size) shows at READABLE_PX; 0 with no text. */
-function readableWidth(svg: string): number {
-	const sizes = [...svg.matchAll(/font-size(?:="|:\s*)([\d.]+)/g)].map((m) => Number(m[1]));
-	return (drawnWidth(svg) * READABLE_PX) / Math.min(...sizes);
-}
-
-/**
- * The drawn width theme.css caps on phones and in print (and scales up on desktops), and the width that keeps the smallest
- * text readable, below which its block scrolls sideways. Custom properties
- * rather than an inline max-width, so one page rule on `.mermaid > svg` can still size it.
- */
-function sizeStyle(svg: string, width: number, height: number): string {
-	const most = Math.floor(width);
-	return `--_diagram-base: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px; --diagram-ratio: ${width / height}`;
-}
-
-/**
- * Makes the renderer's standalone SVG fit inline in a page: drops its stylesheet (a remote font @import and page-wide
- * `svg`/`text` rules; theme.css maps the renderer's variables instead), prefixes its ids so markers of two diagrams do not
- * clash, scopes the xychart stylesheet to this diagram and draws its series in the kit palette, and lets the diagram shrink
- * with the column within sizeStyle's limits. Only attributes and stylesheets change: a label reads as written.
- */
-function inline(svg: string, id: string): string {
-	return editMarkup(svg.replace(/<style>\s*@import[\s\S]*?<\/style>\n?/, ""), {
-		attribute: (name, value) =>
-			name === "id" ? `${id}-${value}` : (ROLE_PAINTS.get(value) ?? localUrls(value, id)),
-		css: (text) =>
-			scopeRules(localUrls(text, id), id).replace(
-				/--xychart-color-(\d+): [^;]+;/g,
-				(_, n: string) => `--xychart-color-${n}: var(--c${(Number(n) % 6) + 1});`,
-			),
-	}).replace(
-		/^<svg ([^>]*?)width="([\d.]+)" height="([\d.]+)" style="[^"]*"/,
-		(_, attrs: string, width: string, height: string) =>
-			`<svg id="${id}" ${attrs}width="100%" style="${sizeStyle(svg, Number(width), Number(height))}"`,
-	);
-}
-
-/**
- * The copy of a flowchart or state diagram that phones show instead (theme.css): the source laid out across its direction (LR
- * as top-down, TD as left to right), when the diagram is wider than a phone's column, so would shrink its text below 13 px, and
- * the copy is narrower. Phones then read a left-to-right flow top-down, while wide screens keep the shorter left-to-right
- * layout. Undefined otherwise.
- */
-function phoneLayout(
-	family: Family,
-	svg: string,
-	draw: (transpose: boolean) => string,
-): string | undefined {
-	if (!flows(family) || drawnWidth(svg) <= PHONE_COLUMN_PX) {
-		return undefined;
-	}
-	const across = draw(true);
-	return drawnWidth(across) < drawnWidth(svg) ? across : undefined;
-}
-
-/**
- * The attribute that makes a diagram's phone copy print instead of the wide layout: paper cannot scroll, so theme.css fits the
- * printed copy to the column, and the wide layout prints only while that keeps its text readable (it is the shorter of the two).
- */
-const printAttr = (svg: string) => (readableWidth(svg) > PRINT_COLUMN_PX ? "data-print " : "");
+/** The room between a tag's ring and its label, in px. */
+const TAG_GAP = 4;
 
 /** One `tag:id=number` of a fence's meta, the number quoted or not. */
 const TAG = /^tag:([^\s=]+)=(?:"([^"]*)"|'([^']*)'|(\S*))$/;
@@ -376,10 +109,264 @@ function tagsOf(meta: string, family: Family): Map<string, string> {
 	return tags;
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The source with each tagged node's label led by `$$tag:id=n$$`, which pele hands to tagMarkup as inline math and sizes the
+ * node for. A flowchart node takes it in its first labelled definition (`a["..."]`, `a(...)`), else at its bare id's first use
+ * with its id as label, as Mermaid shows a node without one; a state in its `state "..." as id`, else in one added for it.
+ */
+function withTags(body: string, tags: Map<string, string>, family: Family): string {
+	let text = body;
+	for (const [id, number] of tags) {
+		const mark = `$$tag:${id}=${number}$$`;
+		const name = escapeRegExp(id);
+		if (family === "state") {
+			const alias = new RegExp(String.raw`^(\s*state\s+")([^"]*"\s+as\s+${name})\s*$`, "m");
+			text = alias.test(text)
+				? text.replace(alias, `$1${mark} $2`)
+				: `${text}\n  state "${mark} ${id}" as ${id}`;
+			continue;
+		}
+		const shaped = new RegExp(
+			String.raw`(^|[\s;&>|])(${name})(\[\[|\[\(|\(\[|\(\(\(|\(\(|\[\/|\[\\|\[|\(|\{\{|\{|>)("?)`,
+			"m",
+		);
+		const bare = new RegExp(String.raw`(^|[\s;&>|])(${name})(?=\s|;|$|:::|-->|---|-\.|==|<)`, "m");
+		text = shaped.test(text)
+			? text.replace(shaped, (_, before: string, node: string, open: string, quote: string) =>
+					quote ? `${before}${node}${open}"${mark} ` : `${before}${node}${open}${mark} `,
+				)
+			: text.replace(
+					bare,
+					(_, before: string, node: string) => `${before}${node}["${mark} ${id}"]`,
+				);
+	}
+	return text;
+}
+
+/**
+ * A number tag as pele places inline math: a ring of 13 px text that the node makes room for, before its label, with TAG_GAP
+ * after it (pele's space before the label is narrower than a ring wants).
+ */
+function tagMarkup(tex: string) {
+	const [, id = "", number = ""] = /^tag:(.+)=(\d{1,3})$/.exec(tex) ?? [];
+	if (!id) {
+		return null;
+	}
+	const width = Math.max(20, 9 + number.length * 8);
+	return {
+		svg: `<g class="tag" data-id="${id}" data-ref="${id}" data-tag="${number}"><rect x="0.5" y="0.5" width="${width - 1}" height="19" rx="9.5" fill="none" stroke="currentColor"/><text x="${width / 2}" y="14.5" text-anchor="middle" font-size="${LABEL_PX}">${number}</text></g>`,
+		width: width + TAG_GAP,
+		height: 20,
+	};
+}
+
+/** The text of a node's label as read aloud: its lines joined by spaces. */
+const labelText = (node: string) =>
+	(/<text class="pele-label"[\s\S]*?<\/text>/.exec(node)?.[0] ?? "")
+		.replace(/<\/tspan><tspan[^>]*?\sy="[^"]*"[^>]*>/g, " ")
+		.replace(/<[^>]*>/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+
+/** Each tag named by its number and its node's label ("2, hybrid inverter"), as a screen reader reaches it from the keyboard. */
+const nameTags = (svg: string) =>
+	svg.replace(
+		/(<g class="pele-node[^"]*" data-id="[^"]*"[\s\S]*?)<g class="tag" ([^>]*)data-tag="(\d+)"/g,
+		(_, node: string, attrs: string, number: string) =>
+			`${node}<g class="tag" ${attrs}data-tag aria-label="${number}, ${labelText(node.slice(node.lastIndexOf('<g class="pele-node')))}"`,
+	);
+
+/**
+ * Gives a flowchart's unnamed edges ids that are unique and count every edge drawn before between the same two nodes, named ones
+ * too: `L_<from>_<to>_<n>`, the next free n where two pairs would read alike (`A_B --> C`, `A --> B_C`) or an author's id took
+ * it. Mermaid numbers a pair's second edge 2 and lets such ids repeat, so one ref would light two edges.
+ */
+function renumberEdges(edges: FlowEdge[] = []) {
+	const taken = new Set(edges.filter((edge) => edge.isUserDefinedId).map((edge) => edge.id));
+	const pairs = new Map<string, number>();
+	for (const edge of edges) {
+		const pair = `${edge.start}_${edge.end}`;
+		let n = pairs.get(pair) ?? 0;
+		pairs.set(pair, n + 1);
+		if (edge.isUserDefinedId) {
+			continue;
+		}
+		while (taken.has(`L_${pair}_${n}`)) {
+			n++;
+		}
+		edge.id = `L_${pair}_${n}`;
+		taken.add(edge.id);
+	}
+}
+
+/** A state diagram's transitions in drawing order, which pele numbers edge0, edge1, ...: nested composites in place. */
+function transitionsOf(statements: StateStatement[] = []): Array<[string, string]> {
+	return statements.flatMap((statement): Array<[string, string]> => {
+		if ("state1" in statement) {
+			return [[statement.state1.id, statement.state2.id]];
+		}
+		return "doc" in statement ? transitionsOf(statement.doc) : [];
+	});
+}
+
+/** A state's ref: the diagram's own start and end are _start and _end, as the generated edge ids name them. */
+const stateRef = (id: string) => id.replace(/^root(?=_start$|_end$)/, "");
+
+/** A state diagram's edge refs by pele's edge id: `L_<from>_<to>_<n>`, n counting the transitions between the two. */
+function stateEdgeRefs(model: ParsedModel): Map<string, string> {
+	const seen = new Map<string, number>();
+	return new Map(
+		transitionsOf(model.rootDoc).map(([from, to], index) => {
+			const pair = `${stateRef(from)}_${stateRef(to)}`;
+			const n = seen.get(pair) ?? 0;
+			seen.set(pair, n + 1);
+			return [`edge${index}`, `L_${pair}_${n}`];
+		}),
+	);
+}
+
+/** Parts whose pele data-id is their ref, by class: nodes, groups, sequence lifelines, flowchart and state edges and labels. */
+const PART =
+	/<(g|path) class="pele-(node|cluster|lifeline|edge|edge-label)\b[^"]*" data-id="([^"]*)"/g;
+
+/**
+ * data-ref on nodes, groups, classes, entities and participants (their id), lifelines (their participant), flowchart edges and
+ * their labels (the edge id: the author's `e1@`, else `L_<from>_<to>_<n>`), state transitions (the same form, [*] as _start and
+ * _end) and sequence messages (m1, m2, ... in order). Class and ER relations, notes and activations carry none.
+ */
+function annotateParts(svg: string, family: Family, model: ParsedModel): string {
+	const edgeRef = edgeRefs(svg, family, model);
+	const ref = (kind: string, id: string) =>
+		kind === "edge" || kind === "edge-label" ? edgeRef(id) : family === "state" ? stateRef(id) : id;
+	return svg.replace(PART, (tag, _element: string, kind: string, id: string) => {
+		const name = ref(kind, id);
+		return name === undefined ? tag : `${tag} data-ref="${name}"`;
+	});
+}
+
+/** An edge's (or its label's) ref by pele's id: see annotateParts. */
+function edgeRefs(
+	svg: string,
+	family: Family,
+	model: ParsedModel,
+): (id: string) => string | undefined {
+	if (family === "flowchart") {
+		return (id) => id;
+	}
+	if (family === "state") {
+		const transitions = stateEdgeRefs(model);
+		return (id) => transitions.get(id);
+	}
+	const messages = [
+		...new Set(
+			[...svg.matchAll(/class="pele-edge pele-message" data-id="([^"]*)"/g)].map((m) => m[1]),
+		),
+	];
+	return (id) => (messages.includes(id) ? `m${messages.indexOf(id) + 1}` : undefined);
+}
+
+/** The drawn width of `svg`, in px: its viewBox's, which inline keeps. */
+const drawnWidth = (svg: string) =>
+	Number(/^<svg [^>]*?viewBox="[\d.-]+ [\d.-]+ ([\d.]+)/.exec(svg)?.[1]);
+
+/** The width at which the smallest text of `svg` (the root's font or a text's font-size) shows at READABLE_PX. */
+function readableWidth(svg: string): number {
+	const sizes = [...svg.matchAll(/font-size="([\d.]+)"|font:([\d.]+)px/g)].map((m) =>
+		Number(m[1] ?? m[2]),
+	);
+	return (drawnWidth(svg) * READABLE_PX) / Math.min(NODE_PX, ...sizes);
+}
+
+/**
+ * The drawn width theme.css caps on phones and in print (and scales up on desktops), and the width that keeps the smallest
+ * text readable, below which its block scrolls sideways. Custom properties rather than an inline max-width, so one page rule
+ * on `.mermaid > svg` can still size it.
+ */
+function sizeStyle(svg: string, width: number, height: number): string {
+	const most = Math.floor(width);
+	return `--_diagram-base: ${most}px; --mermaid-min: ${Math.min(most, Math.ceil(readableWidth(svg)))}px; --diagram-ratio: ${width / height}`;
+}
+
+/**
+ * pele's SVG as one of the page's: its root takes the block's id and the column's width within sizeStyle's limits (theme.css,
+ * in place of pele's own max-width), keeping the private colour variables its style sets from the `--pele-*` ones theme.css
+ * maps to the kit's tokens; text smaller than LABEL_PX, which MEASURER already made room for, is raised to it.
+ */
+function inline(svg: string, id: string): string {
+	return svg
+		.replace(/ font-size="([\d.]+)"/g, (whole, size: string) =>
+			Number(size) < LABEL_PX ? ` font-size="${LABEL_PX}"` : whole,
+		)
+		.replace(
+			/^<svg ([^>]*?)width="([\d.]+)" height="([\d.]+)" style="max-width:100%;height:auto;([^"]*)"/,
+			(_, attrs: string, width: string, height: string, style: string) =>
+				`<svg id="${id}" ${attrs}width="100%" style="${style};${sizeStyle(svg, Number(width), Number(height))}"`,
+		);
+}
+
+/** The source laid out across its direction: LR and RL as top-down, TB, TD and BT (and no direction) as left to right. */
+function across(body: string, family: Family): string {
+	const flip = (dir = "TB") => (dir === "LR" || dir === "RL" ? "TB" : "LR");
+	const turned = body.replace(
+		/^(\s*direction\s+)(LR|RL|TB|TD|BT)\b/gm,
+		(_, head: string, dir: string) => `${head}${flip(dir)}`,
+	);
+	if (family === "flowchart") {
+		return turned.replace(
+			/^((?:flowchart|graph)\b)(?:[ \t]+(LR|RL|TB|TD|BT)\b)?/,
+			(_, head: string, dir?: string) => `${head} ${flip(dir)}`,
+		);
+	}
+	return /^\s*direction\s/m.test(body) ? turned : turned.replace(/^(\S+)/, "$1\n  direction LR");
+}
+
+/**
+ * The copy of a flowchart or state diagram that phones show instead (theme.css): the source laid out across its direction, when
+ * the diagram is wider than a phone's column, so would shrink its text, and the copy is narrower. Phones then read a
+ * left-to-right flow top-down, while wide screens keep the shorter left-to-right layout. Undefined otherwise.
+ */
+function phoneLayout(family: Family, svg: string, draw: () => string): string | undefined {
+	if (!flows(family) || drawnWidth(svg) <= PHONE_COLUMN_PX) {
+		return undefined;
+	}
+	const turned = draw();
+	return drawnWidth(turned) < drawnWidth(svg) ? turned : undefined;
+}
+
+/**
+ * The attribute that makes a diagram's phone copy print instead of the wide layout: paper cannot scroll, so theme.css fits the
+ * printed copy to the column, and the wide layout prints only while that keeps its text readable (it is the shorter of the two).
+ */
+const printAttr = (svg: string) => (readableWidth(svg) > PRINT_COLUMN_PX ? "data-print " : "");
+
 /** The first tagged id no node of the drawn `svg` carries, as its message. */
 function untagged(svg: string, tags: Map<string, string>): string | undefined {
 	const id = [...tags.keys()].find((key) => !svg.includes(`<g class="tag" data-id="${key}"`));
 	return id && `tag:${id} names no node; use the id written before its label, as a in a["label"]`;
+}
+
+/** One layout of `text` as pele draws it for the page, with its parts' refs and tags named; `id` is its root's id. */
+function draw(text: string, family: Family, id: string): string {
+	let model: ParsedModel;
+	let drawn: string;
+	try {
+		model = parse(text);
+		renumberEdges(model.edges);
+		drawn = render(model, {
+			measurer: MEASURER,
+			fontFamily: "Geist",
+			fontSize: NODE_PX,
+			idPrefix: `${id}-`,
+			math: tagMarkup,
+			links: false,
+			images: false,
+		}).svg;
+	} catch (error) {
+		throw new Error(peleMessage(error, text));
+	}
+	return inline(nameTags(annotateParts(drawn, family, model)), id);
 }
 
 /**
@@ -390,41 +377,18 @@ function renderOne(source: string, n: number, meta: string): Diagram {
 	const body = stripPreamble(source);
 	const family = familyOf(body);
 	const tags = tagsOf(meta, family);
-	const statements = splitStatements(body);
-	const problem = firstMisrender(family, statements.split("\n").slice(1));
+	const problem = sourceProblem(family, body);
 	if (problem) {
 		throw new Error(problem);
 	}
-
-	// Elsewhere ";" can be message or label text.
-	const text =
-		family === "flowchart"
-			? statements.replace("\n", `${ROLE_DEFAULTS}\n`)
-			: family === "state"
-				? statements
-				: body;
-	const draw = (transpose: boolean) =>
-		renderMermaidSVG(text, {
-			transparent: true,
-			padding: 12,
-			font: "Geist",
-			transpose,
-			tags: Object.fromEntries(tags),
-		});
-	const raw = draw(false);
-	const unknown = untagged(raw, tags);
+	const text = withTags(body, tags, family);
+	const svg = draw(text, family, `mm${n}`);
+	const unknown = untagged(svg, tags);
 	if (unknown) {
 		throw new Error(unknown);
 	}
-	const across = phoneLayout(family, raw, draw);
-
-	const svg = annotateParts(inline(raw, `mm${n}`));
-	const phone =
-		across &&
-		annotateParts(inline(across, `mm${n}-phone`)).replace(
-			/^<svg /,
-			`<svg data-phone ${printAttr(raw)}`,
-		);
+	const turned = phoneLayout(family, svg, () => draw(across(text, family), family, `mm${n}-phone`));
+	const phone = turned?.replace(/^<svg /, `<svg data-phone ${printAttr(svg)}`);
 	const refs = [svg, phone ?? ""].flatMap((copy) =>
 		[...copy.matchAll(/ data-ref="([^"]*)"/g)].map((m) => m[1] ?? ""),
 	);
@@ -433,14 +397,14 @@ function renderOne(source: string, n: number, meta: string): Diagram {
 		phone,
 		refs: [...new Set(refs)],
 		tags,
-		warnings: family === "flowchart" ? fixedNodePaintWarnings(statements) : [],
+		warnings: family === "flowchart" ? fixedNodePaintWarnings(body) : [],
 	};
 }
 
 /**
  * Renders one Mermaid source to one inline SVG, plus a phone copy for a wide flowchart or state diagram (phoneLayout), with no
- * browser: beautiful-mermaid parses and lays it out (ELK) in this process, estimating text widths. `n`, the block's place on
- * the page, keeps its ids apart from the other diagrams. A source that fails, or whose type is not supported, returns an Error
+ * browser: pele parses and lays it out in this process, measuring text with Geist's advances. `n`, the block's place on the
+ * page, keeps its ids apart from the other diagrams. A source that fails, or whose type is not supported, returns an Error
  * whose message tells the author what to write instead. Every part carries the data-ref of its Mermaid id (see annotateParts),
  * and colours come from the kit's tokens (theme.css). `meta`, the fence's text after `mermaid`, may tag nodes with numbers:
  * `tag:inv=2` draws 2 in a ring before node inv's label.
@@ -449,9 +413,6 @@ export function renderMermaid(source: string, n = 0, meta = ""): Diagram | Error
 	try {
 		return renderOne(source, n, meta);
 	} catch (e) {
-		if (e instanceof UnreadInputError) {
-			return new Error(unreadMessage(e));
-		}
 		return e instanceof Error ? e : new Error(String(e));
 	}
 }

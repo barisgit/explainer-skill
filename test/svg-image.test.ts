@@ -142,7 +142,7 @@ test("a Mermaid diagram is one SVG in the scheme's tokens, never boxed, also in 
 			"one SVG per diagram, its nodes unfilled and its text in the dark --ink": `(() => { ${PIXELS}
 				const rgb = (selector, prop) => getComputedStyle(document.querySelector(selector))[prop].match(/\\d+/g).map(Number);
 				return document.querySelectorAll(".mermaid > svg").length === 3 && !same(token("ink"), [0, 0, 0]) &&
-					rgb("#static .node rect", "fill")[3] === 0 && same(rgb("#static .node text", "fill"), token("ink")); })()`,
+					rgb("#static .pele-node rect", "fill")[3] === 0 && same(rgb("#static .pele-node text", "fill"), token("ink")); })()`,
 			"a diagram, in a figure with or without controls or bare, sits on the page with no frame or surface": `["#static > .mermaid", "#bare", "#controlled", "#controlled > .mermaid"].every((selector) => (({ borderTopWidth, backgroundImage, backgroundColor }) => borderTopWidth === "0px" && backgroundImage === "none" && backgroundColor === "rgba(0, 0, 0, 0)")(getComputedStyle(document.querySelector(selector))))`,
 		},
 	);

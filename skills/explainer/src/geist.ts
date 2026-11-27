@@ -1,7 +1,6 @@
 /**
  * Text widths in Geist, the kit's font, for what pack draws without a browser, so it lays text out as the browser will: charts
- * and plots measure their labels with textWidth, and the beautiful-mermaid patch sizes diagram boxes with geistAdvance
- * (build/vendor.ts bundles this file into vendor/beautiful-mermaid.js).
+ * and plots measure their labels with textWidth, and so does pele, sizing Mermaid diagrams' boxes (src/mermaid.ts).
  */
 
 // geist-widths:start

@@ -3,10 +3,10 @@
  * Measures the kit's Geist in Chrome and writes the advance-width table into skills/explainer/src/geist.ts, between its
  * geist-widths markers: printable ASCII and number-format spaces/euro at the weights text is drawn in, in thousandths of an em,
  * kerning left out. pack
- * measures chart and plot labels with it, and the beautiful-mermaid patch sizes diagram boxes with it. Geist Mono needs no
- * table: its 0.6 em advance is the diagram renderer's own monospace estimate.
+ * measures chart and plot labels and Mermaid diagrams' text with it. Geist Mono needs no table: its 0.6 em advance is what
+ * src/mermaid.ts measures monospace text with.
  *
- * Rerun when kit/fonts changes: `bun build/geist-widths.ts`, `bun run format`, `bun run vendor`.
+ * Rerun when kit/fonts changes: `bun build/geist-widths.ts`, `bun run format`.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

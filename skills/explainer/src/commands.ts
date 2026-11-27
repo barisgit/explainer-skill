@@ -39,8 +39,8 @@ export interface Command {
 
 const MERMAID_DOC = `\`\`\`mermaid fences hold Mermaid source: flowchart (graph), stateDiagram-v2, sequenceDiagram, classDiagram, erDiagram or xychart-beta.
 pack renders each one to SVG that follows light and dark, so no script ships; other types fail the pack with a suggestion (a pie or gantt is a chart: kit Chart).
-It draws a subset of each type and fails on any line, or part of one, it cannot read (notes, titles, cross and circle edge ends, new-style shapes), naming the line.
-Labels wrap at about 30 characters into tall boxes: keep them to a few words, or break one with <br>. Markdown strings ("\`...\`") are not supported; **bold** and *italic* work in plain labels.
+It reads Mermaid 12's syntax (notes, titles, @{ shape: ... }, x and o edge ends included) and fails on any line, or part of one, it cannot read, naming it.
+Labels wrap at about 27 characters into tall boxes: keep them to a few words, or break one with <br>. **bold** and *italic* work in markdown strings ("\`...\`").
 Pack gives each node, group, edge and sequence part a data-ref equal to its Mermaid id, so the page can address it without knowing the SVG:
   flowchart / state / class / ER   nodes and subgraphs: the node id (cache in "api --> cache[(Cache)]")
   edges                            the edge id: name one with "api e1@--> cache" (otherwise Mermaid's, e.g. L_api_cache_0)
@@ -54,8 +54,8 @@ Number tags key a drawing of parts to the text: \`\`\`mermaid tag:inv=2 tag:bat=
   <span data-ref="inv">2</span> in prose or inside a table cell is drawn as the same ring (a cell or row with the ref stays a cell), and either lights both;
   pack warns when it says another number, and one part keeps one number in every drawing. Mentions a client component or filled view draws link but are not ringed.
   A measured value sits in its stage's label or on the edge: atob["atob<br>11 ms"], file -->|418 KB| atob.
-Flowchart nodes are unfilled unless styled. Use a["Label"]:::info or class a,b info (also ok, warn, bad) for a themed outline, tint and label; edges stay neutral. Override the matching kit token (e.g. --info) to recolour a role. Explicit classDef and style still win; pack warns about fixed paint in either.
-Text is laid out at 13 px and can grow to 18.2 px on wide screens, if the column fits it. Phones keep the original size cap and use a narrower, transposed flowchart or state layout when available. Diagrams scroll below the readable width; print fits the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
+Flowchart nodes are unfilled unless styled. Use a["Label"]:::info or class a,b info (also ok, warn, bad) for a themed outline, tint and label; edges stay neutral. Override the matching kit token (e.g. --info) to recolour a role. Explicit classDef and style still win but take plain colours only, not var(); pack warns about fixed paint in either.
+Node text is laid out at 15 px, edge labels and smaller text at 13 px; both can grow 1.4x on wide screens (to 21 and 18.2 px), if the column fits it. Phones keep the original size cap and use a narrower, transposed flowchart or state layout when available. Diagrams scroll below the readable width; print fits the paper. To resize one, set --mermaid-max (widest) or --mermaid-min (narrowest before it scrolls) on its svg.`;
 
 /** Leading comment block of a kit file, comment markers removed; its first line is the one-line description. */
 function kitHeader(file: string): string {

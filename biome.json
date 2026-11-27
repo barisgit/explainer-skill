@@ -8,7 +8,7 @@
 			"!**/*.md",
 			"!skills/explainer/kit/echarts.js",
 			"!skills/explainer/vendor/echarts-ssr.js",
-			"!skills/explainer/vendor/beautiful-mermaid.js",
+			"!skills/explainer/vendor/pele.js",
 			"!skills/explainer/vendor/mdx.js",
 			"!skills/explainer/vendor/math.js",
 			"!skills/explainer/vendor/refractor.js",

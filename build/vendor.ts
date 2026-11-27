@@ -4,7 +4,8 @@
  * (paths inside skills/explainer)
  *   kit/echarts.js                custom ECharts bundle (build/echarts-entry.ts), minified, one script tag
  *   vendor/echarts-ssr.js         the same charts with the SVG renderer, one ES module; used by `pack` to draw charts, never inlined
- *   vendor/beautiful-mermaid.js   beautiful-mermaid with ELK and entities, one ES module; used by `pack` to render diagrams, never inlined
+ *   vendor/pele.js                pele with the diagram types pack draws (build/pele-entry.ts), one ES module; used by `pack` to
+ *                                 render Mermaid fences, never inlined
  *   vendor/mdx.js                 the MDX compiler with remark-gfm and remark-frontmatter, one ES module; used by `pack` for .mdx pages, never inlined
  *   vendor/preact/*.js            Preact, its hooks and JSX runtime, and preact-render-to-string, as ES modules that import "preact";
  *                                 pack bundles them into a page's prerender and its client components
@@ -21,7 +22,6 @@
  */
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BunPlugin } from "bun";
 import { seriesTypes } from "./echarts-charts.ts";
 
 const root = join(import.meta.dir, "..");
@@ -30,19 +30,6 @@ const nm = (...p: string[]) => join(root, "node_modules", ...p);
 const text = (...p: string[]) => Bun.file(nm(...p)).text();
 const versionOf = async (pkg: string): Promise<string> =>
 	(await Bun.file(nm(pkg, "package.json")).json()).version;
-
-/**
- * Resolves `explainer-geist`, which the beautiful-mermaid patch imports, to src/geist.ts: diagrams and the charts pack draws
- * measure text with one table of Geist's advances, which build/geist-widths.ts writes.
- */
-const explainerGeist: BunPlugin = {
-	name: "explainer-geist",
-	setup(builder) {
-		builder.onResolve({ filter: /^explainer-geist$/ }, () => ({
-			path: join(skill, "src", "geist.ts"),
-		}));
-	},
-};
 
 /** Bundles one entry and returns its single output file's text and the files it was built from (relative to the repository). */
 async function build(
@@ -57,7 +44,6 @@ async function build(
 		target,
 		format,
 		external,
-		plugins: [explainerGeist],
 		metafile: true,
 	});
 	const [output] = built.outputs;
@@ -89,18 +75,11 @@ writeFileSync(
 		(await bundle(join(import.meta.dir, "echarts-ssr-entry.ts"), "bun", "esm")),
 );
 
-// The minifier drops ELK's own notice comments, so the header restates them (EPL-2.0 section 3.3) and points at the licence files.
-const [bm, elk, entities] = await Promise.all(
-	["beautiful-mermaid", "elkjs", "entities"].map(versionOf),
-);
-const mermaidHeader = `/*! beautiful-mermaid ${bm} (MIT, Copyright (c) 2026 Craft Docs) with patches/beautiful-mermaid@${bm}.patch, bundled with
-   elkjs ${elk} (EPL-2.0, Copyright (c) 2017, 2021 Kiel University and others; source: https://github.com/kieler/elkjs/tree/${elk},
-   which builds on https://github.com/eclipse/elk) and entities ${entities} (BSD-2-Clause, Copyright (c) Felix Böhm).
-   Each component keeps its own licence; this file as a whole is not MIT. Texts: kit/licenses/beautiful-mermaid.txt, elkjs.txt, entities.txt.
-   Exports renderMermaidSVG and parseMermaid. Rebuild with: bun run vendor */\n`;
+const pele = await versionOf("pele");
 writeFileSync(
-	join(skill, "vendor/beautiful-mermaid.js"),
-	mermaidHeader + (await bundle(join(import.meta.dir, "beautiful-mermaid-entry.ts"), "bun", "esm")),
+	join(skill, "vendor/pele.js"),
+	`/*! pele ${pele} (MIT, Copyright (c) 2026 kepano), flowchart, state, sequence, class, ER and xychart diagrams.
+   Texts: kit/licenses/pele.txt. Exports render, parse and PeleError. Rebuild with: bun run vendor */\n${await bundle(join(import.meta.dir, "pele-entry.ts"), "bun", "esm")}`,
 );
 
 /**
@@ -206,15 +185,7 @@ writeFileSync(
 mkdirSync(join(skill, "kit/licenses"), { recursive: true });
 const licences: Record<string, Promise<string>[]> = {
 	"echarts.txt": [text("echarts", "LICENSE"), text("echarts", "NOTICE")],
-	"beautiful-mermaid.txt": [text("beautiful-mermaid", "LICENSE")],
-	// EPL-2.0 section 3.1(a): the object code must say where its source is available under the same licence.
-	"elkjs.txt": [
-		Promise.resolve(
-			`elkjs ${elk}, Copyright (c) 2017, 2021 Kiel University and others.\nSPDX-License-Identifier: EPL-2.0\n\nvendor/beautiful-mermaid.js contains elkjs ${elk} (lib/elk.bundled.js) in minified form, unmodified.\nIts Source Code is available under the Eclipse Public License 2.0 at https://github.com/kieler/elkjs/tree/${elk}\n(the npm package elkjs@${elk}), and the Java sources it is compiled from at https://github.com/eclipse/elk.`,
-		),
-		text("elkjs", "LICENSE.md"),
-	],
-	"entities.txt": [text("entities", "LICENSE")],
+	"pele.txt": [text("pele", "LICENSE")],
 	"mdx.txt": [
 		Promise.resolve(
 			`vendor/mdx.js bundles these ${mdxNotices.length} packages; each keeps its own licence.\n\n${mdxNotices.join(`\n\n${"-".repeat(72)}\n\n`)}`,
@@ -240,7 +211,7 @@ for (const [file, parts] of Object.entries(licences)) {
 for (const f of [
 	"kit/echarts.js",
 	"vendor/echarts-ssr.js",
-	"vendor/beautiful-mermaid.js",
+	"vendor/pele.js",
 	"vendor/table-core.js",
 	"vendor/mdx.js",
 	...Object.keys(preactModules).map((file) => `vendor/preact/${file}`),

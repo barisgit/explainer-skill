@@ -39,6 +39,12 @@ function copies(source: string, meta: string): string[] {
 	return [diagram.svg, diagram.phone ?? ""];
 }
 
+/** Node `id`'s markup in `svg`: from its group up to the next node's. */
+const nodeOf = (svg: string, id: string) =>
+	new RegExp(`<g class="pele-node[^"]*" data-id="${id}"[\\s\\S]*?(?=<g class="pele-node|$)`).exec(
+		svg,
+	)?.[0] ?? "";
+
 /** The message `source` with `meta` fails with, or "rendered". */
 function failure(source: string, meta: string): string {
 	const diagram = renderMermaid(source, 0, meta);
@@ -54,22 +60,20 @@ test("tag:id=n in a flowchart fence's meta draws n as a tag inside that node, in
 			...copy.matchAll(/<g class="tag" data-id="(\w+)" data-ref="\1" data-tag[^>]*>[\s\S]*?<\/g>/g),
 		];
 		expect(tags.map((m) => m[1]).sort()).toEqual(["bat", "inv", "meter", "roof"]);
-		const inv = /<g class="node" data-id="inv"[\s\S]*?\n<\/g>/.exec(copy)?.[0] ?? "";
-		expect(inv).toMatch(
+		expect(nodeOf(copy, "inv")).toMatch(
 			/<g class="tag"[^>]*>\s*<rect [^>]*\/>\s*<text [^>]*font-size="13"[^>]*>2<\/text>/,
 		);
-		expect(/<g class="node" data-id="house"[\s\S]*?\n<\/g>/.exec(copy)?.[0]).not.toContain(
-			'class="tag"',
-		);
+		expect(nodeOf(copy, "house")).toContain("house");
+		expect(nodeOf(copy, "house")).not.toContain('class="tag"');
 	}
 });
 
 test("a tagged path keeps its values: a stage's second line and an edge's label", () => {
 	for (const copy of copies(PATH, PATH_TAGS).filter(Boolean)) {
-		const atob = /<g class="node" data-id="atob"[\s\S]*?\n<\/g>/.exec(copy)?.[0] ?? "";
+		const atob = nodeOf(copy, "atob");
 		expect(atob).toMatch(/>2<\/text>/);
-		expect(atob).toMatch(/>atob<\/tspan><tspan[^>]*>11 ms</);
-		expect(copy).toMatch(/<g class="edge-label"[^>]*>[\s\S]*?>418 KB inlined</);
+		expect(atob).toMatch(/>\s*atob<\/tspan><tspan[^>]*>11 ms</);
+		expect(copy).toMatch(/<g class="pele-edge-label"[^>]*>[\s\S]*?>418 KB inlined</);
 	}
 });
 
@@ -105,21 +109,21 @@ test("native node roles tint both copies, follow the theme picker and local toke
 						const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
 						return (x + 0.05) / (y + 0.05);
 					};
-					const nodes = (id) => svg.querySelector('.node[data-id="' + id + '"]');
-					const body = (id) => nodes(id).querySelector("rect");
+					const nodes = (id) => svg.querySelector('.pele-node[data-id="' + id + '"]');
+					const body = (id) => nodes(id).querySelector(":scope > rect");
 					const picker = document.querySelector(".scheme-picker");
 					const set = (scheme) => { picker.value = scheme; picker.dispatchEvent(new Event("change")); };
 					const snapshot = () => {
-						const edge = svg.querySelector("polyline.edge");
+						const edge = svg.querySelector(".pele-edge > path");
 						const ink = rgb(edge, "stroke").join(",");
 						const ids = ["inv", "roof", "house", "bat", "grid"];
 						const fills = ids.map((id) => rgb(body(id), "fill"));
 						const strokes = ids.map((id) => rgb(body(id), "stroke").join(","));
 						return {
 							fills, strokes,
-							textReadable: ids.every((id, i) => [...nodes(id).querySelectorAll("text")]
+							textReadable: ids.every((id, i) => [...nodes(id).querySelectorAll(":scope > text")]
 								.every((label) => contrast(fills[i], rgb(label, "fill")) >= 4.5)),
-							edgesNeutral: [...svg.querySelectorAll("polyline.edge")]
+							edgesNeutral: [...svg.querySelectorAll(".pele-edge > path:not(.pele-marker)")]
 								.every((line) => rgb(line, "stroke").join(",") === ink) && !strokes.includes(ink),
 							unassignedPlain: getComputedStyle(body("meter")).fill === "rgba(0, 0, 0, 0)",
 						};
@@ -267,12 +271,12 @@ test("a tag and its mention light each other on hover and focus, read at the 13 
 </main><script src="kit:link.js"></script><script>${pageContract({
 		"the shown tag is focusable, an untagged node is not": `(() => {
 			const svg = [...document.querySelectorAll(".mermaid > svg")].find((s) => getComputedStyle(s).display !== "none");
-			return svg.querySelector('[data-tag][data-ref="inv"]').tabIndex === 0 && svg.querySelector('.node[data-ref="house"]').tabIndex < 0;
+			return svg.querySelector('[data-tag][data-ref="inv"]').tabIndex === 0 && svg.querySelector('.pele-node[data-ref="house"]').tabIndex < 0;
 		})()`,
 		"focusing the tag lights its mention and node": `(() => {
 			const svg = [...document.querySelectorAll(".mermaid > svg")].find((s) => getComputedStyle(s).display !== "none");
 			svg.querySelector('[data-tag][data-ref="inv"]').focus();
-			const lit = document.querySelector("#mention").classList.contains("is-lit") && svg.querySelector('.node[data-ref="inv"]').classList.contains("is-lit");
+			const lit = document.querySelector("#mention").classList.contains("is-lit") && svg.querySelector('.pele-node[data-ref="inv"]').classList.contains("is-lit");
 			document.activeElement.blur();
 			return lit;
 		})()`,
@@ -287,16 +291,16 @@ test("a tag and its mention light each other on hover and focus, read at the 13 
 			const style = getComputedStyle(document.querySelector("#mention"));
 			return style.fontSize === "13px" && style.borderTopWidth === "1px" && parseFloat(style.borderTopLeftRadius) >= 9;
 		})()`,
-		"each shown tag uses the label's text size and keeps its ring inside its node, before its label": `[...document.querySelectorAll(".mermaid > svg")]
+		"each shown tag reads at the 13 px label size and keeps its ring inside its node, before its label": `[...document.querySelectorAll(".mermaid > svg")]
 			.filter((svg) => getComputedStyle(svg).display !== "none")
 			.every((svg) => [...svg.querySelectorAll("[data-tag]")].every((tag) => {
-				const node = tag.closest(".node");
-				const [ring, label] = [tag.querySelector("rect").getBBox(), node.querySelector(":scope > text").getBBox()];
-				const box = node.querySelector(":scope > rect").getBBox();
-				const font = (text) => getComputedStyle(text).fontSize;
-				return font(tag.querySelector("text")) === font(node.querySelector(":scope > text"))
-					&& ring.x >= box.x && ring.y >= box.y && ring.y + ring.height <= box.y + box.height
-					&& ring.x + ring.width < label.x && label.x + label.width <= box.x + box.width;
+				const node = tag.closest(".pele-node");
+				const first = node.querySelector(":scope > text.pele-label tspan") ?? node.querySelector(":scope > text.pele-label");
+				const [ring, label, box] = [tag.querySelector("rect"), first, node.querySelector(":scope > rect")].map((el) => el.getBoundingClientRect());
+				const px = (text) => parseFloat(getComputedStyle(text).fontSize);
+				return px(tag.querySelector("text")) === 13
+					&& ring.x >= box.x && ring.y >= box.y && ring.bottom <= box.bottom
+					&& ring.right <= label.x + 1 && label.right <= box.right;
 			}))`,
 	})}</script></body></html>`;
 
@@ -313,15 +317,15 @@ test.each(["light", "dark"])(
 </main><script src="kit:link.js"></script><script>${pageContract({
 			"hovering the mention dims each edge label's text but not its mask": `(() => {
 				const fill = (g) => getComputedStyle(g.querySelector("text")).fill;
-				const before = [...document.querySelectorAll(".edge-label")].map(fill);
+				const before = [...document.querySelectorAll(".pele-edge-label")].map(fill);
 				document.querySelector("#mention").dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
 				const svg = [...document.querySelectorAll(".mermaid > svg")].find((s) => getComputedStyle(s).display !== "none");
 				const seen = (el) => { let o = 1; for (let e = el; e && e !== svg.parentElement; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
-				const labels = [...svg.querySelectorAll(".edge-label")];
+				const labels = [...svg.querySelectorAll(".pele-edge-label")];
 				return svg.classList.contains("has-lit") && (innerWidth < 640) === svg.hasAttribute("data-phone") && labels.length > 0
 					&& labels.every((g) => !g.classList.contains("is-lit") && seen(g.querySelector("rect")) === 1
 						&& !/rgba\\(.*, 0(\\.\\d+)?\\)$/.test(getComputedStyle(g.querySelector("rect")).fill) && seen(g.querySelector("text")) === 1
-						&& fill(g) !== before[[...document.querySelectorAll(".edge-label")].indexOf(g)]);
+						&& fill(g) !== before[[...document.querySelectorAll(".pele-edge-label")].indexOf(g)]);
 			})()`,
 		})}</script></body></html>`;
 
