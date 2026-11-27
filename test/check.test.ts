@@ -204,10 +204,10 @@ test("check does not warn about a data table that scrolls sideways, in a box or 
 
 test("check names a fix for tiny diagram text, and takes a diagram held at its readable width as scrolling by design", async () => {
 	const sequence =
-		"sequenceDiagram\n  Browser->>Server: GET /report\n  Server->>Cache: lookup\n  Server->>Database: query rows\n  Database-->>Browser: rows";
-	// Held at 341 px: wider than the block's 326 px content box, narrower than its 358 px box with padding.
+		"sequenceDiagram\n  Browser->>Server: GET /report\n  Server->>Cache: lookup the cached report\n  Server->>Database: query rows for the report\n  Database-->>Browser: rows of the report";
+	// Held at 348 px: wider than the block's 326 px content box, narrower than its 358 px box with padding.
 	const padded =
-		"sequenceDiagram\n  participant B as Report generation service\n  participant S as Server\n  B->>S: request\n  S-->>B: response";
+		"sequenceDiagram\n  participant B as Quarterly sales report generation service\n  participant S as Server\n  B->>S: request\n  S-->>B: response";
 	const wide = "R1 supply rail 1k @0,0\nR2 rail 0 2k @100,0 v\nP1 port supply IN @-5,0";
 	const wideMermaid = `sequenceDiagram\n${Array.from({ length: 8 }, (_, n) => `  participant P${n} as Report generation service ${n}`).join("\n")}\n  P0->>P7: request`;
 	const beside = (drawing: string) => `<div class="beside"><p>Details</p>${drawing}</div>`;
