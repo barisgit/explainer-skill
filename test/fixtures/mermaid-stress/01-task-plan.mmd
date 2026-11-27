@@ -1,0 +1,26 @@
+%% A release plan in the reported shape: eight tasks feed one, solid and dashed mixed, loose tasks, a rework loop.
+flowchart LR
+  spec[Write spec] --> api[Design API]
+  spec --> schema[Draft schema]
+  api --> client[Build client]
+  api --> server[Build server]
+  schema --> server
+  schema --> migrate[Write migrations]
+  server --> tests[Integration tests]
+  client --> tests
+  migrate --> tests
+  tests --> review[Security review]
+  review -.-> server
+  spec --> docs[User docs]
+  api -.-> docs
+  client --> release[Release 2.0]
+  server --> release
+  migrate --> release
+  tests --> release
+  review --> release
+  docs -.-> release
+  perf[Load test] -.-> release
+  ops[Runbook] --> release
+  budget[Budget sign-off]
+  vendor[Vendor contract]
+  perf --> ops

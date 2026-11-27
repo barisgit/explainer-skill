@@ -1,0 +1,12 @@
+flowchart TD
+  gateway[API gateway] --> auth[Auth]
+  gateway --> users[Users]
+  gateway --> orders[Orders]
+  gateway --> billing[Billing]
+  gateway --> search[Search]
+  gateway --> media[Media]
+  gateway --> notify[Notifications]
+  gateway --> reports[Reports]
+  gateway --> admin[Admin]
+  orders --> billing
+  orders --> notify

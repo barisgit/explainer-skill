@@ -1,0 +1,10 @@
+flowchart LR
+  a[Sensor A] --> hub[Data hub]
+  b[Sensor B] --> hub
+  c[Sensor C] -.-> hub
+  d[Sensor D] ==> hub
+  e[Sensor E] -.-> hub
+  f[Sensor F] --> hub
+  g[Sensor G] -->|batch| hub
+  h[Sensor H] -.->|retry| hub
+  hub --> store[(Store)]

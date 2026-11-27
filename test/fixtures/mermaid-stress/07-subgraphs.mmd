@@ -1,0 +1,19 @@
+flowchart LR
+  subgraph edge [Edge]
+    lb[Load balancer] --> cdn[CDN]
+  end
+  subgraph app [App tier]
+    web[Web] --> apiS[API]
+    apiS --> jobs[Jobs]
+  end
+  subgraph data [Data tier]
+    db[(Primary DB)] --> replica[(Replica)]
+    cache[(Cache)]
+  end
+  lb --> web
+  cdn --> web
+  apiS --> db
+  apiS --> cache
+  jobs --> db
+  jobs -.-> replica
+  web -.-> cache
