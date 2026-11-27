@@ -28,10 +28,28 @@
 	/* Links are ink with a quiet underline, so the accent keeps its one meaning; a page rule --link: var(--accent) brings it back. */
 	--link: var(--ink);
 	--accent-ink: light-dark(#fff, #1b1208);
+	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
+	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
 	--ok: light-dark(#18744b, #5fcf99);
 	--bad: light-dark(#b3322a, #f2776b);
 	--warn: light-dark(#8a5a00, #e8b94a);
+	--warn-soft: color-mix(in oklab, var(--warn) 11%, var(--surface));
 	--info: light-dark(#345e8f, #9fbeed);
+	/* Series colours: muted inks, so colour shows only where the author puts the accent (var(--accent) on the finding). Each is
+	   --ink mixed into --bg, from 44% (3:1 on --bg, as an axis) to 84%, in the order that keeps neighbours furthest apart in
+	   lightness, the last beside the first as in a pie; lines also take a dash per slot (Chart and Plot), and touching fills a
+	   line in the tone under them, so several stay apart without hue, in both schemes and in print. */
+	--c1: color-mix(in oklab, var(--ink) 60%, var(--bg));
+	--c2: color-mix(in oklab, var(--ink) 84%, var(--bg));
+	--c3: color-mix(in oklab, var(--ink) 44%, var(--bg));
+	--c4: color-mix(in oklab, var(--ink) 68%, var(--bg));
+	--c5: color-mix(in oklab, var(--ink) 52%, var(--bg));
+	--c6: color-mix(in oklab, var(--ink) 76%, var(--bg));
+	/* The accent's three states, for marks: solid (--accent); hollow, its tint (--hollow) inside an accent outline; hatch, grey
+	   lines (--hatch) at 45 degrees every 6 px, which --hatch-fill draws as a background. */
+	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
+	--hatch: color-mix(in oklab, var(--ink) 60%, var(--bg));
+	--hatch-fill: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 6px);
 	/* Three text roles: display (headings have their own scale), text, and label: everything inside a figure or a control, captions, meta lines and navigation. Plot draws its text at the label's 13 px. */
 	--size-headline: clamp(2.1rem, 3.8vw, 3.4rem);
 	--size-display: clamp(1.48rem, 2.3vw, 2rem);
@@ -48,29 +66,6 @@
 	/* The tone under the current block: --bg on the page, --surface in a popover, --sunken in a band. Halos and split cells use it. */
 	--under: var(--bg);
 	--ease: cubic-bezier(0.25, 1, 0.5, 1);
-}
-/* Tokens mixed from the ones above, declared again on a .hero so they mix its own tones. A page that sets them itself (real
-   hues for categories) sets them on both: :root, .hero { --c1: ... }. */
-:root,
-.hero {
-	/* The soft tints derive from --accent and --warn, so a page that changes only --accent stays consistent. */
-	--accent-soft: color-mix(in oklab, var(--accent) 13%, var(--surface));
-	--warn-soft: color-mix(in oklab, var(--warn) 11%, var(--surface));
-	/* Series colours: muted inks, so colour shows only where the author puts the accent (var(--accent) on the finding). Each is
-	   --ink mixed into --bg, from 44% (3:1 on --bg, as an axis) to 84%, in the order that keeps neighbours furthest apart in
-	   lightness, the last beside the first as in a pie; lines also take a dash per slot (Chart and Plot), and touching fills a
-	   line in the tone under them, so several stay apart without hue, in both schemes and in print. */
-	--c1: color-mix(in oklab, var(--ink) 60%, var(--bg));
-	--c2: color-mix(in oklab, var(--ink) 84%, var(--bg));
-	--c3: color-mix(in oklab, var(--ink) 44%, var(--bg));
-	--c4: color-mix(in oklab, var(--ink) 68%, var(--bg));
-	--c5: color-mix(in oklab, var(--ink) 52%, var(--bg));
-	--c6: color-mix(in oklab, var(--ink) 76%, var(--bg));
-	/* The accent's three states, for marks: solid (--accent); hollow, its tint (--hollow) inside an accent outline; hatch, grey
-	   lines (--hatch) at 45 degrees every 6 px, which --hatch-fill draws as a background. */
-	--hollow: color-mix(in oklab, var(--accent) 18%, var(--bg));
-	--hatch: color-mix(in oklab, var(--ink) 60%, var(--bg));
-	--hatch-fill: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 6px);
 }
 :root[data-scheme="light"] {
 	color-scheme: light;

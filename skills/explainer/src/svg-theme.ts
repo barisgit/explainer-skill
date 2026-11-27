@@ -3,14 +3,11 @@ import { kitPath, readKitText } from "./kit.ts";
 const SCHEMES = ["light", "dark"] as const;
 type Scheme = (typeof SCHEMES)[number];
 
-/** The colour tokens of the theme's rules for `:root` (in its first part): the one place their values live, so a file sees what the page sees. */
+/** The colour tokens of the theme's `:root` block (in its first part): the one place their values live, so a file sees what the page sees. */
 function colourTokens(): string {
 	const css = readKitText(kitPath("theme.css")).replace(/\/\*[\s\S]*?\*\//g, "");
-	return [...css.matchAll(/([^{}]*)\{([^}]*)\}/g)]
-		.filter(([, selectors = ""]) =>
-			selectors.split(",").some((selector) => selector.trim() === ":root"),
-		)
-		.flatMap(([, , body = ""]) => body.split(";"))
+	return (/:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "")
+		.split(";")
 		.map((declaration) => declaration.trim())
 		.filter((declaration) => /^--.*(light-dark|color-mix)\(/.test(declaration))
 		.join(";");

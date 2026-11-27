@@ -1,5 +1,5 @@
 /* theme: quiet warm-paper house style; page shell, figures, controls, charts, diagrams, views, trees.
-   One loud thing per screen, the headline (or the page's one .hero figure); everything else is set in plain sentence case and recedes. Labels keep the case you write.
+   One loud thing per screen, the headline; everything else is set in plain sentence case and recedes. Labels keep the case you write.
    Three text roles: display, --size-text and --size-label (figures, controls, captions). Headings have their own scale:
    h1 at --size-headline, h2 at --size-display and h3 (a topic in a section) at 19px.
    Per topic, choose the accent (from the subject or a brand), dark enough for white text in light mode and light in dark mode
@@ -13,7 +13,7 @@
    (energy sources, parties) take real hues: --c1..--c6 on :root, as light-dark() pairs like the accent. A mark takes one of the
    accent's three states: solid, hollow (--hollow inside an accent outline) or hatch (--hatch lines at 45 degrees, --hatch-fill as
    a background), for done, planned and estimated, say.
-   Classes: page masthead meta label cols wide band beside minor | fig hero panel fig-visual stage bleed split chart mermaid schematic scroll dg |
+   Classes: page masthead meta label cols wide band beside minor | fig panel fig-visual stage bleed split chart mermaid schematic scroll dg |
    controls seg toggle field player btn reset | stats chip legend callout caveat procedure detail details tabs | rank compare num mark expand |
    view view-head back | tree tree-head (hierarchical records as nested <details>, number columns sized by --tree-cols under an
    optional head) | records (kit Records' block: its tree, table.compare and board) | toolbar (the row over a records section: a .seg view switch, <input
@@ -25,8 +25,6 @@
    <i class="hatch"></i> mark the accent's other two states.
    Figures: a .fig sits plain on the page with no fill or frame, its controls right above what they act on; .split is a row of
    columns divided by hairlines. .wide lets a .fig use up to 88rem on big screens, centred on the column, beside the contents rail too.
-   .hero sets the one figure carrying the page's answer on a dark navy panel in both schemes, its tokens resolving dark inside;
-   series hues of your own go on :root, .hero.
    Children of a .fig take padding-inline: var(--pad), 0 by default: set --pad on a .fig to inset them, and write
    padding: 1rem var(--pad) (or padding-block alone) on a child to keep it.
    Ink-on-white scans in <img> take class="ink" to blend into the background or class="paper" to stay a page; neither for photos.
