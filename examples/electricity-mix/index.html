@@ -621,7 +621,7 @@ figure:not([class]) > img {
 	background: var(--under);
 }
 
-/* theme part: charts, plots, Mermaid blocks, svg files per scheme, hand-built diagrams. */
+/* theme part: charts, plots, Mermaid blocks, schematics, svg files per scheme. */
 /* Charts (kit:echarts.js + kit:charts.js, or kit:plot.js): the element needs a height; the chart fills it. */
 .chart {
 	inline-size: 100%;
@@ -932,9 +932,9 @@ figure:not([class]) > img {
 	translate: var(--shift) 0;
 }
 
-/* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn with the renderer's private variables (--_line,
-   --_node-fill, ...), set here from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no
-   frame or surface of its own: it sits on the tone around it like a chart. */
+/* Mermaid blocks: pack renders each to an SVG (plus a phone copy, below) drawn by pele with its --pele-* colour variables, set
+   here from the kit's tokens, so a diagram follows light, dark and a page's own tokens. A diagram has no frame or surface of
+   its own: it sits on the tone around it like a chart, its nodes and groups unfilled. */
 .mermaid {
 	display: block;
 	margin: 1.5rem 0;
@@ -945,46 +945,93 @@ figure:not([class]) > img {
 .fig > .mermaid {
 	margin: 0;
 }
-/* The renderer fills edge-label boxes, hollow markers and end states with --bg: here the tone under the diagram, so a diagram in a
-   band or panel has no page-coloured boxes. */
+/* Text is currentColor, so a part a step marks takes the accent. pele masks lines under edge labels and lifelines under
+   activation bars with --pele-bg: here the tone under the diagram, so a diagram in a band or panel has no page-coloured boxes. */
 .mermaid > svg {
 	--_diagram-max: var(--mermaid-max, var(--_diagram-default-max));
-	--bg: var(--under);
-	--fg: var(--ink);
-	--_text: var(--ink);
-	--_text-sec: var(--muted);
-	--_text-muted: var(--muted);
-	--_text-faint: color-mix(in srgb, var(--muted) 70%, var(--under));
-	--_line: var(--muted);
-	--_arrow: var(--muted);
-	--_node-fill: transparent;
-	--_node-stroke: var(--rule-strong);
-	--_group-fill: transparent;
-	--_group-hdr: transparent;
-	--_inner-stroke: var(--rule);
-	--_key-badge: var(--sunken);
-	font-family: var(--font);
+	--pele-bg: var(--under);
+	--pele-fg: currentColor;
+	--pele-muted: var(--muted);
+	--pele-line: var(--muted);
+	--pele-surface: transparent;
+	--pele-surface-alt: transparent;
+	--pele-border: var(--rule-strong);
+	--pele-accent: var(--accent);
+	--pele-radius: var(--radius);
+	--pele-font: var(--font);
+	--pele-font-mono: var(--mono);
+	--pele-heading-weight: 600;
+	--pele-title-weight: 600;
+	--pele-series-1: var(--c1);
+	--pele-series-2: var(--c2);
+	--pele-series-3: var(--c3);
+	--pele-series-4: var(--c4);
+	--pele-series-5: var(--c5);
+	--pele-series-6: var(--c6);
+	--pele-series-7: var(--c1);
+	--pele-series-8: var(--c2);
 	overflow: visible;
 	/* Below this width the block scrolls to keep text at 10 px. */
 	min-width: var(--mermaid-min);
 }
+/* Activation bars and notes hide the lifelines behind them. */
+.mermaid > svg :is(.pele-activations, .pele-notes) {
+	fill: var(--under);
+}
+.mermaid > svg .pele-edge-label {
+	color: var(--muted);
+}
+/* Lifelines are dashed, so the messages across them read first; a state diagram's start and end dots are in ink. */
+.mermaid > svg .pele-lifeline {
+	stroke-dasharray: 4 4;
+}
+.mermaid > svg :is(.pele-state-start, .pele-state-end) > circle:last-child {
+	fill: currentColor;
+}
+.mermaid > svg .pele-state-end > circle:first-child {
+	stroke: currentColor;
+}
+/* Roles: :::info (and ok, warn, bad) tint a node and colour its outline and label from the kit's tokens. An author's classDef
+   or style for the node is written on its shapes and wins. */
+.mermaid > svg .pele-node:is(.info, .ok, .warn, .bad) {
+	--_role: var(--info);
+	color: color-mix(in srgb, var(--_role) 40%, var(--ink));
+}
+.mermaid > svg .pele-node.ok {
+	--_role: var(--ok);
+}
+.mermaid > svg .pele-node.warn {
+	--_role: var(--warn);
+}
+.mermaid > svg .pele-node.bad {
+	--_role: var(--bad);
+}
+.mermaid
+	> svg
+	.pele-node:is(.info, .ok, .warn, .bad)
+	> :is(rect, polygon, circle, ellipse, path):not(
+		:is(.is-lit, .is-now, [data-kit-state][data-state~="now"]) > *
+	) {
+	fill: color-mix(in srgb, var(--_role) 14%, var(--under));
+	stroke: var(--_role);
+}
 /* An edge label's box masks the line under it, so a dimmed label dims by colour, its text mixed toward the tone as far as the
-   other parts fade: a faded mask would let the line strike through the text. */
+   other parts fade: a faded mask would let the line strike through the text. A lit edge's arrowhead takes the accent with it. */
 .mermaid
 	> svg.has-lit
-	.edge-label[data-ref]:not(
+	.pele-edge-label[data-ref]:not(
 		.is-lit,
 		[data-kit-state][data-state~="not-yet"],
 		[data-live] [data-step]:not(.is-on)
 	) {
-	--_text-sec: color-mix(in srgb, var(--muted) calc(var(--_dim) * 100%), var(--bg));
+	color: color-mix(in srgb, var(--muted) calc(var(--_dim) * 100%), var(--under));
 	opacity: 1;
 }
-.mermaid > svg .activation {
-	fill: var(--bg);
-}
-.mermaid > svg .mono {
-	font-family: var(--mono);
+.mermaid
+	> svg
+	:is(.is-lit, .is-now, [data-kit-state][data-state~="now"])
+	> .pele-marker[stroke="none"] {
+	fill: var(--accent);
 }
 /* A flowchart or state diagram too wide for a phone comes with a copy laid out across it (svg[data-phone]), shown on phones in
    its place. */
@@ -1146,6 +1193,7 @@ figure:not([class]) > img {
 	}
 }
 
+/* theme part: hand-built diagram panels (.dg). */
 /* Diagram panels: build the svg at the container's pixel width (viewBox = that width) so text stays 1:1 */
 .dg {
 	display: block;
