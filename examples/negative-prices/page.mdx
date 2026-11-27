@@ -31,7 +31,7 @@ Some plants lose less by paying than by stopping: subsidised wind and solar whos
 
 ## How far below zero
 
-Most negative hours are shallow: of the {depthTotal.toLocaleString("en")} negative hours since 2019, about 60% sit within 5 EUR/MWh of zero. Deep spikes are rare: the lowest hour, −500 EUR/MWh on 2 July 2023, is the auction's floor at the time.
+Most negative hours are shallow: of the {depthTotal.toLocaleString("en")} negative hours since 2019, about 60% sit within 5 EUR/MWh of zero. Deep spikes are rare: the lowest hour, −500 EUR/MWh on 2 July 2023, is the day-ahead auction's harmonised minimum clearing price in force then ([ACER Decision 01/2023](https://www.acer.europa.eu/sites/default/files/documents/Individual%20Decisions/ACER%20Decision%2001-2023%20on%20HMMCP%20SDAC.pdf), recital 82).
 
 <Plot label="Negative hours since 2019 by price range" height="18rem" option={{ categories: depthNames, series: [{ name: "Hours", type: "bar", data: depth.map((d) => d.n), label: true }], y: { name: "hours" } }} />
 
