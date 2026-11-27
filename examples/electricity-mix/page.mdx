@@ -11,13 +11,13 @@ import "./colours.css";
 
 # Change in world electricity generation, by source
 
-Wind and solar added {fmt(WS)} TWh in {Y1}. Total generation added {fmt(TOTAL)} TWh. World electricity generation, change on the year before in TWh, from Our World in Data (Ember and the Energy Institute).
+Not yet worldwide: wind and solar added {fmt(WS)} TWh in {Y1}, {Math.round((WS / TOTAL) * 100)}% of the world's {fmt(TOTAL)} TWh growth, and coal still grew {fmt(COAL)} TWh. Each bar is a year's change on the year before, from Our World in Data (Ember and the Energy Institute).
 
 <Opening />
 
 ## By source
 
-{OTHERS.slice(0, 3).map((s, i) => (i ? s.name.toLowerCase() : s.name)).join(", ").replace(/, ([^,]+)$/, " and $1")} supplied most of the other {fmt(REST)} TWh. Coal grew {fmt(COAL)}.
+{OTHERS.slice(0, 3).map((s, i) => (i ? s.name.toLowerCase() : s.name)).join(", ").replace(/, ([^,]+)$/, " and $1")} supplied most of the other {fmt(REST)} TWh.
 
 <Plot
 	height="22rem"
