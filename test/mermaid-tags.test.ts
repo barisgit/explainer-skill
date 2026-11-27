@@ -144,14 +144,14 @@ test("native node roles tint both copies, follow the theme picker and local toke
 				textReadable: true,
 				edgesNeutral: true,
 				unassignedPlain: true,
-				strokes: ["53,96,156", "138,90,0", "138,90,0", "24,116,75", "179,50,42"],
+				strokes: ["52,94,143", "138,90,0", "138,90,0", "24,116,75", "179,50,42"],
 			},
 			dark: { textReadable: true, edgesNeutral: true, unassignedPlain: true },
 			override: { textReadable: true },
 			tintChanges: true,
 			tag: "2, hybrid inverter",
 		});
-		expect(looks).toHaveProperty("dark.strokes.0", "143,178,232");
+		expect(looks).toHaveProperty("dark.strokes.0", "159,190,237");
 		expect(looks).toHaveProperty("override.strokes.0", "233,139,206");
 	}
 }, 30_000);
